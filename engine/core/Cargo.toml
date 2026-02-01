@@ -23,3 +23,7 @@ harness = false
 [[bench]]
 name = "entity_benches"
 harness = false
+
+[[bench]]
+name = "query_benches"
+harness = false

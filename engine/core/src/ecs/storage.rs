@@ -255,6 +255,15 @@ impl<T: Component> SparseSet<T> {
         self.dense.reserve(additional);
         self.components.reserve(additional);
     }
+
+    /// Get entity at a specific dense index
+    ///
+    /// This allows O(1) indexed iteration instead of using nth() which is O(n).
+    /// Returns None if the index is out of bounds.
+    #[inline]
+    pub(crate) fn get_dense_entity(&self, index: usize) -> Option<Entity> {
+        self.dense.get(index).copied()
+    }
 }
 
 impl<T: Component> Default for SparseSet<T> {
