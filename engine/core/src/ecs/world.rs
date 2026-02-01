@@ -39,7 +39,7 @@ pub struct World {
     /// Entity allocator
     entities: EntityAllocator,
     /// Component storage (TypeId → type-erased SparseSet)
-    components: HashMap<TypeId, Box<dyn Any>>,
+    pub(crate) components: HashMap<TypeId, Box<dyn Any>>,
     /// Component metadata for debugging
     descriptors: HashMap<TypeId, ComponentDescriptor>,
 }
