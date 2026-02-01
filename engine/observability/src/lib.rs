@@ -35,6 +35,7 @@
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
 
+pub mod admin;
 pub mod budgets;
 pub mod metrics;
 
