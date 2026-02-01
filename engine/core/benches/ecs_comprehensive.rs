@@ -65,21 +65,17 @@ fn bench_entity_spawning(c: &mut Criterion) {
     for count in [100, 1_000, 10_000, 100_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                b.iter_batched(
-                    || World::new(),
-                    |mut world| {
-                        for _ in 0..count {
-                            black_box(world.spawn());
-                        }
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            b.iter_batched(
+                || World::new(),
+                |mut world| {
+                    for _ in 0..count {
+                        black_box(world.spawn());
+                    }
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -91,25 +87,21 @@ fn bench_entity_spawning_with_components(c: &mut Criterion) {
     for count in [100, 1_000, 10_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                b.iter_batched(
-                    || World::new(),
-                    |mut world| {
-                        for i in 0..count {
-                            let entity = world.spawn();
-                            world.add(entity, Transform::default());
-                            world.add(entity, Velocity { x: i as f32, y: 0.0, z: 0.0 });
-                            world.add(entity, Health { current: 100.0, max: 100.0 });
-                            black_box(entity);
-                        }
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            b.iter_batched(
+                || World::new(),
+                |mut world| {
+                    for i in 0..count {
+                        let entity = world.spawn();
+                        world.add(entity, Transform::default());
+                        world.add(entity, Velocity { x: i as f32, y: 0.0, z: 0.0 });
+                        world.add(entity, Health { current: 100.0, max: 100.0 });
+                        black_box(entity);
+                    }
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -126,28 +118,24 @@ fn bench_iterate_single_component(c: &mut Criterion) {
     for count in [1_000, 10_000, 100_000, 1_000_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                // Setup: Create world with entities
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, 0.0, 0.0);
-                    world.add(entity, transform);
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            // Setup: Create world with entities
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, 0.0, 0.0);
+                world.add(entity, transform);
+            }
 
-                b.iter(|| {
-                    let mut sum = 0.0f32;
-                    for (_entity, transform) in world.query::<&Transform>() {
-                        sum += black_box(transform.position.x);
-                    }
-                    black_box(sum);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut sum = 0.0f32;
+                for (_entity, transform) in world.query::<&Transform>() {
+                    sum += black_box(transform.position.x);
+                }
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
@@ -159,32 +147,24 @@ fn bench_iterate_two_components(c: &mut Criterion) {
     for count in [1_000, 10_000, 100_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, 0.0, 0.0);
-                    world.add(entity, transform);
-                    world.add(entity, Velocity {
-                        x: 1.0,
-                        y: 0.0,
-                        z: 0.0,
-                    });
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, 0.0, 0.0);
+                world.add(entity, transform);
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            }
 
-                b.iter(|| {
-                    let mut sum = 0.0f32;
-                    for (_entity, (transform, velocity)) in world.query::<(&Transform, &Velocity)>() {
-                        sum += black_box(transform.position.x + velocity.x);
-                    }
-                    black_box(sum);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut sum = 0.0f32;
+                for (_entity, (transform, velocity)) in world.query::<(&Transform, &Velocity)>() {
+                    sum += black_box(transform.position.x + velocity.x);
+                }
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
@@ -196,33 +176,26 @@ fn bench_iterate_four_components(c: &mut Criterion) {
     for count in [1_000, 10_000, 100_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    world.add(entity, Transform::default());
-                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
-                    world.add(entity, Health { current: 100.0, max: 100.0 });
-                    world.add(entity, Player { id: i as u32 });
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                world.add(entity, Transform::default());
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+                world.add(entity, Health { current: 100.0, max: 100.0 });
+                world.add(entity, Player { id: i as u32 });
+            }
 
-                b.iter(|| {
-                    let mut sum = 0.0f32;
-                    for (_entity, (_t, v, h, _p)) in world.query::<(
-                        &Transform,
-                        &Velocity,
-                        &Health,
-                        &Player,
-                    )>() {
-                        sum += black_box(v.x + h.current);
-                    }
-                    black_box(sum);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut sum = 0.0f32;
+                for (_entity, (_t, v, h, _p)) in
+                    world.query::<(&Transform, &Velocity, &Health, &Player)>()
+                {
+                    sum += black_box(v.x + h.current);
+                }
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
@@ -315,30 +288,26 @@ fn bench_query_filtering(c: &mut Criterion) {
     for count in [1_000, 10_000, 100_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("sparse_10_percent", count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    world.add(entity, Transform::default());
+        group.bench_with_input(BenchmarkId::new("sparse_10_percent", count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                world.add(entity, Transform::default());
 
-                    // Only 10% have Player component
-                    if i % 10 == 0 {
-                        world.add(entity, Player { id: i as u32 });
-                    }
+                // Only 10% have Player component
+                if i % 10 == 0 {
+                    world.add(entity, Player { id: i as u32 });
                 }
+            }
 
-                b.iter(|| {
-                    let mut found = 0;
-                    for (_entity, (_transform, _player)) in world.query::<(&Transform, &Player)>() {
-                        found += 1;
-                    }
-                    black_box(found);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut found = 0;
+                for (_entity, (_transform, _player)) in world.query::<(&Transform, &Player)>() {
+                    found += 1;
+                }
+                black_box(found);
+            });
+        });
     }
 
     group.finish();
@@ -353,21 +322,17 @@ fn bench_memory_per_entity(c: &mut Criterion) {
 
     // Target: ≤24 bytes per entity (Unity DOTS level)
     for count in [1_000, 10_000, 100_000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                b.iter(|| {
-                    let mut world = World::new();
-                    for _ in 0..count {
-                        let entity = world.spawn();
-                        black_box(entity);
-                    }
-                    // Memory usage measured by OS tools
-                    black_box(world);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            b.iter(|| {
+                let mut world = World::new();
+                for _ in 0..count {
+                    let entity = world.spawn();
+                    black_box(entity);
+                }
+                // Memory usage measured by OS tools
+                black_box(world);
+            });
+        });
     }
 
     group.finish();
@@ -415,7 +380,8 @@ fn bench_game_simulation(c: &mut Criterion) {
             let dt = 1.0 / 60.0;
 
             // Update positions
-            for (_entity, (transform, velocity)) in world.query_mut::<(&mut Transform, &Velocity)>() {
+            for (_entity, (transform, velocity)) in world.query_mut::<(&mut Transform, &Velocity)>()
+            {
                 transform.position.x += velocity.x * dt;
                 transform.position.y += velocity.y * dt;
                 transform.position.z += velocity.z * dt;

@@ -72,19 +72,15 @@ fn bench_radius_query_linear(c: &mut Criterion) {
 
         let world = create_grid_world(entity_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let results = world.spatial_query_radius_linear(
-                        black_box(Vec3::new(25.0, 25.0, 25.0)),
-                        black_box(20.0),
-                    );
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let results = world.spatial_query_radius_linear(
+                    black_box(Vec3::new(25.0, 25.0, 25.0)),
+                    black_box(20.0),
+                );
+                black_box(results);
+            });
+        });
     }
 
     group.finish();
@@ -98,19 +94,15 @@ fn bench_radius_query_bvh(c: &mut Criterion) {
 
         let world = create_grid_world(entity_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let results = world.spatial_query_radius_bvh(
-                        black_box(Vec3::new(25.0, 25.0, 25.0)),
-                        black_box(20.0),
-                    );
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let results = world.spatial_query_radius_bvh(
+                    black_box(Vec3::new(25.0, 25.0, 25.0)),
+                    black_box(20.0),
+                );
+                black_box(results);
+            });
+        });
     }
 
     group.finish();
@@ -123,25 +115,18 @@ fn bench_radius_query_grid(c: &mut Criterion) {
         group.throughput(Throughput::Elements(entity_count as u64));
 
         let world = create_grid_world(entity_count);
-        let config = SpatialGridConfig {
-            cell_size: 10.0,
-            entities_per_cell: 16,
-        };
+        let config = SpatialGridConfig { cell_size: 10.0, entities_per_cell: 16 };
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let results = world.spatial_query_radius_grid(
-                        black_box(Vec3::new(25.0, 25.0, 25.0)),
-                        black_box(20.0),
-                        black_box(config),
-                    );
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let results = world.spatial_query_radius_grid(
+                    black_box(Vec3::new(25.0, 25.0, 25.0)),
+                    black_box(20.0),
+                    black_box(config),
+                );
+                black_box(results);
+            });
+        });
     }
 
     group.finish();
@@ -155,16 +140,12 @@ fn bench_bvh_build(c: &mut Criterion) {
 
         let world = create_grid_world(entity_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let bvh = Bvh::build(black_box(&world));
-                    black_box(bvh);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let bvh = Bvh::build(black_box(&world));
+                black_box(bvh);
+            });
+        });
     }
 
     group.finish();
@@ -177,21 +158,14 @@ fn bench_grid_build(c: &mut Criterion) {
         group.throughput(Throughput::Elements(entity_count as u64));
 
         let world = create_grid_world(entity_count);
-        let config = SpatialGridConfig {
-            cell_size: 10.0,
-            entities_per_cell: 16,
-        };
+        let config = SpatialGridConfig { cell_size: 10.0, entities_per_cell: 16 };
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let grid = SpatialGrid::build(black_box(&world), black_box(config));
-                    black_box(grid);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let grid = SpatialGrid::build(black_box(&world), black_box(config));
+                black_box(grid);
+            });
+        });
     }
 
     group.finish();
@@ -205,20 +179,16 @@ fn bench_raycast_linear(c: &mut Criterion) {
 
         let world = create_grid_world(entity_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let hits = world.spatial_raycast_linear(
-                        black_box(Vec3::new(-10.0, 25.0, 25.0)),
-                        black_box(Vec3::new(1.0, 0.0, 0.0)),
-                        black_box(1000.0),
-                    );
-                    black_box(hits);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let hits = world.spatial_raycast_linear(
+                    black_box(Vec3::new(-10.0, 25.0, 25.0)),
+                    black_box(Vec3::new(1.0, 0.0, 0.0)),
+                    black_box(1000.0),
+                );
+                black_box(hits);
+            });
+        });
     }
 
     group.finish();
@@ -232,20 +202,16 @@ fn bench_raycast_bvh(c: &mut Criterion) {
 
         let world = create_grid_world(entity_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let hits = world.spatial_raycast_bvh(
-                        black_box(Vec3::new(-10.0, 25.0, 25.0)),
-                        black_box(Vec3::new(1.0, 0.0, 0.0)),
-                        black_box(1000.0),
-                    );
-                    black_box(hits);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            b.iter(|| {
+                let hits = world.spatial_raycast_bvh(
+                    black_box(Vec3::new(-10.0, 25.0, 25.0)),
+                    black_box(Vec3::new(1.0, 0.0, 0.0)),
+                    black_box(1000.0),
+                );
+                black_box(hits);
+            });
+        });
     }
 
     group.finish();
@@ -259,23 +225,17 @@ fn bench_bvh_reuse(c: &mut Criterion) {
 
         let world = create_grid_world(entity_count);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                // Build BVH once
-                let bvh = Bvh::build(&world);
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            // Build BVH once
+            let bvh = Bvh::build(&world);
 
-                b.iter(|| {
-                    // Reuse the BVH for multiple queries
-                    let results = bvh.query_radius(
-                        black_box(Vec3::new(25.0, 25.0, 25.0)),
-                        black_box(20.0),
-                    );
-                    black_box(results);
-                });
-            },
-        );
+            b.iter(|| {
+                // Reuse the BVH for multiple queries
+                let results =
+                    bvh.query_radius(black_box(Vec3::new(25.0, 25.0, 25.0)), black_box(20.0));
+                black_box(results);
+            });
+        });
     }
 
     group.finish();
@@ -288,28 +248,19 @@ fn bench_grid_reuse(c: &mut Criterion) {
         group.throughput(Throughput::Elements(entity_count as u64));
 
         let world = create_grid_world(entity_count);
-        let config = SpatialGridConfig {
-            cell_size: 10.0,
-            entities_per_cell: 16,
-        };
+        let config = SpatialGridConfig { cell_size: 10.0, entities_per_cell: 16 };
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            &entity_count,
-            |b, _| {
-                // Build grid once
-                let grid = SpatialGrid::build(&world, config);
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), &entity_count, |b, _| {
+            // Build grid once
+            let grid = SpatialGrid::build(&world, config);
 
-                b.iter(|| {
-                    // Reuse the grid for multiple queries
-                    let results = grid.query_radius(
-                        black_box(Vec3::new(25.0, 25.0, 25.0)),
-                        black_box(20.0),
-                    );
-                    black_box(results);
-                });
-            },
-        );
+            b.iter(|| {
+                // Reuse the grid for multiple queries
+                let results =
+                    grid.query_radius(black_box(Vec3::new(25.0, 25.0, 25.0)), black_box(20.0));
+                black_box(results);
+            });
+        });
     }
 
     group.finish();

@@ -84,9 +84,7 @@ impl FrameSyncObjects {
         let image_available_semaphore = unsafe {
             device.create_semaphore(&semaphore_info, None)
         }
-        .map_err(|e| SyncError::CreationFailed {
-            details: format!("Failed to create image_available semaphore: {}", e),
-        })?;
+        .map_err(|e| SyncError::creationfailed(format!("Failed to create image_available semaphore: {}", e)))?;
 
         let render_finished_semaphore = unsafe {
             device.create_semaphore(&semaphore_info, None)
@@ -94,9 +92,7 @@ impl FrameSyncObjects {
         .map_err(|e| {
             // Clean up first semaphore on error
             unsafe { device.destroy_semaphore(image_available_semaphore, None) };
-            SyncError::CreationFailed {
-                details: format!("Failed to create render_finished semaphore: {}", e),
-            }
+            SyncError::creationfailed(format!("Failed to create render_finished semaphore: {}", e))
         })?;
 
         // Create fence in signaled state (first frame doesn't wait)
@@ -112,9 +108,7 @@ impl FrameSyncObjects {
                 device.destroy_semaphore(image_available_semaphore, None);
                 device.destroy_semaphore(render_finished_semaphore, None);
             }
-            SyncError::CreationFailed {
-                details: format!("Failed to create fence: {}", e),
-            }
+            SyncError::creationfailed(format!("Failed to create fence: {}", e))
         })?;
 
         debug!(
@@ -155,9 +149,7 @@ impl FrameSyncObjects {
         unsafe {
             device.wait_for_fences(&[self.in_flight_fence], true, timeout_ns)
         }
-        .map_err(|e| SyncError::WaitFailed {
-            details: format!("vkWaitForFences failed: {}", e),
-        })
+        .map_err(|e| SyncError::waitfailed(format!("vkWaitForFences failed: {}", e)))
     }
 
     /// Reset the in-flight fence
@@ -182,9 +174,7 @@ impl FrameSyncObjects {
         unsafe {
             device.reset_fences(&[self.in_flight_fence])
         }
-        .map_err(|e| SyncError::ResetFailed {
-            details: format!("vkResetFences failed: {}", e),
-        })
+        .map_err(|e| SyncError::resetfailed(format!("vkResetFences failed: {}", e)))
     }
 
     /// Get the image available semaphore handle
@@ -258,9 +248,7 @@ mod tests {
 
     #[test]
     fn test_sync_error_display() {
-        let err = SyncError::CreationFailed {
-            details: "test error".to_string(),
-        };
+        let err = SyncError::creationfailed("test error".to_string());
         let msg = err.to_string();
         assert!(msg.contains("CreationFailed") || msg.contains("test error"));
     }

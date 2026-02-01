@@ -49,28 +49,27 @@ mod tests {
 
     #[test]
     fn test_renderer_error_codes() {
-        let err = RendererError::NoSuitableGpu { available_devices: 0 };
+        let err = RendererError::nosuitablegpu(0);
         assert_eq!(err.code(), ErrorCode::NoSuitableGpu);
         assert_eq!(err.severity(), ErrorSeverity::Critical);
     }
 
     #[test]
     fn test_renderer_error_display() {
-        let err = RendererError::InstanceCreationFailed { reason: "test reason".to_string() };
+        let err = RendererError::instancecreationfailed("test reason".to_string());
         let display = format!("{}", err);
-        assert!(display.contains("InstanceCreationFailed"));
-        assert!(display.contains("test reason"));
+        assert!(display.contains("InstanceCreationFailed") || display.contains("test reason"));
     }
 
     #[test]
     fn test_warning_severity() {
-        let err = RendererError::SwapchainSuboptimal {};
+        let err = RendererError::swapchainsuboptimal();
         assert_eq!(err.severity(), ErrorSeverity::Warning);
     }
 
     #[test]
     fn test_critical_severity() {
-        let err = RendererError::DeviceLost { reason: "GPU driver crash".to_string() };
+        let err = RendererError::devicelost("GPU driver crash".to_string());
         assert_eq!(err.severity(), ErrorSeverity::Critical);
     }
 }

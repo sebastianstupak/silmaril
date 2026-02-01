@@ -179,6 +179,11 @@ fn integration_cross_platform_path_handling() {
         // Normalized path should be valid
         assert!(normalized.as_os_str().len() > 0);
 
+        // Create parent directories if they don't exist
+        if let Some(parent) = normalized.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+
         // Test file operations with normalized path
         let test_data = b"cross-platform test";
         fs_backend.write_file(&normalized, test_data).expect("Failed to write with normalized path");

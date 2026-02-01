@@ -335,14 +335,16 @@ impl EntityAllocator {
             .iter()
             .enumerate()
             .filter_map(move |(id, &generation)| {
-                let entity = Entity {
-                    id: id as u32,
-                    generation,
-                };
-                if self.is_alive(entity) {
-                    Some(entity)
-                } else {
+                let id_u32 = id as u32;
+                // If ID is in free list, the entity is dead
+                if self.free_list.contains(&id_u32) {
                     None
+                } else {
+                    // Entity is alive, return it
+                    Some(Entity {
+                        id: id_u32,
+                        generation,
+                    })
                 }
             })
     }

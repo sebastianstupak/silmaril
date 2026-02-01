@@ -55,73 +55,26 @@ fn create_mixed_world(entity_count: usize) -> World {
     // 50% have all components (players/NPCs)
     for i in 0..entity_count / 2 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
         world.add(entity, Health { current: 100.0, max: 100.0 });
         world.add(entity, Transform::identity());
-        world.add(
-            entity,
-            Renderable {
-                mesh_id: i as u32 % 10,
-                material_id: i as u32 % 5,
-            },
-        );
+        world.add(entity, Renderable { mesh_id: i as u32 % 10, material_id: i as u32 % 5 });
     }
 
     // 30% have Position + Renderable only (static objects)
     for i in entity_count / 2..(entity_count * 8) / 10 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
         world.add(entity, Transform::identity());
-        world.add(
-            entity,
-            Renderable {
-                mesh_id: i as u32 % 10,
-                material_id: i as u32 % 5,
-            },
-        );
+        world.add(entity, Renderable { mesh_id: i as u32 % 10, material_id: i as u32 % 5 });
     }
 
     // 20% have Position + Velocity only (particles)
     for i in (entity_count * 8) / 10..entity_count {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
     }
 
     world
@@ -186,55 +139,37 @@ fn bench_pgo_entity_churn(c: &mut Criterion) {
     let mut group = c.benchmark_group("pgo_entity_churn");
 
     for batch_size in [10, 100, 1_000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(batch_size),
-            batch_size,
-            |b, &size| {
-                b.iter_batched(
-                    || {
-                        let mut world = World::new();
-                        world.register::<Position>();
-                        world.register::<Velocity>();
-                        world.register::<Health>();
-                        world
-                    },
-                    |mut world| {
-                        // Spawn entities
-                        let entities: Vec<_> = (0..size)
-                            .map(|i| {
-                                let entity = world.spawn();
-                                world.add(
-                                    entity,
-                                    Position {
-                                        x: i as f32,
-                                        y: 0.0,
-                                        z: 0.0,
-                                    },
-                                );
-                                world.add(
-                                    entity,
-                                    Velocity {
-                                        x: 1.0,
-                                        y: 0.0,
-                                        z: 0.0,
-                                    },
-                                );
-                                world.add(entity, Health { current: 100.0, max: 100.0 });
-                                entity
-                            })
-                            .collect();
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), batch_size, |b, &size| {
+            b.iter_batched(
+                || {
+                    let mut world = World::new();
+                    world.register::<Position>();
+                    world.register::<Velocity>();
+                    world.register::<Health>();
+                    world
+                },
+                |mut world| {
+                    // Spawn entities
+                    let entities: Vec<_> = (0..size)
+                        .map(|i| {
+                            let entity = world.spawn();
+                            world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+                            world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+                            world.add(entity, Health { current: 100.0, max: 100.0 });
+                            entity
+                        })
+                        .collect();
 
-                        // Despawn half
-                        for entity in entities.iter().step_by(2) {
-                            world.despawn(*entity);
-                        }
+                    // Despawn half
+                    for entity in entities.iter().step_by(2) {
+                        world.despawn(*entity);
+                    }
 
-                        black_box(world);
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+                    black_box(world);
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -301,22 +236,8 @@ fn bench_pgo_component_operations(c: &mut Criterion) {
             |(mut world, entities)| {
                 // Add components
                 for entity in &entities {
-                    world.add(
-                        *entity,
-                        Position {
-                            x: 1.0,
-                            y: 2.0,
-                            z: 3.0,
-                        },
-                    );
-                    world.add(
-                        *entity,
-                        Velocity {
-                            x: 1.0,
-                            y: 0.0,
-                            z: 0.0,
-                        },
-                    );
+                    world.add(*entity, Position { x: 1.0, y: 2.0, z: 3.0 });
+                    world.add(*entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
                 }
 
                 // Remove components from half

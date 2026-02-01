@@ -71,26 +71,22 @@ fn bench_world_serialization(c: &mut Criterion) {
     for count in [100, 1_000, 10_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("full_snapshot", count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, i as f32, 0.0);
-                    world.add(entity, transform);
-                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
-                    world.add(entity, Health { current: 100.0, max: 100.0 });
-                }
+        group.bench_with_input(BenchmarkId::new("full_snapshot", count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, i as f32, 0.0);
+                world.add(entity, transform);
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+                world.add(entity, Health { current: 100.0, max: 100.0 });
+            }
 
-                b.iter(|| {
-                    let state = WorldState::snapshot(black_box(&world));
-                    black_box(state);
-                });
-            },
-        );
+            b.iter(|| {
+                let state = WorldState::snapshot(black_box(&world));
+                black_box(state);
+            });
+        });
     }
 
     group.finish();
@@ -103,30 +99,26 @@ fn bench_world_deserialization(c: &mut Criterion) {
     for count in [100, 1_000, 10_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("full_snapshot", count),
-            count,
-            |b, &count| {
-                // Setup: Create serialized world state
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, i as f32, 0.0);
-                    world.add(entity, transform);
-                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
-                    world.add(entity, Health { current: 100.0, max: 100.0 });
-                }
+        group.bench_with_input(BenchmarkId::new("full_snapshot", count), count, |b, &count| {
+            // Setup: Create serialized world state
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, i as f32, 0.0);
+                world.add(entity, transform);
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+                world.add(entity, Health { current: 100.0, max: 100.0 });
+            }
 
-                let serialized_state = WorldState::snapshot(&world);
+            let serialized_state = WorldState::snapshot(&world);
 
-                b.iter(|| {
-                    let mut new_world = World::new();
-                    serialized_state.restore(&mut new_world);
-                    black_box(new_world);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut new_world = World::new();
+                serialized_state.restore(&mut new_world);
+                black_box(new_world);
+            });
+        });
     }
 
     group.finish();
@@ -143,31 +135,27 @@ fn bench_serialization_roundtrip(c: &mut Criterion) {
     for count in [100, 1_000, 10_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, i as f32, 0.0);
-                    world.add(entity, transform);
-                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, i as f32, 0.0);
+                world.add(entity, transform);
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            }
 
-                b.iter(|| {
-                    // Serialize
-                    let state = WorldState::snapshot(black_box(&world));
+            b.iter(|| {
+                // Serialize
+                let state = WorldState::snapshot(black_box(&world));
 
-                    // Deserialize
-                    let mut new_world = World::new();
-                    state.restore(&mut new_world);
+                // Deserialize
+                let mut new_world = World::new();
+                state.restore(&mut new_world);
 
-                    black_box(new_world);
-                });
-            },
-        );
+                black_box(new_world);
+            });
+        });
     }
 
     group.finish();
@@ -184,26 +172,22 @@ fn bench_yaml_serialization(c: &mut Criterion) {
     for count in [10, 100, 1_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, i as f32, 0.0);
-                    world.add(entity, transform);
-                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, i as f32, 0.0);
+                world.add(entity, transform);
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            }
 
-                b.iter(|| {
-                    let state = WorldState::snapshot(black_box(&world));
-                    let yaml = serde_yaml::to_string(&state).unwrap();
-                    black_box(yaml);
-                });
-            },
-        );
+            b.iter(|| {
+                let state = WorldState::snapshot(black_box(&world));
+                let yaml = serde_yaml::to_string(&state).unwrap();
+                black_box(yaml);
+            });
+        });
     }
 
     group.finish();
@@ -218,34 +202,30 @@ fn bench_serialized_size(c: &mut Criterion) {
 
     // Measure memory overhead of serialization
     for count in [100, 1_000, 10_000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for i in 0..count {
-                    let entity = world.spawn();
-                    let mut transform = Transform::default();
-                    transform.position = Vec3::new(i as f32, i as f32, 0.0);
-                    world.add(entity, transform);
-                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let mut world = World::new();
+            for i in 0..count {
+                let entity = world.spawn();
+                let mut transform = Transform::default();
+                transform.position = Vec3::new(i as f32, i as f32, 0.0);
+                world.add(entity, transform);
+                world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            }
 
-                let state = WorldState::snapshot(&world);
+            let state = WorldState::snapshot(&world);
 
-                b.iter(|| {
-                    // Measure bincode size
-                    let bincode_bytes = bincode::serialize(&state).unwrap();
-                    let bincode_size = bincode_bytes.len();
+            b.iter(|| {
+                // Measure bincode size
+                let bincode_bytes = bincode::serialize(&state).unwrap();
+                let bincode_size = bincode_bytes.len();
 
-                    // Measure YAML size (debug format)
-                    let yaml_string = serde_yaml::to_string(&state).unwrap();
-                    let yaml_size = yaml_string.len();
+                // Measure YAML size (debug format)
+                let yaml_string = serde_yaml::to_string(&state).unwrap();
+                let yaml_size = yaml_string.len();
 
-                    black_box((bincode_size, yaml_size));
-                });
-            },
-        );
+                black_box((bincode_size, yaml_size));
+            });
+        });
     }
 
     group.finish();
@@ -287,9 +267,4 @@ criterion_group!(
     targets = bench_yaml_serialization, bench_serialized_size
 );
 
-criterion_main!(
-    entity_serialization,
-    world_serialization,
-    roundtrip,
-    format_comparison
-);
+criterion_main!(entity_serialization, world_serialization, roundtrip, format_comparison);

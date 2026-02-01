@@ -237,12 +237,12 @@ mod tests {
 
     #[test]
     fn test_window_error_display() {
-        let err = WindowError::InvalidDimensions { width: 0, height: 0 };
+        let err = WindowError::invaliddimensions(0, 0);
         // The define_error! macro generates error messages automatically
         let msg = err.to_string();
         assert!(msg.contains("InvalidDimensions") || msg.contains("Invalid"));
 
-        let err2 = WindowError::CreationFailed { details: "test error".to_string() };
+        let err2 = WindowError::creationfailed("test error".to_string());
         let msg2 = err2.to_string();
         assert!(msg2.contains("CreationFailed") || msg2.contains("test error"));
     }

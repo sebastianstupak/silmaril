@@ -12,21 +12,17 @@ fn bench_spawn_entities(c: &mut Criterion) {
 
     for count in [100, 1_000, 10_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                b.iter_batched(
-                    || World::new(),
-                    |mut world| {
-                        for _ in 0..count {
-                            black_box(world.spawn());
-                        }
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            b.iter_batched(
+                || World::new(),
+                |mut world| {
+                    for _ in 0..count {
+                        black_box(world.spawn());
+                    }
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -38,25 +34,21 @@ fn bench_iterate_entities(c: &mut Criterion) {
 
     for count in [1_000, 10_000, 100_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            count,
-            |b, &count| {
-                let mut world = World::new();
-                for _ in 0..count {
-                    let entity = world.spawn();
-                    world.add(entity, Transform::default());
-                }
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let mut world = World::new();
+            for _ in 0..count {
+                let entity = world.spawn();
+                world.add(entity, Transform::default());
+            }
 
-                b.iter(|| {
-                    let mut sum = 0;
-                    for (_entity, _transform) in world.query::<&Transform>() {
-                        sum += 1;
-                    }
-                    black_box(sum);
-                });
-            },
-        );
+            b.iter(|| {
+                let mut sum = 0;
+                for (_entity, _transform) in world.query::<&Transform>() {
+                    sum += 1;
+                }
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
