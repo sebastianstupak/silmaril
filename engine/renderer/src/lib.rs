@@ -43,10 +43,16 @@
 pub mod context;
 pub mod error;
 pub mod offscreen;
+pub mod render_pass;
+pub mod surface;
 pub mod swapchain;
+pub mod window;
 
 // Re-export commonly used types
 pub use context::{QueueFamilies, VulkanContext};
 pub use error::RendererError;
 pub use offscreen::OffscreenTarget;
+pub use render_pass::{RenderPass, RenderPassConfig, RenderPassError};
+pub use surface::{Surface, SurfaceError};
 pub use swapchain::Swapchain;
+pub use window::{Window, WindowConfig, WindowError, WindowEventType};
