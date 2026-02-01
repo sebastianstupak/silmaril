@@ -1,0 +1,14 @@
+[package]
+name = "mmorpg-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# agent-game-engine = { path = "../../../" }
+mmorpg-shared = { path = "../shared" }
+serde.workspace = true
+tokio.workspace = true
+
+# Add server-specific dependencies
+# sqlx for database access
+# redis for caching (optional)

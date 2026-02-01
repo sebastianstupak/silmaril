@@ -1,0 +1,10 @@
+[package]
+name = "moba-shared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# agent-game-engine = { path = "../../../" }
+serde.workspace = true
+
+# Add shared dependencies for heroes, abilities, protocol, etc.

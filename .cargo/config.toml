@@ -1,0 +1,79 @@
+[target.'cfg(all())']
+rustflags = ["-D", "warnings"]  # Deny warnings in CI
+
+[build]
+jobs = 4  # Parallel compilation
+
+# =============================================================================
+# Test Configuration
+# =============================================================================
+
+[test]
+# Enable nextest features if available
+# https://nexte.st/book/configuration.html
+
+# Environment variables for tests
+[env]
+RUST_BACKTRACE = { value = "1", relative = true }
+RUST_TEST_THREADS = { value = "4", relative = true }
+
+# Profile for running tests
+[profile.test]
+# Enable debug info for better error messages
+debug = true
+
+# Optimize dependencies even in test mode for faster execution
+opt-level = 1
+
+# =============================================================================
+# Benchmark Configuration
+# =============================================================================
+
+# Alias for running benchmarks
+[alias]
+bench-all = "bench --workspace"
+bench-core = "bench -p engine-core"
+bench-renderer = "bench -p engine-renderer"
+bench-networking = "bench -p engine-networking"
+
+# Coverage aliases
+cov = "llvm-cov --html --open"
+cov-all = "llvm-cov --all-features --workspace --html --open"
+cov-lcov = "llvm-cov --all-features --workspace --lcov --output-path lcov.info"
+
+# Test aliases for convenience
+test-all = "test --workspace --all-features"
+test-unit = "test --lib --all-features"
+test-integration = "test --tests --all-features"
+test-doc = "test --doc --all-features"
+test-quick = "test --lib --no-fail-fast"
+
+# =============================================================================
+# Lints
+# =============================================================================
+
+[lints.rust]
+unsafe_code = "forbid"  # No unsafe unless explicitly allowed
+missing_docs = "warn"   # Warn on missing public API docs
+
+[lints.clippy]
+# Deny these
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+todo = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+# Pedantic
+pedantic = "warn"
+nursery = "warn"
+
+# Allow some pedantic lints
+cast_precision_loss = "allow"
+module_name_repetitions = "allow"
+
+# Test-specific lints (allow in test code)
+[lints.clippy.tests]
+unwrap_used = "allow"
+expect_used = "allow"

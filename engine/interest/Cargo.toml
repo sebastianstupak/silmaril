@@ -1,0 +1,12 @@
+[package]
+name = "engine-interest"
+version = "0.1.0"
+edition = "2021"
+authors = ["Agent Game Engine Team"]
+
+[dependencies]
+engine-core = { path = "../core" }
+glam = "0.25"
+
+[dev-dependencies]
+criterion = "0.5"

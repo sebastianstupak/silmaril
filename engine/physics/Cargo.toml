@@ -1,0 +1,13 @@
+[package]
+name = "engine-physics"
+version = "0.1.0"
+edition = "2021"
+authors = ["Agent Game Engine Team"]
+
+[dependencies]
+rapier3d = "0.18"
+engine-core = { path = "../core" }
+glam = "0.25"
+
+[dev-dependencies]
+criterion = "0.5"

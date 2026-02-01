@@ -1,0 +1,51 @@
+[package]
+name = "agent_game_engine_server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Agent Game Engine Team"]
+description = "Server binary for Agent Game Engine"
+
+[dependencies]
+# Core engine
+engine-core = { path = "../../core" }
+engine-networking = { path = "../../networking" }
+
+# Macros
+engine-macros = { path = "../../macros" }
+
+# Math
+glam = { version = "0.29", features = ["serde"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Collections
+hashbrown = "0.14"
+
+[features]
+default = ["server"]
+server = []
+
+# Optional features
+metrics = []           # Enable Prometheus metrics
+health_checks = []     # Enable health check endpoints
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+[profile.dev]
+opt-level = 1  # Faster builds, still somewhat optimized

@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: mobaserver
+      POSTGRES_PASSWORD: mobapass
+      POSTGRES_DB: moba
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mobaserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  matchmaking:
+    build:
+      context: .
+      dockerfile: Dockerfile.matchmaking
+    environment:
+      DATABASE_URL: postgres://mobaserver:mobapass@postgres:5432/moba
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      DATABASE_URL: postgres://mobaserver:mobapass@postgres:5432/moba
+      REDIS_URL: redis://redis:6379
+      SERVER_PORT: 7778
+      MAX_PLAYERS: 10
+      TICK_RATE: 30
+      MATCHMAKING_ENABLED: "true"
+      RUST_LOG: info
+    ports:
+      - "7778:7778"
+      - "7778:7778/udp"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      matchmaking:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

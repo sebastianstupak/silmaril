@@ -1,0 +1,14 @@
+[package]
+name = "engine-renderer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Agent Game Engine Team"]
+
+[dependencies]
+ash = "0.38"
+vk-mem = "0.3"
+glam = "0.25"
+engine-core = { path = "../core" }
+
+[dev-dependencies]
+criterion = "0.5"

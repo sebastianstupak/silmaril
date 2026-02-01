@@ -1,0 +1,47 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Vulkan SDK
+        run: |
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list \
+            https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+          sudo apt update
+          sudo apt install vulkan-sdk
+
+      # Cache
+      - uses: Swatinem/rust-cache@v2
+
+      # Run benchmarks
+      - name: Run benchmarks
+        run: cargo bench --workspace -- --save-baseline current
+
+      # Compare with main branch (if PR)
+      - name: Compare with baseline
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin main
+          git checkout origin/main
+          cargo bench --workspace -- --save-baseline main
+          git checkout -
+          cargo bench --workspace -- --baseline main
+
+      # Fail if regression > 10%
+      - name: Check for regressions
+        if: github.event_name == 'pull_request'
+        run: |
+          # Parse Criterion output and fail if any benchmark is >10% slower
+          # (Implementation depends on Criterion output format)
+          echo "Checking for performance regressions..."

@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build Release Binaries
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: client-linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: client-windows-x64.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: client-macos-x64
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact: client-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Install platform dependencies
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install vulkan-sdk libxcb1-dev libx11-dev
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile VulkanSDK.exe
+          .\VulkanSDK.exe /S
+
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install molten-vk
+
+      # Build
+      - name: Build release
+        run: cargo build --release --bin client --target ${{ matrix.target }}
+
+      # Upload artifact
+      - name: Upload binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/client${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download all artifacts
+      - uses: actions/download-artifact@v3
+
+      # Create release
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            client-linux-x64/client
+            client-windows-x64.exe/client.exe
+            client-macos-x64/client
+            client-macos-arm64/client
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

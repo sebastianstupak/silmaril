@@ -1,0 +1,13 @@
+[package]
+name = "moba-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# agent-game-engine = { path = "../../../" }
+moba-shared = { path = "../shared" }
+serde.workspace = true
+tokio.workspace = true
+
+# Add client-specific dependencies
+# bevy or similar for rendering

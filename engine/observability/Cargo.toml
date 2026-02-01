@@ -1,0 +1,14 @@
+[package]
+name = "engine-observability"
+version = "0.1.0"
+edition = "2021"
+authors = ["Agent Game Engine Team"]
+
+[dependencies]
+tracy-client = { version = "0.17", optional = true }
+puffin = { version = "0.19", optional = true }
+
+[features]
+default = []
+tracy = ["tracy-client"]
+puffin = ["dep:puffin"]

@@ -1,0 +1,10 @@
+[package]
+name = "mmorpg-shared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# agent-game-engine = { path = "../../../" }
+serde.workspace = true
+
+# Add shared dependencies for protocol, entities, etc.

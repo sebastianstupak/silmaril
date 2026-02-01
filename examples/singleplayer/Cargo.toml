@@ -1,0 +1,12 @@
+[package]
+name = "singleplayer-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Add agent-game-engine dependency here
+# agent-game-engine = { path = "../../" }
+
+# Common game development dependencies
+# bevy = "0.12"
+# or similar ECS/game framework

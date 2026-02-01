@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python:*)",
+      "Bash(wc:*)",
+      "Bash(curl:*)",
+      "Bash(tree:*)",
+      "Bash(^d \")",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(cargo test:*)",
+      "Bash(timeout 60 cargo build:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

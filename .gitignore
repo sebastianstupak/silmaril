@@ -1,0 +1,198 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE - General
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# IDE - Additional editors
+.fleet/
+.zed/
+*.sublime-project
+*.sublime-workspace
+.helix/
+.lapce/
+
+# OS - macOS
+.DS_Store
+Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# OS - Windows
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# OS - Linux
+.directory
+.Trash-*
+
+# Build artifacts - General
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts - Platform-specific
+*.o
+*.a
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
+*.obj
+*.res
+*.out
+*.app
+*.dSYM/
+
+# Profiling - General
+*.prof
+perf.data*
+flamegraph.svg
+
+# Profiling - Tracy
+*.tracy
+tracy_*.json
+capture_*.tracy
+profiler_*.tracy
+
+# Test artifacts
+# Test outputs and results
+test-results/
+test-output/
+*.test
+*.testlog
+
+# Test snapshots
+snapshots/
+__snapshots__/
+.snapshots/
+
+# Test databases
+*.test.db
+*.test.sqlite
+*.test.sqlite3
+test_*.db
+
+# Test coverage data
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+
+# Benchmark results
+# Criterion output
+criterion/
+target/criterion/
+bench-results/
+
+# Saved baselines
+baseline/
+baselines/
+*.baseline
+
+# Benchmark data files
+*.bench
+benchmark_*.json
+
+# CI/CD artifacts
+# Build and test artifacts from CI
+.ci/
+.github/artifacts/
+ci-output/
+ci-results/
+
+# CI cache and temp files
+.ci-cache/
+.ci-tmp/
+
+# Documentation build artifacts
+# mdBook output
+book/
+docs/book/
+
+# Generated documentation
+target/doc/
+docs/generated/
+api-docs/
+
+# Rustdoc output
+rustdoc/
+
+# Other doc generators
+.docusaurus/
+.vuepress/dist/
+
+# Shader compiled outputs
+# SPIR-V compiled shaders
+*.spv
+*.spirv
+
+# Shader cache
+shader-cache/
+.shader-cache/
+*.shadercache
+
+# Generated shader files
+generated-shaders/
+*.generated.wgsl
+*.generated.glsl
+
+# Asset cache files
+# General asset caches
+.asset-cache/
+asset-cache/
+*.assetcache
+
+# Texture and model caches
+.texture-cache/
+.model-cache/
+*.texcache
+*.meshcache
+
+# Compressed asset caches
+*.astc
+*.ktx
+*.ktx2
+
+# Vulkan validation layers
+# Validation layer outputs
+vk_validation_*.txt
+vulkan_validation_*.log
+
+# Shader validation
+*.val
+validation/
+
+# Vulkan debug markers
+VkLayer_*.log
+
+# Assets (too large for git)
+assets/**/*.bin
+assets/**/*.pak
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+# Env files
+.env
+.env.local
+
+# Coverage
+lcov.info
+coverage/
+*.lcov
+tarpaulin-report.html

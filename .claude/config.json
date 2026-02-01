@@ -1,0 +1,247 @@
+{
+  "$schema": "https://claude.ai/schemas/config.json",
+  "name": "Agent Game Engine",
+  "version": "0.1.0",
+  "description": "Production-grade game engine optimized for AI agents with visual feedback loops, server-authoritative multiplayer, and cross-platform support",
+
+  "project": {
+    "root": ".",
+    "language": "rust",
+    "type": "game-engine",
+    "platforms": ["windows", "linux", "macos-x64", "macos-arm"]
+  },
+
+  "skills": {
+    "directory": ".claude/skills",
+    "enabled": true
+  },
+
+  "prompts": {
+    "directory": ".claude/prompts",
+    "custom": [
+      {
+        "name": "phase-guide",
+        "file": "phase-guide.md",
+        "description": "Guide through ROADMAP phases with context-aware assistance",
+        "triggers": ["phase", "roadmap", "task", "next step"]
+      },
+      {
+        "name": "code-review",
+        "file": "code-review.md",
+        "description": "Comprehensive code review against coding standards",
+        "triggers": ["review", "check code", "verify standards"]
+      }
+    ]
+  },
+
+  "hooks": {
+    "pre-commit": {
+      "script": ".claude/hooks/pre-commit.sh",
+      "enabled": true,
+      "blocking": true,
+      "timeout": 120,
+      "description": "Run cargo fmt, clippy before commit"
+    },
+    "post-test": {
+      "script": ".claude/hooks/post-test.sh",
+      "enabled": true,
+      "blocking": false,
+      "timeout": 60,
+      "description": "Update test metrics and coverage"
+    },
+    "pre-push": {
+      "script": ".claude/hooks/pre-push.sh",
+      "enabled": false,
+      "blocking": true,
+      "timeout": 300,
+      "description": "Run full test suite on all platforms"
+    }
+  },
+
+  "agents": {
+    "architect": {
+      "role": "System architecture and design decisions",
+      "context": [
+        "docs/architecture.md",
+        "docs/platform-abstraction.md",
+        "ROADMAP.md"
+      ],
+      "expertise": ["ECS design", "networking", "rendering", "cross-platform"],
+      "constraints": [
+        "Must maintain cross-platform compatibility",
+        "No unsafe code except FFI",
+        "Server-authoritative architecture required"
+      ]
+    },
+    "implementer": {
+      "role": "Code implementation following task specifications",
+      "context": [
+        "docs/rules/coding-standards.md",
+        "docs/testing-strategy.md",
+        "docs/tasks/*.md"
+      ],
+      "expertise": ["Rust", "Vulkan", "networking", "ECS"],
+      "constraints": [
+        "Follow coding-standards.md strictly",
+        "100% test coverage for new code",
+        "No println!/dbg!/eprintln!",
+        "All public APIs must be documented"
+      ]
+    },
+    "reviewer": {
+      "role": "Code review and quality assurance",
+      "context": [
+        "docs/rules/coding-standards.md",
+        "docs/performance-targets.md",
+        ".claude/prompts/code-review.md"
+      ],
+      "expertise": ["Code review", "performance", "security"],
+      "constraints": [
+        "Check for anti-patterns",
+        "Verify test coverage",
+        "Validate error handling",
+        "Ensure documentation completeness"
+      ]
+    },
+    "tester": {
+      "role": "Test strategy and implementation",
+      "context": [
+        "docs/testing-strategy.md",
+        "docs/performance-targets.md"
+      ],
+      "expertise": ["Unit testing", "integration testing", "benchmarking"],
+      "constraints": [
+        "Property-based tests for serialization",
+        "Platform-specific integration tests",
+        "Performance regression tests"
+      ]
+    }
+  },
+
+  "rules": {
+    "coding-standards": "docs/rules/coding-standards.md",
+    "enforce": [
+      "No println!, eprintln!, dbg! macros",
+      "Custom error types only (no anyhow/Box<dyn Error>)",
+      "No unsafe except in FFI layer",
+      "Platform abstraction required (no #[cfg] in business logic)",
+      "Rustfmt + Clippy must pass",
+      "All public APIs documented",
+      "Tests required for all new code"
+    ]
+  },
+
+  "lints": {
+    "rust": {
+      "clippy": {
+        "deny": [
+          "print_stdout",
+          "print_stderr",
+          "dbg_macro",
+          "unwrap_used",
+          "expect_used",
+          "panic"
+        ],
+        "warn": [
+          "missing_docs",
+          "missing_errors_doc",
+          "missing_panics_doc"
+        ]
+      },
+      "rustfmt": {
+        "config": "rustfmt.toml",
+        "check_on_save": true
+      }
+    }
+  },
+
+  "testing": {
+    "framework": "cargo test",
+    "coverage": {
+      "tool": "cargo-tarpaulin",
+      "target": 80,
+      "exclude": ["tests/*", "benches/*"]
+    },
+    "benchmarks": {
+      "tool": "criterion",
+      "directory": "benches"
+    },
+    "ci": {
+      "platforms": ["windows", "linux", "macos-x64", "macos-arm"],
+      "required_checks": [
+        "cargo fmt --check",
+        "cargo clippy -- -D warnings",
+        "cargo test --all-features",
+        "cargo doc --no-deps"
+      ]
+    }
+  },
+
+  "performance": {
+    "profiling": {
+      "tool": "tracy",
+      "enabled_in": "dev"
+    },
+    "targets": {
+      "client_fps": "60+",
+      "server_tps": "60",
+      "network_latency_overhead": "<5ms",
+      "memory_client": "<2GB",
+      "memory_server_1000_players": "<8GB"
+    }
+  },
+
+  "documentation": {
+    "format": "mdbook",
+    "api_docs": "rustdoc",
+    "required_sections": [
+      "Examples",
+      "Errors",
+      "Panics",
+      "Safety (for unsafe fn)"
+    ]
+  },
+
+  "workflow": {
+    "branch_naming": "<type>/<short-description>",
+    "commit_format": "conventional-commits",
+    "pr_template": ".github/pull_request_template.md"
+  },
+
+  "context": {
+    "always_include": [
+      "ROADMAP.md",
+      "docs/rules/coding-standards.md",
+      "docs/architecture.md"
+    ],
+    "phase_specific": {
+      "0": ["docs/tasks/phase0-*.md"],
+      "1": ["docs/tasks/phase1-*.md", "docs/ecs.md", "docs/rendering.md"],
+      "2": ["docs/tasks/phase2-*.md", "docs/networking.md"],
+      "3": ["docs/tasks/phase3-*.md", "docs/physics.md"],
+      "4": ["docs/tasks/phase4-*.md"],
+      "5": ["docs/tasks/phase5-*.md"]
+    }
+  },
+
+  "commands": {
+    "dev": "cargo run --bin dev-server",
+    "test": "cargo test --all-features",
+    "test-ci": "cargo test --all-features -- --test-threads=1",
+    "lint": "cargo clippy -- -D warnings",
+    "format": "cargo fmt",
+    "format-check": "cargo fmt --check",
+    "docs": "cargo doc --no-deps --open",
+    "bench": "cargo bench",
+    "build-release": "cargo build --release --all-features"
+  },
+
+  "preferences": {
+    "auto_format": true,
+    "auto_lint": true,
+    "suggest_tests": true,
+    "suggest_docs": true,
+    "check_performance": true,
+    "check_security": true
+  }
+}
