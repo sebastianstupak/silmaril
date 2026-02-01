@@ -190,21 +190,28 @@ impl Transform {
     /// Up vector is assumed to be (0, 1, 0).
     #[inline]
     pub fn look_at(&mut self, target: Vec3, up: Vec3) {
-        let forward = (target - self.position).normalize();
-        if forward.magnitude_squared() < 1e-6 {
+        // Check distance before normalizing (optimization: avoid expensive normalize if too close)
+        let direction = target - self.position;
+        let distance_sq = direction.magnitude_squared();
+        if distance_sq < 1e-6 {
             return; // Can't look at self
         }
 
-        let right = forward.cross(up).normalize();
-        if right.magnitude_squared() < 1e-6 {
+        let forward = direction * (1.0 / distance_sq.sqrt()); // Fast normalize using rsqrt
+
+        // Calculate right vector and check if forward/up are parallel
+        let right_unnorm = forward.cross(up);
+        let right_len_sq = right_unnorm.magnitude_squared();
+        if right_len_sq < 1e-6 {
             return; // Forward and up are parallel
         }
 
-        let up = right.cross(forward);
+        let right = right_unnorm * (1.0 / right_len_sq.sqrt()); // Fast normalize
+        let up_corrected = right.cross(forward); // Already normalized
 
-        // Build rotation matrix and convert to quaternion
-        // This is a simplified version; for production, use proper matrix->quat conversion
-        self.rotation = quat_from_forward_up(forward, up);
+        // Build rotation matrix directly (inlined for performance)
+        let mat = glam::Mat3::from_cols(right, up_corrected, -forward);
+        self.rotation = Quat::from_mat3(&mat);
         self.rebuild_affine();
     }
 }
@@ -213,19 +220,6 @@ impl Default for Transform {
     fn default() -> Self {
         Self::identity()
     }
-}
-
-/// Helper function to create a quaternion from forward and up vectors.
-/// Used internally by look_at().
-///
-/// Uses glam's optimized Mat3 -> Quat conversion instead of manual implementation.
-/// This reduces code by ~35 lines and provides 20-30% performance improvement.
-#[inline]
-fn quat_from_forward_up(forward: Vec3, up: Vec3) -> Quat {
-    let right = forward.cross(up).normalize();
-    let up = right.cross(forward);
-    let mat = glam::Mat3::from_cols(right, up, -forward);
-    Quat::from_mat3(&mat)
 }
 
 #[cfg(test)]

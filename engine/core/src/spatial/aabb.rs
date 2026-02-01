@@ -176,22 +176,33 @@ impl Aabb {
         direction: Vec3,
         max_distance: f32,
     ) -> Option<(f32, f32)> {
-        // Optimized slab method
-        let inv_dir = Vec3::new(
-            if direction.x != 0.0 { 1.0 / direction.x } else { f32::INFINITY },
-            if direction.y != 0.0 { 1.0 / direction.y } else { f32::INFINITY },
-            if direction.z != 0.0 { 1.0 / direction.z } else { f32::INFINITY },
-        );
+        // Fast slab method - optimized for common case (non-zero direction)
+        // Avoiding Vec3 allocation and conditionals for better performance
+        let inv_dir_x = 1.0 / direction.x;
+        let inv_dir_y = 1.0 / direction.y;
+        let inv_dir_z = 1.0 / direction.z;
 
-        let t1 = (self.min - origin) * inv_dir;
-        let t2 = (self.max - origin) * inv_dir;
+        // Calculate intersection parameters for each slab
+        let tx1 = (self.min.x - origin.x) * inv_dir_x;
+        let tx2 = (self.max.x - origin.x) * inv_dir_x;
+        let ty1 = (self.min.y - origin.y) * inv_dir_y;
+        let ty2 = (self.max.y - origin.y) * inv_dir_y;
+        let tz1 = (self.min.z - origin.z) * inv_dir_z;
+        let tz2 = (self.max.z - origin.z) * inv_dir_z;
 
-        let t_min = t1.min(t2);
-        let t_max = t1.max(t2);
+        // Find entry/exit for each axis (handles negative direction)
+        let tx_min = tx1.min(tx2);
+        let tx_max = tx1.max(tx2);
+        let ty_min = ty1.min(ty2);
+        let ty_max = ty1.max(ty2);
+        let tz_min = tz1.min(tz2);
+        let tz_max = tz1.max(tz2);
 
-        let t_enter = t_min.x.max(t_min.y).max(t_min.z);
-        let t_exit = t_max.x.min(t_max.y).min(t_max.z);
+        // Find overall entry and exit
+        let t_enter = tx_min.max(ty_min).max(tz_min);
+        let t_exit = tx_max.min(ty_max).min(tz_max);
 
+        // Check if intersection is valid
         if t_enter <= t_exit && t_exit >= 0.0 && t_enter <= max_distance {
             Some((t_enter.max(0.0), t_exit))
         } else {
