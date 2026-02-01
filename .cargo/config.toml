@@ -14,8 +14,8 @@ jobs = 4  # Parallel compilation
 
 # Environment variables for tests
 [env]
-RUST_BACKTRACE = { value = "1", relative = true }
-RUST_TEST_THREADS = { value = "4", relative = true }
+RUST_BACKTRACE = "1"
+RUST_TEST_THREADS = "4"
 
 # Profile for running tests
 [profile.test]
