@@ -12,4 +12,4 @@ pub mod serialization;
 pub mod platform;
 
 // Re-export commonly used types
-pub use ecs::{World, Entity, Component};
+pub use ecs::{Entity, EntityAllocator, Component, ComponentDescriptor, SparseSet};
