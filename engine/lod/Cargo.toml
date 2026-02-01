@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Agent Game Engine Team"]
 
 [dependencies]
-meshopt = "0.2"
+meshopt = "0.6"
 engine-core = { path = "../core" }
 glam = "0.25"
 
