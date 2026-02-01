@@ -5,16 +5,9 @@
 //! - UDP for real-time updates
 //! - State synchronization
 //! - Client prediction
+//!
+//! This crate is a placeholder. Implementation will follow Phase 2 tasks.
 
 #![warn(missing_docs)]
 
-pub mod protocol;
-pub mod tcp;
-pub mod udp;
-pub mod state_sync;
-pub mod prediction;
-
-// Re-export commonly used types
-pub use protocol::{Message, Packet};
-pub use tcp::Server;
-pub use udp::Client;
+// TODO: Implement based on docs/tasks/phase2-*.md

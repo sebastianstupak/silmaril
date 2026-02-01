@@ -5,13 +5,9 @@
 //! - LOD selection based on distance
 //! - Network LOD integration
 //! - Smooth transitions
+//!
+//! This crate is a placeholder. Implementation will follow Phase 3 tasks.
 
 #![warn(missing_docs)]
 
-pub mod generator;
-pub mod selector;
-pub mod network;
-
-// Re-export commonly used types
-pub use generator::LodGenerator;
-pub use selector::LodLevel;
+// TODO: Implement based on docs/tasks/phase3-lod-*.md

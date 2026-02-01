@@ -5,13 +5,9 @@
 //! - Frame profiling
 //! - External profiler integration (Tracy, Puffin)
 //! - Performance validation
+//!
+//! This crate is a placeholder. Implementation will follow Phase 4 tasks.
 
 #![warn(missing_docs)]
 
-pub mod profiler;
-pub mod metrics;
-pub mod overlay;
-
-// Re-export commonly used types
-pub use profiler::Profiler;
-pub use metrics::Metrics;
+// TODO: Implement based on docs/tasks/phase4-profiling-integration.md

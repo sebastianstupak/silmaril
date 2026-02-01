@@ -5,16 +5,9 @@
 //! - Mesh rendering with PBR materials
 //! - Forward+ lighting system
 //! - Frame capture capabilities
+//!
+//! This crate is a placeholder. Implementation will follow Phase 1 tasks.
 
 #![warn(missing_docs)]
 
-pub mod context;
-pub mod mesh;
-pub mod material;
-pub mod lighting;
-pub mod capture;
-
-// Re-export commonly used types
-pub use context::Renderer;
-pub use mesh::Mesh;
-pub use material::Material;
+// TODO: Implement based on docs/tasks/phase1-vulkan-*.md and phase1-*-rendering.md

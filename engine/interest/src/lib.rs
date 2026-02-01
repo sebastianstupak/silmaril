@@ -5,13 +5,9 @@
 //! - Interest area calculation
 //! - Priority-based updates
 //! - Bandwidth optimization
+//!
+//! This crate is a placeholder. Implementation will follow Phase 2-3 tasks.
 
 #![warn(missing_docs)]
 
-pub mod grid;
-pub mod priority;
-pub mod manager;
-
-// Re-export commonly used types
-pub use manager::InterestManager;
-pub use grid::Grid;
+// TODO: Implement based on docs/tasks/phase2-interest-basic.md and phase3-interest-advanced.md

@@ -5,13 +5,9 @@
 //! - Delta patching
 //! - Background updates
 //! - Safe installation with rollback
+//!
+//! This crate is a placeholder. Implementation will follow Phase 4 tasks.
 
 #![warn(missing_docs)]
 
-pub mod manager;
-pub mod downloader;
-pub mod patcher;
-pub mod installer;
-
-// Re-export commonly used types
-pub use manager::{UpdateManager, UpdateStatus};
+// TODO: Implement based on docs/tasks/phase4-auto-update.md

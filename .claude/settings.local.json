@@ -11,7 +11,8 @@
       "Bash(ls:*)",
       "Bash(cargo test:*)",
       "Bash(timeout 60 cargo build:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cargo check:*)"
     ]
   }
 }

@@ -5,15 +5,9 @@
 //! - Collision detection
 //! - Raycasting
 //! - Character controller
+//!
+//! This crate is a placeholder. Implementation will follow Phase 3 tasks.
 
 #![warn(missing_docs)]
 
-pub mod world;
-pub mod rigidbody;
-pub mod collider;
-pub mod raycast;
-
-// Re-export commonly used types
-pub use world::PhysicsWorld;
-pub use rigidbody::RigidBody;
-pub use collider::Collider;
+// TODO: Implement based on docs/tasks/phase3-physics.md
