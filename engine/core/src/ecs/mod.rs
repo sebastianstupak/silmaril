@@ -9,8 +9,10 @@
 pub mod entity;
 pub mod component;
 pub mod storage;
+pub mod world;
 
 // Re-export commonly used types
 pub use entity::{Entity, EntityAllocator};
 pub use component::{Component, ComponentDescriptor};
 pub use storage::SparseSet;
+pub use world::World;
