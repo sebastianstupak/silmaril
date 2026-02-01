@@ -76,7 +76,12 @@
       "Bash(wmic cpu get NumberOfCores,NumberOfLogicalProcessors)",
       "Bash($env:RUST_MIN_STACK=\"16777216\")",
       "Bash(timeout 120 cat:*)",
-      "Bash(target/release/deps/simple_benches-*.exe)"
+      "Bash(target/release/deps/simple_benches-*.exe)",
+      "Bash(xargs:*)",
+      "Bash(./verify_num_cpus_optimization.exe:*)",
+      "Bash(./scripts/benchmark_all_platforms.sh:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Get-Help ./scripts/benchmark_all_platforms.ps1 | Select-Object -First 15\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File ./scripts/benchmark_all_platforms.ps1 -Help)"
     ]
   }
 }

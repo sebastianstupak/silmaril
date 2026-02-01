@@ -220,9 +220,223 @@ Make the hook executable:
 chmod +x .git/hooks/pre-commit
 ```
 
-## Benchmark Regression Checking
+## Cross-Platform Benchmark Automation
+
+### benchmark_all_platforms.sh / .ps1
+
+**Purpose:** Automated benchmark suite that runs all engine benchmarks and generates comprehensive reports.
+
+**Features:**
+- Runs all benchmark suites (Platform, ECS, Physics, Math, Serialization, Profiling)
+- Saves results with timestamps for historical tracking
+- Baseline management (save/compare)
+- Integration with regression detection and industry comparison
+- Cross-platform (Linux, macOS, Windows)
+
+**Usage:**
+
+**Linux/macOS:**
+```bash
+./scripts/benchmark_all_platforms.sh [OPTIONS]
+```
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\benchmark_all_platforms.ps1 [OPTIONS]
+```
+
+**Options:**
+- `--baseline NAME` / `-Baseline NAME`: Save results as named baseline
+- `--compare NAME` / `-Compare NAME`: Compare with named baseline
+- `--output DIR` / `-OutputDir DIR`: Custom output directory
+- `--quick` / `-Quick`: Run subset of benchmarks (faster, for development)
+- `--no-platform` / `-NoPlatform`: Skip platform-specific benchmarks
+- `--no-ecs` / `-NoEcs`: Skip ECS benchmarks
+- `--verbose` / `-Verbose`: Enable verbose output
+- `--help` / `-Help`: Show help message
+
+**Examples:**
+```bash
+# Run all benchmarks
+./scripts/benchmark_all_platforms.sh
+
+# Quick mode (development)
+./scripts/benchmark_all_platforms.sh --quick
+
+# Save as baseline
+./scripts/benchmark_all_platforms.sh --baseline main
+
+# Compare with baseline
+./scripts/benchmark_all_platforms.sh --compare main
+
+# Full workflow: optimize, save, and compare
+./scripts/benchmark_all_platforms.sh --baseline after --compare before
+```
+
+**Output:**
+- `benchmarks/results/<platform>_<timestamp>/` - Timestamped results directory
+- `benchmarks/results/<platform>_<timestamp>/SUMMARY.md` - Summary report
+- `benchmarks/results/<platform>_<timestamp>/*.log` - Individual benchmark logs
+- `target/criterion/report/index.html` - Criterion HTML report
+
+**Baseline Management:**
+
+Baselines are saved in `benchmarks/baselines/<platform>_<name>/`:
+```bash
+# List available baselines
+ls benchmarks/baselines/
+
+# View baseline metadata
+cat benchmarks/baselines/windows_main/metadata.json
+```
+
+**See:** `benchmarks/AUTOMATION.md` for complete documentation.
+
+---
+
+### compare_with_industry.py
+
+**Purpose:** Compare benchmark results against industry standards and performance targets.
+
+**Features:**
+- Parses Criterion benchmark output
+- Compares against industry baselines (Unity, Unreal, Godot, Bevy)
+- Generates performance assessment (✅ Excellent, ✓ Good, ⚠️ Acceptable, ❌ Poor)
+- Provides optimization recommendations
+- No external dependencies (uses Python stdlib only)
+
+**Usage:**
+```bash
+python scripts/compare_with_industry.py --results <results_dir> [OPTIONS]
+```
+
+**Options:**
+- `--results DIR`: Path to results directory from benchmark_all_platforms.sh (required)
+- `--output FILE`: Custom output markdown file (optional)
+- `--criterion-dir DIR`: Custom Criterion output directory (default: target/criterion)
+
+**Examples:**
+```bash
+# Compare after running benchmarks
+python scripts/compare_with_industry.py \
+  --results benchmarks/results/windows_20260201_120000
+
+# Custom output file
+python scripts/compare_with_industry.py \
+  --results benchmarks/results/linux_20260201_130000 \
+  --output custom_comparison.md
+
+# View report
+cat benchmarks/results/windows_20260201_120000/industry_comparison.md
+```
+
+**Output Report Includes:**
+- Performance assessment for each benchmark
+- Summary statistics (% meeting goals)
+- High/medium priority optimization recommendations
+- Comparison with industry baseline ranges
+
+**Industry Targets:**
+
+Targets are based on research from:
+- Windows QPC, Linux clock_gettime (time queries)
+- Unity, Unreal, Godot, Bevy (ECS performance)
+- EnTT, Flecs, Hecs (ECS frameworks)
+
+See `PLATFORM_BENCHMARK_COMPARISON.md` for detailed industry data.
+
+---
+
+### benchmark_regression_check.py
+
+**Purpose:** Detect performance regressions by comparing baseline and current benchmark results.
+
+**Features:**
+- Supports Criterion (wall-clock time) and Iai-callgrind (instruction counts)
+- Configurable regression threshold
+- Detailed comparison tables and markdown reports
+- CI integration (exit codes for automated checks)
+- Shows regressions, improvements, and unchanged benchmarks
+
+**Usage:**
+```bash
+python scripts/benchmark_regression_check.py \
+  --baseline <baseline_dir> \
+  --current <current_dir> \
+  --threshold <percent> \
+  --format <criterion|iai> \
+  [OPTIONS]
+```
+
+**Options:**
+- `--baseline DIR`: Path to baseline benchmark directory (required)
+- `--current DIR`: Path to current benchmark directory (required)
+- `--threshold PERCENT`: Regression threshold percentage (required)
+- `--format {criterion,iai}`: Benchmark format (default: criterion)
+- `--output FILE`: Generate markdown report
+- `--fail-on-regression`: Exit with error code if regressions detected (for CI)
+- `--show-all`: Show all benchmarks, not just changes
+
+**Thresholds:**
+- **Iai benchmarks**: 10% (deterministic instruction counts, strict)
+- **Criterion benchmarks**: 20% (wall-clock time, tolerates CI VM noise)
+
+**Examples:**
+```bash
+# Compare Criterion benchmarks
+python scripts/benchmark_regression_check.py \
+  --baseline benchmarks/baselines/windows_main/criterion \
+  --current target/criterion \
+  --threshold 20 \
+  --format criterion
+
+# Compare Iai benchmarks (Linux only, deterministic)
+python scripts/benchmark_regression_check.py \
+  --baseline benchmarks/baselines/linux_main/iai \
+  --current target/iai \
+  --threshold 10 \
+  --format iai \
+  --fail-on-regression
+
+# Generate detailed markdown report
+python scripts/benchmark_regression_check.py \
+  --baseline benchmarks/baselines/windows_main/criterion \
+  --current target/criterion \
+  --threshold 20 \
+  --output benchmarks/reports/regression.md \
+  --show-all
+```
+
+**CI Integration:**
+
+This script runs automatically in `.github/workflows/benchmark-regression.yml` on pull requests:
+- Compares PR against main branch baseline
+- Warns on 20% Criterion regression
+- Fails on 10% Iai regression
+- Archives results as artifacts
+
+**Local Testing:**
+```bash
+# Simulate CI workflow
+./scripts/benchmark_all_platforms.sh --baseline main
+# ... make changes ...
+./scripts/benchmark_all_platforms.sh --compare main
+
+# Or use regression check directly
+python scripts/benchmark_regression_check.py \
+  --baseline benchmarks/baselines/<platform>_main/criterion \
+  --current target/criterion \
+  --threshold 20 \
+  --fail-on-regression
+```
+
+---
+
+## Benchmark Regression Checking (Legacy)
 
 ### check_benchmark_regression.py
+
+**Note:** This is the original regression checker. Use `benchmark_regression_check.py` for enhanced functionality.
 
 Python script that detects performance regressions in benchmark results.
 
@@ -254,27 +468,6 @@ python scripts/check_benchmark_regression.py \
 **CI Integration:**
 
 This script runs automatically in the `benchmark-regression.yml` workflow on pull requests.
-
-**Local Testing:**
-```bash
-# Run Criterion benchmarks with baseline
-cargo bench --features profiling-puffin -- --save-baseline main
-
-# Make changes to code...
-
-# Run benchmarks again
-cargo bench --features profiling-puffin -- --save-baseline pr
-
-# Compare manually
-cargo bench --features profiling-puffin -- --baseline main
-
-# Or use the script
-python scripts/check_benchmark_regression.py \
-  --baseline target/criterion/main \
-  --current target/criterion/pr \
-  --threshold 20 \
-  --format criterion
-```
 
 ## Profile-Guided Optimization (PGO)
 

@@ -51,6 +51,16 @@ pub struct World {
     current_tick: Tick,
 }
 
+impl std::fmt::Debug for World {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("World")
+            .field("entity_count", &self.entities.len())
+            .field("component_types", &self.components.len())
+            .field("current_tick", &self.current_tick)
+            .finish()
+    }
+}
+
 impl World {
     /// Create a new empty world
     pub fn new() -> Self {

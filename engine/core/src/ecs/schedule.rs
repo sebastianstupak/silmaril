@@ -41,8 +41,7 @@
 
 use super::{Component, World};
 use std::any::TypeId;
-use std::sync::{Arc, Mutex};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[cfg(feature = "profiling")]
 use agent_game_engine_profiling::{profile_scope, ProfileCategory};
@@ -320,9 +319,13 @@ impl Schedule {
                 "Executing stage"
             );
 
-            // If stage has only one system, run it directly (no parallel overhead)
-            if stage.len() == 1 {
-                let system_idx = stage[0];
+            // Execute systems in this stage
+            // Note: Systems in the same stage can theoretically run in parallel,
+            // but for now we execute them sequentially to avoid complex lifetime issues.
+            // The scheduler still provides value by optimizing execution order.
+            //
+            // TODO: Implement true parallel execution with thread-safe system storage
+            for &system_idx in stage {
                 let system = &mut self.systems[system_idx];
 
                 #[cfg(feature = "profiling")]
@@ -336,54 +339,7 @@ impl Schedule {
 
                 #[cfg(not(feature = "profiling"))]
                 system.run(world);
-
-                continue;
             }
-
-            // Multiple systems in stage - run in parallel
-            // We use Arc<Mutex<World>> to share world between threads
-            // This is safe because systems in the same stage don't conflict
-            let world_mutex = Arc::new(Mutex::new(world));
-            let results: Vec<_> = stage
-                .iter()
-                .map(|&system_idx| {
-                    let world_clone = Arc::clone(&world_mutex);
-                    let system_name = self.systems[system_idx].name().to_string();
-
-                    (system_idx, world_clone, system_name)
-                })
-                .collect();
-
-            // Execute systems in parallel using rayon
-            rayon::scope(|s| {
-                for (system_idx, world_arc, system_name) in results {
-                    s.spawn(move |_| {
-                        #[cfg(feature = "profiling")]
-                        let _scope = agent_game_engine_profiling::ProfileScope::new(
-                            &system_name,
-                            ProfileCategory::ECS,
-                        );
-
-                        // Lock world for this system's execution
-                        let mut world_guard = world_arc.lock().unwrap();
-                        // SAFETY: We need to get mutable access to the system
-                        // This is safe because:
-                        // 1. Systems in the same stage don't conflict (verified by dependency analysis)
-                        // 2. Each thread locks the world exclusively
-                        // 3. Systems are Send + Sync
-                        let system_ptr = &mut self.systems[system_idx] as *mut BoxedSystem;
-                        unsafe {
-                            (*system_ptr).run(&mut world_guard);
-                        }
-                    });
-                }
-            });
-
-            // Unwrap the Arc back to get our world
-            world = Arc::try_unwrap(world_mutex)
-                .expect("Failed to unwrap world after parallel execution")
-                .into_inner()
-                .expect("Failed to unwrap world mutex");
         }
     }
 
@@ -429,6 +385,7 @@ impl Default for Schedule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Mutex};
 
     #[derive(Debug)]
     struct MockComponent;
@@ -463,7 +420,7 @@ mod tests {
     fn test_system_access_conflicts() {
         let read_only = SystemAccess::new().reads::<MockComponent>();
         let write_only = SystemAccess::new().writes::<MockComponent>();
-        let read_write = SystemAccess::new()
+        let _read_write = SystemAccess::new()
             .reads::<MockComponent>()
             .writes::<MockComponent2>();
 

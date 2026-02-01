@@ -41,7 +41,12 @@ use agent_game_engine_profiling::{profile_scope, ProfileCategory};
 /// Provides type-erased access to component storage operations,
 /// allowing World to work with component storages without knowing
 /// the concrete component type.
-pub trait ComponentStorage: Any {
+///
+/// # Thread Safety
+///
+/// ComponentStorage is Send + Sync to allow parallel query iteration.
+/// All implementations must be thread-safe for concurrent reads.
+pub trait ComponentStorage: Any + Send + Sync {
     /// Remove a component from an entity (type-erased)
     ///
     /// Returns true if the component was removed, false if the entity

@@ -44,7 +44,7 @@ use criterion::{
 };
 use engine_core::{
     ecs::{Component, Entity, World},
-    math::{Transform, Vec3},
+    math::{Quat, Transform, Vec3},
     serialization::{Format, Serializable, WorldState},
     spatial::{Aabb, SpatialGrid, SpatialGridConfig},
     Velocity,
@@ -155,16 +155,19 @@ fn setup_simple_game_world(entity_count: usize) -> World {
 }
 
 fn physics_update_system(world: &mut World, dt: f32) {
-    // Get storage references directly for maximum performance
-    let positions = world.get_storage::<Position>().unwrap();
-    let velocities = world.get_storage::<Velocity>().unwrap();
+    // Collect all entities first to avoid borrow checker issues
+    let entities: Vec<Entity> = world.entities().collect();
 
     // Iterate through entities with both components
-    for entity in positions.entities() {
-        if let (Some(pos), Some(vel)) = (
-            world.get_mut::<Position>(entity),
-            world.get::<Velocity>(entity),
-        ) {
+    for entity in entities {
+        // Get velocity first (immutable)
+        let vel = match world.get::<Velocity>(entity) {
+            Some(v) => *v,
+            None => continue,
+        };
+
+        // Then mutate position
+        if let Some(pos) = world.get_mut::<Position>(entity) {
             pos.x += vel.x * dt;
             pos.y += vel.y * dt;
             pos.z += vel.z * dt;
@@ -174,11 +177,11 @@ fn physics_update_system(world: &mut World, dt: f32) {
 
 fn rendering_query_system(world: &World) -> usize {
     // Simulate rendering by gathering all positions
-    let positions = world.get_storage::<Position>().unwrap();
+    let entities: Vec<Entity> = world.entities().collect();
     let mut count = 0;
 
-    for entity in positions.entities() {
-        if let Some(_pos) = world.get::<Position>(entity) {
+    for entity in entities {
+        if world.get::<Position>(entity).is_some() {
             count += 1;
         }
     }
@@ -272,14 +275,17 @@ fn setup_mmo_world(player_count: usize, npc_count: usize) -> World {
 }
 
 fn movement_system(world: &mut World, dt: f32) {
-    let positions = world.get_storage::<Position>().unwrap();
-    let entities: Vec<Entity> = positions.entities().collect();
+    let entities: Vec<Entity> = world.entities().collect();
 
     for entity in entities {
-        if let (Some(pos), Some(vel)) = (
-            world.get_mut::<Position>(entity),
-            world.get::<Velocity>(entity),
-        ) {
+        // Get velocity first (immutable)
+        let vel = match world.get::<Velocity>(entity) {
+            Some(v) => *v,
+            None => continue,
+        };
+
+        // Then mutate position
+        if let Some(pos) = world.get_mut::<Position>(entity) {
             pos.x += vel.x * dt;
             pos.y += vel.y * dt;
             pos.z += vel.z * dt;
@@ -289,8 +295,7 @@ fn movement_system(world: &mut World, dt: f32) {
 
 fn combat_system(world: &mut World) {
     // Simplified combat: damage all entities with Health
-    let health_storage = world.get_storage::<Health>().unwrap();
-    let entities: Vec<Entity> = health_storage.entities().collect();
+    let entities: Vec<Entity> = world.entities().collect();
 
     for entity in entities {
         if let Some(health) = world.get_mut::<Health>(entity) {
@@ -301,11 +306,11 @@ fn combat_system(world: &mut World) {
 
 fn replication_system(world: &World) -> usize {
     // Simulate network replication by counting entities that need sync
-    let network_ids = world.get_storage::<NetworkId>().unwrap();
+    let entities: Vec<Entity> = world.entities().collect();
     let mut sync_count = 0;
 
-    for entity in network_ids.entities() {
-        if world.get::<Position>(entity).is_some() {
+    for entity in entities {
+        if world.get::<NetworkId>(entity).is_some() && world.get::<Position>(entity).is_some() {
             sync_count += 1;
         }
     }
@@ -425,7 +430,7 @@ fn setup_serialization_world(entity_count: usize) -> World {
             (i / 100) as f32 * 2.0,
         );
 
-        world.add(entity, Transform::from_translation(pos));
+        world.add(entity, Transform::new(pos, Quat::IDENTITY, Vec3::ONE));
         world.add(entity, Health { current: 100.0, max: 100.0 });
 
         if i % 2 == 0 {

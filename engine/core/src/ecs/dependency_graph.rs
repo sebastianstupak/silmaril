@@ -89,52 +89,52 @@ impl DependencyGraph {
     /// Analyze dependencies between all systems
     ///
     /// This builds the dependency graph by checking component access conflicts.
+    /// The key insight: if two systems conflict, we need an ordering between them.
+    /// We add an edge from the first system to the second, ensuring deterministic ordering.
     pub fn analyze_dependencies(&mut self) {
         debug!("Analyzing system dependencies");
 
         self.edges.clear();
 
-        // Check each pair of systems for conflicts
+        // Check each ordered pair of systems (i < j) to avoid bidirectional edges
         for i in 0..self.nodes.len() {
-            for j in 0..self.nodes.len() {
-                if i == j {
-                    continue;
-                }
-
+            for j in (i + 1)..self.nodes.len() {
                 let node_i = &self.nodes[i];
                 let node_j = &self.nodes[j];
 
-                // Check if i conflicts with j
-                if self.has_dependency(&node_i.access, &node_j.access) {
-                    // i must run before j
+                // Check if there's a conflict between i and j
+                if self.systems_conflict(&node_i.access, &node_j.access) {
+                    // Systems conflict - add edge to enforce ordering
+                    // By convention, lower index runs first
                     self.edges.entry(i).or_insert_with(Vec::new).push(j);
                     debug!(
                         from = %node_i.name,
                         to = %node_j.name,
-                        "Dependency edge added"
+                        "Dependency edge added (systems conflict)"
                     );
                 }
             }
         }
     }
 
-    /// Check if system A has a dependency on system B
+    /// Check if two systems conflict and need to be ordered
     ///
-    /// A depends on B if:
-    /// - A writes to a component that B reads
-    /// - A writes to a component that B writes
-    /// - A reads a component that B writes
-    fn has_dependency(&self, access_a: &SystemAccess, access_b: &SystemAccess) -> bool {
-        // A writes, B reads or writes -> A must run before B
+    /// Systems conflict if:
+    /// - One writes and the other reads the same component
+    /// - Both write to the same component
+    ///
+    /// Systems that only read the same components don't conflict.
+    fn systems_conflict(&self, access_a: &SystemAccess, access_b: &SystemAccess) -> bool {
+        // Check if A writes something that B reads or writes
         for write_type in &access_a.writes {
             if access_b.reads.contains(write_type) || access_b.writes.contains(write_type) {
                 return true;
             }
         }
 
-        // A reads, B writes -> A must run before B (B might invalidate A's reads)
-        for read_type in &access_a.reads {
-            if access_b.writes.contains(read_type) {
+        // Check if B writes something that A reads or writes
+        for write_type in &access_b.writes {
+            if access_a.reads.contains(write_type) || access_a.writes.contains(write_type) {
                 return true;
             }
         }

@@ -12,6 +12,7 @@
 pub mod components;
 pub mod config;
 pub mod systems;
+pub mod world;
 
 // Re-exports
 pub use components::{
@@ -19,3 +20,4 @@ pub use components::{
 };
 pub use config::{PhysicsConfig, PhysicsMode};
 pub use systems::{physics_integration_system, physics_integration_system_simd};
+pub use world::PhysicsWorld;
