@@ -10,6 +10,9 @@ use rapier3d::prelude::*;
 use rapier3d::na::{Quaternion, UnitQuaternion};
 use std::collections::HashMap;
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
 /// Contact force event wrapper
 #[derive(Debug, Clone)]
 pub struct PhysicsContactForceEvent {
@@ -71,6 +74,9 @@ pub struct PhysicsWorld {
     entity_to_body: HashMap<u64, RigidBodyHandle>,
     body_to_entity: HashMap<RigidBodyHandle, u64>,
 
+    /// ColliderHandle -> Entity ID mapping (for event translation)
+    collider_to_entity: HashMap<ColliderHandle, u64>,
+
     /// Entity ID -> desired mass mapping (for density calculation)
     entity_desired_mass: HashMap<u64, f32>,
 
@@ -113,6 +119,7 @@ impl PhysicsWorld {
             query_pipeline: QueryPipeline::new(),
             entity_to_body: HashMap::new(),
             body_to_entity: HashMap::new(),
+            collider_to_entity: HashMap::new(),
             entity_desired_mass: HashMap::new(),
             collision_events: Vec::new(),
             contact_force_events: Vec::new(),
@@ -127,6 +134,9 @@ impl PhysicsWorld {
     /// Uses fixed timestep internally for stability.
     /// See: https://gafferongames.com/post/fix_your_timestep/
     pub fn step(&mut self, dt: f32) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("physics_step", ProfileCategory::Physics);
+
         if matches!(self.config.mode, PhysicsMode::Disabled) {
             return;
         }
@@ -156,6 +166,9 @@ impl PhysicsWorld {
 
     /// Internal step (one fixed timestep)
     fn step_internal(&mut self, _dt: f32) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("physics_step_internal", ProfileCategory::Physics);
+
         self.frame_count += 1;
 
         // Event collector
@@ -342,6 +355,9 @@ impl PhysicsWorld {
             self.collider_set
                 .insert_with_parent(collider, *rb_handle, &mut self.rigid_body_set);
 
+        // Register collider->entity mapping for event translation
+        self.collider_to_entity.insert(collider_handle, entity_id);
+
         tracing::debug!(entity = entity_id, "Added collider");
 
         Some(collider_handle)
@@ -350,6 +366,10 @@ impl PhysicsWorld {
     /// Remove rigidbody and all associated colliders
     pub fn remove_rigidbody(&mut self, entity_id: u64) {
         if let Some(handle) = self.entity_to_body.remove(&entity_id) {
+            // Remove collider mappings before removing rigidbody
+            // (Rapier will remove colliders when removing the body)
+            self.collider_to_entity.retain(|_, &mut ent_id| ent_id != entity_id);
+
             self.rigid_body_set.remove(
                 handle,
                 &mut self.islands,
@@ -493,6 +513,11 @@ impl PhysicsWorld {
     /// Get current frame count
     pub fn frame_count(&self) -> u64 {
         self.frame_count
+    }
+
+    /// Get entity ID from collider handle (for event translation)
+    pub fn get_entity_from_collider(&self, handle: ColliderHandle) -> Option<&u64> {
+        self.collider_to_entity.get(&handle)
     }
 
     /// Convert collider shape component to Rapier shape

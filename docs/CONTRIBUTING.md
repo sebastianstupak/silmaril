@@ -505,6 +505,182 @@ cargo test --test '*'
 cargo tarpaulin --out Html
 ```
 
+### Benchmark Requirements
+
+All performance-critical code must include benchmarks to prevent regressions.
+
+#### When to Add Benchmarks
+
+Add benchmarks for:
+- **ECS operations**: Entity spawn, component queries, iteration
+- **Physics systems**: Integration, collision detection, SIMD operations
+- **Rendering**: Command buffer creation, sync operations, pipeline setup
+- **Math operations**: Vector math, transforms, SIMD optimizations
+- **Serialization**: Encoding/decoding world state, component data
+- **Hot paths**: Any code that runs frequently (>1000 times/frame)
+
+#### Benchmark Structure
+
+```rust
+// benches/my_feature_benches.rs
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use agent_game_engine::*;
+
+fn bench_my_feature(c: &mut Criterion) {
+    let mut group = c.benchmark_group("my_feature");
+
+    // Test with different sizes
+    for size in [100, 1000, 10000] {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(size),
+            &size,
+            |b, &size| {
+                // Setup
+                let world = setup_world(size);
+
+                b.iter(|| {
+                    // Benchmark code
+                    let result = my_feature(&world);
+                    black_box(result); // Prevent optimization
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_my_feature);
+criterion_main!(benches);
+```
+
+#### Performance Targets
+
+All benchmarks must meet industry-standard targets:
+
+| Operation | Target | Acceptable | Critical |
+|-----------|--------|------------|----------|
+| Entity spawn | < 50ns | < 100ns | < 200ns |
+| Component query (1K entities) | < 1ms | < 2ms | < 5ms |
+| Physics tick (10K entities) | < 8ms | < 12ms | < 16ms |
+| Vulkan fence reset | < 10µs | < 20µs | < 50µs |
+
+See [docs/performance-targets.md](performance-targets.md) for complete targets.
+
+#### Running Benchmarks
+
+```bash
+# Run all benchmarks
+just bench-all
+
+# Run specific suite
+just bench-ecs
+
+# Compare with baseline
+just bench-baseline
+
+# Run with profiling
+just bench-profile
+```
+
+#### Regression Detection
+
+CI/CD automatically detects performance regressions on every PR:
+
+- **Threshold**: 20% regression triggers CI failure
+- **Comparison**: Against `main` branch baseline
+- **Platforms**: Linux, Windows, macOS
+- **Reporting**: Automated PR comments with results
+
+If your PR triggers a regression:
+
+1. **Review the benchmark results** in the PR comment
+2. **Profile the code** with `just bench-profile`
+3. **Optimize** the hot paths identified
+4. **Re-run benchmarks** with `just bench-baseline`
+5. **Document** any intentional performance trade-offs
+
+#### Baseline Updates
+
+Update baselines only when:
+
+- ✅ Performance **improves** significantly (>10%)
+- ✅ Architecture changes make old baseline irrelevant
+- ✅ Quarterly baseline refresh for long-term tracking
+
+Do NOT update baselines when:
+
+- ❌ Performance **regresses** (fix the regression instead)
+- ❌ Results vary due to system load (re-run in clean environment)
+- ❌ Without maintainer approval and documentation
+
+To update baseline:
+
+```bash
+# Create new baseline
+./scripts/update_benchmark_baseline.sh main
+
+# Review changes
+git diff benchmarks/baselines/
+
+# Commit with justification
+git add benchmarks/baselines/
+git commit -m "chore: Update benchmark baseline after ECS optimization
+
+Performance improvements:
+- Entity spawn: 47ns → 38ns (-19%)
+- Component query: 0.8ms → 0.6ms (-25%)
+
+Baseline updated to reflect optimizations in PR #123."
+```
+
+#### Benchmark Best Practices
+
+1. **Use `black_box`**: Prevent compiler from optimizing away code
+   ```rust
+   b.iter(|| {
+       let result = expensive_operation();
+       black_box(result); // Essential!
+   });
+   ```
+
+2. **Minimize setup time**: Only benchmark the operation, not setup
+   ```rust
+   // Setup outside the benchmark loop
+   let world = setup_world(10000);
+
+   b.iter(|| {
+       // Only benchmark this part
+       query_entities(&world);
+   });
+   ```
+
+3. **Use realistic data**: Benchmark with production-like workloads
+   ```rust
+   // Good: Realistic entity count
+   let world = create_world_with_entities(10000);
+
+   // Bad: Unrealistically small
+   let world = create_world_with_entities(10);
+   ```
+
+4. **Test multiple scales**: Verify performance across different sizes
+   ```rust
+   for size in [100, 1000, 10000, 100000] {
+       group.bench_with_input(BenchmarkId::from_parameter(size), ...);
+   }
+   ```
+
+5. **Document targets**: Explain why performance target was chosen
+   ```rust
+   /// Benchmark: Entity spawn
+   ///
+   /// Target: < 50ns (industry standard for ECS engines)
+   /// - Unity DOTS: ~60ns
+   /// - Bevy: ~45ns
+   /// - Our target: < 50ns to be competitive
+   ```
+
 ---
 
 ## Documentation

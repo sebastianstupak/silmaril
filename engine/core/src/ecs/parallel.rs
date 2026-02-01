@@ -68,14 +68,21 @@ impl<T> SendPtr<T> {
 
     /// Get the raw pointer (unsafe - caller must ensure disjoint access)
     #[inline(always)]
+    #[allow(dead_code)]
     unsafe fn as_ptr(&self) -> *mut T {
         self.0
     }
 
     /// Get a mutable reference (unsafe - caller must ensure disjoint access)
     #[inline(always)]
-    unsafe fn as_mut<'a>(&self) -> &'a mut T {
+    unsafe fn deref_mut<'a>(&self) -> &'a mut T {
         &mut *self.0
+    }
+
+    /// Get a shared reference (unsafe - caller must ensure valid access)
+    #[inline(always)]
+    unsafe fn deref<'a>(&self) -> &'a T {
+        &*self.0
     }
 }
 
@@ -107,14 +114,16 @@ impl<T> SendConstPtr<T> {
     }
 
     /// Get the raw pointer (unsafe - caller must ensure valid access)
+    #[allow(dead_code)]
     #[inline(always)]
+    #[allow(dead_code)]
     unsafe fn as_ptr(&self) -> *const T {
         self.0
     }
 
     /// Get a shared reference (unsafe - caller must ensure valid access)
     #[inline(always)]
-    unsafe fn as_ref<'a>(&self) -> &'a T {
+    unsafe fn deref<'a>(&self) -> &'a T {
         &*self.0
     }
 }
@@ -224,6 +233,7 @@ pub trait ParallelQueryMut<'a, Q> {
 // Single Component Parallel Query - Immutable
 //
 
+/// Parallel iterator for single-component immutable queries
 pub struct ParallelQuery1<'a, T: Component> {
     world: &'a World,
     _phantom: std::marker::PhantomData<T>,
@@ -258,6 +268,7 @@ impl<'a, T: Component + Sync> ParallelIterator for ParallelQuery1<'a, T> {
 // Single Component Parallel Query - Mutable
 //
 
+/// Parallel iterator for single-component mutable queries
 pub struct ParallelQueryMut1<'a, T: Component> {
     world: &'a mut World,
     _phantom: std::marker::PhantomData<T>,
@@ -287,12 +298,12 @@ impl<'a, T: Component + Send> ParallelIterator for ParallelQueryMut1<'a, T> {
         };
 
         // SAFETY: We have exclusive access via &mut World
-        let len = unsafe { storage_ptr.as_ref().len() };
+        let len = unsafe { storage_ptr.deref().len() };
 
         (0..len)
             .into_par_iter()
             .filter_map(move |index| unsafe {
-                let storage = storage_ptr.as_mut();
+                let storage = storage_ptr.deref_mut();
                 let entity = storage.get_dense_entity(index)?;
                 storage.get_mut(entity).map(|component| {
                     let component_ptr = component as *mut T;
@@ -307,6 +318,7 @@ impl<'a, T: Component + Send> ParallelIterator for ParallelQueryMut1<'a, T> {
 // Two Component Parallel Query - Immutable
 //
 
+/// Parallel iterator for two-component immutable queries
 pub struct ParallelQuery2<'a, A: Component, B: Component> {
     world: &'a World,
     _phantom: std::marker::PhantomData<(A, B)>,
@@ -351,6 +363,7 @@ impl<'a, A: Component + Sync, B: Component + Sync> ParallelIterator
 // Two Component Parallel Query - Mixed Mutability (&mut A, &B)
 //
 
+/// Parallel iterator for two-component mixed-mutability queries
 pub struct ParallelQuery2Mut<'a, A: Component, B: Component> {
     world: &'a mut World,
     _phantom: std::marker::PhantomData<(A, B)>,
@@ -390,13 +403,13 @@ impl<'a, A: Component + Send, B: Component + Sync> ParallelIterator
             _ => return consumer.into_folder().complete(),
         };
 
-        let len = unsafe { storage_a_ptr.as_ref().len().min(storage_b_ptr.as_ref().len()) };
+        let len = unsafe { storage_a_ptr.deref().len().min(storage_b_ptr.deref().len()) };
 
         (0..len)
             .into_par_iter()
             .filter_map(move |index| unsafe {
-                let storage_a = storage_a_ptr.as_mut();
-                let storage_b = storage_b_ptr.as_ref();
+                let storage_a = storage_a_ptr.deref_mut();
+                let storage_b = storage_b_ptr.deref();
 
                 let entity = storage_a.get_dense_entity(index)?;
                 let comp_a = storage_a.get_mut(entity).map(|c| {
@@ -415,6 +428,7 @@ impl<'a, A: Component + Send, B: Component + Sync> ParallelIterator
 // Two Component Parallel Query - Both Mutable (&mut A, &mut B)
 //
 
+/// Parallel iterator for two-component double-mutable queries
 pub struct ParallelQuery2Mut2<'a, A: Component, B: Component> {
     world: &'a mut World,
     _phantom: std::marker::PhantomData<(A, B)>,
@@ -464,13 +478,13 @@ impl<'a, A: Component + Send, B: Component + Send> ParallelIterator
             "Attempted to create two mutable references to the same component storage"
         );
 
-        let len = unsafe { storage_a_ptr.as_ref().len().min(storage_b_ptr.as_ref().len()) };
+        let len = unsafe { storage_a_ptr.deref().len().min(storage_b_ptr.deref().len()) };
 
         (0..len)
             .into_par_iter()
             .filter_map(move |index| unsafe {
-                let storage_a = storage_a_ptr.as_mut();
-                let storage_b = storage_b_ptr.as_mut();
+                let storage_a = storage_a_ptr.deref_mut();
+                let storage_b = storage_b_ptr.deref_mut();
 
                 let entity = storage_a.get_dense_entity(index)?;
 

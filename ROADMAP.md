@@ -103,9 +103,19 @@ Build a fully automatable game engine optimized for AI agents with:
 - [x] Query API for programmatic access
 - [x] Configuration system (YAML + env vars)
 - [x] Performance budget warnings
-- [x] CI benchmark regression detection (benchmarks ready, CI workflow pending)
+- [x] CI benchmark regression detection ✅ **COMPLETE**
 - [x] Integration with engine-core
 - [x] Documentation and examples
+
+#### **0.6 Benchmark CI/CD Integration** ✅ **COMPLETE** - NEW
+- [x] GitHub Actions workflow (benchmark-ci.yml)
+- [x] Multi-platform benchmark execution (Linux, Windows, macOS)
+- [x] Automated regression detection (20% threshold)
+- [x] PR comments with benchmark results
+- [x] Baseline management system
+- [x] Justfile benchmark targets
+- [x] Documentation (README.md, benchmarks/README.md)
+- [x] Helper scripts (update_baseline.sh, compare_baseline.sh)
 
 **Time Estimate:** 8.5-9.5 days (~2 weeks)
 **Actual Time:** ~8.5 days

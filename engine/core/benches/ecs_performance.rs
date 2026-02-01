@@ -65,6 +65,7 @@ impl Component for Health {}
 
 #[derive(Debug, Clone, Copy)]
 struct Damage {
+    #[allow(dead_code)]
     amount: f32,
     #[allow(dead_code)]
     damage_type: u8,
@@ -73,6 +74,7 @@ impl Component for Damage {}
 
 #[derive(Debug, Clone, Copy)]
 struct Player {
+    #[allow(dead_code)]
     id: u32,
     #[allow(dead_code)]
     level: u16,
@@ -89,6 +91,7 @@ impl Component for Enemy {}
 
 #[derive(Debug, Clone, Copy)]
 struct Projectile {
+    #[allow(dead_code)]
     damage: f32,
     #[allow(dead_code)]
     speed: f32,
@@ -188,7 +191,7 @@ fn bench_entity_creation_with_components(c: &mut Criterion) {
                 b.iter_batched(
                     || setup_world(),
                     |mut world| {
-                        for i in 0..count {
+                        for _i in 0..count {
                             let entity = world.spawn();
                             world.add(entity, Transform::default());
                             black_box(entity);

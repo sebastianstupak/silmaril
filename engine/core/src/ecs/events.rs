@@ -46,6 +46,8 @@ impl EventQueue {
 pub struct Events {
     /// Map from TypeId to event queue
     queues: HashMap<TypeId, EventQueue>,
+    /// Empty queue for when no events exist
+    empty_queue: VecDeque<Box<dyn Any + Send + Sync>>,
 }
 
 impl Events {
@@ -53,6 +55,7 @@ impl Events {
     pub fn new() -> Self {
         Self {
             queues: HashMap::new(),
+            empty_queue: VecDeque::new(),
         }
     }
 
@@ -99,7 +102,7 @@ impl Events {
             }
         } else {
             EventIter {
-                events: &VecDeque::new(),
+                events: &self.empty_queue,
                 current: 0,
                 end: 0,
                 _phantom: PhantomData,
@@ -297,7 +300,7 @@ mod tests {
             events.send(TestEvent { value: i as i32 });
         }
 
-        let mut reader = EventReader::new();
+        let mut reader: EventReader<TestEvent> = EventReader::new();
         let received: Vec<_> = events.read(&mut reader).collect();
 
         // Should only have MAX_EVENTS_PER_TYPE events

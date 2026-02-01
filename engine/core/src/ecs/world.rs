@@ -4,7 +4,7 @@
 //! interface for creating entities and managing component data.
 
 use super::change_detection::Tick;
-use super::events::Events;
+use super::events::{Event, EventReader, Events};
 use super::storage::ComponentStorage;
 use super::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet};
 use std::any::TypeId;

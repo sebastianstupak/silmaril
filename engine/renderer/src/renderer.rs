@@ -11,6 +11,7 @@ use tracing::{info, instrument, warn};
 pub struct Renderer {
     window: Window,
     context: VulkanContext,
+    _entry: ash::Entry,
     surface: Surface,
     swapchain: Swapchain,
     render_pass: RenderPass,
@@ -33,32 +34,46 @@ impl Renderer {
         info!("Creating renderer");
 
         // 1. Create window
-        let window = Window::new(window_config)?;
+        let window = Window::new(window_config)
+            .map_err(|e| RendererError::surfacecreationfailed(format!("Window creation failed: {:?}", e)))?;
         let (width, height) = window.size();
 
-        // 2. Create Vulkan surface from window
-        let (vk_surface, surface_loader) = window.create_vulkan_surface()?;
+        // 2. Create Vulkan entry
+        let entry = unsafe {
+            ash::Entry::load()
+                .map_err(|e| RendererError::instancecreationfailed(format!("Failed to load Vulkan: {:?}", e)))?
+        };
 
-        // 3. Create Vulkan context
-        let context = VulkanContext::new(app_name, Some(vk_surface), Some(&surface_loader))?;
+        // 3. Create surface wrapper (will create VkSurfaceKHR internally)
+        let surface = Surface::new(&entry, &{
+            // Need to create instance first to create surface
+            // Create temp instance just to get extension requirements
+            let required_extensions = window.required_extensions();
 
-        // 4. Create surface wrapper
-        let surface = Surface::new(
-            vk_surface,
-            surface_loader,
-            &context.instance,
-            context.physical_device,
-        )?;
+            // Create VulkanContext (it will create the instance)
+            let context = VulkanContext::new(app_name, None, None)?;
+            context.instance
+        }, &window)
+        .map_err(|e| RendererError::surfacecreationfailed(format!("Surface creation failed: {:?}", e)))?;
+
+        // 4. Create Vulkan context with surface
+        let context = VulkanContext::new(app_name, Some(surface.handle()), Some(surface.loader()))?;
 
         // 5. Create swapchain
-        let swapchain_config = surface.get_swapchain_config(width, height)?;
-        let swapchain = Swapchain::new(&context.device, swapchain_config)?;
+        let swapchain = Swapchain::new(
+            &context,
+            surface.handle(),
+            surface.loader(),
+            width,
+            height,
+            None,
+        )?;
 
         // 6. Create render pass (simple color attachment, clear to color)
         let render_pass = RenderPass::new(
             &context.device,
             RenderPassConfig {
-                color_format: swapchain.format(),
+                color_format: swapchain.format,
                 depth_format: None,
                 samples: vk::SampleCountFlags::TYPE_1,
                 load_op: vk::AttachmentLoadOp::CLEAR,
@@ -70,8 +85,8 @@ impl Renderer {
         let framebuffers = create_framebuffers(
             &context.device,
             render_pass.handle(),
-            swapchain.image_views(),
-            swapchain.extent(),
+            &swapchain.image_views,
+            swapchain.extent,
         )?;
 
         // 8. Create command pool
@@ -95,13 +110,14 @@ impl Renderer {
         info!(
             width = width,
             height = height,
-            images = swapchain.image_count(),
+            images = swapchain.image_count,
             "Renderer created successfully"
         );
 
         Ok(Self {
             window,
             context,
+            _entry: entry,
             surface,
             swapchain,
             render_pass,
@@ -147,9 +163,9 @@ impl Renderer {
         // Acquire next swapchain image
         let image_index = unsafe {
             self.swapchain
-                .loader()
+                .loader
                 .acquire_next_image(
-                    self.swapchain.handle(),
+                    self.swapchain.swapchain,
                     u64::MAX,
                     sync.image_available_semaphore,
                     vk::Fence::null(),
@@ -157,8 +173,8 @@ impl Renderer {
                 .map_err(|e| match e {
                     vk::Result::ERROR_OUT_OF_DATE_KHR => RendererError::swapchainoutofdate(),
                     _ => RendererError::swapchainacquisitionfailed(format!("{:?}", e)),
-                })?
-                .0 as usize
+                })?.
+.0 as usize
         };
 
         // Reset fence after acquiring image
@@ -201,7 +217,7 @@ impl Renderer {
         }
 
         // Present
-        let swapchains = [self.swapchain.handle()];
+        let swapchains = [self.swapchain.swapchain];
         let image_indices = [image_index as u32];
 
         let present_info = vk::PresentInfoKHR::default()
@@ -211,7 +227,7 @@ impl Renderer {
 
         unsafe {
             self.swapchain
-                .loader()
+                .loader
                 .queue_present(self.context.present_queue, &present_info)
                 .map_err(|e| match e {
                     vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR => {
@@ -258,7 +274,7 @@ impl Renderer {
                 .framebuffer(self.framebuffers[image_index].handle())
                 .render_area(vk::Rect2D {
                     offset: vk::Offset2D { x: 0, y: 0 },
-                    extent: self.swapchain.extent(),
+                    extent: self.swapchain.extent,
                 })
                 .clear_values(&clear_values);
 
