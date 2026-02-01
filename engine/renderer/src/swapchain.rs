@@ -146,7 +146,7 @@ impl Swapchain {
         // The returned images are owned by the swapchain and remain valid until swapchain destruction.
         let images = unsafe {
             swapchain_loader.get_swapchain_images(swapchain).map_err(|e| {
-                RendererError::swapchainmageretrievalfailed(format!("{:?}", e))
+                RendererError::swapchainimageretrievalfailed(format!("Failed to retrieve swapchain images: {:?}", e))
             })?
         };
 
@@ -289,7 +289,7 @@ impl Swapchain {
         // SAFETY: new_swapchain is valid, just created above.
         let images = unsafe {
             self.loader.get_swapchain_images(new_swapchain).map_err(|e| {
-                RendererError::swapchainmageretrievalfailed(format!("{:?}", e))
+                RendererError::swapchainimageretrievalfailed(format!("Failed to retrieve swapchain images: {:?}", e))
             })?
         };
 

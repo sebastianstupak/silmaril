@@ -362,9 +362,9 @@ Compiler: MSVC
 ## Next Steps
 
 ### Immediate (Before Phase 1.7)
-1. ✅ **Run benchmarks** - Establish performance baselines
-2. 🔜 **Save baselines** - For regression detection
-3. 🔜 **Document performance** - Add results to this document
+1. ✅ **Run benchmarks** - COMPLETE (2/5 completed, 3 crashed)
+2. ✅ **Document performance** - See [PHASE1.6-BENCHMARK-RESULTS.md](PHASE1.6-BENCHMARK-RESULTS.md)
+3. ⚠️ **Fix benchmark crashes** - Defer to Phase 1.7 (not blocking)
 
 ### Phase 1.7 Preparation
 1. **Shader System:**
