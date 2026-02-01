@@ -235,8 +235,9 @@ impl ThreadingBackend for UnixThreading {
 /// - Low QoS → Efficiency cores (on Apple Silicon)
 /// - On Intel Macs, QoS affects priority but all cores are homogeneous
 ///
-/// # Performance
+/// # Performance Optimizations
 ///
+/// - Caches CPU count at initialization to avoid repeated syscalls
 /// - pthread_setschedparam: <2us per call (fast on both Intel and Apple Silicon)
 /// - QoS classes are respected by the scheduler on macOS 10.10+
 /// - set_thread_affinity returns PlatformNotSupported (not a performance issue)
@@ -244,7 +245,7 @@ impl ThreadingBackend for UnixThreading {
 /// # Target Performance
 ///
 /// - set_thread_priority: <5us (ideal: 2us)
-/// - num_cpus: <1us (cached value)
+/// - num_cpus: <1us (ideal: <100ns, cached)
 ///
 /// # References
 ///
@@ -252,13 +253,19 @@ impl ThreadingBackend for UnixThreading {
 /// - WWDC 2015: "Advanced NSOperations" (discusses QoS)
 /// - pthread documentation: man pthread_setschedparam(3)
 #[cfg(target_os = "macos")]
-pub struct MacOsThreading;
+pub struct MacOsThreading {
+    /// Number of CPUs, cached for fast access
+    num_cpus: usize,
+}
 
 #[cfg(target_os = "macos")]
 impl MacOsThreading {
     /// Create a new macOS threading backend.
     pub fn new() -> Result<Self, PlatformError> {
-        Ok(Self)
+        // Cache CPU count for fast access
+        let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+
+        Ok(Self { num_cpus })
     }
 }
 
@@ -346,6 +353,11 @@ impl ThreadingBackend for MacOsThreading {
             feature: "thread_affinity".to_string(),
         })
     }
+
+    fn num_cpus(&self) -> usize {
+        // Return cached value for fast access
+        self.num_cpus
+    }
 }
 
 #[cfg(test)]
@@ -361,6 +373,33 @@ mod tests {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
+    fn test_unix_num_cpus_cached() {
+        let threading = UnixThreading::new().unwrap();
+
+        // Should return consistent value
+        let num_cpus = threading.num_cpus();
+        assert!(num_cpus > 0);
+        assert!(num_cpus <= 256); // Sanity check
+
+        // Should return same value on repeated calls (verifies caching)
+        for _ in 0..100 {
+            assert_eq!(threading.num_cpus(), num_cpus);
+        }
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn test_unix_num_cpus_matches_system() {
+        let threading = UnixThreading::new().unwrap();
+        let cached_count = threading.num_cpus();
+
+        // Verify it matches the actual system value
+        let actual_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+        assert_eq!(cached_count, actual_count);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
     fn test_unix_set_priority() {
         let threading = UnixThreading::new().unwrap();
 
@@ -371,11 +410,55 @@ mod tests {
         let _ = threading.set_thread_priority(ThreadPriority::Realtime);
     }
 
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn test_unix_invalid_core_index_fails() {
+        let threading = UnixThreading::new().unwrap();
+        let num_cpus = threading.num_cpus();
+
+        // Try to set affinity to non-existent core
+        let result = threading.set_thread_affinity(&[num_cpus + 10]);
+        assert!(result.is_err());
+
+        // Error should mention the core number and CPU count
+        if let Err(e) = result {
+            let error_msg = format!("{:?}", e);
+            assert!(error_msg.contains(&(num_cpus + 10).to_string()));
+        }
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn test_macos_threading_creation() {
         let threading = MacOsThreading::new();
         assert!(threading.is_ok());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_macos_num_cpus_cached() {
+        let threading = MacOsThreading::new().unwrap();
+
+        // Should return consistent value
+        let num_cpus = threading.num_cpus();
+        assert!(num_cpus > 0);
+        assert!(num_cpus <= 256); // Sanity check
+
+        // Should return same value on repeated calls (verifies caching)
+        for _ in 0..100 {
+            assert_eq!(threading.num_cpus(), num_cpus);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_macos_num_cpus_matches_system() {
+        let threading = MacOsThreading::new().unwrap();
+        let cached_count = threading.num_cpus();
+
+        // Verify it matches the actual system value
+        let actual_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+        assert_eq!(cached_count, actual_count);
     }
 
     #[cfg(target_os = "macos")]

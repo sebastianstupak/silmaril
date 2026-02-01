@@ -109,3 +109,11 @@ harness = false
 [[bench]]
 name = "serialization_comprehensive"
 harness = false
+
+[[bench]]
+name = "change_detection"
+harness = false
+
+[[bench]]
+name = "ecs_performance"
+harness = false

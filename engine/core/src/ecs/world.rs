@@ -3,6 +3,7 @@
 //! The World owns all entities and their components, providing the main
 //! interface for creating entities and managing component data.
 
+use super::change_detection::Tick;
 use super::storage::ComponentStorage;
 use super::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet};
 use std::any::TypeId;
@@ -46,6 +47,8 @@ pub struct World {
     pub(crate) components: HashMap<TypeId, Box<dyn ComponentStorage>>,
     /// Component metadata for debugging
     descriptors: HashMap<TypeId, ComponentDescriptor>,
+    /// Current tick for change detection
+    current_tick: Tick,
 }
 
 impl World {
@@ -55,6 +58,7 @@ impl World {
             entities: EntityAllocator::new(),
             components: HashMap::new(),
             descriptors: HashMap::new(),
+            current_tick: Tick::new(),
         }
     }
 
@@ -188,7 +192,7 @@ impl World {
             .downcast_mut::<SparseSet<T>>()
             .expect("Component storage type mismatch (internal error)");
 
-        storage.insert(entity, component);
+        storage.insert(entity, component, self.current_tick);
     }
 
     /// Get a typed storage reference directly (internal use for queries)
@@ -494,6 +498,83 @@ impl World {
             .get(&type_id)
             .map(|storage| storage.contains_entity(entity))
             .unwrap_or(false)
+    }
+
+    // ========================================================================
+    // Change Detection
+    // ========================================================================
+
+    /// Get the current tick
+    ///
+    /// The tick is incremented each time `increment_tick()` is called,
+    /// typically between system executions.
+    #[inline]
+    pub fn current_tick(&self) -> Tick {
+        self.current_tick
+    }
+
+    /// Increment the tick counter
+    ///
+    /// This should be called between system executions to enable change detection.
+    /// Systems can track which tick they last ran and query only components
+    /// that changed since then.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use engine_core::ecs::{World, Component};
+    /// # #[derive(Component)]
+    /// # struct Transform { x: f32 }
+    /// let mut world = World::new();
+    /// world.register::<Transform>();
+    ///
+    /// let entity = world.spawn();
+    /// world.add(entity, Transform { x: 0.0 });
+    ///
+    /// // Simulate system execution
+    /// world.increment_tick();
+    ///
+    /// // Components added after this tick will be detected as changed
+    /// let entity2 = world.spawn();
+    /// world.add(entity2, Transform { x: 1.0 });
+    /// ```
+    #[inline]
+    pub fn increment_tick(&mut self) {
+        self.current_tick.increment();
+    }
+
+    /// Mark a component as changed
+    ///
+    /// This is used when getting mutable access to a component to track
+    /// that it has been modified.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use engine_core::ecs::{World, Component};
+    /// # #[derive(Component)]
+    /// # struct Transform { x: f32 }
+    /// let mut world = World::new();
+    /// world.register::<Transform>();
+    ///
+    /// let entity = world.spawn();
+    /// world.add(entity, Transform { x: 0.0 });
+    ///
+    /// // Modify component and mark as changed
+    /// if let Some(transform) = world.get_mut::<Transform>(entity) {
+    ///     transform.x = 10.0;
+    /// }
+    /// world.mark_changed::<Transform>(entity);
+    /// ```
+    pub fn mark_changed<T: Component>(&mut self, entity: Entity) {
+        let type_id = TypeId::of::<T>();
+        if let Some(storage) = self.components.get_mut(&type_id) {
+            let storage = storage
+                .as_any_mut()
+                .downcast_mut::<SparseSet<T>>()
+                .expect("Component storage type mismatch");
+            storage.mark_changed(entity, self.current_tick);
+        }
     }
 }
 

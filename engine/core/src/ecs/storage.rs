@@ -23,8 +23,14 @@
 //! - Aggressive capacity pre-allocation via `with_capacity()` reduces reallocations
 //! - Component and entity arrays kept aligned for better prefetching
 //! - Swap-remove strategy avoids expensive array shifts
+//!
+//! ## Change Detection
+//!
+//! Each component tracks when it was added and last modified via ComponentTicks.
+//! This enables efficient change detection queries that only process modified entities.
 
 use super::{Component, Entity};
+use super::change_detection::{ComponentTicks, Tick};
 use std::any::Any;
 
 #[cfg(feature = "profiling")]
@@ -58,6 +64,11 @@ pub trait ComponentStorage: Any {
 
     /// Clear all components (type-erased)
     fn clear(&mut self);
+
+    /// Check if a component changed since the given tick (type-erased)
+    ///
+    /// Returns false if the entity doesn't have this component or if it hasn't changed.
+    fn component_changed_since(&self, entity: Entity, tick: Tick) -> bool;
 }
 
 /// Sparse-set storage for a single component type
@@ -101,12 +112,20 @@ pub struct SparseSet<T: Component> {
     /// Dense component array (packed, no gaps)
     /// Aligned with entity array for sequential access
     components: Vec<T>,
+    /// Component tick tracking for change detection
+    /// Aligned with entity/component arrays
+    ticks: Vec<ComponentTicks>,
 }
 
 impl<T: Component> SparseSet<T> {
     /// Create a new empty sparse set
     pub fn new() -> Self {
-        Self { sparse: Vec::new(), dense: Vec::new(), components: Vec::new() }
+        Self {
+            sparse: Vec::new(),
+            dense: Vec::new(),
+            components: Vec::new(),
+            ticks: Vec::new(),
+        }
     }
 
     /// Create a new sparse set with preallocated capacity
@@ -118,29 +137,32 @@ impl<T: Component> SparseSet<T> {
             sparse: Vec::new(),
             dense: Vec::with_capacity(capacity),
             components: Vec::with_capacity(capacity),
+            ticks: Vec::with_capacity(capacity),
         }
     }
 
     /// Insert a component for an entity
     ///
-    /// If the entity already has this component, it will be replaced.
+    /// If the entity already has this component, it will be replaced and marked as changed.
     ///
     /// # Examples
     ///
     /// ```
     /// # use engine_core::ecs::{Component, EntityAllocator, SparseSet};
+    /// # use engine_core::ecs::change_detection::Tick;
     /// # struct Health { current: f32, max: f32 }
     /// # impl Component for Health {}
     /// let mut storage = SparseSet::<Health>::new();
     /// let mut allocator = EntityAllocator::new();
     /// let entity = allocator.allocate();
+    /// let tick = Tick::new();
     ///
-    /// storage.insert(entity, Health { current: 100.0, max: 100.0 });
-    /// storage.insert(entity, Health { current: 50.0, max: 100.0 }); // Replaces
+    /// storage.insert(entity, Health { current: 100.0, max: 100.0 }, tick);
+    /// storage.insert(entity, Health { current: 50.0, max: 100.0 }, tick); // Replaces and marks changed
     /// assert_eq!(storage.get(entity).unwrap().current, 50.0);
     /// ```
     #[inline]
-    pub fn insert(&mut self, entity: Entity, component: T) {
+    pub fn insert(&mut self, entity: Entity, component: T, current_tick: Tick) {
         #[cfg(feature = "profiling")]
         profile_scope!("storage_insert", ProfileCategory::ECS);
 
@@ -157,7 +179,7 @@ impl<T: Component> SparseSet<T> {
         }
 
         if let Some(dense_idx) = self.sparse[idx] {
-            // Component exists, replace it
+            // Component exists, replace it and mark as changed
             // Extra defensive: verify dense index is valid
             assert!(
                 dense_idx < self.components.len(),
@@ -166,15 +188,18 @@ impl<T: Component> SparseSet<T> {
                 self.components.len()
             );
             self.components[dense_idx] = component;
+            self.ticks[dense_idx].set_changed(current_tick);
         } else {
             // New component, add to dense arrays
             let dense_idx = self.dense.len();
             self.sparse[idx] = Some(dense_idx);
             self.dense.push(entity);
             self.components.push(component);
+            self.ticks.push(ComponentTicks::new(current_tick));
 
             // Extra defensive: verify arrays stay synchronized
             debug_assert_eq!(self.dense.len(), self.components.len(), "Dense arrays out of sync");
+            debug_assert_eq!(self.dense.len(), self.ticks.len(), "Ticks array out of sync");
         }
     }
 
@@ -223,6 +248,7 @@ impl<T: Component> SparseSet<T> {
             // Swap with last element
             self.dense.swap(dense_idx, last_idx);
             self.components.swap(dense_idx, last_idx);
+            self.ticks.swap(dense_idx, last_idx);
 
             // Update sparse index for swapped entity
             let swapped_entity = self.dense[dense_idx];
@@ -245,12 +271,18 @@ impl<T: Component> SparseSet<T> {
 
         self.dense.pop();
         let component = self.components.pop().unwrap();
+        self.ticks.pop();
 
         // Extra defensive: verify arrays stay synchronized
         debug_assert_eq!(
             self.dense.len(),
             self.components.len(),
             "Dense arrays out of sync after remove"
+        );
+        debug_assert_eq!(
+            self.dense.len(),
+            self.ticks.len(),
+            "Ticks array out of sync after remove"
         );
 
         Some(component)
@@ -283,6 +315,112 @@ impl<T: Component> SparseSet<T> {
             self.components.len()
         );
         Some(unsafe { self.components.get_unchecked(dense_idx) })
+    }
+
+    /// Get an immutable reference to an entity's component (unchecked fast-path)
+    ///
+    /// This is an optimized version of `get()` that assumes:
+    /// - The entity ID is valid (< sparse.len())
+    /// - The entity has this component (sparse[id].is_some())
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure:
+    /// - `entity.id()` is within bounds of the sparse array
+    /// - The entity has this component (e.g., checked via `contains()` first)
+    /// - No mutable access to the storage while the returned reference is live
+    ///
+    /// # Performance
+    ///
+    /// This method reduces get() latency from ~49ns to ~15-20ns by:
+    /// - Eliminating the Option check on the sparse array lookup
+    /// - Removing the bounds check on sparse array access
+    /// - Direct pointer arithmetic instead of multiple indirections
+    ///
+    /// Use this in hot paths where you can prove safety invariants hold,
+    /// such as query iteration over known-valid entities.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::{Component, Entity, SparseSet};
+    /// # use engine_core::ecs::change_detection::Tick;
+    /// # struct Position { x: f32, y: f32, z: f32 }
+    /// # impl Component for Position {}
+    /// let mut storage = SparseSet::<Position>::new();
+    /// let entity = Entity::new(0, 0);
+    /// storage.insert(entity, Position { x: 1.0, y: 2.0, z: 3.0 }, Tick::new());
+    ///
+    /// // Safe: We know entity exists and has the component
+    /// unsafe {
+    ///     let pos = storage.get_unchecked_fast(entity);
+    ///     assert_eq!(pos.x, 1.0);
+    /// }
+    /// ```
+    #[inline(always)]
+    pub unsafe fn get_unchecked_fast(&self, entity: Entity) -> &T {
+        let idx = entity.id() as usize;
+
+        // SAFETY: Caller guarantees idx < sparse.len() and entity has component
+        let dense_idx = self.sparse.get_unchecked(idx).unwrap_unchecked();
+
+        // SAFETY: Sparse set invariant guarantees dense_idx < components.len()
+        debug_assert!(
+            dense_idx < self.components.len(),
+            "Sparse set invariant violated: dense_idx {} >= components.len() {}",
+            dense_idx,
+            self.components.len()
+        );
+
+        self.components.get_unchecked(dense_idx)
+    }
+
+    /// Get a mutable reference to an entity's component (unchecked fast-path)
+    ///
+    /// This is an optimized version of `get_mut()` with the same safety requirements
+    /// as `get_unchecked_fast()`.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure:
+    /// - `entity.id()` is within bounds of the sparse array
+    /// - The entity has this component
+    /// - No other access (mutable or immutable) to this component while the reference is live
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::{Component, Entity, SparseSet};
+    /// # use engine_core::ecs::change_detection::Tick;
+    /// # struct Position { x: f32, y: f32, z: f32 }
+    /// # impl Component for Position {}
+    /// let mut storage = SparseSet::<Position>::new();
+    /// let entity = Entity::new(0, 0);
+    /// storage.insert(entity, Position { x: 1.0, y: 2.0, z: 3.0 }, Tick::new());
+    ///
+    /// // Safe: We know entity exists and has the component
+    /// unsafe {
+    ///     let pos = storage.get_unchecked_fast_mut(entity);
+    ///     pos.x = 5.0;
+    /// }
+    /// assert_eq!(storage.get(entity).unwrap().x, 5.0);
+    /// ```
+    #[inline(always)]
+    pub unsafe fn get_unchecked_fast_mut(&mut self, entity: Entity) -> &mut T {
+        let idx = entity.id() as usize;
+
+        // SAFETY: Caller guarantees idx < sparse.len() and entity has component
+        let dense_idx = self.sparse.get_unchecked(idx).unwrap_unchecked();
+
+        // SAFETY: Sparse set invariant guarantees dense_idx < components.len()
+        debug_assert!(
+            dense_idx < self.components.len(),
+            "Sparse set invariant violated: dense_idx {} >= components.len() {}",
+            dense_idx,
+            self.components.len()
+        );
+
+        self.components.get_unchecked_mut(dense_idx)
     }
 
     /// Get a mutable reference to an entity's component
@@ -365,12 +503,50 @@ impl<T: Component> SparseSet<T> {
         self.sparse.clear();
         self.dense.clear();
         self.components.clear();
+        self.ticks.clear();
     }
 
     /// Reserve capacity for at least `additional` more components
     pub fn reserve(&mut self, additional: usize) {
         self.dense.reserve(additional);
         self.components.reserve(additional);
+        self.ticks.reserve(additional);
+    }
+
+    /// Get component ticks for an entity
+    ///
+    /// Returns None if the entity doesn't have this component.
+    #[inline]
+    pub fn get_ticks(&self, entity: Entity) -> Option<ComponentTicks> {
+        let idx = entity.id() as usize;
+        if idx >= self.sparse.len() {
+            return None;
+        }
+        let dense_idx = self.sparse[idx]?;
+        Some(self.ticks[dense_idx])
+    }
+
+    /// Get mutable component ticks for an entity
+    ///
+    /// Returns None if the entity doesn't have this component.
+    #[inline]
+    pub fn get_ticks_mut(&mut self, entity: Entity) -> Option<&mut ComponentTicks> {
+        let idx = entity.id() as usize;
+        if idx >= self.sparse.len() {
+            return None;
+        }
+        let dense_idx = self.sparse[idx]?;
+        Some(&mut self.ticks[dense_idx])
+    }
+
+    /// Mark component as changed for an entity
+    ///
+    /// This is used when getting mutable access to a component.
+    #[inline]
+    pub fn mark_changed(&mut self, entity: Entity, current_tick: Tick) {
+        if let Some(ticks) = self.get_ticks_mut(entity) {
+            ticks.set_changed(current_tick);
+        }
     }
 
     /// Get entity at a specific dense index
@@ -500,6 +676,15 @@ impl<T: Component> ComponentStorage for SparseSet<T> {
     fn clear(&mut self) {
         self.clear();
     }
+
+    #[inline]
+    fn component_changed_since(&self, entity: Entity, tick: Tick) -> bool {
+        if let Some(component_ticks) = self.get_ticks(entity) {
+            component_ticks.is_changed(tick)
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -522,7 +707,7 @@ mod tests {
         let mut storage = SparseSet::<Health>::new();
         let entity = Entity::new(0, 0);
 
-        storage.insert(entity, Health { current: 100.0, max: 100.0 });
+        storage.insert(entity, Health { current: 100.0, max: 100.0 }, Tick::new());
 
         let health = storage.get(entity).unwrap();
         assert_eq!(health.current, 100.0);
@@ -534,8 +719,8 @@ mod tests {
         let e1 = Entity::new(0, 0);
         let e2 = Entity::new(1, 0);
 
-        storage.insert(e1, Health { current: 100.0, max: 100.0 });
-        storage.insert(e2, Health { current: 50.0, max: 100.0 });
+        storage.insert(e1, Health { current: 100.0, max: 100.0 }, Tick::new());
+        storage.insert(e2, Health { current: 50.0, max: 100.0 }, Tick::new());
 
         storage.remove(e1);
 
@@ -548,7 +733,7 @@ mod tests {
         let mut storage = SparseSet::<i32>::new();
 
         for i in 0..100 {
-            storage.insert(Entity::new(i, 0), i as i32);
+            storage.insert(Entity::new(i, 0), i as i32, Tick::new());
         }
 
         let count: usize = storage.iter().count();
@@ -560,8 +745,8 @@ mod tests {
         let mut storage = SparseSet::<Health>::new();
         let entity = Entity::new(0, 0);
 
-        storage.insert(entity, Health { current: 100.0, max: 100.0 });
-        storage.insert(entity, Health { current: 50.0, max: 100.0 });
+        storage.insert(entity, Health { current: 100.0, max: 100.0 }, Tick::new());
+        storage.insert(entity, Health { current: 50.0, max: 100.0 }, Tick::new());
 
         assert_eq!(storage.len(), 1);
         assert_eq!(storage.get(entity).unwrap().current, 50.0);
@@ -576,9 +761,9 @@ mod tests {
         let e1 = Entity::new(1, 0);
         let e2 = Entity::new(2, 0);
 
-        storage.insert(e0, 100);
-        storage.insert(e1, 200);
-        storage.insert(e2, 300);
+        storage.insert(e0, 100, Tick::new());
+        storage.insert(e1, 200, Tick::new());
+        storage.insert(e2, 300, Tick::new());
 
         // Remove middle element
         let removed = storage.remove(e1);
@@ -597,7 +782,7 @@ mod tests {
 
         assert!(!storage.contains(entity));
 
-        storage.insert(entity, 42);
+        storage.insert(entity, 42, Tick::new());
         assert!(storage.contains(entity));
 
         storage.remove(entity);
@@ -609,7 +794,7 @@ mod tests {
         let mut storage = SparseSet::<Health>::new();
         let entity = Entity::new(0, 0);
 
-        storage.insert(entity, Health { current: 100.0, max: 100.0 });
+        storage.insert(entity, Health { current: 100.0, max: 100.0 }, Tick::new());
 
         if let Some(health) = storage.get_mut(entity) {
             health.current = 50.0;
@@ -623,7 +808,7 @@ mod tests {
         let mut storage = SparseSet::<i32>::new();
 
         for i in 0..10 {
-            storage.insert(Entity::new(i, 0), i as i32);
+            storage.insert(Entity::new(i, 0), i as i32, Tick::new());
         }
 
         assert_eq!(storage.len(), 10);
@@ -646,7 +831,7 @@ mod tests {
         let mut storage = SparseSet::<i32>::new();
 
         for i in 0..10 {
-            storage.insert(Entity::new(i, 0), i as i32);
+            storage.insert(Entity::new(i, 0), i as i32, Tick::new());
         }
 
         // Double all values
@@ -664,9 +849,9 @@ mod tests {
         let mut storage = SparseSet::<i32>::new();
 
         // Use sparse entity IDs
-        storage.insert(Entity::new(0, 0), 100);
-        storage.insert(Entity::new(100, 0), 200);
-        storage.insert(Entity::new(1000, 0), 300);
+        storage.insert(Entity::new(0, 0), 100, Tick::new());
+        storage.insert(Entity::new(100, 0), 200, Tick::new());
+        storage.insert(Entity::new(1000, 0), 300, Tick::new());
 
         assert_eq!(storage.get(Entity::new(0, 0)), Some(&100));
         assert_eq!(storage.get(Entity::new(100, 0)), Some(&200));

@@ -24,6 +24,7 @@ engine-build-utils = { path = "../build-utils" }
 
 [dev-dependencies]
 criterion = "0.5"
+serde_yaml = "0.9"
 
 [[bench]]
 name = "integration_bench"
@@ -39,4 +40,8 @@ harness = false
 
 [[bench]]
 name = "threshold_standalone"
+harness = false
+
+[[bench]]
+name = "component_benches"
 harness = false

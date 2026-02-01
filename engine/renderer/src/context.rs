@@ -255,12 +255,12 @@ impl VulkanContext {
     /// ```
     pub fn new_for_benchmarks(
         app_name: &str,
-        surface_provider: Option<&dyn Fn(&ash::Entry, &ash::Instance) -> Result<vk::SurfaceKHR, RendererError>>,
-        preferred_device_uuid: Option<[u8; 16]>,
+        surface: Option<vk::SurfaceKHR>,
+        surface_loader: Option<&ash::khr::surface::Instance>,
     ) -> Result<Self, RendererError> {
         // Same as new() but forces validation layers off
         std::env::set_var("DISABLE_VULKAN_VALIDATION", "1");
-        let result = Self::new(app_name, surface_provider, preferred_device_uuid);
+        let result = Self::new(app_name, surface, surface_loader);
         std::env::remove_var("DISABLE_VULKAN_VALIDATION");
         result
     }

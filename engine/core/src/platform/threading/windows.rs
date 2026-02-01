@@ -9,12 +9,29 @@ use winapi::um::winbase::{
 };
 
 /// Windows threading backend.
-pub struct WindowsThreading;
+///
+/// # Performance Optimizations
+///
+/// - Caches CPU count at initialization to avoid repeated syscalls
+/// - Thread-safe via Windows API guarantees (no locks needed)
+///
+/// # Target Performance
+///
+/// - set_thread_priority: <5us (ideal: 2us)
+/// - set_thread_affinity (1 core): <10us (ideal: 5us)
+/// - num_cpus: <1us (ideal: <100ns, cached)
+pub struct WindowsThreading {
+    /// Number of CPUs, cached for fast access
+    num_cpus: usize,
+}
 
 impl WindowsThreading {
     /// Create a new Windows threading backend.
     pub fn new() -> Result<Self, PlatformError> {
-        Ok(Self)
+        // Cache CPU count for fast access
+        let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+
+        Ok(Self { num_cpus })
     }
 }
 
@@ -30,10 +47,10 @@ impl ThreadingBackend for WindowsThreading {
         let result = unsafe { SetThreadPriority(GetCurrentThread(), win_priority) };
 
         if result == 0 {
-            return Err(PlatformError::threadingerror(
-                "set_priority".to_string(),
-                format!("SetThreadPriority failed for {:?}", priority),
-            ));
+            return Err(PlatformError::ThreadingError {
+                operation: "set_priority".to_string(),
+                details: format!("SetThreadPriority failed for {:?}", priority),
+            });
         }
 
         Ok(())
@@ -41,20 +58,30 @@ impl ThreadingBackend for WindowsThreading {
 
     fn set_thread_affinity(&self, cores: &[usize]) -> Result<(), PlatformError> {
         if cores.is_empty() {
-            return Err(PlatformError::threadingerror(
-                "set_affinity".to_string(),
-                "Core list cannot be empty".to_string(),
-            ));
+            return Err(PlatformError::ThreadingError {
+                operation: "set_affinity".to_string(),
+                details: "Core list cannot be empty".to_string(),
+            });
+        }
+
+        // Validate core indices before building mask
+        for &core in cores {
+            if core >= self.num_cpus {
+                return Err(PlatformError::ThreadingError {
+                    operation: "set_affinity".to_string(),
+                    details: format!("Core {} exceeds available CPUs ({})", core, self.num_cpus),
+                });
+            }
         }
 
         // Build affinity mask
         let mut mask: usize = 0;
         for &core in cores {
             if core >= std::mem::size_of::<usize>() * 8 {
-                return Err(PlatformError::threadingerror(
-                    "set_affinity".to_string(),
-                    format!("Core index {} is out of range", core),
-                ));
+                return Err(PlatformError::ThreadingError {
+                    operation: "set_affinity".to_string(),
+                    details: format!("Core index {} is out of range", core),
+                });
             }
             mask |= 1 << core;
         }
@@ -62,13 +89,18 @@ impl ThreadingBackend for WindowsThreading {
         let result = unsafe { SetThreadAffinityMask(GetCurrentThread(), mask) };
 
         if result == 0 {
-            return Err(PlatformError::threadingerror(
-                "set_affinity".to_string(),
-                "SetThreadAffinityMask failed".to_string(),
-            ));
+            return Err(PlatformError::ThreadingError {
+                operation: "set_affinity".to_string(),
+                details: "SetThreadAffinityMask failed".to_string(),
+            });
         }
 
         Ok(())
+    }
+
+    fn num_cpus(&self) -> usize {
+        // Return cached value for fast access
+        self.num_cpus
     }
 }
 

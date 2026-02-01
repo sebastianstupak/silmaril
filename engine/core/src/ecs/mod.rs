@@ -5,16 +5,23 @@
 //! - Component storage using sparse sets
 //! - World container for managing all ECS data
 //! - Type-safe component queries
+//! - Change detection for efficient component tracking
 
+pub mod change_detection;
 pub mod component;
+pub mod dependency_graph;
 pub mod entity;
 pub mod query;
+pub mod schedule;
 pub mod storage;
 pub mod world;
 
 // Re-export commonly used types
+pub use change_detection::{Changed, ComponentTicks, SystemTicks, Tick};
 pub use component::{Component, ComponentDescriptor};
+pub use dependency_graph::{DependencyGraph, SystemNode};
 pub use entity::{Entity, EntityAllocator};
 pub use query::{Query, QueryIter, QueryIterMut};
+pub use schedule::{Schedule, System, SystemAccess};
 pub use storage::SparseSet;
 pub use world::World;
