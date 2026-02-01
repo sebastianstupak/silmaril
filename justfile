@@ -173,6 +173,27 @@ bench-report:
 bench-network:
     cargo bench --package engine-networking
 
+# Run serialization benchmarks (Phase 1.3)
+bench-serialization:
+    @echo "Running serialization benchmarks..."
+    cargo bench --package engine-core --bench serialization_benches
+    cargo bench --package engine-core --bench serialization_comprehensive
+
+# Run asset loading benchmarks
+bench-assets:
+    @echo "Running asset benchmarks..."
+    cargo bench --package engine-assets
+
+# Run spatial data structure benchmarks
+bench-spatial:
+    @echo "Running spatial benchmarks..."
+    cargo bench --package engine-core --bench spatial_benches
+
+# Run allocator benchmarks
+bench-allocators:
+    @echo "Running allocator benchmarks..."
+    cargo bench --package engine-core --bench allocator_benches
+
 # === Benchmark Management ===
 
 # Run comprehensive benchmark suite with report generation

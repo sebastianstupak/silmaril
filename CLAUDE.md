@@ -37,6 +37,7 @@ Build a **fully automatable game engine** optimized for AI agent workflows with:
 
 - **Profiling & Observability** → [docs/profiling.md](docs/profiling.md)
 - **Performance** → [docs/performance-targets.md](docs/performance-targets.md)
+- **Benchmarking** → [docs/benchmarking.md](docs/benchmarking.md) ⚠️ **NEW - USE `just benchmark:*` COMMANDS**
 - **Architecture** → [docs/architecture.md](docs/architecture.md)
 - **Dev Workflow** → [docs/development-workflow.md](docs/development-workflow.md)
 
@@ -374,23 +375,28 @@ agent-game-engine/
 ### **Before Committing**
 
 ```bash
-# Run all checks
-cargo fmt --check              # Format
-cargo clippy -- -D warnings    # Lints
-cargo test --all-features      # All tests
-cargo test --doc               # Doc tests
+# Quick checks (recommended)
+just check                     # Format + clippy + test
 
-# Platform-specific
-cargo build --target x86_64-pc-windows-msvc
-cargo build --target x86_64-unknown-linux-gnu
-cargo build --target x86_64-apple-darwin
-cargo build --target aarch64-apple-darwin
+# Or run individually
+just fmt-check                 # Format
+just clippy                    # Lints
+just test                      # All tests
+
+# Test specific features
+just test:serialization        # Test serialization
+just test:ecs                  # Test ECS
+just test:physics              # Test physics
 
 # Benchmarks (if changed performance-sensitive code)
-cargo bench
+just benchmark:serialization   # Benchmark serialization
+just benchmark:ecs             # Benchmark ECS
+just benchmark:all             # All benchmarks
 ```
 
-**See:** [docs/development-workflow.md](docs/development-workflow.md)
+**See:**
+- [docs/development-workflow.md](docs/development-workflow.md)
+- [docs/rules/justfile-commands.md](docs/rules/justfile-commands.md)
 
 ---
 
