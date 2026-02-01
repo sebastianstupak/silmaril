@@ -296,24 +296,89 @@ Build a fully automatable game engine optimized for AI agents with:
 **Status:** ⚪ Not Started
 
 ### **Goals**
-- Client/server architecture with attribute-based splitting
+- Client/server architecture with compile-time enforcement
+- Feature flags with flexible client/server/shared patterns
 - TCP + UDP dual-channel networking
-- Full state + delta compression
+- Full state + delta compression with property-based validation
 - Client-side prediction + server reconciliation
-- Version checking
+- Comprehensive metrics and monitoring (built-in)
 - Basic interest management
+- Docker-based development environment
+- Production-ready containers
+
+### **Architecture Decisions** (Phase 2 Planning Session)
+
+#### **1. Feature Flags & Code Splitting**
+- **Pattern:** `#[client_only]`, `#[server_only]`, `#[shared]`, `#[server_authoritative]`
+- **Flexibility:** Code can be shared between client/server with different implementations
+- **Validation:** Property-based tests ensure client/server parity
+- **Build System:** Separate binaries with feature flags (`cargo build --bin client/server`)
+
+#### **2. Module Structure** (Future Phases)
+Three new optional modules for scaling:
+- `engine/persistence` - Database, Redis, caching (Phase 3-4)
+- `engine/infrastructure` - Config, secrets, service discovery, health checks (Phase 3-4)
+- `engine/scaling` - Sharding, load balancing, replication (Phase 4-5)
+
+#### **3. Testing Strategy**
+- **Comprehensive:** Unit + Integration + Property + Benchmarks (like Phase 1.4)
+- **Validation:** Property tests for client/server prediction parity
+- **Performance:** Benchmark every critical path (< 1ms per network operation)
+- **Coverage:** AAA quality requires >80% test coverage
+
+#### **4. Metrics & Monitoring** (Day One)
+- **Built-in:** Prometheus endpoint on port 8080 (optional, can disable)
+- **AI-Friendly:** Comprehensive metrics for debugging (TPS, latency, entity counts, errors)
+- **Console:** Basic telnet admin console (localhost-only, no auth for Phase 2)
+- **Dashboard:** Advanced web UI deferred to Phase 4
+
+#### **5. Container Infrastructure**
+- **Development:** docker-compose with hot-reload support
+- **Production:** Multi-stage Dockerfiles (small images ~50MB)
+- **Registry:** Local-only for Phase 2 (Docker Desktop)
+- **Orchestration:** Kubernetes deferred to Phase 4
 
 ### **Tasks**
 
-#### **2.1 Proc Macros** ⚠️ **MUST READ:** [docs/tasks/phase2-proc-macros.md](docs/tasks/phase2-proc-macros.md)
+#### **2.1 Foundation & Infrastructure** ⚠️ **MUST READ:** [docs/tasks/phase2-foundation.md](docs/tasks/phase2-foundation.md)
+
+**Part A: Proc Macros (3-4 days)**
 - [ ] #[client_only] attribute macro
 - [ ] #[server_only] attribute macro
-- [ ] #[shared_system] attribute macro
+- [ ] #[shared] attribute macro
+- [ ] #[server_authoritative] attribute macro (client/server different impl)
 - [ ] Compile-time enforcement
-- [ ] Tests (verify macros work)
-- [ ] Documentation
+- [ ] Property-based tests (verify client/server parity)
+- [ ] Documentation with examples
 
-**Time Estimate:** 3-4 days
+**Part B: Build Infrastructure (2-3 days)**
+- [ ] Separate client/server binaries in `engine/binaries/`
+- [ ] Feature flag setup (client, server, networking, all)
+- [ ] Separate build profiles (client optimized for perf, server for size)
+- [ ] CI matrix for both builds
+- [ ] Cross-compilation verification
+
+**Part C: Docker Infrastructure (2-3 days)**
+- [ ] Development docker-compose.yml
+- [ ] Production Dockerfiles (multi-stage, <50MB images)
+- [ ] One-command dev environment (`./scripts/dev.sh`)
+- [ ] Hot-reload support (cargo-watch integration)
+- [ ] Docker networking (client ↔ server communication)
+
+**Part D: Metrics & Observability (2-3 days)**
+- [ ] Prometheus metrics endpoint (optional, port 8080)
+- [ ] Core metrics (TPS, entity count, memory, CPU)
+- [ ] Network metrics (latency, bandwidth, packet loss)
+- [ ] Performance metrics (tick duration, per-system timing)
+- [ ] Error tracking (counts, rates, patterns)
+- [ ] Basic admin console (telnet, localhost-only)
+
+**Time Estimate:** 5-7 days
+**Deliverables:**
+- Macros enforce client/server separation
+- `cargo build --bin client/server` works
+- `./scripts/dev.sh` starts complete environment
+- Metrics visible at `http://localhost:8080/metrics`
 
 #### **2.2 Network Protocol** ⚠️ **MUST READ:** [docs/tasks/phase2-network-protocol.md](docs/tasks/phase2-network-protocol.md)
 - [ ] Message enum (ClientMessage, ServerMessage)
@@ -391,13 +456,19 @@ Build a fully automatable game engine optimized for AI agents with:
 **Performance:** < 1ms per client
 
 **Phase 2 Deliverables:**
-- ✅ Client + server binaries compile separately
-- ✅ TCP + UDP working
-- ✅ State sync (full + delta)
-- ✅ Client prediction working
-- ✅ Basic multiplayer demo (2+ clients)
+- ✅ Client + server binaries compile separately with feature flags
+- ✅ Macros enforce client/server code separation
+- ✅ Docker development environment working
+- ✅ Metrics endpoint serving Prometheus format
+- ✅ Basic admin console operational
+- ✅ TCP + UDP channels working
+- ✅ State sync (full + delta) with property tests
+- ✅ Client prediction with < 10% error rate
+- ✅ Basic multiplayer demo (2+ clients, <50ms latency)
+- ✅ Comprehensive test suite (>80% coverage)
+- ✅ Benchmarks for all network operations (<1ms target)
 
-**Total Phase 2 Time:** 3-4 weeks
+**Total Phase 2 Time:** 4-5 weeks (added infrastructure week)
 
 ---
 
