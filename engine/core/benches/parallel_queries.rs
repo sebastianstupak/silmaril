@@ -24,8 +24,9 @@ struct Velocity {
 impl Component for Velocity {}
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct Mass {
-    value: f32,
+    _value: f32,
 }
 impl Component for Mass {}
 
@@ -38,23 +39,9 @@ fn create_world_with_entities(entity_count: usize) -> World {
 
     for i in 0..entity_count {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: i as f32 * 2.0,
-                z: i as f32 * 3.0,
-            },
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-        );
-        world.add(entity, Mass { value: 1.0 + i as f32 * 0.01 });
+        world.add(entity, Position { x: i as f32, y: i as f32 * 2.0, z: i as f32 * 3.0 });
+        world.add(entity, Velocity { x: 1.0, y: 2.0, z: 3.0 });
+        world.add(entity, Mass { _value: 1.0 + i as f32 * 0.01 });
     }
 
     world
@@ -74,35 +61,21 @@ fn bench_single_component_iter(c: &mut Criterion) {
             entity_count,
             |b, _| {
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(1)
-                        .build()
-                        .unwrap()
-                        .install(|| {
-                            let sum: f32 = world
-                                .par_query::<Position>()
-                                .map(|(_, pos)| pos.x)
-                                .sum();
-                            black_box(sum);
-                        });
+                    rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| {
+                        let sum: f32 = world.par_query::<Position>().map(|(_, pos)| pos.x).sum();
+                        black_box(sum);
+                    });
                 });
             },
         );
 
         // Parallel (default thread count)
-        group.bench_with_input(
-            BenchmarkId::new("parallel", entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let sum: f32 = world
-                        .par_query::<Position>()
-                        .map(|(_, pos)| pos.x)
-                        .sum();
-                    black_box(sum);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("parallel", entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let sum: f32 = world.par_query::<Position>().map(|(_, pos)| pos.x).sum();
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
@@ -122,38 +95,30 @@ fn bench_single_component_iter_mut(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(1)
-                        .build()
-                        .unwrap()
-                        .install(|| {
-                            world.par_query_mut::<Position>().for_each(|(_, pos)| {
-                                pos.x += 1.0;
-                                pos.y += 1.0;
-                                pos.z += 1.0;
-                                black_box(pos);
-                            });
+                    rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| {
+                        world.par_query_mut::<Position>().for_each(|(_, pos)| {
+                            pos.x += 1.0;
+                            pos.y += 1.0;
+                            pos.z += 1.0;
+                            black_box(pos);
                         });
+                    });
                 });
             },
         );
 
         // Parallel
-        group.bench_with_input(
-            BenchmarkId::new("parallel", entity_count),
-            entity_count,
-            |b, _| {
-                let mut world = create_world_with_entities(*entity_count);
-                b.iter(|| {
-                    world.par_query_mut::<Position>().for_each(|(_, pos)| {
-                        pos.x += 1.0;
-                        pos.y += 1.0;
-                        pos.z += 1.0;
-                        black_box(pos);
-                    });
+        group.bench_with_input(BenchmarkId::new("parallel", entity_count), entity_count, |b, _| {
+            let mut world = create_world_with_entities(*entity_count);
+            b.iter(|| {
+                world.par_query_mut::<Position>().for_each(|(_, pos)| {
+                    pos.x += 1.0;
+                    pos.y += 1.0;
+                    pos.z += 1.0;
+                    black_box(pos);
                 });
-            },
-        );
+            });
+        });
     }
 
     group.finish();
@@ -173,35 +138,27 @@ fn bench_two_component_iter(c: &mut Criterion) {
             entity_count,
             |b, _| {
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(1)
-                        .build()
-                        .unwrap()
-                        .install(|| {
-                            let sum: f32 = world
-                                .par_query2::<Position, Velocity>()
-                                .map(|(_, (pos, vel))| pos.x + vel.x)
-                                .sum();
-                            black_box(sum);
-                        });
+                    rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| {
+                        let sum: f32 = world
+                            .par_query2::<Position, Velocity>()
+                            .map(|(_, (pos, vel))| pos.x + vel.x)
+                            .sum();
+                        black_box(sum);
+                    });
                 });
             },
         );
 
         // Parallel
-        group.bench_with_input(
-            BenchmarkId::new("parallel", entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let sum: f32 = world
-                        .par_query2::<Position, Velocity>()
-                        .map(|(_, (pos, vel))| pos.x + vel.x)
-                        .sum();
-                    black_box(sum);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("parallel", entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let sum: f32 = world
+                    .par_query2::<Position, Velocity>()
+                    .map(|(_, (pos, vel))| pos.x + vel.x)
+                    .sum();
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
@@ -221,42 +178,30 @@ fn bench_two_component_iter_mut(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(1)
-                        .build()
-                        .unwrap()
-                        .install(|| {
-                            world
-                                .par_query2_mut::<Position, Velocity>()
-                                .for_each(|(_, (pos, vel))| {
-                                    pos.x += vel.x;
-                                    pos.y += vel.y;
-                                    pos.z += vel.z;
-                                    black_box(pos);
-                                });
-                        });
-                });
-            },
-        );
-
-        // Parallel
-        group.bench_with_input(
-            BenchmarkId::new("parallel", entity_count),
-            entity_count,
-            |b, _| {
-                let mut world = create_world_with_entities(*entity_count);
-                b.iter(|| {
-                    world
-                        .par_query2_mut::<Position, Velocity>()
-                        .for_each(|(_, (pos, vel))| {
+                    rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| {
+                        world.par_query2_mut::<Position, Velocity>().for_each(|(_, (pos, vel))| {
                             pos.x += vel.x;
                             pos.y += vel.y;
                             pos.z += vel.z;
                             black_box(pos);
                         });
+                    });
                 });
             },
         );
+
+        // Parallel
+        group.bench_with_input(BenchmarkId::new("parallel", entity_count), entity_count, |b, _| {
+            let mut world = create_world_with_entities(*entity_count);
+            b.iter(|| {
+                world.par_query2_mut::<Position, Velocity>().for_each(|(_, (pos, vel))| {
+                    pos.x += vel.x;
+                    pos.y += vel.y;
+                    pos.z += vel.z;
+                    black_box(pos);
+                });
+            });
+        });
     }
 
     group.finish();
@@ -276,36 +221,8 @@ fn bench_physics_workload(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(1)
-                        .build()
-                        .unwrap()
-                        .install(|| {
-                            world
-                                .par_query2_mut::<Position, Velocity>()
-                                .for_each(|(_, (pos, vel))| {
-                                    // Simulate simple physics step
-                                    let dt = 0.016; // 60 FPS
-                                    pos.x += vel.x * dt;
-                                    pos.y += vel.y * dt;
-                                    pos.z += vel.z * dt;
-                                    black_box(pos);
-                                });
-                        });
-                });
-            },
-        );
-
-        // Parallel
-        group.bench_with_input(
-            BenchmarkId::new("parallel", entity_count),
-            entity_count,
-            |b, _| {
-                let mut world = create_world_with_entities(*entity_count);
-                b.iter(|| {
-                    world
-                        .par_query2_mut::<Position, Velocity>()
-                        .for_each(|(_, (pos, vel))| {
+                    rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| {
+                        world.par_query2_mut::<Position, Velocity>().for_each(|(_, (pos, vel))| {
                             // Simulate simple physics step
                             let dt = 0.016; // 60 FPS
                             pos.x += vel.x * dt;
@@ -313,9 +230,25 @@ fn bench_physics_workload(c: &mut Criterion) {
                             pos.z += vel.z * dt;
                             black_box(pos);
                         });
+                    });
                 });
             },
         );
+
+        // Parallel
+        group.bench_with_input(BenchmarkId::new("parallel", entity_count), entity_count, |b, _| {
+            let mut world = create_world_with_entities(*entity_count);
+            b.iter(|| {
+                world.par_query2_mut::<Position, Velocity>().for_each(|(_, (pos, vel))| {
+                    // Simulate simple physics step
+                    let dt = 0.016; // 60 FPS
+                    pos.x += vel.x * dt;
+                    pos.y += vel.y * dt;
+                    pos.z += vel.z * dt;
+                    black_box(pos);
+                });
+            });
+        });
     }
 
     group.finish();
@@ -335,35 +268,21 @@ fn bench_parallel_overhead(c: &mut Criterion) {
             entity_count,
             |b, _| {
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(1)
-                        .build()
-                        .unwrap()
-                        .install(|| {
-                            let sum: f32 = world
-                                .par_query::<Position>()
-                                .map(|(_, pos)| pos.x)
-                                .sum();
-                            black_box(sum);
-                        });
+                    rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap().install(|| {
+                        let sum: f32 = world.par_query::<Position>().map(|(_, pos)| pos.x).sum();
+                        black_box(sum);
+                    });
                 });
             },
         );
 
         // Parallel
-        group.bench_with_input(
-            BenchmarkId::new("parallel", entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let sum: f32 = world
-                        .par_query::<Position>()
-                        .map(|(_, pos)| pos.x)
-                        .sum();
-                    black_box(sum);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("parallel", entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let sum: f32 = world.par_query::<Position>().map(|(_, pos)| pos.x).sum();
+                black_box(sum);
+            });
+        });
     }
 
     group.finish();
@@ -384,17 +303,15 @@ fn bench_thread_scaling(c: &mut Criterion) {
             thread_count,
             |b, &threads| {
                 b.iter(|| {
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(threads)
-                        .build()
-                        .unwrap()
-                        .install(|| {
+                    rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap().install(
+                        || {
                             let sum: f32 = world
                                 .par_query2::<Position, Velocity>()
                                 .map(|(_, (pos, vel))| pos.x + vel.x)
                                 .sum();
                             black_box(sum);
-                        });
+                        },
+                    );
                 });
             },
         );

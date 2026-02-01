@@ -58,11 +58,7 @@ struct OrderTrackingSystem {
 
 impl OrderTrackingSystem {
     fn new(name: &str, access: SystemAccess, log: Arc<Mutex<Vec<String>>>) -> Self {
-        Self {
-            name: name.to_string(),
-            access,
-            execution_log: log,
-        }
+        Self { name: name.to_string(), access, execution_log: log }
     }
 }
 
@@ -90,11 +86,7 @@ struct WorkSystem {
 
 impl WorkSystem {
     fn new(name: &str, access: SystemAccess, duration: Duration) -> Self {
-        Self {
-            name: name.to_string(),
-            access,
-            duration,
-        }
+        Self { name: name.to_string(), access, duration }
     }
 }
 
@@ -496,10 +488,7 @@ fn test_no_data_races() {
 
 #[test]
 fn test_system_access_builder() {
-    let access = SystemAccess::new()
-        .reads::<Position>()
-        .reads::<Velocity>()
-        .writes::<Health>();
+    let access = SystemAccess::new().reads::<Position>().reads::<Velocity>().writes::<Health>();
 
     assert_eq!(access.reads.len(), 2);
     assert_eq!(access.writes.len(), 1);

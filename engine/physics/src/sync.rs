@@ -8,7 +8,6 @@
 //! - Only syncs dynamic bodies (static/kinematic handled separately)
 //! - Uses profiling to track sync overhead
 
-use crate::components::{RigidBody, RigidBodyType};
 use crate::events::*;
 use crate::world::PhysicsWorld;
 use engine_core::ecs::{Entity, World};
@@ -110,8 +109,12 @@ impl PhysicsSyncSystem {
         // Clear buffer (keeps capacity)
         self.transform_buffer.clear();
 
+        // Collect entity mappings to avoid borrow issues
+        let entity_mappings: Vec<_> =
+            self.entity_map.iter().map(|(&id, &entity)| (id, entity)).collect();
+
         // Batch collect transforms
-        for (&entity_id, &ecs_entity) in &self.entity_map {
+        for (entity_id, ecs_entity) in entity_mappings {
             if let Some((pos, rot)) = physics.get_transform(entity_id) {
                 self.transform_buffer.push((ecs_entity, pos, rot));
 
@@ -148,8 +151,12 @@ impl PhysicsSyncSystem {
         // Clear buffer (keeps capacity)
         self.velocity_buffer.clear();
 
+        // Collect entity mappings to avoid borrow issues
+        let entity_mappings: Vec<_> =
+            self.entity_map.iter().map(|(&id, &entity)| (id, entity)).collect();
+
         // Batch collect velocities
-        for (&entity_id, &ecs_entity) in &self.entity_map {
+        for (entity_id, ecs_entity) in entity_mappings {
             if let Some((linvel, angvel)) = physics.get_velocity(entity_id) {
                 self.velocity_buffer.push((ecs_entity, linvel, angvel));
 
@@ -169,11 +176,11 @@ impl PhysicsSyncSystem {
     /// Flush velocity batch to ECS
     #[inline]
     fn flush_velocity_batch(&mut self, world: &mut World) {
-        for (entity, linvel, angvel) in self.velocity_buffer.drain(..) {
+        for (entity, linvel, _angvel) in self.velocity_buffer.drain(..) {
             // Update Velocity component if it exists
+            // Note: Velocity component only stores linear velocity currently
             if let Some(vel) = world.get_mut::<crate::components::Velocity>(entity) {
                 vel.linear = linvel;
-                vel.angular = angvel;
             }
         }
     }
@@ -196,7 +203,7 @@ impl PhysicsSyncSystem {
                             entity_a: e1,
                             entity_b: e2,
                             contact_point: Vec3::ZERO, // TODO: Get actual contact point
-                            normal: Vec3::ZERO,         // TODO: Get actual normal
+                            normal: Vec3::ZERO,        // TODO: Get actual normal
                         });
                     }
                 }
@@ -205,10 +212,7 @@ impl PhysicsSyncSystem {
                         physics.get_entity_from_collider(*h1),
                         physics.get_entity_from_collider(*h2),
                     ) {
-                        world.send_event(CollisionEndEvent {
-                            entity_a: e1,
-                            entity_b: e2,
-                        });
+                        world.send_event(CollisionEndEvent { entity_a: e1, entity_b: e2 });
                     }
                 }
             }
@@ -241,7 +245,7 @@ impl Default for PhysicsSyncSystem {
 ///
 /// Scans all entities with RigidBody components and registers them
 /// with the sync system.
-pub fn build_entity_mapping(world: &World, sync: &mut PhysicsSyncSystem) {
+pub fn build_entity_mapping(_world: &World, sync: &mut PhysicsSyncSystem) {
     #[cfg(feature = "profiling")]
     profile_scope!("build_entity_mapping", ProfileCategory::Physics);
 
@@ -270,10 +274,16 @@ mod tests {
 
     #[test]
     fn test_entity_registration() {
-        let mut sync = PhysicsSyncSystem::default();
+        use engine_core::ecs::EntityAllocator;
 
-        sync.register_entity(1, Entity::from_raw(0));
-        sync.register_entity(2, Entity::from_raw(1));
+        let mut sync = PhysicsSyncSystem::default();
+        let mut allocator = EntityAllocator::new();
+
+        let entity1 = allocator.allocate();
+        let entity2 = allocator.allocate();
+
+        sync.register_entity(1, entity1);
+        sync.register_entity(2, entity2);
 
         assert_eq!(sync.entity_map.len(), 2);
 

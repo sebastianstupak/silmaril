@@ -19,7 +19,6 @@
 #[cfg(feature = "metrics")]
 use engine_observability::metrics::{start_metrics_server, MetricsRegistry};
 
-
 #[cfg(feature = "metrics")]
 #[tokio::main]
 async fn main() {

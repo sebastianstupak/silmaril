@@ -1,7 +1,7 @@
 //! Debug test to understand physics behavior
 
-use engine_physics::{Collider, PhysicsConfig, PhysicsWorld, RigidBody};
 use engine_math::{Quat, Vec3};
+use engine_physics::{Collider, PhysicsConfig, PhysicsWorld, RigidBody};
 
 #[test]
 fn debug_falling_box() {
@@ -16,10 +16,7 @@ fn debug_falling_box() {
         Vec3::new(0.0, -1.0, 0.0),
         Quat::IDENTITY,
     );
-    world.add_collider(
-        ground_id,
-        &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)),
-    );
+    world.add_collider(ground_id, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
 
     // Create falling box
     let box_id = 1;

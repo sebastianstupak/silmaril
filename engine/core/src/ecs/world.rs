@@ -654,7 +654,10 @@ impl World {
     ///     println!("Collision: {} and {}", event.entity_a, event.entity_b);
     /// }
     /// ```
-    pub fn read_events<'a, E: Event>(&'a self, reader: &mut EventReader<E>) -> impl Iterator<Item = &'a E> + 'a {
+    pub fn read_events<'a, E: Event>(
+        &'a self,
+        reader: &mut EventReader<E>,
+    ) -> impl Iterator<Item = &'a E> + 'a {
         self.events.read(reader)
     }
 

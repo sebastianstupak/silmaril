@@ -1,0 +1,25 @@
+[package]
+name = "engine-assets"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+backtrace = ["engine-core/backtrace"]
+
+[dependencies]
+glam = "0.25"
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"], optional = true }
+engine-core = { path = "../core" }
+engine-macros = { path = "../macros" }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "mesh_benches"
+harness = false

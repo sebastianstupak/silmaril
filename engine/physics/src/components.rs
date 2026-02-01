@@ -19,9 +19,7 @@ impl Velocity {
 
     /// Create a new velocity
     pub const fn new(x: f32, y: f32, z: f32) -> Self {
-        Self {
-            linear: Vec3::new(x, y, z),
-        }
+        Self { linear: Vec3::new(x, y, z) }
     }
 
     /// Get X component
@@ -110,8 +108,8 @@ impl Default for RigidBody {
             mass: 1.0,
             linear_velocity: Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
-            linear_damping: 0.01,     // Slight air resistance
-            angular_damping: 0.05,    // More rotational damping
+            linear_damping: 0.01,  // Slight air resistance
+            angular_damping: 0.05, // More rotational damping
             gravity_scale: 1.0,
             lock_translation: [false; 3],
             lock_rotation: [false; 3],
@@ -124,19 +122,12 @@ impl Default for RigidBody {
 impl RigidBody {
     /// Create a dynamic body with given mass
     pub fn dynamic(mass: f32) -> Self {
-        Self {
-            body_type: RigidBodyType::Dynamic,
-            mass,
-            ..Default::default()
-        }
+        Self { body_type: RigidBodyType::Dynamic, mass, ..Default::default() }
     }
 
     /// Create a kinematic body
     pub fn kinematic() -> Self {
-        Self {
-            body_type: RigidBodyType::Kinematic,
-            ..Default::default()
-        }
+        Self { body_type: RigidBodyType::Kinematic, ..Default::default() }
     }
 
     /// Create a static body
@@ -151,8 +142,8 @@ impl RigidBody {
     /// Lock Y-axis translation (2D platformer physics)
     pub fn lock_2d_platform(mut self) -> Self {
         self.lock_translation[1] = true; // Lock Y
-        self.lock_rotation[0] = true;    // Lock X rotation
-        self.lock_rotation[2] = true;    // Lock Z rotation
+        self.lock_rotation[0] = true; // Lock X rotation
+        self.lock_rotation[2] = true; // Lock Z rotation
         self
     }
 
@@ -347,11 +338,7 @@ impl PhysicsMaterial {
 
     fn combine_values(&self, a: f32, b: f32, mode_a: CombineMode, mode_b: CombineMode) -> f32 {
         // Use the mode with higher precedence
-        let mode = if mode_b as u8 > mode_a as u8 {
-            mode_b
-        } else {
-            mode_a
-        };
+        let mode = if mode_b as u8 > mode_a as u8 { mode_b } else { mode_a };
 
         match mode {
             CombineMode::Average => (a + b) / 2.0,
@@ -365,9 +352,7 @@ impl PhysicsMaterial {
 impl Default for Collider {
     fn default() -> Self {
         Self {
-            shape: ColliderShape::Box {
-                half_extents: Vec3::ONE,
-            },
+            shape: ColliderShape::Box { half_extents: Vec3::ONE },
             material: PhysicsMaterial::default(),
             is_sensor: false,
             collision_layer: 1,         // Layer 0
@@ -379,38 +364,22 @@ impl Default for Collider {
 impl Collider {
     /// Box collider
     pub fn box_collider(half_extents: Vec3) -> Self {
-        Self {
-            shape: ColliderShape::Box { half_extents },
-            ..Default::default()
-        }
+        Self { shape: ColliderShape::Box { half_extents }, ..Default::default() }
     }
 
     /// Sphere collider
     pub fn sphere(radius: f32) -> Self {
-        Self {
-            shape: ColliderShape::Sphere { radius },
-            ..Default::default()
-        }
+        Self { shape: ColliderShape::Sphere { radius }, ..Default::default() }
     }
 
     /// Capsule collider (best for character controllers)
     pub fn capsule(half_height: f32, radius: f32) -> Self {
-        Self {
-            shape: ColliderShape::Capsule {
-                half_height,
-                radius,
-            },
-            ..Default::default()
-        }
+        Self { shape: ColliderShape::Capsule { half_height, radius }, ..Default::default() }
     }
 
     /// Create a sensor/trigger collider
     pub fn sensor(shape: ColliderShape) -> Self {
-        Self {
-            shape,
-            is_sensor: true,
-            ..Default::default()
-        }
+        Self { shape, is_sensor: true, ..Default::default() }
     }
 
     /// Set collision layer (what group am I in?)
@@ -501,8 +470,8 @@ mod tests {
     fn test_lock_2d_platform() {
         let rb = RigidBody::default().lock_2d_platform();
         assert!(rb.lock_translation[1]); // Y locked
-        assert!(rb.lock_rotation[0]);    // X rotation locked
-        assert!(rb.lock_rotation[2]);    // Z rotation locked
+        assert!(rb.lock_rotation[0]); // X rotation locked
+        assert!(rb.lock_rotation[2]); // Z rotation locked
     }
 
     #[test]
@@ -554,7 +523,9 @@ mod tests {
         assert!(matches!(box_collider.shape, ColliderShape::Box { .. }));
 
         let sphere = Collider::sphere(1.5);
-        assert!(matches!(sphere.shape, ColliderShape::Sphere { radius } if (radius - 1.5).abs() < 0.01));
+        assert!(
+            matches!(sphere.shape, ColliderShape::Sphere { radius } if (radius - 1.5).abs() < 0.01)
+        );
 
         let capsule = Collider::capsule(2.0, 0.5);
         assert!(matches!(
@@ -579,9 +550,7 @@ mod tests {
 
     #[test]
     fn test_sensor_collider() {
-        let sensor = Collider::sensor(ColliderShape::Box {
-            half_extents: Vec3::ONE,
-        });
+        let sensor = Collider::sensor(ColliderShape::Box { half_extents: Vec3::ONE });
         assert!(sensor.is_sensor);
     }
 }

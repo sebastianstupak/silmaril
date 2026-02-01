@@ -151,9 +151,7 @@ pub trait ParallelWorld {
     fn par_query_mut<T: Component + Send>(&mut self) -> ParallelQueryMut1<'_, T>;
 
     /// Create a parallel iterator for an immutable two-component query
-    fn par_query2<A: Component + Sync, B: Component + Sync>(
-        &self,
-    ) -> ParallelQuery2<'_, A, B>;
+    fn par_query2<A: Component + Sync, B: Component + Sync>(&self) -> ParallelQuery2<'_, A, B>;
 
     /// Create a parallel iterator for a mixed-mutability two-component query
     fn par_query2_mut<A: Component + Send, B: Component + Sync>(
@@ -181,9 +179,7 @@ impl ParallelWorld for World {
         ParallelQueryMut1 { world: self, _phantom: std::marker::PhantomData }
     }
 
-    fn par_query2<A: Component + Sync, B: Component + Sync>(
-        &self,
-    ) -> ParallelQuery2<'_, A, B> {
+    fn par_query2<A: Component + Sync, B: Component + Sync>(&self) -> ParallelQuery2<'_, A, B> {
         #[cfg(feature = "profiling")]
         profile_scope!("par_query2_setup", ProfileCategory::ECS);
 
@@ -326,9 +322,7 @@ pub struct ParallelQuery2<'a, A: Component, B: Component> {
     _phantom: std::marker::PhantomData<(A, B)>,
 }
 
-impl<'a, A: Component + Sync, B: Component + Sync> ParallelIterator
-    for ParallelQuery2<'a, A, B>
-{
+impl<'a, A: Component + Sync, B: Component + Sync> ParallelIterator for ParallelQuery2<'a, A, B> {
     type Item = (Entity, (&'a A, &'a B));
 
     fn drive_unindexed<C>(self, consumer: C) -> C::Result

@@ -49,8 +49,7 @@ fn bench_all_operations(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _ in 0..iters {
-                let sync = FrameSyncObjects::new(&context.device)
-                    .expect("Failed to create sync");
+                let sync = FrameSyncObjects::new(&context.device).expect("Failed to create sync");
                 black_box(sync);
             }
             start.elapsed()
@@ -66,9 +65,7 @@ fn bench_all_operations(c: &mut Criterion) {
     c.bench_function("02_fence_reset", |b| {
         b.iter(|| {
             unsafe {
-                context.device
-                    .reset_fences(&[sync.in_flight_fence])
-                    .expect("Failed to reset");
+                context.device.reset_fences(&[sync.in_flight_fence]).expect("Failed to reset");
             }
             black_box(&sync);
         });
@@ -91,13 +88,10 @@ fn bench_all_operations(c: &mut Criterion) {
     )
     .expect("Failed to create render pass");
 
-    let target = OffscreenTarget::new(context, 1920, 1080, None, false)
-        .expect("Failed to create target");
+    let target =
+        OffscreenTarget::new(context, 1920, 1080, None, false).expect("Failed to create target");
 
-    let extent = ash::vk::Extent2D {
-        width: 1920,
-        height: 1080,
-    };
+    let extent = ash::vk::Extent2D { width: 1920, height: 1080 };
 
     c.bench_function("03_framebuffer_create", |b| {
         b.iter_custom(|iters| {

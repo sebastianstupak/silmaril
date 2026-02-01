@@ -39,9 +39,7 @@
 
 #![allow(dead_code)]
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use engine_core::{
     ecs::{Component, Entity, World},
     math::{Quat, Transform, Vec3},
@@ -133,21 +131,10 @@ fn setup_simple_game_world(entity_count: usize) -> World {
 
     for i in 0..entity_count {
         let entity = world.spawn();
+        world.add(entity, Position::new((i % 32) as f32 * 2.0, 0.0, (i / 32) as f32 * 2.0));
         world.add(
             entity,
-            Position::new(
-                (i % 32) as f32 * 2.0,
-                0.0,
-                (i / 32) as f32 * 2.0,
-            ),
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: ((i as f32).sin() * 10.0),
-                y: 0.0,
-                z: ((i as f32).cos() * 10.0),
-            },
+            Velocity { x: ((i as f32).sin() * 10.0), y: 0.0, z: ((i as f32).cos() * 10.0) },
         );
     }
 
@@ -233,22 +220,8 @@ fn setup_mmo_world(player_count: usize, npc_count: usize) -> World {
     // Spawn players
     for i in 0..player_count {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position::new(
-                (i % 100) as f32 * 5.0,
-                0.0,
-                (i / 100) as f32 * 5.0,
-            ),
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position::new((i % 100) as f32 * 5.0, 0.0, (i / 100) as f32 * 5.0));
+        world.add(entity, Velocity { x: 0.0, y: 0.0, z: 0.0 });
         world.add(entity, Health { current: 100.0, max: 100.0 });
         world.add(entity, Inventory { items: [0; 8] });
         world.add(entity, NetworkId { id: i as u64 });
@@ -261,11 +234,7 @@ fn setup_mmo_world(player_count: usize, npc_count: usize) -> World {
         let entity = world.spawn();
         world.add(
             entity,
-            Position::new(
-                (i % 100) as f32 * 5.0 + 2.5,
-                0.0,
-                (i / 100) as f32 * 5.0 + 2.5,
-            ),
+            Position::new((i % 100) as f32 * 5.0 + 2.5, 0.0, (i / 100) as f32 * 5.0 + 2.5),
         );
         world.add(entity, Health { current: 50.0, max: 50.0 });
         world.add(entity, Armor { value: 10.0 });
@@ -360,10 +329,7 @@ struct AssetPath {
 
 fn normalize_path(path: &str) -> String {
     // Simulate path normalization work
-    path.replace('\\', "/")
-        .to_lowercase()
-        .trim_start_matches("./")
-        .to_string()
+    path.replace('\\', "/").to_lowercase().trim_start_matches("./").to_string()
 }
 
 fn simulate_asset_load(path: &str) -> AssetPath {
@@ -371,14 +337,11 @@ fn simulate_asset_load(path: &str) -> AssetPath {
     let normalized = normalize_path(path);
 
     // Simulate some computation
-    let _hash = normalized.bytes().fold(0u64, |acc, b| {
-        acc.wrapping_mul(31).wrapping_add(b as u64)
-    });
+    let _hash = normalized
+        .bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
-    AssetPath {
-        path: path.to_string(),
-        normalized,
-    }
+    AssetPath { path: path.to_string(), normalized }
 }
 
 fn bench_asset_loading(c: &mut Criterion) {
@@ -389,23 +352,15 @@ fn bench_asset_loading(c: &mut Criterion) {
         group.throughput(Throughput::Elements(asset_count as u64));
 
         // Generate asset paths
-        let paths: Vec<String> = (0..asset_count)
-            .map(|i| format!("assets/models/model_{:04}.mesh", i))
-            .collect();
+        let paths: Vec<String> =
+            (0..asset_count).map(|i| format!("assets/models/model_{:04}.mesh", i)).collect();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(asset_count),
-            &paths,
-            |b, paths| {
-                b.iter(|| {
-                    let assets: Vec<AssetPath> = paths
-                        .iter()
-                        .map(|p| simulate_asset_load(p))
-                        .collect();
-                    black_box(assets);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(asset_count), &paths, |b, paths| {
+            b.iter(|| {
+                let assets: Vec<AssetPath> = paths.iter().map(|p| simulate_asset_load(p)).collect();
+                black_box(assets);
+            });
+        });
     }
 
     group.finish();
@@ -424,11 +379,7 @@ fn setup_serialization_world(entity_count: usize) -> World {
     for i in 0..entity_count {
         let entity = world.spawn();
 
-        let pos = Vec3::new(
-            (i % 100) as f32 * 2.0,
-            0.0,
-            (i / 100) as f32 * 2.0,
-        );
+        let pos = Vec3::new((i % 100) as f32 * 2.0, 0.0, (i / 100) as f32 * 2.0);
 
         world.add(entity, Transform::new(pos, Quat::IDENTITY, Vec3::ONE));
         world.add(entity, Health { current: 100.0, max: 100.0 });
@@ -436,11 +387,7 @@ fn setup_serialization_world(entity_count: usize) -> World {
         if i % 2 == 0 {
             world.add(
                 entity,
-                Velocity {
-                    x: ((i as f32).sin() * 5.0),
-                    y: 0.0,
-                    z: ((i as f32).cos() * 5.0),
-                },
+                Velocity { x: ((i as f32).sin() * 5.0), y: 0.0, z: ((i as f32).cos() * 5.0) },
             );
         }
     }
@@ -538,41 +485,30 @@ fn bench_spatial_queries(c: &mut Criterion) {
         let world = setup_spatial_world(entity_count);
 
         // Build spatial grid
-        let config = SpatialGridConfig {
-            cell_size: 10.0,
-            entities_per_cell: 16,
-        };
+        let config = SpatialGridConfig { cell_size: 10.0, entities_per_cell: 16 };
         let grid = SpatialGrid::build(&world, config);
 
         // Benchmark radius query
-        group.bench_with_input(
-            BenchmarkId::new("radius_query", entity_count),
-            &grid,
-            |b, grid| {
-                b.iter(|| {
-                    let center = Vec3::new(50.0, 50.0, 0.0);
-                    let radius = 10.0;
-                    let results = grid.query_radius(center, radius);
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("radius_query", entity_count), &grid, |b, grid| {
+            b.iter(|| {
+                let center = Vec3::new(50.0, 50.0, 0.0);
+                let radius = 10.0;
+                let results = grid.query_radius(center, radius);
+                black_box(results);
+            });
+        });
 
         // Benchmark AABB query
-        group.bench_with_input(
-            BenchmarkId::new("aabb_query", entity_count),
-            &grid,
-            |b, grid| {
-                b.iter(|| {
-                    let query_aabb = Aabb::from_center_half_extents(
-                        Vec3::new(50.0, 50.0, 0.0),
-                        Vec3::new(10.0, 10.0, 10.0),
-                    );
-                    let results = grid.query_aabb(&query_aabb);
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("aabb_query", entity_count), &grid, |b, grid| {
+            b.iter(|| {
+                let query_aabb = Aabb::from_center_half_extents(
+                    Vec3::new(50.0, 50.0, 0.0),
+                    Vec3::new(10.0, 10.0, 10.0),
+                );
+                let results = grid.query_aabb(&query_aabb);
+                black_box(results);
+            });
+        });
 
         // Benchmark grid rebuild
         group.bench_with_input(

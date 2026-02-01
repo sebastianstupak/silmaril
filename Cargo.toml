@@ -4,6 +4,7 @@ members = [
     "engine/core",
     "engine/math",
     "engine/build-utils",
+    "engine/assets",
     "engine/renderer",
     "engine/networking",
     "engine/physics",

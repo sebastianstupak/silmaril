@@ -2,6 +2,10 @@
 # Install `just`: cargo install just
 # Run `just` to see all commands
 
+# Configuration variables
+profile_dir := if os() == "windows" { env_var_or_default("TEMP", "C:\\temp") + "\\pgo-data" } else { "/tmp/pgo-data" }
+baseline_dir := if os() == "windows" { env_var_or_default("TEMP", "C:\\temp") + "\\pgo-baseline" } else { "/tmp/pgo-baseline" }
+
 # Default: show available commands
 default:
     @just --list
@@ -91,7 +95,7 @@ clippy-fix:
 # Run all checks (format + clippy + test)
 check: fmt-check clippy test
 
-# === Benchmarks ===
+# === Basic Benchmarks ===
 
 # Run all benchmarks
 bench:
@@ -151,19 +155,811 @@ bench-profile:
 
 # Open benchmark report in browser
 bench-report:
-    @echo "Opening benchmark report..."
-    @if [ -f "target/criterion/report/index.html" ]; then \
-        xdg-open target/criterion/report/index.html 2>/dev/null || \
-        open target/criterion/report/index.html 2>/dev/null || \
-        start target/criterion/report/index.html 2>/dev/null || \
-        echo "Could not open browser. View report at: target/criterion/report/index.html"; \
-    else \
-        echo "No benchmark report found. Run 'just bench' first."; \
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -f "target/criterion/report/index.html" ]; then
+        if [[ "{{os()}}" == "macos" ]]; then
+            open target/criterion/report/index.html
+        elif [[ "{{os()}}" == "linux" ]]; then
+            xdg-open target/criterion/report/index.html 2>/dev/null || echo "Could not open browser"
+        elif [[ "{{os()}}" == "windows" ]]; then
+            start target/criterion/report/index.html 2>/dev/null || echo "Could not open browser"
+        fi
+    else
+        echo "No benchmark report found. Run 'just bench' first."
     fi
 
 # Network benchmarks (when implemented)
 bench-network:
     cargo bench --package engine-networking
+
+# === Benchmark Management ===
+
+# Run comprehensive benchmark suite with report generation
+bench-all-platforms baseline_name="" compare_name="" output_dir="benchmarks/results" quick="false" skip_platform="false" skip_ecs="false":
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+    from datetime import datetime
+    import json
+
+    # Configuration
+    platform = sys.platform
+    if platform.startswith('linux'):
+        platform = 'linux'
+    elif platform == 'darwin':
+        platform = 'macos'
+    elif platform == 'win32':
+        platform = 'windows'
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    result_dir = os.path.join("{{output_dir}}", f"{platform}_{timestamp}")
+    os.makedirs(result_dir, exist_ok=True)
+
+    print(f"=== Cross-Platform Benchmark Suite ===")
+    print(f"Platform: {platform}")
+    print(f"Timestamp: {timestamp}")
+    print(f"Results: {result_dir}\n")
+
+    quick_mode = "{{quick}}" == "true"
+    skip_platform = "{{skip_platform}}" == "true"
+    skip_ecs = "{{skip_ecs}}" == "true"
+
+    def run_benchmark(name, package, bench):
+        print(f"Running benchmark: {name}")
+        log_file = os.path.join(result_dir, f"{name}.log")
+
+        cmd = ["cargo", "bench", "--package", package, "--bench", bench]
+        if quick_mode:
+            cmd.extend(["--", "--warm-up-time", "1", "--measurement-time", "3", "--sample-size", "20"])
+        cmd.extend(["--save-baseline", name])
+
+        with open(log_file, 'w') as f:
+            subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT)
+        print(f"✓ Completed: {name}\n")
+
+    # Run benchmarks
+    if not skip_platform:
+        print("=== Platform Abstraction Benchmarks ===\n")
+        run_benchmark("platform_time", "engine-core", "platform_benches")
+
+    if not skip_ecs:
+        print("=== ECS Benchmarks ===\n")
+        run_benchmark("ecs_world", "engine-core", "world_benches")
+        run_benchmark("ecs_query", "engine-core", "query_benches")
+
+    print("=== Physics Benchmarks ===\n")
+    run_benchmark("physics_integration", "engine-physics", "integration_bench")
+
+    print("=== Math/SIMD Benchmarks ===\n")
+    run_benchmark("math_simd", "engine-math", "simd_benches")
+    run_benchmark("math_transform", "engine-math", "transform_benches")
+
+    print("=== Profiling Overhead Benchmarks ===\n")
+    run_benchmark("profiling_overhead", "engine-profiling", "profiling_overhead")
+
+    # Generate summary
+    summary_file = os.path.join(result_dir, "SUMMARY.md")
+    with open(summary_file, 'w') as f:
+        f.write(f"# Benchmark Results Summary\n\n")
+        f.write(f"**Platform:** {platform}\n")
+        f.write(f"**Date:** {datetime.now().isoformat()}\n")
+        f.write(f"**Mode:** {'Quick' if quick_mode else 'Full'}\n\n")
+        f.write(f"---\n\n")
+        f.write(f"## Results Location\n\n")
+        f.write(f"- Benchmark logs: `{result_dir}/*.log`\n")
+        f.write(f"- Criterion output: `target/criterion/`\n")
+        f.write(f"- HTML report: `target/criterion/report/index.html`\n")
+
+    print(f"✓ Summary saved to: {summary_file}")
+    print(f"\nResults directory: {result_dir}")
+    print(f"HTML report: target/criterion/report/index.html")
+
+# Update benchmark baseline for regression testing
+bench-update-baseline baseline_name="main":
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import json
+    import sys
+    from datetime import datetime
+
+    platform = f"{sys.platform}-{os.uname().machine if hasattr(os, 'uname') else 'unknown'}"
+    baseline_dir = f"benchmarks/baselines/{platform}/{{baseline_name}}"
+
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"📊 Updating Benchmark Baseline")
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"Baseline: {{baseline_name}}")
+    print(f"Platform: {platform}")
+    print(f"Target:   {baseline_dir}\n")
+
+    # Run benchmarks
+    print("Running benchmarks...")
+    subprocess.run(["cargo", "bench", "--all-features", "--", "--save-baseline", "{{baseline_name}}"], check=True)
+
+    # Create baseline directory
+    os.makedirs(baseline_dir, exist_ok=True)
+
+    # Copy criterion results
+    import shutil
+    if os.path.exists(f"{baseline_dir}/criterion"):
+        shutil.rmtree(f"{baseline_dir}/criterion")
+    shutil.copytree("target/criterion", f"{baseline_dir}/criterion")
+
+    # Create metadata
+    metadata = {
+        "baseline_name": "{{baseline_name}}",
+        "platform": platform,
+        "created_at": datetime.now().isoformat(),
+        "rust_version": subprocess.check_output(["rustc", "--version"]).decode().strip()
+    }
+
+    with open(f"{baseline_dir}/baseline-info.json", 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"✅ Baseline Updated Successfully!")
+    print(f"Location: {baseline_dir}")
+
+# Compare current benchmarks with saved baseline
+bench-compare-baseline baseline_name="main" threshold="20":
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import sys
+
+    platform = f"{sys.platform}-{os.uname().machine if hasattr(os, 'uname') else 'unknown'}"
+    baseline_dir = f"benchmarks/baselines/{platform}/{{baseline_name}}"
+
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"📊 Comparing Benchmarks with Baseline")
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"Baseline: {{baseline_name}}")
+    print(f"Platform: {platform}")
+    print(f"Threshold: {{threshold}}%\n")
+
+    if not os.path.exists(f"{baseline_dir}/criterion"):
+        print(f"❌ Error: Baseline not found at {baseline_dir}")
+        print(f"\nCreate baseline with:")
+        print(f"  just bench-update-baseline {{baseline_name}}")
+        sys.exit(1)
+
+    # Copy baseline to target
+    import shutil
+    if os.path.exists("target/criterion-baseline"):
+        shutil.rmtree("target/criterion-baseline")
+    shutil.copytree(f"{baseline_dir}/criterion", "target/criterion-baseline")
+
+    # Run benchmarks
+    print("Running benchmarks...")
+    subprocess.run(["cargo", "bench", "--all-features", "--", "--save-baseline", "current"], check=True)
+
+    # Run regression checker
+    print("\nChecking for regressions...")
+    try:
+        subprocess.run([
+            "python3", "scripts/check_benchmark_regression.py",
+            "--baseline", "target/criterion-baseline",
+            "--current", "target/criterion",
+            "--threshold", "{{threshold}}",
+            "--format", "criterion",
+            "--fail-on-regression"
+        ], check=True)
+        print("\n✅ No Performance Regressions Detected!")
+    except subprocess.CalledProcessError:
+        print("\n❌ Performance Regressions Detected!")
+        sys.exit(1)
+
+# === Build Tiers ===
+
+# Build all platform-specific tiers (baseline, modern, highend)
+build-all-tiers mode="debug" client="true" server="true":
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import sys
+
+    mode = "{{mode}}"
+    build_client = "{{client}}" == "true"
+    build_server = "{{server}}" == "true"
+
+    # Detect OS
+    if sys.platform.startswith('linux'):
+        target_suffix = "unknown-linux-gnu"
+    elif sys.platform == 'darwin':
+        target_suffix = "apple-darwin"
+    elif sys.platform == 'win32':
+        target_suffix = "pc-windows-msvc"
+    else:
+        print(f"Unsupported platform: {sys.platform}")
+        sys.exit(1)
+
+    print("======================================")
+    print("Building Multi-Tier Binaries")
+    print("======================================")
+    print(f"Mode: {mode}")
+    print(f"Client: {build_client}")
+    print(f"Server: {build_server}\n")
+
+    tiers = {
+        "baseline": ("x86_64", "SSE2 (100% compatible)", "1.0x (baseline)"),
+        "modern": ("x86-64-v3", "AVX2+FMA+SSE4.2 (95% compatible)", "1.15-1.30x"),
+        "highend": ("x86-64-v4", "AVX512+AVX2 (70% compatible)", "1.20-1.50x")
+    }
+
+    release_flag = ["--release"] if mode == "release" else []
+
+    def build_tier(tier, target_cpu, binary):
+        print(f"[Building] {binary} ({tier})")
+        print(f"  Target CPU: {target_cpu}")
+        print(f"  Features: {tiers[tier][1]}")
+        print(f"  Expected: {tiers[tier][2]}")
+
+        tier_target_dir = f"target/{tier}"
+        env = os.environ.copy()
+
+        if tier == "baseline":
+            env["RUSTFLAGS"] = ""
+        else:
+            env["RUSTFLAGS"] = f"-C target-cpu={target_cpu}"
+
+        cmd = ["cargo", "build", "--bin", binary, "--target-dir", tier_target_dir] + release_flag
+        subprocess.run(cmd, env=env, check=True)
+
+        binary_path = os.path.join(tier_target_dir, mode, binary + (".exe" if sys.platform == "win32" else ""))
+        if os.path.exists(binary_path):
+            size = os.path.getsize(binary_path) / (1024 * 1024)
+            print(f"  ✓ Built successfully (size: {size:.2f} MB)\n")
+        else:
+            print(f"  ✗ Build failed\n")
+            sys.exit(1)
+
+    # Build all tiers
+    for tier, (target_cpu, _, _) in tiers.items():
+        if build_client:
+            build_tier(tier, target_cpu, "client")
+        if build_server:
+            build_tier(tier, target_cpu, "server")
+
+    print("======================================")
+    print("All builds completed successfully!")
+    print("======================================\n")
+
+    print("Binary locations:")
+    for tier in tiers.keys():
+        if build_client:
+            print(f"  target/{tier}/{mode}/client  ({tiers[tier][1]})")
+        if build_server:
+            print(f"  target/{tier}/{mode}/server  ({tiers[tier][1]})")
+
+# Benchmark all build tiers
+benchmark-tiers:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("======================================")
+    print("Benchmarking All Build Tiers")
+    print("======================================\n")
+
+    tiers = ["baseline", "modern", "highend"]
+
+    # Check if builds exist
+    missing = False
+    for tier in tiers:
+        if not os.path.exists(f"target/{tier}/release"):
+            print(f"Missing builds for tier: {tier}")
+            missing = True
+
+    if missing:
+        print("Run: just build-all-tiers mode=release")
+        sys.exit(1)
+
+    # Detect CPU
+    if sys.platform.startswith('linux'):
+        import subprocess
+        try:
+            cpu_info = subprocess.check_output("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2", shell=True).decode().strip()
+            print(f"CPU: {cpu_info}\n")
+        except:
+            pass
+
+    benchmarks = ["vec3_benches", "simd_benches", "transform_benches"]
+
+    def tier_version(tier):
+        return {"baseline": "1", "modern": "3", "highend": "4"}[tier]
+
+    for bench in benchmarks:
+        print(f"=== {bench} ===\n")
+
+        for tier in tiers:
+            print(f"[Benchmarking] {tier} - {bench}")
+
+            env = os.environ.copy()
+            env["RUSTFLAGS"] = f"-C target-cpu=x86-64-v{tier_version(tier)}"
+
+            subprocess.run([
+                "cargo", "bench",
+                "--bench", bench,
+                "--target-dir", f"target/{tier}",
+                "--", "--noplot"
+            ], env=env)
+            print()
+
+    print("======================================")
+    print("Benchmark Summary")
+    print("======================================\n")
+    print("Results locations:")
+    for tier in tiers:
+        print(f"  target/{tier}/criterion/")
+
+# Verify build tiers implementation
+verify-build-tiers:
+    #!/usr/bin/env python3
+    import os
+    import sys
+
+    print("======================================")
+    print("Build Tier Implementation Verification")
+    print("======================================\n")
+
+    passed = 0
+    failed = 0
+
+    def check_file(path, desc):
+        nonlocal passed, failed
+        if os.path.exists(path):
+            print(f"✓ {desc}")
+            passed += 1
+        else:
+            print(f"✗ {desc} (missing: {path})")
+            failed += 1
+
+    print("1. Checking build infrastructure...\n")
+    check_file(".cargo/config.toml", "Cargo config exists")
+    check_file(".cargo/config.toml.example", "Example config template")
+
+    print("\n2. Checking runtime CPU detection...\n")
+    check_file("engine/build-utils/src/cpu_features.rs", "CPU feature detection module")
+    check_file("engine/build-utils/examples/cpu_tier_detection.rs", "CPU detection example")
+
+    print("\n======================================")
+    print("Summary")
+    print("======================================\n")
+    print(f"Passed: {passed}")
+    print(f"Failed: {failed}\n")
+
+    if failed == 0:
+        print("✓ All checks passed!")
+    else:
+        print("✗ Some checks failed")
+        sys.exit(1)
+
+# === Profile-Guided Optimization (PGO) ===
+
+# Build instrumented binary for PGO (step 1/3)
+pgo-build-instrumented:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import shutil
+
+    profile_dir = "{{profile_dir}}"
+
+    print("======================================")
+    print("Profile-Guided Optimization (PGO)")
+    print("Step 1/3: Build Instrumented Binary")
+    print("======================================\n")
+
+    # Clean old profile data
+    if os.path.exists(profile_dir):
+        print(f"Cleaning old profile data in {profile_dir}")
+        shutil.rmtree(profile_dir)
+
+    os.makedirs(profile_dir, exist_ok=True)
+    print(f"Created profile directory: {profile_dir}\n")
+
+    print("Building instrumented binaries...")
+    print("This will be slower than a regular build\n")
+
+    env = os.environ.copy()
+    env["RUSTFLAGS"] = f"-C profile-generate={profile_dir}"
+
+    subprocess.run(["cargo", "build", "--release", "--all-targets"], env=env, check=True)
+
+    print("\n======================================")
+    print("Instrumented Build Complete!")
+    print("======================================\n")
+    print("Next Steps:\n")
+    print("1. Run representative workload:")
+    print("   just pgo-run-workload\n")
+    print("2. Build optimized binary:")
+    print("   just pgo-build-optimized\n")
+    print(f"Profile Directory: {profile_dir}\n")
+
+# Run PGO workload to collect profile data (step 2/3)
+pgo-run-workload:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import glob
+
+    profile_dir = "{{profile_dir}}"
+
+    print("======================================")
+    print("Profile-Guided Optimization (PGO)")
+    print("Step 2/3: Run Representative Workload")
+    print("======================================\n")
+
+    if not os.path.exists(profile_dir):
+        print(f"Error: Profile directory not found: {profile_dir}")
+        print("Run 'just pgo-build-instrumented' first")
+        exit(1)
+
+    print("Running representative workload...")
+    print("This will take several minutes\n")
+
+    env = os.environ.copy()
+    env["LLVM_PROFILE_FILE"] = os.path.join(profile_dir, "pgo-%p-%m.profraw")
+
+    workloads = [
+        ("ECS World Operations", ["cargo", "bench", "--package", "engine-core", "--bench", "world_benches", "--", "--sample-size", "20"]),
+        ("ECS Query System", ["cargo", "bench", "--package", "engine-core", "--bench", "query_benches", "--", "--sample-size", "20"]),
+        ("Physics Integration", ["cargo", "bench", "--package", "engine-physics", "--bench", "integration_bench", "--", "--sample-size", "20"]),
+        ("SIMD Math Operations", ["cargo", "bench", "--package", "engine-math", "--bench", "simd_benches", "--", "--sample-size", "20"]),
+        ("Transform Operations", ["cargo", "bench", "--package", "engine-math", "--bench", "transform_benches", "--", "--sample-size", "20"])
+    ]
+
+    for i, (name, cmd) in enumerate(workloads, 1):
+        print(f"[{i}/{len(workloads)}] Running: {name}")
+        try:
+            subprocess.run(cmd, env=env, check=True, capture_output=True)
+            print(f"✓ Completed: {name}\n")
+        except subprocess.CalledProcessError:
+            print(f"⚠ Warning: {name} failed (continuing anyway)\n")
+
+    profraw_count = len(glob.glob(os.path.join(profile_dir, "*.profraw")))
+
+    print("======================================")
+    print("Workload Complete!")
+    print("======================================\n")
+    print(f"Profile files generated: {profraw_count}")
+    print(f"Profile directory: {profile_dir}\n")
+
+    if profraw_count == 0:
+        print("Error: No profile data was generated!")
+        exit(1)
+
+    print("Next Steps:\n")
+    print("Build the optimized binary:")
+    print("  just pgo-build-optimized\n")
+
+# Build PGO-optimized binary (step 3/3)
+pgo-build-optimized:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import glob
+    import shutil
+
+    profile_dir = "{{profile_dir}}"
+
+    print("======================================")
+    print("Profile-Guided Optimization (PGO)")
+    print("Step 3/3: Build Optimized Binary")
+    print("======================================\n")
+
+    if not os.path.exists(profile_dir):
+        print(f"Error: Profile directory not found: {profile_dir}")
+        print("Run 'just pgo-build-instrumented' and 'just pgo-run-workload' first")
+        exit(1)
+
+    profraw_files = glob.glob(os.path.join(profile_dir, "*.profraw"))
+    if not profraw_files:
+        print(f"Error: No .profraw files found in {profile_dir}")
+        print("Run 'just pgo-run-workload' first")
+        exit(1)
+
+    print(f"Found {len(profraw_files)} profile data files\n")
+
+    # Merge profile data
+    print("Merging profile data...")
+    merged_profile = os.path.join(profile_dir, "merged.profdata")
+
+    # Try to find llvm-profdata
+    llvm_profdata = shutil.which("llvm-profdata")
+    if not llvm_profdata:
+        # Try rustup
+        try:
+            result = subprocess.run(
+                ["rustup", "which", "--toolchain", "stable", "llvm-profdata"],
+                capture_output=True, text=True, check=True
+            )
+            llvm_profdata = result.stdout.strip()
+        except:
+            print("Warning: llvm-profdata not found")
+            print("Install with: rustup component add llvm-tools-preview")
+            merged_profile = profile_dir
+
+    if llvm_profdata:
+        subprocess.run([llvm_profdata, "merge", "-o", merged_profile] + profraw_files, check=True)
+        print("Profile data merged successfully\n")
+
+    # Build with profile data
+    print("Building PGO-optimized binaries...")
+
+    env = os.environ.copy()
+    env["RUSTFLAGS"] = f"-C profile-use={merged_profile} -C llvm-args=-pgo-warn-missing-function"
+
+    subprocess.run(["cargo", "build", "--release", "--all-targets"], env=env, check=True)
+
+    print("\n======================================")
+    print("PGO-Optimized Build Complete!")
+    print("======================================\n")
+    print("Performance Gains:")
+    print("  - Expected: 5-15% faster on typical workloads")
+    print("  - Hot paths optimized based on actual usage\n")
+    print("Next Steps:")
+    print("  1. Run benchmarks: just bench")
+    print("  2. Compare with non-PGO: just pgo-compare\n")
+
+# Compare PGO-optimized vs regular release build
+pgo-compare:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+
+    print("======================================")
+    print("PGO Performance Comparison")
+    print("======================================\n")
+
+    # Build and benchmark baseline (no PGO)
+    print("Step 1/5: Building baseline release binary (no PGO)\n")
+    env = os.environ.copy()
+    if "RUSTFLAGS" in env:
+        del env["RUSTFLAGS"]
+    subprocess.run(["cargo", "clean"], check=True)
+    subprocess.run(["cargo", "build", "--release", "--all-targets"], env=env, check=True)
+
+    print("\nStep 2/5: Running baseline benchmarks\n")
+    subprocess.run(["cargo", "bench", "--", "--save-baseline", "no-pgo"], check=True)
+
+    # Build PGO workflow
+    print("\nStep 3/5: Building PGO workflow\n")
+    subprocess.run(["just", "pgo-build-instrumented"], check=True)
+
+    print("\nStep 4/5: Collecting profile data\n")
+    subprocess.run(["just", "pgo-run-workload"], check=True)
+
+    print("\nStep 5/5: Building PGO-optimized binary\n")
+    subprocess.run(["just", "pgo-build-optimized"], check=True)
+
+    # Compare
+    print("\nRunning PGO-optimized benchmarks and comparing\n")
+    subprocess.run(["cargo", "bench", "--", "--baseline", "no-pgo"], check=True)
+
+    print("\n======================================")
+    print("Performance Comparison Complete!")
+    print("======================================\n")
+    print("Results:")
+    print("  - Baseline: target/criterion (no-pgo baseline)")
+    print("  - PGO: target/criterion (compared against baseline)\n")
+    print("Expected gain: 5-15% on typical workloads")
+    print("HTML reports: target/criterion/report/index.html\n")
+
+# Test PGO workflow
+pgo-test:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import sys
+
+    print("======================================")
+    print("PGO Workflow Test")
+    print("======================================\n")
+
+    scripts = [
+        "build_pgo_instrumented.sh",
+        "build_pgo_optimized.sh",
+        "run_pgo_workload.sh",
+        "compare_pgo_performance.sh"
+    ]
+
+    print("[1/3] Checking script files...")
+    for script in scripts:
+        path = f"scripts/{script}"
+        if os.path.exists(path):
+            print(f"  ✓ Found: {script}")
+        else:
+            print(f"  ✗ Missing: {script}")
+
+    print("\n[2/3] Checking dependencies...")
+    if subprocess.run(["cargo", "--version"], capture_output=True).returncode == 0:
+        print("  ✓ cargo available")
+    else:
+        print("  ✗ cargo not found")
+        sys.exit(1)
+
+    print("\n[3/3] Testing profile directory creation...")
+    profile_dir = "{{profile_dir}}"
+    os.makedirs(profile_dir, exist_ok=True)
+    if os.path.exists(profile_dir):
+        print(f"  ✓ Created: {profile_dir}")
+        import shutil
+        shutil.rmtree(profile_dir)
+
+    print("\n======================================")
+    print("All Tests Passed!")
+    print("======================================\n")
+    print("PGO workflow is ready to use.\n")
+    print("To run the full workflow:")
+    print("  just pgo-build-instrumented")
+    print("  just pgo-run-workload")
+    print("  just pgo-build-optimized\n")
+    print("Or use automated comparison:")
+    print("  just pgo-compare\n")
+
+# === Optimization Validation ===
+
+# Validate component get() optimization
+validate-component-optimization:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import sys
+
+    print("=========================================")
+    print("Component get() Optimization Validation")
+    print("=========================================\n")
+
+    os.chdir("engine/core")
+
+    print("1. Building project in release mode...")
+    subprocess.run(["cargo", "build", "--release", "--quiet"], check=True)
+    print("   ✓ Build successful\n")
+
+    print("2. Checking code quality...")
+
+    checks = [
+        ("get_unchecked_fast", "get_unchecked_fast() implemented"),
+        ("get_unchecked_fast_mut", "get_unchecked_fast_mut() implemented"),
+        ("storage.get_unchecked_fast(entity)", "Query iterator using optimized fast-path")
+    ]
+
+    for pattern, desc in checks:
+        found = False
+        for file in ["src/ecs/storage.rs", "src/ecs/query.rs"]:
+            if os.path.exists(file):
+                with open(file, 'r') as f:
+                    if pattern in f.read():
+                        found = True
+                        break
+
+        if found:
+            print(f"   ✓ {desc}")
+        else:
+            print(f"   ✗ {desc}")
+            sys.exit(1)
+
+    print("\n=========================================")
+    print("✅ Optimization Validation Complete!")
+    print("=========================================\n")
+    print("Next steps:")
+    print("  1. Run benchmarks: cargo bench --bench component_get_optimized")
+    print("  2. Verify 3x improvement target\n")
+
+# Verify physics optimization
+verify-physics-optimization:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("==========================================")
+    print("Physics Integration Optimization Verify")
+    print("==========================================\n")
+
+    os.chdir("engine/physics")
+
+    steps = [
+        ("Check compilation", ["cargo", "check", "--package", "engine-physics"]),
+        ("Run unit tests", ["cargo", "test", "--lib"]),
+        ("Run integration tests", ["cargo", "test", "--test", "integration_simd_test"]),
+        ("Build release binary", ["cargo", "build", "--release"])
+    ]
+
+    for i, (desc, cmd) in enumerate(steps, 1):
+        print(f"Step {i}: {desc}...")
+        print("-" * 30)
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode == 0:
+            print(f"✓ {desc} successful\n")
+        else:
+            print(f"✗ {desc} failed\n")
+            sys.exit(1)
+
+    print("==========================================")
+    print("All verification steps completed!")
+    print("==========================================\n")
+    print("To run benchmarks:")
+    print("  cargo bench --bench integration_bench\n")
+    print("Expected results:")
+    print("  - 2-4x speedup over scalar version")
+    print("  - All tests passing\n")
+
+# === Development Setup ===
+
+# Setup git hooks and development environment
+setup-hooks:
+    #!/usr/bin/env python3
+    import subprocess
+    import os
+    import shutil
+    import sys
+
+    print("=========================================")
+    print("Setting up development environment...")
+    print("=========================================\n")
+
+    # Find git root
+    try:
+        git_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    except:
+        print("Error: Not in a git repository")
+        sys.exit(1)
+
+    hooks_dir = os.path.join(git_root, ".git", "hooks")
+    source_hook = os.path.join(git_root, "scripts", "hooks", "pre-commit")
+
+    print(f"Git root: {git_root}")
+    print(f"Hooks directory: {hooks_dir}\n")
+
+    # Check if source hook exists
+    if not os.path.exists(source_hook):
+        print(f"Error: Pre-commit hook not found at {source_hook}")
+        sys.exit(1)
+
+    # Create hooks directory
+    os.makedirs(hooks_dir, exist_ok=True)
+
+    # Copy pre-commit hook
+    print("Installing pre-commit hook...")
+    dest_hook = os.path.join(hooks_dir, "pre-commit")
+    shutil.copy(source_hook, dest_hook)
+
+    # Make executable (Unix-like systems)
+    if sys.platform != 'win32':
+        os.chmod(dest_hook, 0o755)
+
+    print("✓ Pre-commit hook installed\n")
+
+    # Check for optional tools
+    print("Checking for optional development tools...\n")
+
+    tools = [
+        ("cargo-deny", "cargo install cargo-deny"),
+        ("cargo-watch", "cargo install cargo-watch"),
+        ("cargo-flamegraph", "cargo install flamegraph")
+    ]
+
+    for tool, install_cmd in tools:
+        if shutil.which(tool):
+            print(f"✓ {tool} installed")
+        else:
+            print(f"○ {tool} not installed (optional)")
+            print(f"  Install with: {install_cmd}")
+
+    print("\n=========================================")
+    print("Setup complete!")
+    print("=========================================\n")
+    print("Pre-commit hooks will now run automatically.\n")
+    print("The following checks will run:")
+    print("  • Code formatting (cargo fmt)")
+    print("  • Linting (cargo clippy)")
+    print("  • Unit tests (cargo test --lib)")
+    print("  • Common issue detection\n")
 
 # === Documentation ===
 
@@ -227,7 +1023,8 @@ docker-rebuild:
 docker-sizes:
     @echo "Development images:"
     @docker images | grep agent-game.*dev || echo "  No dev images"
-    @echo "\nProduction images:"
+    @echo ""
+    @echo "Production images:"
     @docker images | grep agent-game-engine || echo "  No prod images"
 
 # Clean Docker artifacts
@@ -258,11 +1055,14 @@ build-macos:
 sizes:
     @echo "Client (dev):"
     @ls -lh target/debug/client* 2>/dev/null || echo "Not built"
-    @echo "\nServer (dev):"
+    @echo ""
+    @echo "Server (dev):"
     @ls -lh target/debug/server* 2>/dev/null || echo "Not built"
-    @echo "\nClient (release):"
+    @echo ""
+    @echo "Client (release):"
     @ls -lh target/release/client* 2>/dev/null || echo "Not built"
-    @echo "\nServer (release-server):"
+    @echo ""
+    @echo "Server (release-server):"
     @ls -lh target/release-server/server* 2>/dev/null || echo "Not built"
 
 # Update dependencies

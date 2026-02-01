@@ -3,8 +3,8 @@
 //! Verifies that the optimized get_unchecked_fast() maintains correctness
 //! and safety invariants.
 
-use engine_core::ecs::{Component, Entity, EntityAllocator, SparseSet, World};
 use engine_core::ecs::change_detection::Tick;
+use engine_core::ecs::{Component, Entity, EntityAllocator, SparseSet, World};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Position {
@@ -189,18 +189,10 @@ fn test_replace_correctness() {
     let entity = Entity::new(0, 0);
 
     // Insert initial value
-    storage.insert(
-        entity,
-        Position { x: 1.0, y: 2.0, z: 3.0 },
-        Tick::new(),
-    );
+    storage.insert(entity, Position { x: 1.0, y: 2.0, z: 3.0 }, Tick::new());
 
     // Replace value
-    storage.insert(
-        entity,
-        Position { x: 10.0, y: 20.0, z: 30.0 },
-        Tick::new(),
-    );
+    storage.insert(entity, Position { x: 10.0, y: 20.0, z: 30.0 }, Tick::new());
 
     // Verify unchecked_fast returns new value
     let pos = unsafe { storage.get_unchecked_fast(entity) };
@@ -237,11 +229,13 @@ fn test_iteration_after_modifications() {
     world.register::<Position>();
 
     // Create entities
-    let entities: Vec<_> = (0..1000).map(|i| {
-        let entity = world.spawn();
-        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
-        entity
-    }).collect();
+    let entities: Vec<_> = (0..1000)
+        .map(|i| {
+            let entity = world.spawn();
+            world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+            entity
+        })
+        .collect();
 
     // Modify some entities
     for &entity in entities.iter().step_by(2) {
@@ -279,11 +273,7 @@ fn test_single_entity() {
     let mut storage = SparseSet::<Position>::new();
     let entity = Entity::new(0, 0);
 
-    storage.insert(
-        entity,
-        Position { x: 1.0, y: 2.0, z: 3.0 },
-        Tick::new(),
-    );
+    storage.insert(entity, Position { x: 1.0, y: 2.0, z: 3.0 }, Tick::new());
 
     let pos = unsafe { storage.get_unchecked_fast(entity) };
     assert_eq!(pos.x, 1.0);
@@ -308,19 +298,21 @@ fn test_concurrent_safe_reads() {
     let storage = Arc::new(storage);
 
     // Spawn multiple reader threads
-    let handles: Vec<_> = (0..4).map(|_| {
-        let storage = Arc::clone(&storage);
-        thread::spawn(move || {
-            let mut sum = 0.0;
-            for i in 0..1000 {
-                let entity = Entity::new(i, 0);
-                if let Some(pos) = storage.get(entity) {
-                    sum += pos.x;
+    let handles: Vec<_> = (0..4)
+        .map(|_| {
+            let storage = Arc::clone(&storage);
+            thread::spawn(move || {
+                let mut sum = 0.0;
+                for i in 0..1000 {
+                    let entity = Entity::new(i, 0);
+                    if let Some(pos) = storage.get(entity) {
+                        sum += pos.x;
+                    }
                 }
-            }
-            sum
+                sum
+            })
         })
-    }).collect();
+        .collect();
 
     // Verify all threads get same result
     let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();

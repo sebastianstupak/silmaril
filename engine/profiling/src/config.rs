@@ -84,7 +84,6 @@ pub enum ProfileFormat {
     Json,
 }
 
-
 /// Configuration for profiling data retention.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "config", derive(Serialize, Deserialize))]
@@ -181,7 +180,7 @@ impl ProfilerConfig {
     /// Default configuration for development builds.
     ///
     /// Profiling enabled with reasonable defaults for development workflow.
-    #[must_use] 
+    #[must_use]
     pub fn default_dev() -> Self {
         let mut budgets = HashMap::new();
         budgets.insert("game_loop".to_string(), Duration::from_millis(16)); // 60 FPS
@@ -203,7 +202,7 @@ impl ProfilerConfig {
     /// Default configuration for release builds.
     ///
     /// All profiling disabled to ensure zero overhead.
-    #[must_use] 
+    #[must_use]
     pub fn default_release() -> Self {
         Self {
             enabled: false,
@@ -279,7 +278,7 @@ impl ProfilerConfig {
     ///
     /// let config = ProfilerConfig::from_env();
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default_dev();
 
@@ -564,7 +563,7 @@ pub fn parse_duration(s: &str) -> Result<Duration, ConfigError> {
 /// assert_eq!(format_duration(&Duration::from_millis(16)), "16.0ms");
 /// assert_eq!(format_duration(&Duration::from_secs(1)), "1000.0ms");
 /// ```
-#[must_use] 
+#[must_use]
 pub fn format_duration(duration: &Duration) -> String {
     let micros = duration.as_micros();
     if micros >= 1000 {

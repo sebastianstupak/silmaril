@@ -112,10 +112,7 @@ impl Default for PhysicsConfig {
 impl PhysicsConfig {
     /// Create configuration for server-authoritative mode
     pub fn server_authoritative() -> Self {
-        Self {
-            mode: PhysicsMode::ServerAuthoritative,
-            ..Default::default()
-        }
+        Self { mode: PhysicsMode::ServerAuthoritative, ..Default::default() }
     }
 
     /// Create configuration for client-side prediction
@@ -160,10 +157,8 @@ impl PhysicsConfig {
             return Err("solver_iterations must be > 0");
         }
 
-        if let PhysicsMode::ClientPrediction {
-            reconciliation_threshold,
-            history_frames,
-        } = self.mode
+        if let PhysicsMode::ClientPrediction { reconciliation_threshold, history_frames } =
+            self.mode
         {
             if reconciliation_threshold <= 0.0 {
                 return Err("reconciliation_threshold must be > 0");
@@ -203,10 +198,7 @@ mod tests {
     fn test_client_prediction_config() {
         let config = PhysicsConfig::client_prediction(0.1);
         match config.mode {
-            PhysicsMode::ClientPrediction {
-                reconciliation_threshold,
-                history_frames,
-            } => {
+            PhysicsMode::ClientPrediction { reconciliation_threshold, history_frames } => {
                 assert_eq!(reconciliation_threshold, 0.1);
                 assert_eq!(history_frames, 60);
             }
@@ -217,10 +209,7 @@ mod tests {
     #[test]
     fn test_deterministic_disables_parallelism() {
         let config = PhysicsConfig::deterministic(false);
-        assert!(matches!(
-            config.mode,
-            PhysicsMode::Deterministic { use_fixed_point: false }
-        ));
+        assert!(matches!(config.mode, PhysicsMode::Deterministic { use_fixed_point: false }));
         assert!(!config.enable_parallel); // Must be disabled for determinism
         assert!(!config.enable_simd); // Must be disabled for determinism
         assert_eq!(config.solver_iterations, 10); // Higher for stability

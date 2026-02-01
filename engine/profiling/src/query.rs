@@ -178,7 +178,7 @@ impl<'a> QueryBuilder<'a> {
     /// let stats = profiler.query().frame(1234).aggregate();
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn frame(mut self, frame: usize) -> Self {
         self.frame_range = Some(frame..frame + 1);
         self
@@ -200,7 +200,7 @@ impl<'a> QueryBuilder<'a> {
     /// let stats = profiler.query().frames(1000..2000).aggregate();
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn frames(mut self, range: Range<usize>) -> Self {
         self.frame_range = Some(range);
         self
@@ -224,7 +224,7 @@ impl<'a> QueryBuilder<'a> {
     ///     .aggregate();
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn category(mut self, cat: ProfileCategory) -> Self {
         self.category_filter = Some(cat);
         self
@@ -273,7 +273,7 @@ impl<'a> QueryBuilder<'a> {
     /// assert!(stats.p95_us >= stats.p50_us);
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn aggregate(self) -> AggregateMetrics {
         let timeline = self.timeline();
 
@@ -306,7 +306,7 @@ impl<'a> QueryBuilder<'a> {
     /// }
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn timeline(self) -> Vec<TimelineEvent> {
         // Access internal profiler state
         let state = self.profiler.get_state_for_query();
@@ -377,7 +377,7 @@ impl<'a> QueryBuilder<'a> {
     /// // Save to file or send to analysis tool
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn chrome_trace(self) -> String {
         let events = self.timeline();
 

@@ -97,9 +97,7 @@ fn test_concurrent_delta_computation() {
     for _ in 0..4 {
         let s1 = Arc::clone(&state1);
         let s2 = Arc::clone(&state2);
-        let handle = thread::spawn(move || {
-            WorldStateDelta::compute(&*s1, &*s2)
-        });
+        let handle = thread::spawn(move || WorldStateDelta::compute(&*s1, &*s2));
         handles.push(handle);
     }
 
@@ -142,7 +140,11 @@ fn test_serialize_100k_entities() {
     println!("Serializing to bincode...");
     let start = Instant::now();
     let bytes = snapshot.serialize(Format::Bincode).unwrap();
-    println!("Serialization took: {:?}, size: {} MB", start.elapsed(), bytes.len() / 1_000_000);
+    println!(
+        "Serialization took: {:?}, size: {} MB",
+        start.elapsed(),
+        bytes.len() / 1_000_000
+    );
 
     // Verify size is reasonable (< 20MB for 100k simple entities)
     assert!(bytes.len() < 20_000_000, "Bincode size: {} bytes", bytes.len());
@@ -472,9 +474,8 @@ fn test_serialization_determinism() {
     let snapshot = WorldState::snapshot(&world);
 
     // Serialize 10 times
-    let serializations: Vec<_> = (0..10)
-        .map(|_| snapshot.serialize(Format::Bincode).unwrap())
-        .collect();
+    let serializations: Vec<_> =
+        (0..10).map(|_| snapshot.serialize(Format::Bincode).unwrap()).collect();
 
     // All should be identical
     let first = &serializations[0];
@@ -505,9 +506,7 @@ fn test_delta_computation_determinism() {
     let state2 = WorldState::snapshot(&world);
 
     // Compute delta 10 times
-    let deltas: Vec<_> = (0..10)
-        .map(|_| WorldStateDelta::compute(&state1, &state2))
-        .collect();
+    let deltas: Vec<_> = (0..10).map(|_| WorldStateDelta::compute(&state1, &state2)).collect();
 
     // All should produce same results
     for delta in &deltas[1..] {

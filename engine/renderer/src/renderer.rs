@@ -12,10 +12,12 @@ pub struct Renderer {
     window: Window,
     context: VulkanContext,
     _entry: ash::Entry,
+    #[allow(dead_code)]
     surface: Surface,
     swapchain: Swapchain,
     render_pass: RenderPass,
     framebuffers: Vec<Framebuffer>,
+    #[allow(dead_code)]
     command_pool: CommandPool,
     command_buffers: Vec<CommandBuffer>,
     sync_objects: Vec<FrameSyncObjects>,
@@ -34,22 +36,25 @@ impl Renderer {
         info!("Creating renderer");
 
         // 1. Create window
-        let window = Window::new(window_config)
-            .map_err(|e| RendererError::surfacecreationfailed(format!("Window creation failed: {:?}", e)))?;
+        let window = Window::new(window_config).map_err(|e| {
+            RendererError::surfacecreationfailed(format!("Window creation failed: {:?}", e))
+        })?;
         let (width, height) = window.size();
 
         // 2. Create Vulkan entry
         let entry = unsafe {
-            ash::Entry::load()
-                .map_err(|e| RendererError::instancecreationfailed(format!("Failed to load Vulkan: {:?}", e)))?
+            ash::Entry::load().map_err(|e| {
+                RendererError::instancecreationfailed(format!("Failed to load Vulkan: {:?}", e))
+            })?
         };
 
         // 3. Create temporary context to get instance for surface creation
         let temp_context = VulkanContext::new(app_name, None, None)?;
 
         // 4. Create surface using temporary context's instance
-        let surface = Surface::new(&entry, &temp_context.instance, &window)
-            .map_err(|e| RendererError::surfacecreationfailed(format!("Surface creation failed: {:?}", e)))?;
+        let surface = Surface::new(&entry, &temp_context.instance, &window).map_err(|e| {
+            RendererError::surfacecreationfailed(format!("Surface creation failed: {:?}", e))
+        })?;
 
         // 5. Create final Vulkan context with surface (this ensures proper device selection)
         let context = VulkanContext::new(app_name, Some(surface.handle()), Some(surface.loader()))?;
@@ -57,14 +62,8 @@ impl Renderer {
         // Temp context gets dropped here, but surface was created and is valid
 
         // 6. Create swapchain
-        let swapchain = Swapchain::new(
-            &context,
-            surface.handle(),
-            surface.loader(),
-            width,
-            height,
-            None,
-        )?;
+        let swapchain =
+            Swapchain::new(&context, surface.handle(), surface.loader(), width, height, None)?;
 
         // 7. Create render pass (simple color attachment, clear to color)
         let render_pass = RenderPass::new(
@@ -99,19 +98,18 @@ impl Renderer {
         // 10. Allocate command buffers (one per frame in flight)
         const FRAMES_IN_FLIGHT: u32 = 2;
         let command_buffers = command_pool
-            .allocate(
-                &context.device,
-                vk::CommandBufferLevel::PRIMARY,
-                FRAMES_IN_FLIGHT,
-            )
-            .map_err(|e| RendererError::commandbufferallocationfailed(FRAMES_IN_FLIGHT, format!("{:?}", e)))?
+            .allocate(&context.device, vk::CommandBufferLevel::PRIMARY, FRAMES_IN_FLIGHT)
+            .map_err(|e| {
+                RendererError::commandbufferallocationfailed(FRAMES_IN_FLIGHT, format!("{:?}", e))
+            })?
             .into_iter()
             .map(CommandBuffer::from_handle)
             .collect();
 
         // 11. Create synchronization objects
-        let sync_objects = create_sync_objects(&context.device, FRAMES_IN_FLIGHT)
-            .map_err(|e| RendererError::syncobjectcreationfailed("frame sync".to_string(), format!("{:?}", e)))?;
+        let sync_objects = create_sync_objects(&context.device, FRAMES_IN_FLIGHT).map_err(|e| {
+            RendererError::syncobjectcreationfailed("frame sync".to_string(), format!("{:?}", e))
+        })?;
 
         info!(
             width = width,
@@ -162,7 +160,10 @@ impl Renderer {
                 .device
                 .wait_for_fences(&[sync.in_flight_fence], true, u64::MAX)
                 .map_err(|e| {
-                    RendererError::queuesubmissionfailed(format!("Failed to wait for fence: {:?}", e))
+                    RendererError::queuesubmissionfailed(format!(
+                        "Failed to wait for fence: {:?}",
+                        e
+                    ))
                 })?;
         }
 
@@ -185,12 +186,9 @@ impl Renderer {
 
         // Reset fence after acquiring image
         unsafe {
-            self.context
-                .device
-                .reset_fences(&[sync.in_flight_fence])
-                .map_err(|e| {
-                    RendererError::queuesubmissionfailed(format!("Failed to reset fence: {:?}", e))
-                })?;
+            self.context.device.reset_fences(&[sync.in_flight_fence]).map_err(|e| {
+                RendererError::queuesubmissionfailed(format!("Failed to reset fence: {:?}", e))
+            })?;
         }
 
         // Record command buffer
@@ -212,11 +210,7 @@ impl Renderer {
         unsafe {
             self.context
                 .device
-                .queue_submit(
-                    self.context.graphics_queue,
-                    &[submit_info],
-                    sync.in_flight_fence,
-                )
+                .queue_submit(self.context.graphics_queue, &[submit_info], sync.in_flight_fence)
                 .map_err(|e| {
                     RendererError::queuesubmissionfailed(format!("Failed to submit queue: {:?}", e))
                 })?;
@@ -269,11 +263,8 @@ impl Renderer {
                 })?;
 
             // Begin render pass
-            let clear_values = [vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: self.clear_color,
-                },
-            }];
+            let clear_values =
+                [vk::ClearValue { color: vk::ClearColorValue { float32: self.clear_color } }];
 
             let render_pass_begin_info = vk::RenderPassBeginInfo::default()
                 .render_pass(self.render_pass.handle())
@@ -297,15 +288,12 @@ impl Renderer {
             self.context.device.cmd_end_render_pass(command_buffer);
 
             // End command buffer
-            self.context
-                .device
-                .end_command_buffer(command_buffer)
-                .map_err(|e| {
-                    RendererError::commandbufferallocationfailed(
-                        1,
-                        format!("Failed to end command buffer: {:?}", e),
-                    )
-                })?;
+            self.context.device.end_command_buffer(command_buffer).map_err(|e| {
+                RendererError::commandbufferallocationfailed(
+                    1,
+                    format!("Failed to end command buffer: {:?}", e),
+                )
+            })?;
         }
 
         Ok(())

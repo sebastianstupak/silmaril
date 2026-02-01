@@ -69,11 +69,7 @@ pub struct DependencyGraph {
 impl DependencyGraph {
     /// Create a new empty dependency graph
     pub fn new() -> Self {
-        Self {
-            nodes: Vec::new(),
-            edges: HashMap::new(),
-            stages: Vec::new(),
-        }
+        Self { nodes: Vec::new(), edges: HashMap::new(), stages: Vec::new() }
     }
 
     /// Add a system node to the graph
@@ -151,12 +147,11 @@ impl DependencyGraph {
 
         for node in &self.nodes {
             if !visited.contains(&node.index) {
-                if let Some(cycle) = self.detect_cycle_dfs(node.index, &mut visited, &mut rec_stack) {
+                if let Some(cycle) = self.detect_cycle_dfs(node.index, &mut visited, &mut rec_stack)
+                {
                     // Build cycle path with system names
-                    let cycle_names: Vec<String> = cycle
-                        .iter()
-                        .map(|&idx| self.nodes[idx].name.clone())
-                        .collect();
+                    let cycle_names: Vec<String> =
+                        cycle.iter().map(|&idx| self.nodes[idx].name.clone()).collect();
                     return Err(cycle_names);
                 }
             }
@@ -260,9 +255,7 @@ impl DependencyGraph {
 
         // Verify all nodes were processed
         if self.stages.iter().flatten().count() != self.nodes.len() {
-            warn!(
-                "Not all systems were scheduled. This may indicate a circular dependency."
-            );
+            warn!("Not all systems were scheduled. This may indicate a circular dependency.");
         }
     }
 
@@ -317,11 +310,7 @@ mod tests {
     use super::*;
 
     fn create_test_node(index: usize, name: &str) -> SystemNode {
-        SystemNode {
-            index,
-            name: name.to_string(),
-            access: SystemAccess::new(),
-        }
+        SystemNode { index, name: name.to_string(), access: SystemAccess::new() }
     }
 
     #[test]

@@ -104,10 +104,7 @@ pub struct ComponentTicks {
 impl ComponentTicks {
     /// Create new component ticks
     pub fn new(current_tick: Tick) -> Self {
-        Self {
-            added: current_tick,
-            changed: current_tick,
-        }
+        Self { added: current_tick, changed: current_tick }
     }
 
     /// Mark this component as changed
@@ -136,9 +133,7 @@ pub struct SystemTicks {
 impl SystemTicks {
     /// Create new system ticks
     pub fn new() -> Self {
-        Self {
-            last_run: Tick::new(),
-        }
+        Self { last_run: Tick::new() }
     }
 
     /// Update the last run tick

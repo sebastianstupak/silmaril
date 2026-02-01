@@ -8,7 +8,7 @@
 //! 3. Multiple systems reacting to the same events
 //! 4. Batch-optimized transform synchronization
 
-use engine_core::ecs::{Entity, Event, World};
+use engine_core::ecs::{Entity, EntityAllocator, World};
 use engine_math::{Quat, Vec3};
 use engine_physics::events::*;
 use engine_physics::sync::*;
@@ -33,14 +33,12 @@ fn main() {
         Vec3::new(0.0, -1.0, 0.0),
         Quat::IDENTITY,
     );
-    physics.add_collider(
-        ground_id,
-        &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)),
-    );
+    physics.add_collider(ground_id, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
 
     // Falling box (dynamic)
     let box_id = 1u64;
-    let box_entity = Entity::from_raw(0);
+    let mut allocator = EntityAllocator::new();
+    let box_entity = allocator.allocate();
     physics.add_rigidbody(
         box_id,
         &RigidBody::dynamic(1.0),
@@ -85,8 +83,10 @@ fn main() {
                     "[Frame {}] 💥 Damage System: High-force contact! Force: {:.1}N",
                     frame, event.force_magnitude
                 );
-                println!("  → Applying damage to entities {} and {}",
-                    event.entity_a, event.entity_b);
+                println!(
+                    "  → Applying damage to entities {} and {}",
+                    event.entity_a, event.entity_b
+                );
             }
         }
 

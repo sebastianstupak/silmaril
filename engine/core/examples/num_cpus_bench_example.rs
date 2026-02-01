@@ -57,7 +57,7 @@ fn main() {
 
     // Target verification
     let target_ns = 1_000; // 1µs target
-    let ideal_ns = 100;    // 100ns ideal
+    let ideal_ns = 100; // 100ns ideal
 
     println!("=== Target Verification ===");
     println!("Target:      < {} ns (< 1µs)", target_ns);

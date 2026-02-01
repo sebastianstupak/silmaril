@@ -36,23 +36,13 @@ fn test_parallel_iter_correctness() {
     // Spawn entities with known values
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: i as f32 * 2.0,
-                z: i as f32 * 3.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: i as f32 * 2.0, z: i as f32 * 3.0 });
     }
 
     // Parallel sum should match sequential sum
     let seq_sum: f32 = world.query::<&Position>().map(|(_, pos)| pos.x).sum();
 
-    let par_sum: f32 = world
-        .par_query::<Position>()
-        .map(|(_, pos)| pos.x)
-        .sum();
+    let par_sum: f32 = world.par_query::<Position>().map(|(_, pos)| pos.x).sum();
 
     assert_eq!(seq_sum, par_sum);
 }
@@ -65,14 +55,7 @@ fn test_parallel_iter_mut_correctness() {
     // Spawn entities
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
     }
 
     // Apply parallel mutation
@@ -97,22 +80,8 @@ fn test_parallel_two_component_correctness() {
     // Spawn entities
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(entity, Velocity { x: 1.0, y: 2.0, z: 3.0 });
     }
 
     // Sequential sum
@@ -140,22 +109,8 @@ fn test_parallel_mixed_mutability() {
     // Spawn entities
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: i as f32,
-                y: i as f32 * 2.0,
-                z: i as f32 * 3.0,
-            },
-        );
+        world.add(entity, Position { x: 0.0, y: 0.0, z: 0.0 });
+        world.add(entity, Velocity { x: i as f32, y: i as f32 * 2.0, z: i as f32 * 3.0 });
     }
 
     // Apply parallel physics update
@@ -185,11 +140,7 @@ fn test_parallel_empty_query() {
     let count = world.query::<&Position>().par_iter().count();
     assert_eq!(count, 0);
 
-    let sum: f32 = world
-        .query::<&Position>()
-        .par_iter()
-        .map(|(_, pos)| pos.x)
-        .sum();
+    let sum: f32 = world.query::<&Position>().par_iter().map(|(_, pos)| pos.x).sum();
     assert_eq!(sum, 0.0);
 }
 
@@ -202,14 +153,7 @@ fn test_parallel_filter_map() {
     // Spawn entities - some with Health, some without
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
 
         // Only add Health to even entities
         if i % 2 == 0 {
@@ -222,10 +166,7 @@ fn test_parallel_filter_map() {
     assert_eq!(pos_count, 1000);
 
     // Count entities with both Position and Health (should be 500)
-    let both_count = world
-        .query::<(&Position, &Health)>()
-        .par_iter()
-        .count();
+    let both_count = world.query::<(&Position, &Health)>().par_iter().count();
     assert_eq!(both_count, 500);
 }
 
@@ -237,22 +178,11 @@ fn test_parallel_collect() {
     // Spawn entities
     for i in 0..100 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
     }
 
     // Collect parallel results
-    let positions: Vec<f32> = world
-        .query::<&Position>()
-        .par_iter()
-        .map(|(_, pos)| pos.x)
-        .collect();
+    let positions: Vec<f32> = world.query::<&Position>().par_iter().map(|(_, pos)| pos.x).collect();
 
     assert_eq!(positions.len(), 100);
 
@@ -273,14 +203,7 @@ fn test_parallel_reduce() {
     // Spawn entities
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
     }
 
     // Find max using parallel reduce
@@ -310,40 +233,21 @@ fn test_parallel_any_all() {
     // Spawn entities
     for i in 0..100 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
     }
 
     // Test any
-    let has_large = world
-        .query::<&Position>()
-        .par_iter()
-        .any(|(_, pos)| pos.x > 50.0);
+    let has_large = world.query::<&Position>().par_iter().any(|(_, pos)| pos.x > 50.0);
     assert!(has_large);
 
-    let has_negative = world
-        .query::<&Position>()
-        .par_iter()
-        .any(|(_, pos)| pos.x < 0.0);
+    let has_negative = world.query::<&Position>().par_iter().any(|(_, pos)| pos.x < 0.0);
     assert!(!has_negative);
 
     // Test all
-    let all_non_negative = world
-        .query::<&Position>()
-        .par_iter()
-        .all(|(_, pos)| pos.x >= 0.0);
+    let all_non_negative = world.query::<&Position>().par_iter().all(|(_, pos)| pos.x >= 0.0);
     assert!(all_non_negative);
 
-    let all_large = world
-        .query::<&Position>()
-        .par_iter()
-        .all(|(_, pos)| pos.x > 50.0);
+    let all_large = world.query::<&Position>().par_iter().all(|(_, pos)| pos.x > 50.0);
     assert!(!all_large);
 }
 
@@ -356,23 +260,12 @@ fn test_parallel_entity_order_independence() {
     // Spawn entities
     for i in 0..1000 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Position {
-                x: i as f32,
-                y: i as f32,
-                z: i as f32,
-            },
-        );
+        world.add(entity, Position { x: i as f32, y: i as f32, z: i as f32 });
     }
 
     // Run multiple times - results should be deterministic
     for _ in 0..10 {
-        let sum: f32 = world
-            .query::<&Position>()
-            .par_iter()
-            .map(|(_, pos)| pos.x)
-            .sum();
+        let sum: f32 = world.query::<&Position>().par_iter().map(|(_, pos)| pos.x).sum();
         assert_eq!(sum, 499_500.0); // Sum of 0..1000
     }
 }
@@ -401,11 +294,7 @@ fn test_parallel_sparse_entities() {
     let count = world.query::<&Position>().par_iter().count();
     assert_eq!(count, 50);
 
-    let sum: f32 = world
-        .query::<&Position>()
-        .par_iter()
-        .map(|(_, pos)| pos.x)
-        .sum();
+    let sum: f32 = world.query::<&Position>().par_iter().map(|(_, pos)| pos.x).sum();
 
     // Sum of odd numbers 1 + 3 + 5 + ... + 99 = 2500
     assert_eq!(sum, 2500.0);
@@ -424,11 +313,7 @@ fn test_parallel_large_workload() {
         world.add(entity, Position { x: 0.0, y: 0.0, z: 0.0 });
         world.add(
             entity,
-            Velocity {
-                x: (i % 100) as f32,
-                y: ((i / 100) % 100) as f32,
-                z: (i / 10000) as f32,
-            },
+            Velocity { x: (i % 100) as f32, y: ((i / 100) % 100) as f32, z: (i / 10000) as f32 },
         );
     }
 
@@ -465,18 +350,10 @@ fn test_parallel_thread_pool_isolation() {
     }
 
     // Use a custom thread pool with 4 threads
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(4)
-        .build()
-        .unwrap();
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(4).build().unwrap();
 
-    let sum = pool.install(|| {
-        world
-            .query::<&Position>()
-            .par_iter()
-            .map(|(_, pos)| pos.x)
-            .sum::<f32>()
-    });
+    let sum =
+        pool.install(|| world.query::<&Position>().par_iter().map(|(_, pos)| pos.x).sum::<f32>());
 
     assert_eq!(sum, 499_500.0);
 }

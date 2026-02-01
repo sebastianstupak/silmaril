@@ -29,9 +29,7 @@ fn bench_num_cpus_uncached(c: &mut Criterion) {
     c.bench_function("threading/num_cpus/uncached_baseline", |b| {
         b.iter(|| {
             // This makes a syscall every time (no caching)
-            let count = std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(1);
+            let count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
             black_box(count);
         });
     });
@@ -54,9 +52,7 @@ fn bench_num_cpus_batch(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("uncached", count), count, |b, &count| {
             b.iter(|| {
                 for _ in 0..count {
-                    let n = std::thread::available_parallelism()
-                        .map(|n| n.get())
-                        .unwrap_or(1);
+                    let n = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
                     black_box(n);
                 }
             });

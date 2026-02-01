@@ -25,7 +25,6 @@
 #[cfg(feature = "admin")]
 use engine_observability::admin::{AdminCommand, AdminConsole};
 
-
 #[cfg(feature = "admin")]
 #[tokio::main]
 async fn main() {

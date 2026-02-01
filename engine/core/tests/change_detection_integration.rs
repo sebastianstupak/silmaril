@@ -88,7 +88,7 @@ fn test_single_component_change_detection() {
         .query_mut::<&mut Position>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     // Only e1 and e2 should be in the results
@@ -134,7 +134,7 @@ fn test_two_component_mut_change_detection() {
         .query_mut::<(&mut Position, &mut Velocity)>()
         .since_tick(tick_before)
         .changed::<Velocity>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     // Only e1 should be in the results
@@ -173,7 +173,7 @@ fn test_mixed_mutability_change_detection() {
         .query_mut::<(&Position, &mut Health)>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     assert_eq!(changed_entities.len(), 1);
@@ -212,7 +212,7 @@ fn test_mixed_mutability_reverse_change_detection() {
         .query_mut::<(&mut Position, &Health)>()
         .since_tick(tick_before)
         .changed::<Health>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     assert_eq!(changed_entities.len(), 1);
@@ -243,7 +243,7 @@ fn test_unchanged_entities_filtered() {
         .query_mut::<&mut Position>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     assert_eq!(changed_entities.len(), 0);
@@ -277,7 +277,7 @@ fn test_all_entities_changed() {
         .query_mut::<&mut Position>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     assert_eq!(changed_entities.len(), 3);
@@ -304,7 +304,7 @@ fn test_no_entities_with_component() {
         .query_mut::<&mut Position>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     assert_eq!(changed_entities.len(), 0);
@@ -349,7 +349,7 @@ fn test_change_detection_with_other_filters() {
         .since_tick(tick_before)
         .with::<Marker>()
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     // Only e1 should match (changed AND has Marker)
@@ -389,7 +389,7 @@ fn test_three_component_change_detection() {
         .query_mut::<(&mut Position, &mut Velocity, &mut Health)>()
         .since_tick(tick_before)
         .changed::<Velocity>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     assert_eq!(changed_entities.len(), 1);
@@ -437,7 +437,7 @@ fn test_multiple_change_filters() {
         .query_mut::<(&mut Position, &mut Velocity)>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     // Only e1 should have Position changed
@@ -449,7 +449,7 @@ fn test_multiple_change_filters() {
         .query_mut::<(&mut Position, &mut Velocity)>()
         .since_tick(tick_before)
         .changed::<Velocity>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     // Only e2 should have Velocity changed
@@ -476,7 +476,7 @@ fn test_add_component_marks_changed() {
         .query_mut::<&mut Position>()
         .since_tick(tick_before)
         .changed::<Position>()
-                .map(|(e, _)| e)
+        .map(|(e, _)| e)
         .collect();
 
     // e1 should be in the results because the component was just added

@@ -107,6 +107,10 @@ name = "ecs_comprehensive"
 harness = false
 
 [[bench]]
+name = "event_benches"
+harness = false
+
+[[bench]]
 name = "ecs_simple"
 harness = false
 

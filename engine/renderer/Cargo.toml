@@ -21,6 +21,7 @@ tracing = "0.1"
 smallvec = "1.13"
 lazy_static = "1.5"
 engine-core = { path = "../core" }
+engine-assets = { path = "../assets" }
 engine-macros = { path = "../macros" }
 raw-window-handle = "0.6"
 tracy-client = { version = "0.17", optional = true, default-features = false }

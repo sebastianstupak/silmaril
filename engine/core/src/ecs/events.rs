@@ -23,10 +23,7 @@ struct EventQueue {
 
 impl EventQueue {
     fn new(capacity: usize) -> Self {
-        Self {
-            events: VecDeque::with_capacity(capacity),
-            capacity,
-        }
+        Self { events: VecDeque::with_capacity(capacity), capacity }
     }
 
     fn push<E: Event>(&mut self, event: E) {
@@ -53,19 +50,17 @@ pub struct Events {
 impl Events {
     /// Create new event storage
     pub fn new() -> Self {
-        Self {
-            queues: HashMap::new(),
-            empty_queue: VecDeque::new(),
-        }
+        Self { queues: HashMap::new(), empty_queue: VecDeque::new() }
     }
 
     /// Send an event
     pub fn send<E: Event>(&mut self, event: E) {
         let type_id = TypeId::of::<E>();
 
-        let queue = self.queues.entry(type_id).or_insert_with(|| {
-            EventQueue::new(MAX_EVENTS_PER_TYPE)
-        });
+        let queue = self
+            .queues
+            .entry(type_id)
+            .or_insert_with(|| EventQueue::new(MAX_EVENTS_PER_TYPE));
 
         queue.push(event);
     }
@@ -73,16 +68,9 @@ impl Events {
     /// Get event reader for a specific event type
     pub fn get_reader<E: Event>(&self) -> EventReader<E> {
         let type_id = TypeId::of::<E>();
-        let count = self.queues
-            .get(&type_id)
-            .map(|q| q.events.len())
-            .unwrap_or(0);
+        let count = self.queues.get(&type_id).map(|q| q.events.len()).unwrap_or(0);
 
-        EventReader {
-            last_read: 0,
-            _phantom: PhantomData,
-            total_events: count,
-        }
+        EventReader { last_read: 0, _phantom: PhantomData, total_events: count }
     }
 
     /// Read events with a reader (returns iterator)
@@ -101,12 +89,7 @@ impl Events {
                 _phantom: PhantomData,
             }
         } else {
-            EventIter {
-                events: &self.empty_queue,
-                current: 0,
-                end: 0,
-                _phantom: PhantomData,
-            }
+            EventIter { events: &self.empty_queue, current: 0, end: 0, _phantom: PhantomData }
         }
     }
 
@@ -145,11 +128,7 @@ pub struct EventReader<E: Event> {
 impl<E: Event> EventReader<E> {
     /// Create new event reader (starts at current position)
     pub fn new() -> Self {
-        Self {
-            last_read: 0,
-            total_events: 0,
-            _phantom: PhantomData,
-        }
+        Self { last_read: 0, total_events: 0, _phantom: PhantomData }
     }
 
     /// Reset reader to read all events from the beginning

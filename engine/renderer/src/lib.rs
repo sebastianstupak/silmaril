@@ -66,3 +66,6 @@ pub use surface::{Surface, SurfaceError};
 pub use swapchain::Swapchain;
 pub use sync::{create_sync_objects, FrameSyncObjects, SyncError};
 pub use window::{Window, WindowConfig, WindowError, WindowEventType};
+
+// Re-export from engine-assets for convenience
+pub use engine_assets::{MeshData, Vertex};

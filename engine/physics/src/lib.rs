@@ -25,6 +25,6 @@ pub use events::{
     BodySleepEvent, BodyWakeEvent, CollisionEndEvent, CollisionStartEvent, ContactForceEvent,
     TriggerEnterEvent, TriggerExitEvent,
 };
-pub use sync::{PhysicsSyncConfig, PhysicsSyncSystem, build_entity_mapping};
+pub use sync::{build_entity_mapping, PhysicsSyncConfig, PhysicsSyncSystem};
 pub use systems::{physics_integration_system, physics_integration_system_simd};
 pub use world::PhysicsWorld;

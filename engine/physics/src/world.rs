@@ -3,11 +3,11 @@
 //! This module is **standalone** - works without ECS integration.
 //! ECS sync will be added later via a separate system.
 
-use crate::config::{PhysicsConfig, PhysicsMode};
 use crate::components::{Collider, ColliderShape, RigidBody, RigidBodyType};
+use crate::config::{PhysicsConfig, PhysicsMode};
 use engine_math::{Quat, Vec3};
-use rapier3d::prelude::*;
 use rapier3d::na::{Quaternion, UnitQuaternion};
+use rapier3d::prelude::*;
 use std::collections::HashMap;
 
 #[cfg(feature = "profiling")]
@@ -175,10 +175,7 @@ impl PhysicsWorld {
         let (collision_send, collision_recv) = crossbeam_channel::unbounded();
         let (contact_send, contact_recv) = crossbeam_channel::unbounded();
 
-        let event_handler = ChannelEventCollector {
-            collision_send,
-            contact_send,
-        };
+        let event_handler = ChannelEventCollector { collision_send, contact_send };
 
         // Step the physics simulation
         self.pipeline.step(
@@ -235,10 +232,7 @@ impl PhysicsWorld {
 
         // Convert quaternion to Rapier's UnitQuaternion
         let rapier_rotation = UnitQuaternion::from_quaternion(Quaternion::new(
-            rotation.w,
-            rotation.x,
-            rotation.y,
-            rotation.z,
+            rotation.w, rotation.x, rotation.y, rotation.z,
         ));
 
         let mut rigid_body = RigidBodyBuilder::new(rapier_type)
@@ -348,7 +342,7 @@ impl PhysicsWorld {
                 Group::from_bits_truncate(collider_component.collision_layer),
                 Group::from_bits_truncate(collider_component.collision_mask),
             ))
-            .active_events(ActiveEvents::COLLISION_EVENTS)  // Enable collision events!
+            .active_events(ActiveEvents::COLLISION_EVENTS) // Enable collision events!
             .build();
 
         let collider_handle =
@@ -393,10 +387,7 @@ impl PhysicsWorld {
         let pos = body.translation();
         let rot = body.rotation();
 
-        Some((
-            Vec3::new(pos.x, pos.y, pos.z),
-            Quat::from_xyzw(rot.i, rot.j, rot.k, rot.w),
-        ))
+        Some((Vec3::new(pos.x, pos.y, pos.z), Quat::from_xyzw(rot.i, rot.j, rot.k, rot.w)))
     }
 
     /// Set transform of entity
@@ -406,10 +397,7 @@ impl PhysicsWorld {
                 body.set_translation(vector![position.x, position.y, position.z], true);
                 body.set_rotation(
                     UnitQuaternion::from_quaternion(Quaternion::new(
-                        rotation.w,
-                        rotation.x,
-                        rotation.y,
-                        rotation.z,
+                        rotation.w, rotation.x, rotation.y, rotation.z,
                     )),
                     true,
                 );
@@ -425,10 +413,7 @@ impl PhysicsWorld {
         let linvel = body.linvel();
         let angvel = body.angvel();
 
-        Some((
-            Vec3::new(linvel.x, linvel.y, linvel.z),
-            Vec3::new(angvel.x, angvel.y, angvel.z),
-        ))
+        Some((Vec3::new(linvel.x, linvel.y, linvel.z), Vec3::new(angvel.x, angvel.y, angvel.z)))
     }
 
     /// Set velocity of entity
@@ -527,14 +512,12 @@ impl PhysicsWorld {
                 SharedShape::cuboid(half_extents.x, half_extents.y, half_extents.z)
             }
             ColliderShape::Sphere { radius } => SharedShape::ball(*radius),
-            ColliderShape::Capsule {
-                half_height,
-                radius,
-            } => SharedShape::capsule_y(*half_height, *radius),
-            ColliderShape::Cylinder {
-                half_height,
-                radius,
-            } => SharedShape::cylinder(*half_height, *radius),
+            ColliderShape::Capsule { half_height, radius } => {
+                SharedShape::capsule_y(*half_height, *radius)
+            }
+            ColliderShape::Cylinder { half_height, radius } => {
+                SharedShape::cylinder(*half_height, *radius)
+            }
         }
     }
 
@@ -549,10 +532,7 @@ impl PhysicsWorld {
                 // Volume = (4/3) * π * r³
                 (4.0 / 3.0) * std::f32::consts::PI * radius.powi(3)
             }
-            ColliderShape::Capsule {
-                half_height,
-                radius,
-            } => {
+            ColliderShape::Capsule { half_height, radius } => {
                 // Volume = cylinder + sphere
                 // Cylinder: π * r² * (2 * half_height)
                 // Sphere: (4/3) * π * r³
@@ -560,10 +540,7 @@ impl PhysicsWorld {
                 let sphere_vol = (4.0 / 3.0) * std::f32::consts::PI * radius.powi(3);
                 cylinder_vol + sphere_vol
             }
-            ColliderShape::Cylinder {
-                half_height,
-                radius,
-            } => {
+            ColliderShape::Cylinder { half_height, radius } => {
                 // Volume = π * r² * (2 * half_height)
                 std::f32::consts::PI * radius.powi(2) * (2.0 * half_height)
             }

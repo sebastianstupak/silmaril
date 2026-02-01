@@ -81,7 +81,9 @@
       "Bash(./verify_num_cpus_optimization.exe:*)",
       "Bash(./scripts/benchmark_all_platforms.sh:*)",
       "Bash(powershell -ExecutionPolicy Bypass -Command \"Get-Help ./scripts/benchmark_all_platforms.ps1 | Select-Object -First 15\")",
-      "Bash(powershell -ExecutionPolicy Bypass -File ./scripts/benchmark_all_platforms.ps1 -Help)"
+      "Bash(powershell -ExecutionPolicy Bypass -File ./scripts/benchmark_all_platforms.ps1 -Help)",
+      "Bash(bcb97d7 \")",
+      "Bash(just:*)"
     ]
   }
 }

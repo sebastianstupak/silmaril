@@ -29,8 +29,8 @@
 //! Each component tracks when it was added and last modified via ComponentTicks.
 //! This enables efficient change detection queries that only process modified entities.
 
-use super::{Component, Entity};
 use super::change_detection::{ComponentTicks, Tick};
+use super::{Component, Entity};
 use std::any::Any;
 
 #[cfg(feature = "profiling")]
@@ -125,12 +125,7 @@ pub struct SparseSet<T: Component> {
 impl<T: Component> SparseSet<T> {
     /// Create a new empty sparse set
     pub fn new() -> Self {
-        Self {
-            sparse: Vec::new(),
-            dense: Vec::new(),
-            components: Vec::new(),
-            ticks: Vec::new(),
-        }
+        Self { sparse: Vec::new(), dense: Vec::new(), components: Vec::new(), ticks: Vec::new() }
     }
 
     /// Create a new sparse set with preallocated capacity

@@ -6,8 +6,8 @@
 //! - Raycasting (queries work)
 //! - Performance (meets AAA targets)
 
-use engine_physics::{Collider, PhysicsConfig, PhysicsWorld, RigidBody};
 use engine_math::{Quat, Vec3};
+use engine_physics::{Collider, PhysicsConfig, PhysicsWorld, RigidBody};
 
 #[test]
 fn test_falling_box() {
@@ -22,10 +22,7 @@ fn test_falling_box() {
         Vec3::new(0.0, -1.0, 0.0),
         Quat::IDENTITY,
     );
-    world.add_collider(
-        ground_id,
-        &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)),
-    );
+    world.add_collider(ground_id, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
 
     // Create falling box
     let box_id = 1;
@@ -53,11 +50,7 @@ fn test_falling_box() {
 
     // Box should have stopped (velocity near zero)
     let (linvel, _) = world.get_velocity(box_id).unwrap();
-    assert!(
-        linvel.length() < 0.5,
-        "Box should have stopped, velocity: {}",
-        linvel.length()
-    );
+    assert!(linvel.length() < 0.5, "Box should have stopped, velocity: {}", linvel.length());
 }
 
 #[test]
@@ -67,25 +60,12 @@ fn test_collision_detection() {
 
     // Ground
     let ground_id = 0;
-    world.add_rigidbody(
-        ground_id,
-        &RigidBody::static_body(),
-        Vec3::ZERO,
-        Quat::IDENTITY,
-    );
-    world.add_collider(
-        ground_id,
-        &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)),
-    );
+    world.add_rigidbody(ground_id, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
+    world.add_collider(ground_id, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
 
     // Falling box
     let box_id = 1;
-    world.add_rigidbody(
-        box_id,
-        &RigidBody::dynamic(1.0),
-        Vec3::new(0.0, 5.0, 0.0),
-        Quat::IDENTITY,
-    );
+    world.add_rigidbody(box_id, &RigidBody::dynamic(1.0), Vec3::new(0.0, 5.0, 0.0), Quat::IDENTITY);
     world.add_collider(box_id, &Collider::box_collider(Vec3::ONE));
 
     // Simulate until collision
@@ -99,10 +79,7 @@ fn test_collision_detection() {
         }
     }
 
-    assert!(
-        collision_detected,
-        "Box should collide with ground"
-    );
+    assert!(collision_detected, "Box should collide with ground");
 }
 
 #[test]
@@ -112,12 +89,7 @@ fn test_raycast() {
 
     // Create box at origin
     let box_id = 1;
-    world.add_rigidbody(
-        box_id,
-        &RigidBody::static_body(),
-        Vec3::ZERO,
-        Quat::IDENTITY,
-    );
+    world.add_rigidbody(box_id, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
     world.add_collider(box_id, &Collider::box_collider(Vec3::ONE));
 
     // Step once to update query pipeline
@@ -147,16 +119,8 @@ fn test_stacked_boxes() {
     let mut world = PhysicsWorld::new(config);
 
     // Ground
-    world.add_rigidbody(
-        0,
-        &RigidBody::static_body(),
-        Vec3::new(0.0, -0.5, 0.0),
-        Quat::IDENTITY,
-    );
-    world.add_collider(
-        0,
-        &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)),
-    );
+    world.add_rigidbody(0, &RigidBody::static_body(), Vec3::new(0.0, -0.5, 0.0), Quat::IDENTITY);
+    world.add_collider(0, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
 
     // Stack 5 boxes
     for i in 0..5 {
@@ -200,12 +164,7 @@ fn test_bouncing_ball() {
     let mut world = PhysicsWorld::new(config);
 
     // Ground (bouncy material)
-    world.add_rigidbody(
-        0,
-        &RigidBody::static_body(),
-        Vec3::ZERO,
-        Quat::IDENTITY,
-    );
+    world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
 
     let mut bouncy_collider = Collider::box_collider(Vec3::new(10.0, 0.5, 10.0));
     bouncy_collider.material.restitution = 0.9; // Very bouncy
@@ -257,12 +216,7 @@ fn test_impulse_application() {
     let mut world = PhysicsWorld::new(config);
 
     let box_id = 1;
-    world.add_rigidbody(
-        box_id,
-        &RigidBody::dynamic(1.0),
-        Vec3::ZERO,
-        Quat::IDENTITY,
-    );
+    world.add_rigidbody(box_id, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
     world.add_collider(box_id, &Collider::box_collider(Vec3::ONE));
 
     // Apply impulse
@@ -273,11 +227,7 @@ fn test_impulse_application() {
 
     // Check velocity changed
     let (linvel, _) = world.get_velocity(box_id).unwrap();
-    assert!(
-        linvel.x > 5.0,
-        "Impulse should have changed velocity, got {}",
-        linvel.x
-    );
+    assert!(linvel.x > 5.0, "Impulse should have changed velocity, got {}", linvel.x);
 
     // Step for 1 second
     for _ in 0..59 {
@@ -286,11 +236,7 @@ fn test_impulse_application() {
 
     // Check box moved in X direction
     let (pos, _) = world.get_transform(box_id).unwrap();
-    assert!(
-        pos.x > 5.0,
-        "Box should have moved from impulse, got x={}",
-        pos.x
-    );
+    assert!(pos.x > 5.0, "Box should have moved from impulse, got x={}", pos.x);
 }
 
 #[test]
@@ -306,12 +252,7 @@ fn test_multiple_physics_modes() {
     for config in modes {
         let mut world = PhysicsWorld::new(config);
 
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(1, &Collider::sphere(1.0));
 
         // Just verify it doesn't crash
@@ -331,16 +272,8 @@ fn test_performance_1000_bodies() {
     let mut world = PhysicsWorld::new(config);
 
     // Ground
-    world.add_rigidbody(
-        0,
-        &RigidBody::static_body(),
-        Vec3::new(0.0, -1.0, 0.0),
-        Quat::IDENTITY,
-    );
-    world.add_collider(
-        0,
-        &Collider::box_collider(Vec3::new(50.0, 0.5, 50.0)),
-    );
+    world.add_rigidbody(0, &RigidBody::static_body(), Vec3::new(0.0, -1.0, 0.0), Quat::IDENTITY);
+    world.add_collider(0, &Collider::box_collider(Vec3::new(50.0, 0.5, 50.0)));
 
     // Add 1000 dynamic boxes in grid
     let grid_size = 32; // 32x32 = 1024
@@ -349,12 +282,7 @@ fn test_performance_1000_bodies() {
             let entity_id = x * grid_size + z + 1;
             let pos = Vec3::new(x as f32 * 2.0, 10.0, z as f32 * 2.0);
 
-            world.add_rigidbody(
-                entity_id,
-                &RigidBody::dynamic(1.0),
-                pos,
-                Quat::IDENTITY,
-            );
+            world.add_rigidbody(entity_id, &RigidBody::dynamic(1.0), pos, Quat::IDENTITY);
             world.add_collider(entity_id, &Collider::box_collider(Vec3::ONE));
         }
     }
@@ -376,10 +304,7 @@ fn test_performance_1000_bodies() {
     let avg_frame_time = elapsed.as_secs_f32() / 60.0;
     let avg_frame_time_ms = avg_frame_time * 1000.0;
 
-    println!(
-        "Average frame time for 1000 bodies: {:.2}ms",
-        avg_frame_time_ms
-    );
+    println!("Average frame time for 1000 bodies: {:.2}ms", avg_frame_time_ms);
 
     // Performance targets (based on AAA game engines):
     // Unity PhysX: ~15-20ms for 1000 active bodies

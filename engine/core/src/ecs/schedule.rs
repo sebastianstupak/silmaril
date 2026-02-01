@@ -73,10 +73,7 @@ pub struct SystemAccess {
 impl SystemAccess {
     /// Create a new empty SystemAccess
     pub fn new() -> Self {
-        Self {
-            reads: Vec::new(),
-            writes: Vec::new(),
-        }
+        Self { reads: Vec::new(), writes: Vec::new() }
     }
 
     /// Add a component type that this system reads
@@ -201,11 +198,7 @@ pub struct Schedule {
 impl Schedule {
     /// Create a new empty schedule
     pub fn new() -> Self {
-        Self {
-            systems: Vec::new(),
-            graph: DependencyGraph::new(),
-            built: false,
-        }
+        Self { systems: Vec::new(), graph: DependencyGraph::new(), built: false }
     }
 
     /// Add a system to the schedule
@@ -253,11 +246,8 @@ impl Schedule {
 
         // Create nodes for each system
         for (index, system) in self.systems.iter().enumerate() {
-            let node = SystemNode {
-                index,
-                name: system.name().to_string(),
-                access: system.access(),
-            };
+            let node =
+                SystemNode { index, name: system.name().to_string(), access: system.access() };
             self.graph.add_node(node);
         }
 
@@ -266,19 +256,13 @@ impl Schedule {
 
         // Check for cycles
         if let Err(cycle) = self.graph.check_for_cycles() {
-            panic!(
-                "Circular dependency detected in schedule: {}",
-                cycle.join(" -> ")
-            );
+            panic!("Circular dependency detected in schedule: {}", cycle.join(" -> "));
         }
 
         // Create execution stages
         self.graph.create_execution_stages();
 
-        info!(
-            stages = self.graph.stage_count(),
-            "Schedule built successfully"
-        );
+        info!(stages = self.graph.stage_count(), "Schedule built successfully");
 
         self.built = true;
     }
@@ -313,11 +297,7 @@ impl Schedule {
 
         // Execute each stage
         for (stage_idx, stage) in self.graph.stages().iter().enumerate() {
-            debug!(
-                stage = stage_idx,
-                system_count = stage.len(),
-                "Executing stage"
-            );
+            debug!(stage = stage_idx, system_count = stage.len(), "Executing stage");
 
             // Execute systems in this stage
             // Note: Systems in the same stage can theoretically run in parallel,
@@ -359,7 +339,8 @@ impl Schedule {
             return "Schedule not built yet".to_string();
         }
 
-        let mut info = format!("Schedule with {} systems in {} stages:\n",
+        let mut info = format!(
+            "Schedule with {} systems in {} stages:\n",
             self.systems.len(),
             self.stage_count()
         );
@@ -420,9 +401,7 @@ mod tests {
     fn test_system_access_conflicts() {
         let read_only = SystemAccess::new().reads::<MockComponent>();
         let write_only = SystemAccess::new().writes::<MockComponent>();
-        let _read_write = SystemAccess::new()
-            .reads::<MockComponent>()
-            .writes::<MockComponent2>();
+        let _read_write = SystemAccess::new().reads::<MockComponent>().writes::<MockComponent2>();
 
         // Two readers don't conflict
         assert!(!read_only.conflicts_with(&read_only));

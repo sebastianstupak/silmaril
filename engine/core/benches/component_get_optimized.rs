@@ -4,8 +4,8 @@
 //! the 3x improvement target (49ns -> 15-20ns).
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use engine_core::ecs::{Component, Entity, SparseSet, World};
 use engine_core::ecs::change_detection::Tick;
+use engine_core::ecs::{Component, Entity, SparseSet, World};
 
 #[derive(Clone, Copy, Debug)]
 struct Position {
@@ -41,18 +41,14 @@ fn bench_component_get_single(c: &mut Criterion) {
             );
         }
 
-        group.bench_with_input(
-            BenchmarkId::new("get_standard", size),
-            &storage,
-            |b, storage| {
-                b.iter(|| {
-                    // Access middle entity to avoid cache effects
-                    let entity = Entity::new((size / 2) as u32, 0);
-                    let pos = storage.get(entity);
-                    black_box(pos);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("get_standard", size), &storage, |b, storage| {
+            b.iter(|| {
+                // Access middle entity to avoid cache effects
+                let entity = Entity::new((size / 2) as u32, 0);
+                let pos = storage.get(entity);
+                black_box(pos);
+            });
+        });
 
         group.bench_with_input(
             BenchmarkId::new("get_unchecked_fast", size),
@@ -88,21 +84,17 @@ fn bench_component_get_batch(c: &mut Criterion) {
             );
         }
 
-        group.bench_with_input(
-            BenchmarkId::new("get_standard", size),
-            &storage,
-            |b, storage| {
-                b.iter(|| {
-                    let mut sum = 0.0;
-                    for i in 0..*size {
-                        if let Some(pos) = storage.get(Entity::new(i as u32, 0)) {
-                            sum += pos.x;
-                        }
+        group.bench_with_input(BenchmarkId::new("get_standard", size), &storage, |b, storage| {
+            b.iter(|| {
+                let mut sum = 0.0;
+                for i in 0..*size {
+                    if let Some(pos) = storage.get(Entity::new(i as u32, 0)) {
+                        sum += pos.x;
                     }
-                    black_box(sum);
-                });
-            },
-        );
+                }
+                black_box(sum);
+            });
+        });
 
         group.bench_with_input(
             BenchmarkId::new("get_unchecked_fast", size),
@@ -289,7 +281,11 @@ fn bench_component_size_effects(c: &mut Criterion) {
     // Medium component (32 bytes)
     let mut medium_storage = SparseSet::<Medium>::with_capacity(size);
     for i in 0..size {
-        medium_storage.insert(Entity::new(i as u32, 0), Medium { data: [i as f32; 8] }, Tick::new());
+        medium_storage.insert(
+            Entity::new(i as u32, 0),
+            Medium { data: [i as f32; 8] },
+            Tick::new(),
+        );
     }
 
     group.bench_function("medium_32bytes", |b| {

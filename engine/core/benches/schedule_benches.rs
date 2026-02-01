@@ -231,9 +231,7 @@ fn bench_parallel_vs_sequential(c: &mut Criterion) {
     // Parallel schedule (independent systems)
     let mut parallel_schedule = Schedule::new();
     for _ in 0..4 {
-        parallel_schedule.add_system(WorkSystem {
-            work_duration,
-        });
+        parallel_schedule.add_system(WorkSystem { work_duration });
     }
     parallel_schedule.build();
 
@@ -271,10 +269,7 @@ fn bench_parallel_vs_sequential(c: &mut Criterion) {
 
     let mut sequential_schedule = Schedule::new();
     for i in 0..4 {
-        sequential_schedule.add_system(SequentialWorkSystem {
-            index: i,
-            work_duration,
-        });
+        sequential_schedule.add_system(SequentialWorkSystem { index: i, work_duration });
     }
     sequential_schedule.build();
 

@@ -149,27 +149,24 @@ fn setup_world() -> World {
 
 fn bench_entity_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("1_entity_creation");
-    group.plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
     // Spawn 1M entities (measure time)
     for &count in &[1_000, 10_000, 100_000, 1_000_000] {
         group.throughput(Throughput::Elements(count));
 
-        group.bench_with_input(
-            BenchmarkId::new("spawn_entities", count),
-            &count,
-            |b, &count| {
-                b.iter_batched(
-                    || setup_world(),
-                    |mut world| {
-                        for _ in 0..count {
-                            black_box(world.spawn());
-                        }
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("spawn_entities", count), &count, |b, &count| {
+            b.iter_batched(
+                || setup_world(),
+                |mut world| {
+                    for _ in 0..count {
+                        black_box(world.spawn());
+                    }
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -177,7 +174,8 @@ fn bench_entity_creation(c: &mut Criterion) {
 
 fn bench_entity_creation_with_components(c: &mut Criterion) {
     let mut group = c.benchmark_group("1_entity_creation_with_components");
-    group.plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
     // Spawn entities with 1, 2, 3 components
     for &count in &[1_000, 10_000, 100_000] {
@@ -258,7 +256,8 @@ fn bench_entity_creation_with_components(c: &mut Criterion) {
 
 fn bench_component_iteration(c: &mut Criterion) {
     let mut group = c.benchmark_group("2_component_iteration");
-    group.plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
     for &count in &[1_000, 10_000, 100_000, 1_000_000] {
         group.throughput(Throughput::Elements(count));
@@ -302,7 +301,8 @@ fn bench_component_iteration(c: &mut Criterion) {
 
                 b.iter(|| {
                     let mut sum = 0.0f32;
-                    for (_entity, (transform, velocity)) in world.query::<(&Transform, &Velocity)>() {
+                    for (_entity, (transform, velocity)) in world.query::<(&Transform, &Velocity)>()
+                    {
                         sum += black_box(transform.position.x + velocity.x);
                     }
                     black_box(sum);
@@ -343,7 +343,8 @@ fn bench_component_iteration(c: &mut Criterion) {
 
 fn bench_component_iteration_mutable(c: &mut Criterion) {
     let mut group = c.benchmark_group("2_component_iteration_mutable");
-    group.plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
     for &count in &[1_000, 10_000, 100_000, 1_000_000] {
         group.throughput(Throughput::Elements(count));
@@ -397,10 +398,7 @@ fn bench_component_operations(c: &mut Criterion) {
         let mut idx = 0;
 
         b.iter(|| {
-            world.add(
-                entities[idx % entities.len()],
-                Health { current: 100.0, max: 100.0 },
-            );
+            world.add(entities[idx % entities.len()], Health { current: 100.0, max: 100.0 });
             idx += 1;
         });
     });
@@ -493,7 +491,8 @@ fn bench_component_operations(c: &mut Criterion) {
 
 fn bench_query_performance(c: &mut Criterion) {
     let mut group = c.benchmark_group("4_query_performance");
-    group.plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
     // Simple query (all entities have components)
     for &count in &[1_000, 10_000, 100_000] {
@@ -543,8 +542,7 @@ fn bench_query_performance(c: &mut Criterion) {
 
                 b.iter(|| {
                     let mut found = 0;
-                    for (_entity, (_transform, _player)) in world.query::<(&Transform, &Player)>()
-                    {
+                    for (_entity, (_transform, _player)) in world.query::<(&Transform, &Player)>() {
                         found += 1;
                     }
                     black_box(found);

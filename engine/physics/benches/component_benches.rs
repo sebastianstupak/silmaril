@@ -2,9 +2,9 @@
 //!
 //! Establishes baseline performance for physics components.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use engine_physics::{RigidBody, Collider, PhysicsMaterial};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use engine_math::Vec3;
+use engine_physics::{Collider, PhysicsMaterial, RigidBody};
 
 /// Benchmark RigidBody creation
 fn bench_rigidbody_creation(c: &mut Criterion) {
@@ -35,9 +35,7 @@ fn bench_impulse_application(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let mut bodies: Vec<RigidBody> = (0..count)
-                .map(|_| RigidBody::dynamic(1.0))
-                .collect();
+            let mut bodies: Vec<RigidBody> = (0..count).map(|_| RigidBody::dynamic(1.0)).collect();
 
             b.iter(|| {
                 for body in &mut bodies {
@@ -76,9 +74,8 @@ fn bench_material_combine(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let materials: Vec<PhysicsMaterial> = (0..count)
-                .map(|i| if i % 2 == 0 { ice } else { rubber })
-                .collect();
+            let materials: Vec<PhysicsMaterial> =
+                (0..count).map(|i| if i % 2 == 0 { ice } else { rubber }).collect();
 
             b.iter(|| {
                 for i in 0..materials.len() - 1 {
@@ -114,9 +111,7 @@ fn bench_collider_creation(c: &mut Criterion) {
 
 /// Benchmark collision layer checks
 fn bench_collision_layer_check(c: &mut Criterion) {
-    let collider = Collider::sphere(1.0)
-        .with_layer(2)
-        .with_mask(0b10101010);
+    let collider = Collider::sphere(1.0).with_layer(2).with_mask(0b10101010);
 
     c.bench_function("collision_layer_check", |b| {
         b.iter(|| {
@@ -134,11 +129,7 @@ fn bench_collision_layer_check(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             let colliders: Vec<Collider> = (0..count)
-                .map(|i| {
-                    Collider::sphere(1.0)
-                        .with_layer(i % 8)
-                        .with_mask(0xFFFFFFFF)
-                })
+                .map(|i| Collider::sphere(1.0).with_layer(i % 8).with_mask(0xFFFFFFFF))
                 .collect();
 
             b.iter(|| {

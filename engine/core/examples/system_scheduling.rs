@@ -78,9 +78,7 @@ impl System for PhysicsSystem {
     }
 
     fn access(&self) -> SystemAccess {
-        SystemAccess::new()
-            .reads::<Velocity>()
-            .writes::<Transform>()
+        SystemAccess::new().reads::<Velocity>().writes::<Transform>()
     }
 }
 
@@ -155,9 +153,7 @@ impl System for DamageSystem {
     }
 
     fn access(&self) -> SystemAccess {
-        SystemAccess::new()
-            .reads::<Damage>()
-            .writes::<Health>()
+        SystemAccess::new().reads::<Damage>().writes::<Health>()
     }
 }
 
@@ -229,29 +225,9 @@ fn main() {
     // Spawn some entities
     for i in 0..5 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Transform {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            entity,
-            Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            entity,
-            Health {
-                current: 100.0,
-                max: 100.0,
-            },
-        );
+        world.add(entity, Transform { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+        world.add(entity, Health { current: 100.0, max: 100.0 });
     }
 
     println!("\n--- Running schedule ---");
@@ -320,7 +296,9 @@ fn main() {
         println!("\nSpeedup: {:.2}x faster with scheduling!", speedup);
     } else {
         println!("\nNote: Speedup may not be visible with such short systems.");
-        println!("In real games with heavier systems, parallelization provides significant benefits.");
+        println!(
+            "In real games with heavier systems, parallelization provides significant benefits."
+        );
     }
 
     println!("\n=== Example Complete ===");
