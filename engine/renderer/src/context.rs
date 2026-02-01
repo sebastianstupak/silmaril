@@ -234,6 +234,26 @@ impl VulkanContext {
         }
     }
 
+    /// Create a VulkanContext optimized for benchmarking (no validation layers).
+    ///
+    /// This constructor disables validation layers regardless of build type,
+    /// which is essential for accurate performance measurements.
+    ///
+    /// # Warning
+    /// Only use this for benchmarks! Validation layers catch bugs during development.
+    #[cfg(any(test, bench))]
+    pub fn new_for_benchmarks(
+        app_name: &str,
+        surface_provider: Option<&dyn Fn(&ash::Entry, &ash::Instance) -> Result<vk::SurfaceKHR, RendererError>>,
+        preferred_device_uuid: Option<[u8; 16]>,
+    ) -> Result<Self, RendererError> {
+        // Same as new() but forces validation layers off
+        std::env::set_var("DISABLE_VULKAN_VALIDATION", "1");
+        let result = Self::new(app_name, surface_provider, preferred_device_uuid);
+        std::env::remove_var("DISABLE_VULKAN_VALIDATION");
+        result
+    }
+
     /// Wait for the device to become idle.
     pub fn wait_idle(&self) -> Result<(), RendererError> {
         // SAFETY: self.device is valid and we have exclusive access via &self.
@@ -355,13 +375,20 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
         extension_names.push(ash::khr::get_physical_device_properties2::NAME.as_ptr());
     }
 
-    // Validation layers (debug builds only) - use cached static to avoid allocation
+    // Validation layers (debug builds only, unless explicitly disabled for benchmarks)
     #[cfg(debug_assertions)]
     let layer_name_ptrs: Vec<*const i8>;
 
     #[cfg(debug_assertions)]
     {
-        layer_name_ptrs = VALIDATION_LAYERS.iter().map(|name| name.as_ptr()).collect();
+        // Check if validation should be disabled (for benchmarks)
+        let disable_validation = std::env::var("DISABLE_VULKAN_VALIDATION").is_ok();
+
+        if disable_validation {
+            info!("Validation layers disabled for benchmarking");
+            layer_name_ptrs = vec![];
+        } else {
+            layer_name_ptrs = VALIDATION_LAYERS.iter().map(|name| name.as_ptr()).collect();
 
         // Check if validation layers are available
         // SAFETY: enumerate_instance_layer_properties only queries available layers.
