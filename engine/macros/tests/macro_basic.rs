@@ -1,6 +1,6 @@
 //! Basic integration tests for client/server macros
 
-use engine_macros::{client_only, server_only, shared, server_authoritative};
+use engine_macros::{client_only, server_authoritative, server_only, shared};
 
 // Test that macros compile and work correctly
 

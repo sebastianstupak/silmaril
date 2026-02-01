@@ -25,3 +25,4 @@ server = []
 [dev-dependencies]
 trybuild = "1.0"
 engine-core = { path = "../core" }
+proptest = "1.4"

@@ -103,10 +103,7 @@ pub fn shared_impl(item: TokenStream) -> Result<TokenStream> {
 ///     // Server implementation
 /// }
 /// ```
-pub fn server_authoritative_impl(
-    attr: TokenStream,
-    item: TokenStream,
-) -> Result<TokenStream> {
+pub fn server_authoritative_impl(attr: TokenStream, item: TokenStream) -> Result<TokenStream> {
     let input = parse2::<ItemFn>(item)?;
     let fn_sig = &input.sig;
     let server_block = &input.block;
