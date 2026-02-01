@@ -154,7 +154,7 @@ def detect_regressions(
 
     for name, current_result in current.items():
         if name not in baseline:
-            print(f"ℹ️  New benchmark: {name} ({current_result.value} {current_result.unit})")
+            print(f"[INFO] New benchmark: {name} ({current_result.value} {current_result.unit})")
             continue
 
         baseline_result = baseline[name]
@@ -179,7 +179,7 @@ def detect_regressions(
     # Check for removed benchmarks
     for name in baseline:
         if name not in current:
-            print(f"⚠️  Benchmark removed: {name}", file=sys.stderr)
+            print(f"[WARNING] Benchmark removed: {name}", file=sys.stderr)
 
     return regressions
 
@@ -211,10 +211,10 @@ def format_value(value: float, unit: str) -> str:
 def print_report(regressions: List[Regression], threshold_percent: float):
     """Print a formatted regression report."""
     if not regressions:
-        print("✅ No regressions detected!")
+        print("[OK] No regressions detected!")
         return
 
-    print(f"❌ Detected {len(regressions)} regression(s) exceeding {threshold_percent}% threshold:\n")
+    print(f"[ERROR] Detected {len(regressions)} regression(s) exceeding {threshold_percent}% threshold:\n")
 
     # Sort by change percentage (worst first)
     regressions.sort(key=lambda r: r.change_percent, reverse=True)
@@ -290,15 +290,15 @@ Examples:
         return 1
 
     if not baseline_results:
-        print(f"⚠️  No baseline results found in {args.baseline}", file=sys.stderr)
-        print("ℹ️  Skipping regression check (first run?)")
+        print(f"[WARNING] No baseline results found in {args.baseline}", file=sys.stderr)
+        print("[INFO] Skipping regression check (first run?)")
         return 0
 
     if not current_results:
-        print(f"❌ No current results found in {args.current}", file=sys.stderr)
+        print(f"[ERROR] No current results found in {args.current}", file=sys.stderr)
         return 1
 
-    print(f"📊 Comparing {len(baseline_results)} baseline benchmarks with {len(current_results)} current benchmarks")
+    print(f"[STATS] Comparing {len(baseline_results)} baseline benchmarks with {len(current_results)} current benchmarks")
     print(f"   Threshold: {args.threshold}%")
     print(f"   Format: {args.format}")
     print()
@@ -311,7 +311,7 @@ Examples:
 
     # Exit with error if regressions found and flag is set
     if regressions and args.fail_on_regression:
-        print(f"❌ CI failed due to {len(regressions)} regression(s)", file=sys.stderr)
+        print(f"[ERROR] CI failed due to {len(regressions)} regression(s)", file=sys.stderr)
         return 1
 
     return 0

@@ -201,7 +201,7 @@ def print_comparison_table(comparisons: List[Comparison], show_all: bool = False
         display_comparisons = comparisons
 
     if not display_comparisons:
-        print("✅ No significant changes detected.")
+        print("[OK] No significant changes detected.")
         return
 
     # Header
@@ -213,17 +213,17 @@ def print_comparison_table(comparisons: List[Comparison], show_all: bool = False
 
     # Results
     for comp in sorted(display_comparisons, key=lambda x: abs(x.change_percent), reverse=True):
-        emoji = ""
+        marker = ""
         if comp.is_regression:
-            emoji = "❌"
+            marker = "[ERROR]"
         elif comp.is_improvement:
-            emoji = "✅"
+            marker = "[OK]   "
         else:
-            emoji = "  "
+            marker = "       "
 
         name = comp.name[:38] if len(comp.name) > 38 else comp.name
 
-        print(f"{emoji} {name:<38} "
+        print(f"{marker} {name:<38} "
               f"{format_value(comp.baseline, comp.unit):<15} "
               f"{format_value(comp.current, comp.unit):<15} "
               f"{comp.change_percent:+9.2f}%")
@@ -254,7 +254,7 @@ def generate_markdown_report(
 """
 
     if regressions:
-        report += "## ❌ Regressions Detected\n\n"
+        report += "## Regressions Detected\n\n"
         report += "| Benchmark | Baseline | Current | Change |\n"
         report += "|-----------|----------|---------|--------|\n"
 
@@ -266,7 +266,7 @@ def generate_markdown_report(
         report += "\n"
 
     if improvements:
-        report += "## ✅ Improvements Detected\n\n"
+        report += "## Improvements Detected\n\n"
         report += "| Benchmark | Baseline | Current | Change |\n"
         report += "|-----------|----------|---------|--------|\n"
 
@@ -278,7 +278,7 @@ def generate_markdown_report(
         report += "\n"
 
     if unchanged:
-        report += f"## ⚪ Unchanged ({len(unchanged)} benchmarks)\n\n"
+        report += f"## Unchanged ({len(unchanged)} benchmarks)\n\n"
         report += "<details>\n<summary>Click to expand</summary>\n\n"
         report += "| Benchmark | Baseline | Current | Change |\n"
         report += "|-----------|----------|---------|--------|\n"
@@ -296,7 +296,7 @@ def generate_markdown_report(
     with open(output_file, 'w') as f:
         f.write(report)
 
-    print(f"\n📄 Detailed report saved to: {output_file}")
+    print(f"\n[REPORT] Detailed report saved to: {output_file}")
 
 
 def main():
@@ -385,11 +385,11 @@ Examples:
         current_results = parse_iai_results(args.current)
 
     if not baseline_results:
-        print(f"❌ Error: No baseline results found in {args.baseline}")
+        print(f"[ERROR] No baseline results found in {args.baseline}")
         return 1
 
     if not current_results:
-        print(f"❌ Error: No current results found in {args.current}")
+        print(f"[ERROR] No current results found in {args.current}")
         return 1
 
     print(f"Found {len(baseline_results)} baseline benchmarks")
@@ -410,15 +410,15 @@ Examples:
     improvements = [c for c in comparisons if c.is_improvement]
 
     # Summary
-    print(f"\n📊 Summary:")
-    print(f"   Total:        {len(comparisons)} benchmarks")
-    print(f"   ❌ Regressions: {len(regressions)}")
-    print(f"   ✅ Improvements: {len(improvements)}")
-    print(f"   Threshold:    ±{args.threshold}%")
+    print(f"\n[SUMMARY] Summary:")
+    print(f"   Total:           {len(comparisons)} benchmarks")
+    print(f"   [ERROR] Regressions:  {len(regressions)}")
+    print(f"   [OK] Improvements: {len(improvements)}")
+    print(f"   Threshold:       ±{args.threshold}%")
 
     # Exit code
     if regressions:
-        print(f"\n⚠️  {len(regressions)} regression(s) detected!")
+        print(f"\n[WARNING] {len(regressions)} regression(s) detected!")
         if args.fail_on_regression:
             print("Failing due to --fail-on-regression flag")
             return 1
@@ -426,7 +426,7 @@ Examples:
             print("(Use --fail-on-regression to fail CI on regressions)")
             return 0
     else:
-        print("\n✅ No regressions detected!")
+        print("\n[OK] No regressions detected!")
         return 0
 
 

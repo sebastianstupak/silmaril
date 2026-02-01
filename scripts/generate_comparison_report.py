@@ -191,13 +191,13 @@ class ComparisonReport:
     def _write_performance_badge(self, f, actual: float, target: float) -> None:
         """Write performance status badge."""
         if actual < target * 0.8:
-            f.write("🚀 **Excellent**\n")
+            f.write("[EXCELLENT] **Excellent**\n")
         elif actual < target:
-            f.write("✅ **Good**\n")
+            f.write("[GOOD] **Good**\n")
         elif actual < target * 1.5:
-            f.write("⚠️ **Acceptable**\n")
+            f.write("[ACCEPTABLE] **Acceptable**\n")
         else:
-            f.write("❌ **Needs Work**\n")
+            f.write("[NEEDS_WORK] **Needs Work**\n")
 
     def _write_scenario_comparisons(self, f) -> None:
         """Write detailed scenario comparisons."""
@@ -299,25 +299,25 @@ class ComparisonReport:
         f.write("## Recommendations\n\n")
 
         f.write("### When to Use Agent Game Engine\n\n")
-        f.write("✅ **Recommended for**:\n")
+        f.write("**Recommended for**:\n")
         f.write("- AI agent-driven game development\n")
         f.write("- Performance-critical multiplayer games\n")
         f.write("- Projects requiring full control over engine internals\n")
         f.write("- Teams comfortable with Rust and low-level optimization\n\n")
 
         f.write("### When to Consider Alternatives\n\n")
-        f.write("⚠️ **Consider Unity/Unreal if**:\n")
+        f.write("**Consider Unity/Unreal if**:\n")
         f.write("- Need mature tooling and asset ecosystem\n")
         f.write("- Require visual editor and designer workflows\n")
         f.write("- Team expertise is in C#/C++/Blueprint\n")
         f.write("- Need platform support (consoles, mobile)\n\n")
 
-        f.write("⚠️ **Consider Godot if**:\n")
+        f.write("**Consider Godot if**:\n")
         f.write("- Want fully open-source engine\n")
         f.write("- Need integrated editor and GDScript\n")
         f.write("- Building 2D games (Godot excels here)\n\n")
 
-        f.write("⚠️ **Consider Bevy if**:\n")
+        f.write("**Consider Bevy if**:\n")
         f.write("- Want mature Rust ECS ecosystem\n")
         f.write("- Need more community plugins and examples\n")
         f.write("- Don't require AI agent automation features\n\n")
@@ -407,7 +407,7 @@ def main():
     report.load_benchmark_results()
     report.generate_report(args.output)
 
-    print("\n✅ Report generation complete!")
+    print("\n[OK] Report generation complete!")
     print(f"\nView report: {args.output}")
 
 
