@@ -51,7 +51,7 @@ use std::any::TypeId;
 #[cfg(feature = "profiling")]
 use agent_game_engine_profiling::{profile_scope, ProfileCategory};
 
-/// Send-safe wrapper for raw pointers used in parallel iteration
+/// Send-safe wrapper for mutable raw pointers used in parallel iteration
 ///
 /// SAFETY: This is safe because:
 /// 1. The pointer is derived from exclusive access (&mut World)
@@ -60,10 +60,22 @@ use agent_game_engine_profiling::{profile_scope, ProfileCategory};
 struct SendPtr<T>(*mut T);
 
 impl<T> SendPtr<T> {
+    /// Create a new SendPtr from a mutable reference
+    #[inline(always)]
+    fn new(ptr: *mut T) -> Self {
+        SendPtr(ptr)
+    }
+
     /// Get the raw pointer (unsafe - caller must ensure disjoint access)
     #[inline(always)]
-    unsafe fn get(&self) -> *mut T {
+    unsafe fn as_ptr(&self) -> *mut T {
         self.0
+    }
+
+    /// Get a mutable reference (unsafe - caller must ensure disjoint access)
+    #[inline(always)]
+    unsafe fn as_mut<'a>(&self) -> &'a mut T {
+        &mut *self.0
     }
 }
 
@@ -78,6 +90,46 @@ impl<T> Copy for SendPtr<T> {}
 // SAFETY: We manually verify that parallel iteration uses disjoint indices
 unsafe impl<T> Send for SendPtr<T> {}
 unsafe impl<T> Sync for SendPtr<T> {}
+
+/// Send-safe wrapper for const raw pointers used in parallel iteration
+///
+/// SAFETY: This is safe because:
+/// 1. The pointer is derived from shared access (&World)
+/// 2. Multiple threads can read the same data concurrently
+/// 3. The lifetime is tied to the world borrow
+struct SendConstPtr<T>(*const T);
+
+impl<T> SendConstPtr<T> {
+    /// Create a new SendConstPtr from a const reference
+    #[inline(always)]
+    fn new(ptr: *const T) -> Self {
+        SendConstPtr(ptr)
+    }
+
+    /// Get the raw pointer (unsafe - caller must ensure valid access)
+    #[inline(always)]
+    unsafe fn as_ptr(&self) -> *const T {
+        self.0
+    }
+
+    /// Get a shared reference (unsafe - caller must ensure valid access)
+    #[inline(always)]
+    unsafe fn as_ref<'a>(&self) -> &'a T {
+        &*self.0
+    }
+}
+
+impl<T> Clone for SendConstPtr<T> {
+    fn clone(&self) -> Self {
+        SendConstPtr(self.0)
+    }
+}
+
+impl<T> Copy for SendConstPtr<T> {}
+
+// SAFETY: We manually verify that parallel iteration is safe
+unsafe impl<T> Send for SendConstPtr<T> {}
+unsafe impl<T> Sync for SendConstPtr<T> {}
 
 /// Extension trait to add parallel iteration methods to World
 pub trait ParallelWorld {
@@ -227,7 +279,7 @@ impl<'a, T: Component + Send> ParallelIterator for ParallelQueryMut1<'a, T> {
             .components
             .get_mut(&type_id)
             .and_then(|s| s.as_any_mut().downcast_mut::<SparseSet<T>>())
-            .map(|s| SendPtr(s as *mut SparseSet<T>));
+            .map(|s| SendPtr::new(s as *mut SparseSet<T>));
 
         let storage_ptr = match storage_ptr {
             Some(ptr) => ptr,
@@ -235,12 +287,12 @@ impl<'a, T: Component + Send> ParallelIterator for ParallelQueryMut1<'a, T> {
         };
 
         // SAFETY: We have exclusive access via &mut World
-        let len = unsafe { (*storage_ptr.0).len() };
+        let len = unsafe { storage_ptr.as_ref().len() };
 
         (0..len)
             .into_par_iter()
             .filter_map(move |index| unsafe {
-                let storage = &mut *storage_ptr.0;
+                let storage = storage_ptr.as_mut();
                 let entity = storage.get_dense_entity(index)?;
                 storage.get_mut(entity).map(|component| {
                     let component_ptr = component as *mut T;
@@ -324,27 +376,27 @@ impl<'a, A: Component + Send, B: Component + Sync> ParallelIterator
             .components
             .get_mut(&type_id_a)
             .and_then(|s| s.as_any_mut().downcast_mut::<SparseSet<A>>())
-            .map(|s| SendPtr(s as *mut SparseSet<A>));
+            .map(|s| SendPtr::new(s as *mut SparseSet<A>));
 
         let storage_b_ptr = self
             .world
             .components
             .get(&type_id_b)
             .and_then(|s| s.as_any().downcast_ref::<SparseSet<B>>())
-            .map(|s| SendPtr(s as *const SparseSet<B>));
+            .map(|s| SendConstPtr::new(s as *const SparseSet<B>));
 
         let (storage_a_ptr, storage_b_ptr) = match (storage_a_ptr, storage_b_ptr) {
             (Some(a), Some(b)) => (a, b),
             _ => return consumer.into_folder().complete(),
         };
 
-        let len = unsafe { (*storage_a_ptr.0).len().min((*storage_b_ptr.0).len()) };
+        let len = unsafe { storage_a_ptr.as_ref().len().min(storage_b_ptr.as_ref().len()) };
 
         (0..len)
             .into_par_iter()
             .filter_map(move |index| unsafe {
-                let storage_a = &mut *storage_a_ptr.0;
-                let storage_b = &*storage_b_ptr.0;
+                let storage_a = storage_a_ptr.as_mut();
+                let storage_b = storage_b_ptr.as_ref();
 
                 let entity = storage_a.get_dense_entity(index)?;
                 let comp_a = storage_a.get_mut(entity).map(|c| {
@@ -388,7 +440,7 @@ impl<'a, A: Component + Send, B: Component + Send> ParallelIterator
             .components
             .get_mut(&type_id_a)
             .and_then(|s| s.as_any_mut().downcast_mut::<SparseSet<A>>())
-            .map(|s| SendPtr(s as *mut SparseSet<A>));
+            .map(|s| SendPtr::new(s as *mut SparseSet<A>));
 
         // Get second mutable reference safely (different TypeIds guarantee different storages)
         let world_ptr = self.world as *mut World;
@@ -397,7 +449,7 @@ impl<'a, A: Component + Send, B: Component + Send> ParallelIterator
                 .components
                 .get_mut(&type_id_b)
                 .and_then(|s| s.as_any_mut().downcast_mut::<SparseSet<B>>())
-                .map(|s| SendPtr(s as *mut SparseSet<B>))
+                .map(|s| SendPtr::new(s as *mut SparseSet<B>))
         };
 
         let (storage_a_ptr, storage_b_ptr) = match (storage_a_ptr, storage_b_ptr) {
@@ -407,18 +459,18 @@ impl<'a, A: Component + Send, B: Component + Send> ParallelIterator
 
         // Verify they're different storages
         debug_assert_ne!(
-            storage_a_ptr.0 as *const (),
-            storage_b_ptr.0 as *const (),
+            unsafe { storage_a_ptr.as_ptr() } as *const (),
+            unsafe { storage_b_ptr.as_ptr() } as *const (),
             "Attempted to create two mutable references to the same component storage"
         );
 
-        let len = unsafe { (*storage_a_ptr.0).len().min((*storage_b_ptr.0).len()) };
+        let len = unsafe { storage_a_ptr.as_ref().len().min(storage_b_ptr.as_ref().len()) };
 
         (0..len)
             .into_par_iter()
             .filter_map(move |index| unsafe {
-                let storage_a = &mut *storage_a_ptr.0;
-                let storage_b = &mut *storage_b_ptr.0;
+                let storage_a = storage_a_ptr.as_mut();
+                let storage_b = storage_b_ptr.as_mut();
 
                 let entity = storage_a.get_dense_entity(index)?;
 

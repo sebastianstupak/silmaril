@@ -22,6 +22,7 @@ define_error! {
         PresentModeQueryFailed { reason: String } = ErrorCode::PresentModeQueryFailed, ErrorSeverity::Error,
         SwapchainCreationFailed { reason: String } = ErrorCode::SwapchainCreationFailed, ErrorSeverity::Error,
         SwapchainImageRetrievalFailed { reason: String } = ErrorCode::SwapchainCreationFailed, ErrorSeverity::Error,
+        SwapchainAcquisitionFailed { reason: String } = ErrorCode::SwapchainCreationFailed, ErrorSeverity::Error,
         MemoryAllocationFailed { size: u64, reason: String } = ErrorCode::MemoryAllocationFailed, ErrorSeverity::Error,
         BufferCreationFailed { size: u64, reason: String } = ErrorCode::BufferCreationFailed, ErrorSeverity::Error,
         ImageCreationFailed { width: u32, height: u32, reason: String } = ErrorCode::ImageCreationFailed, ErrorSeverity::Error,

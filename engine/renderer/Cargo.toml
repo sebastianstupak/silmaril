@@ -32,7 +32,8 @@ tracing-subscriber = "0.3"
 
 [build-dependencies]
 engine-build-utils = { path = "../build-utils" }
-# TODO: Add shaderc when implementing shader module (requires ninja)
+# Shaderc temporarily removed - requires ninja dependency
+# Will be added in Phase 1.7 (Mesh Rendering)
 # shaderc = "0.8"
 
 [[bench]]

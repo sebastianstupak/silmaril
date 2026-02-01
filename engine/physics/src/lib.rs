@@ -11,6 +11,8 @@
 
 pub mod components;
 pub mod config;
+pub mod events;
+pub mod sync;
 pub mod systems;
 pub mod world;
 
@@ -19,5 +21,10 @@ pub use components::{
     Collider, ColliderShape, CombineMode, PhysicsMaterial, RigidBody, RigidBodyType, Velocity,
 };
 pub use config::{PhysicsConfig, PhysicsMode};
+pub use events::{
+    BodySleepEvent, BodyWakeEvent, CollisionEndEvent, CollisionStartEvent, ContactForceEvent,
+    TriggerEnterEvent, TriggerExitEvent,
+};
+pub use sync::{PhysicsSyncConfig, PhysicsSyncSystem, build_entity_mapping};
 pub use systems::{physics_integration_system, physics_integration_system_simd};
 pub use world::PhysicsWorld;

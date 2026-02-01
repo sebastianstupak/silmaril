@@ -97,11 +97,71 @@ check: fmt-check clippy test
 bench:
     cargo bench --all-features
 
-# Run ECS benchmarks
-bench-ecs:
-    cargo bench --package engine-core
+# Run all benchmarks and save baseline
+bench-all:
+    cargo bench --all-features -- --save-baseline current
 
-# Run network benchmarks (when implemented)
+# Run platform-specific benchmarks only
+bench-platform:
+    cargo bench --package engine-core --bench platform_benches
+    cargo bench --package engine-renderer --bench vulkan_context_bench
+
+# Run ECS benchmarks only
+bench-ecs:
+    cargo bench --package engine-core --bench ecs_simple
+    cargo bench --package engine-core --bench ecs_comprehensive
+    cargo bench --package engine-core --bench query_benches
+    cargo bench --package engine-core --bench world_benches
+
+# Run physics benchmarks
+bench-physics:
+    cargo bench --package engine-physics
+
+# Run renderer benchmarks
+bench-renderer:
+    cargo bench --package engine-renderer
+
+# Run math benchmarks
+bench-math:
+    cargo bench --package engine-math
+
+# Run profiling overhead benchmarks
+bench-profiling:
+    cargo bench --package engine-profiling
+
+# Run industry comparison benchmarks
+bench-compare:
+    cargo bench --package engine-core --bench game_engine_comparison
+
+# Compare current benchmarks with saved baseline
+bench-baseline:
+    cargo bench --all-features -- --baseline current
+
+# Save current benchmarks as main baseline
+bench-save-baseline:
+    cargo bench --all-features -- --save-baseline main
+
+# Run quick benchmark smoke test (fast, for CI)
+bench-smoke:
+    cargo bench --package engine-core --bench ecs_simple -- --sample-size 10
+
+# Run benchmarks with profiling enabled
+bench-profile:
+    cargo bench --all-features --features profiling-puffin
+
+# Open benchmark report in browser
+bench-report:
+    @echo "Opening benchmark report..."
+    @if [ -f "target/criterion/report/index.html" ]; then \
+        xdg-open target/criterion/report/index.html 2>/dev/null || \
+        open target/criterion/report/index.html 2>/dev/null || \
+        start target/criterion/report/index.html 2>/dev/null || \
+        echo "Could not open browser. View report at: target/criterion/report/index.html"; \
+    else \
+        echo "No benchmark report found. Run 'just bench' first."; \
+    fi
+
+# Network benchmarks (when implemented)
 bench-network:
     cargo bench --package engine-networking
 

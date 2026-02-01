@@ -174,6 +174,29 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  # Quick benchmark smoke test (full benchmarks run in benchmark-ci.yml)
+  benchmark-smoke:
+    name: Benchmark Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Vulkan SDK
+        run: |
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list \
+            https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+          sudo apt update
+          sudo apt install vulkan-sdk
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bench-smoke
+      - name: Run quick benchmark smoke test
+        run: |
+          # Run a subset of benchmarks quickly to ensure they compile and run
+          cargo bench --package engine-core --bench ecs_simple -- --sample-size 10
+        timeout-minutes: 10
+
   # CI complete gate
   ci-complete:
     name: CI Complete
@@ -186,6 +209,7 @@ jobs:
       - coverage
       - docs
       - audit
+      - benchmark-smoke
     steps:
       - name: All CI checks passed
         run: |
@@ -199,3 +223,6 @@ jobs:
           echo "- Code coverage"
           echo "- Documentation build"
           echo "- Security audit"
+          echo "- Benchmark smoke test"
+          echo ""
+          echo "ℹ️  Full benchmark suite runs separately in benchmark-ci.yml"

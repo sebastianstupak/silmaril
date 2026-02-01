@@ -1,0 +1,307 @@
+name: Benchmark CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Run all benchmark suites across platforms
+  benchmark-suite:
+    name: Benchmark Suite (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for baseline comparison
+
+      # Install Rust
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Platform-specific Vulkan setup
+      - name: Install Vulkan SDK (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list \
+            https://packages.lunarg.com/vularg-vulkan-jammy.list
+          sudo apt update
+          sudo apt install vulkan-sdk libxcb1-dev libx11-dev
+
+      - name: Install Vulkan SDK (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile VulkanSDK.exe
+          .\VulkanSDK.exe /S
+          echo "VULKAN_SDK=C:\VulkanSDK" >> $env:GITHUB_ENV
+
+      - name: Install MoltenVK (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          brew install molten-vk
+
+      # Cache Rust dependencies
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bench-${{ matrix.os }}
+
+      # Fetch baseline from main branch (if PR)
+      - name: Fetch main branch baseline
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          git fetch origin main:main
+          git checkout main
+          cargo bench --all-features --no-fail-fast -- --save-baseline main || true
+          git checkout -
+
+      # Run all benchmarks on current branch
+      - name: Run all benchmarks
+        run: |
+          cargo bench --all-features --no-fail-fast -- --save-baseline current
+
+      # Compare with baseline (PR only)
+      - name: Compare with main baseline
+        if: github.event_name == 'pull_request'
+        id: compare
+        continue-on-error: true
+        run: |
+          # Compare and capture output
+          cargo bench --all-features --no-fail-fast -- --baseline main > benchmark-comparison.txt 2>&1 || true
+
+          # Check if comparison file exists
+          if [ -f benchmark-comparison.txt ]; then
+            echo "comparison_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "comparison_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Run regression check script (PR only)
+      - name: Check for regressions
+        if: github.event_name == 'pull_request'
+        id: regression
+        continue-on-error: true
+        run: |
+          # Install Python dependencies
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+          # Run regression check (20% threshold)
+          python scripts/check_benchmark_regression.py \
+            --baseline target/criterion-baseline \
+            --current target/criterion \
+            --threshold 20 \
+            --format criterion \
+            --fail-on-regression > regression-report.txt 2>&1 || echo "regression_detected=true" >> $GITHUB_OUTPUT
+
+          # Capture exit code
+          if [ $? -eq 0 ]; then
+            echo "regression_detected=false" >> $GITHUB_OUTPUT
+          else
+            echo "regression_detected=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Archive benchmark results
+      - name: Archive criterion results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-results-${{ matrix.os }}
+          path: target/criterion/
+          retention-days: 30
+
+      # Archive comparison results (PR only)
+      - name: Archive comparison report
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-comparison-${{ matrix.os }}
+          path: |
+            benchmark-comparison.txt
+            regression-report.txt
+          retention-days: 30
+
+      # Store baseline for main branch commits
+      - name: Store baseline for main branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-${{ matrix.os }}-${{ github.sha }}
+          path: target/criterion/
+          retention-days: 90
+
+  # Comment on PR with benchmark results
+  pr-comment:
+    name: Comment PR with Results
+    if: github.event_name == 'pull_request'
+    needs: benchmark-suite
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download all comparison reports
+      - name: Download comparison reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-comparison-*
+          merge-multiple: true
+
+      # Create PR comment
+      - name: Create PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = '## 📊 Benchmark Results\n\n';
+            comment += 'Benchmark comparison against `main` branch:\n\n';
+
+            // Read comparison files for each platform
+            const platforms = ['ubuntu-latest', 'windows-latest', 'macos-latest'];
+            const platformNames = { 'ubuntu-latest': 'Linux', 'windows-latest': 'Windows', 'macos-latest': 'macOS' };
+
+            for (const platform of platforms) {
+              const comparisonFile = `benchmark-comparison-${platform}.txt`;
+              const regressionFile = `regression-report-${platform}.txt`;
+
+              comment += `### ${platformNames[platform]}\n\n`;
+
+              if (fs.existsSync(regressionFile)) {
+                const regression = fs.readFileSync(regressionFile, 'utf8');
+                if (regression.includes('No regressions detected')) {
+                  comment += '✅ No regressions detected!\n\n';
+                } else if (regression.includes('regression(s)')) {
+                  comment += '❌ **Performance regressions detected:**\n\n';
+                  comment += '```\n' + regression.substring(0, 1000) + '\n```\n\n';
+                } else {
+                  comment += 'ℹ️ Baseline not available for comparison\n\n';
+                }
+              } else {
+                comment += 'ℹ️ No regression report available\n\n';
+              }
+            }
+
+            comment += '\n---\n\n';
+            comment += '📈 **View detailed results** in the [Actions artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n';
+            comment += '💡 **Tip:** Download the criterion results and open `target/criterion/report/index.html` for interactive charts.\n';
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' && comment.body.includes('📊 Benchmark Results')
+            );
+
+            // Update or create comment
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+  # Fail CI if significant regressions detected
+  regression-gate:
+    name: Regression Check Gate
+    if: github.event_name == 'pull_request'
+    needs: benchmark-suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download regression reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-comparison-*
+          merge-multiple: true
+
+      - name: Check for regressions
+        run: |
+          echo "Checking for performance regressions..."
+
+          # Check if any regression report indicates failure
+          REGRESSION_FOUND=false
+
+          for file in regression-report-*.txt; do
+            if [ -f "$file" ]; then
+              if grep -q "regression(s) exceeding" "$file"; then
+                echo "❌ Regressions found in $file"
+                cat "$file"
+                REGRESSION_FOUND=true
+              fi
+            fi
+          done
+
+          if [ "$REGRESSION_FOUND" = true ]; then
+            echo ""
+            echo "❌ Performance regressions detected!"
+            echo "   Review the benchmark results and optimize before merging."
+            exit 1
+          else
+            echo "✅ No significant performance regressions detected"
+          fi
+
+  # Summary job
+  benchmark-complete:
+    name: Benchmark Checks Complete
+    runs-on: ubuntu-latest
+    needs:
+      - benchmark-suite
+    if: always()
+
+    steps:
+      - name: Check job results
+        run: |
+          if [ "${{ needs.benchmark-suite.result }}" != "success" ]; then
+            echo "❌ Benchmark suite failed"
+            exit 1
+          fi
+
+          echo "✅ All benchmark checks completed successfully!"
+          echo ""
+          echo "Completed checks:"
+          echo "- Benchmark suite (3 platforms)"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "- Regression analysis"
+            echo "- PR comment with results"
+          fi
+          echo ""
+          echo "📊 View detailed results in the artifacts section above."

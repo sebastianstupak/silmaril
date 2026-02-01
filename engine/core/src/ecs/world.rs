@@ -4,6 +4,7 @@
 //! interface for creating entities and managing component data.
 
 use super::change_detection::Tick;
+use super::events::Events;
 use super::storage::ComponentStorage;
 use super::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet};
 use std::any::TypeId;
@@ -49,6 +50,8 @@ pub struct World {
     descriptors: HashMap<TypeId, ComponentDescriptor>,
     /// Current tick for change detection
     current_tick: Tick,
+    /// Event storage for inter-system communication
+    events: Events,
 }
 
 impl std::fmt::Debug for World {
@@ -69,6 +72,7 @@ impl World {
             components: HashMap::new(),
             descriptors: HashMap::new(),
             current_tick: Tick::new(),
+            events: Events::new(),
         }
     }
 
@@ -585,6 +589,83 @@ impl World {
                 .expect("Component storage type mismatch");
             storage.mark_changed(entity, self.current_tick);
         }
+    }
+
+    // ========================================================================
+    // Event System
+    // ========================================================================
+
+    /// Send an event
+    ///
+    /// Events can be used for inter-system communication without tight coupling.
+    /// Multiple systems can read the same events.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use engine_core::ecs::{World, Event};
+    /// # #[derive(Debug, Clone)]
+    /// # struct CollisionEvent { entity_a: u64, entity_b: u64 }
+    /// # impl Event for CollisionEvent {}
+    /// let mut world = World::new();
+    ///
+    /// // Physics system sends collision event
+    /// world.send_event(CollisionEvent { entity_a: 1, entity_b: 2 });
+    /// ```
+    pub fn send_event<E: Event>(&mut self, event: E) {
+        self.events.send(event);
+    }
+
+    /// Get an event reader for a specific event type
+    ///
+    /// Event readers track which events have been read, allowing multiple
+    /// systems to independently process events.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use engine_core::ecs::{World, Event};
+    /// # #[derive(Debug, Clone)]
+    /// # struct CollisionEvent { entity_a: u64, entity_b: u64 }
+    /// # impl Event for CollisionEvent {}
+    /// let world = World::new();
+    /// let mut reader = world.get_event_reader::<CollisionEvent>();
+    /// ```
+    pub fn get_event_reader<E: Event>(&self) -> EventReader<E> {
+        self.events.get_reader()
+    }
+
+    /// Read events with a reader
+    ///
+    /// Returns an iterator over all unread events of the specified type.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use engine_core::ecs::{World, Event};
+    /// # #[derive(Debug, Clone)]
+    /// # struct CollisionEvent { entity_a: u64, entity_b: u64 }
+    /// # impl Event for CollisionEvent {}
+    /// let mut world = World::new();
+    /// world.send_event(CollisionEvent { entity_a: 1, entity_b: 2 });
+    ///
+    /// let mut reader = world.get_event_reader::<CollisionEvent>();
+    /// for event in world.read_events(&mut reader) {
+    ///     println!("Collision: {} and {}", event.entity_a, event.entity_b);
+    /// }
+    /// ```
+    pub fn read_events<'a, E: Event>(&'a self, reader: &mut EventReader<E>) -> impl Iterator<Item = &'a E> + 'a {
+        self.events.read(reader)
+    }
+
+    /// Clear all events of a specific type
+    pub fn clear_events<E: Event>(&mut self) {
+        self.events.clear::<E>();
+    }
+
+    /// Clear all events
+    pub fn clear_all_events(&mut self) {
+        self.events.clear_all();
     }
 }
 
