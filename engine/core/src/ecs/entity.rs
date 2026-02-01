@@ -45,6 +45,7 @@ impl Entity {
 
     /// Create a new entity (internal use only, prefer EntityAllocator)
     #[inline]
+    #[allow(dead_code)]
     pub(crate) fn new(id: u32, generation: u32) -> Self {
         Self { id, generation }
     }
