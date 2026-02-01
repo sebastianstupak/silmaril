@@ -23,7 +23,7 @@ lazy_static = "1.5"
 engine-core = { path = "../core" }
 engine-macros = { path = "../macros" }
 raw-window-handle = "0.6"
-tracy-client = { version = "0.17", optional = true, default-features = false }
+tracy-client = { version = "0.18", optional = true, default-features = false }
 
 [dev-dependencies]
 criterion = "0.5"
