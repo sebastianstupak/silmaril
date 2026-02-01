@@ -118,7 +118,6 @@ fn test_concurrent_delta_computation() {
 // ====================
 
 #[test]
-#[ignore] // Very large test, run with --ignored
 fn test_serialize_100k_entities() {
     let mut world = World::new();
     world.register::<Transform>();

@@ -357,7 +357,6 @@ fn test_concurrent_serialization_safety() {
 }
 
 #[test]
-#[ignore] // This test is very slow (20k+ entities), run with --ignored flag
 fn test_very_large_world_20k_entities() {
     let mut world = World::new();
     world.register::<Transform>();
