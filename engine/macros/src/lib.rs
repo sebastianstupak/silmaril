@@ -10,22 +10,39 @@
 
 #![warn(missing_docs)]
 
-mod error;
 mod client_server;
+mod error;
 
 use proc_macro::TokenStream;
 
 /// Derive macro for the Component trait
 ///
+/// Automatically implements the Component marker trait for a struct.
+/// The struct must be 'static, Send, and Sync (enforced by the trait bounds).
+///
 /// # Example
 /// ```ignore
+/// use engine_macros::Component;
+///
 /// #[derive(Component)]
 /// struct Position { x: f32, y: f32, z: f32 }
 /// ```
+///
+/// # Note
+/// Works inside engine-core crate and external crates.
 #[proc_macro_derive(Component)]
-pub fn derive_component(_input: TokenStream) -> TokenStream {
-    // TODO: Implement Component derive macro
-    TokenStream::new()
+pub fn derive_component(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    // Use crate::ecs::Component which works inside engine-core
+    // External crates should re-export or use full path
+    let expanded = quote::quote! {
+        impl #impl_generics crate::ecs::Component for #name #ty_generics #where_clause {}
+    };
+
+    TokenStream::from(expanded)
 }
 
 /// Define a structured error type with error codes and severity levels.
