@@ -338,28 +338,45 @@ async fn metrics_handler(_req: Request<Body>) -> Result<Response<Body>, hyper::E
 
 // === Stubs for when metrics feature is disabled ===
 
+/// Stub metrics registry (metrics feature disabled)
 #[cfg(not(feature = "metrics"))]
 pub struct MetricsRegistry;
 
 #[cfg(not(feature = "metrics"))]
 impl MetricsRegistry {
+    /// Create a new stub metrics registry (no-op)
     pub fn new() -> Self {
         Self
     }
+    /// Record frame time (no-op)
     pub fn record_frame_time(&self, _ms: f64) {}
+    /// Set FPS (no-op)
     pub fn set_fps(&self, _fps: f64) {}
+    /// Record tick duration (no-op)
     pub fn record_tick_duration(&self, _ms: f64) {}
+    /// Set tick rate (no-op)
     pub fn set_tick_rate(&self, _tps: f64) {}
+    /// Set entity count (no-op)
     pub fn set_entity_count(&self, _count: i64) {}
+    /// Increment entity count (no-op)
     pub fn increment_entity_count(&self, _delta: i64) {}
+    /// Record query time (no-op)
     pub fn record_query_time(&self, _ms: f64) {}
+    /// Set connected clients (no-op)
     pub fn set_connected_clients(&self, _count: i64) {}
+    /// Record bytes sent (no-op)
     pub fn record_bytes_sent(&self, _bytes: u64) {}
+    /// Record bytes received (no-op)
     pub fn record_bytes_received(&self, _bytes: u64) {}
+    /// Record packet sent (no-op)
     pub fn record_packet_sent(&self) {}
+    /// Record packet received (no-op)
     pub fn record_packet_received(&self) {}
+    /// Record network latency (no-op)
     pub fn record_network_latency(&self, _ms: f64) {}
+    /// Set allocated memory (no-op)
     pub fn set_memory_allocated(&self, _bytes: i64) {}
+    /// Set ECS memory (no-op)
     pub fn set_ecs_memory(&self, _bytes: i64) {}
 }
 
@@ -370,6 +387,7 @@ impl Default for MetricsRegistry {
     }
 }
 
+/// Stub metrics server (metrics feature disabled)
 #[cfg(not(feature = "metrics"))]
 pub async fn start_metrics_server(_addr: &str) -> Result<(), Box<dyn std::error::Error>> {
     tracing::warn!("Metrics feature is disabled, server not started");

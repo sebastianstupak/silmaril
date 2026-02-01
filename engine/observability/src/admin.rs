@@ -36,7 +36,12 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 
 use std::net::SocketAddr;
-use tracing::{error, info, warn};
+
+#[cfg(feature = "admin")]
+use tracing::{error, info};
+
+#[cfg(not(feature = "admin"))]
+use tracing::warn;
 
 /// Admin command types
 #[derive(Debug, Clone, PartialEq)]
@@ -56,9 +61,17 @@ pub enum AdminCommand {
     /// Despawn N entities
     Despawn(u32),
     /// Set configuration value
-    SetConfig { key: String, value: String },
+    SetConfig {
+        /// Configuration key
+        key: String,
+        /// Configuration value
+        value: String,
+    },
     /// Get configuration value
-    GetConfig { key: String },
+    GetConfig {
+        /// Configuration key
+        key: String,
+    },
     /// Disconnect client
     Quit,
     /// Unknown command
