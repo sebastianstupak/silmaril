@@ -3,78 +3,11 @@
 //! This module provides the main `Profiler` type and related structures for
 //! collecting performance metrics and timing data.
 
-use crate::ProfileCategory;
+use crate::{ProfileCategory, ProfilerConfig};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-/// Configuration for the profiler.
-///
-/// Controls profiling behavior, persistence, and performance budgets.
-#[derive(Debug, Clone)]
-pub struct ProfilerConfig {
-    /// Whether profiling is enabled
-    pub enabled: bool,
-
-    /// Whether to persist profiling data to disk
-    pub persist_to_disk: bool,
-
-    /// Output directory for profiling data
-    pub output_dir: String,
-
-    /// Maximum file size in MB before rotation
-    pub max_file_size_mb: usize,
-
-    /// Number of frames to keep in circular buffer
-    pub circular_buffer_frames: usize,
-
-    /// Whether to save data when budget is exceeded
-    pub save_on_budget_exceeded: bool,
-
-    /// Performance budgets for specific scopes (in milliseconds)
-    pub budgets: HashMap<String, f32>,
-}
-
-impl Default for ProfilerConfig {
-    fn default() -> Self {
-        Self::default_dev()
-    }
-}
-
-impl ProfilerConfig {
-    /// Default configuration for development builds.
-    pub fn default_dev() -> Self {
-        let mut budgets = HashMap::new();
-        budgets.insert("game_loop".to_string(), 16.0); // 60 FPS
-        budgets.insert("physics_step".to_string(), 5.0);
-        budgets.insert("rendering".to_string(), 8.0);
-        budgets.insert("networking".to_string(), 2.0);
-
-        Self {
-            enabled: true,
-            persist_to_disk: true,
-            output_dir: "profiling_data".to_string(),
-            max_file_size_mb: 100,
-            circular_buffer_frames: 1000,
-            save_on_budget_exceeded: true,
-            budgets,
-        }
-    }
-
-    /// Default configuration for release builds (everything disabled).
-    pub fn default_release() -> Self {
-        Self {
-            enabled: false,
-            persist_to_disk: false,
-            output_dir: String::new(),
-            max_file_size_mb: 0,
-            circular_buffer_frames: 0,
-            save_on_budget_exceeded: false,
-            budgets: HashMap::new(),
-        }
-    }
-}
 
 /// Metrics collected for a single frame.
 ///
@@ -122,6 +55,16 @@ struct ScopeData {
     duration: Option<Duration>,
 }
 
+/// Completed scope data for historical queries.
+#[derive(Debug, Clone)]
+pub(crate) struct CompletedScopeData {
+    pub(crate) name: String,
+    pub(crate) category: ProfileCategory,
+    pub(crate) frame_number: u64,
+    pub(crate) start_us: u64,
+    pub(crate) duration_us: u64,
+}
+
 /// Shared profiler state.
 #[derive(Debug)]
 pub(crate) struct ProfilerState {
@@ -130,7 +73,8 @@ pub(crate) struct ProfilerState {
     frame_start_time: Option<Instant>,
     active_scopes: Vec<ScopeData>,
     completed_scopes: Vec<ScopeData>,
-    frame_metrics_history: Vec<FrameMetrics>,
+    pub(crate) frame_metrics_history: Vec<FrameMetrics>,
+    pub(crate) completed_scopes_by_frame: Vec<CompletedScopeData>,
 }
 
 impl ProfilerState {
@@ -142,6 +86,7 @@ impl ProfilerState {
             active_scopes: Vec::new(),
             completed_scopes: Vec::new(),
             frame_metrics_history: Vec::new(),
+            completed_scopes_by_frame: Vec::new(),
         }
     }
 }
@@ -227,11 +172,32 @@ impl Profiler {
             }
         }
 
+        // Store completed scopes for querying (clone to avoid borrow checker issues)
+        let frame_start_time = state.frame_start_time.unwrap_or_else(Instant::now);
+        let current_frame = state.frame_number;
+        let completed_scopes_clone = state.completed_scopes.clone();
+
+        for scope in &completed_scopes_clone {
+            if let Some(duration) = scope.duration {
+                let start_us = scope.start_time.duration_since(frame_start_time).as_micros() as u64;
+                let duration_us = duration.as_micros() as u64;
+
+                state.completed_scopes_by_frame.push(CompletedScopeData {
+                    name: scope.name.clone(),
+                    category: scope.category,
+                    frame_number: current_frame,
+                    start_us,
+                    duration_us,
+                });
+            }
+        }
+
         // Check budgets and warn if exceeded
         for scope in &state.completed_scopes {
             if let Some(duration) = scope.duration {
-                let time_ms = duration.as_secs_f32() * 1000.0;
-                if let Some(&budget_ms) = state.config.budgets.get(&scope.name) {
+                if let Some(&budget_duration) = state.config.budgets.get(&scope.name) {
+                    let time_ms = duration.as_secs_f32() * 1000.0;
+                    let budget_ms = budget_duration.as_secs_f32() * 1000.0;
                     if time_ms > budget_ms {
                         tracing::warn!(
                             scope = %scope.name,
@@ -258,9 +224,13 @@ impl Profiler {
         // Store in history
         state.frame_metrics_history.push(metrics.clone());
 
-        // Limit history size
-        if state.frame_metrics_history.len() > state.config.circular_buffer_frames {
+        // Limit history size for both metrics and scopes
+        if state.frame_metrics_history.len() > state.config.retention.circular_buffer_frames {
             state.frame_metrics_history.remove(0);
+
+            // Also remove old scope data to match frame history
+            let oldest_frame = state.frame_metrics_history[0].frame_number;
+            state.completed_scopes_by_frame.retain(|s| s.frame_number >= oldest_frame);
         }
 
         state.frame_number += 1;
@@ -317,8 +287,7 @@ impl Profiler {
     /// * `duration` - Budget duration
     pub fn set_budget(&self, scope: &str, duration: Duration) {
         let mut state = self.state.lock();
-        let budget_ms = duration.as_secs_f32() * 1000.0;
-        state.config.budgets.insert(scope.to_string(), budget_ms);
+        state.config.budgets.insert(scope.to_string(), duration);
     }
 
     /// Internal method to end a scope.
@@ -345,10 +314,44 @@ impl Profiler {
         state.frame_metrics_history.clone()
     }
 
+    /// Create a query builder for programmatic access to profiling data.
+    ///
+    /// This enables AI agents to analyze profiling metrics and make data-driven
+    /// decisions about performance optimization.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+    ///
+    /// # #[cfg(feature = "metrics")]
+    /// # {
+    /// let profiler = Profiler::new(ProfilerConfig::default());
+    ///
+    /// // Query physics metrics for frames 1000-2000
+    /// let stats = profiler.query()
+    ///     .frames(1000..2000)
+    ///     .category(ProfileCategory::Physics)
+    ///     .aggregate();
+    ///
+    /// println!("Physics p95: {}us", stats.p95_us);
+    /// # }
+    /// ```
+    pub fn query(&self) -> crate::query::QueryBuilder<'_> {
+        crate::query::QueryBuilder::new(self)
+    }
+
+    /// Internal method for query access to profiler state.
+    ///
+    /// This is used by the query API to safely access internal state.
+    pub(crate) fn get_state_for_query(&self) -> parking_lot::MutexGuard<'_, ProfilerState> {
+        self.state.lock()
+    }
+
     /// Get the current performance budget for a scope (for testing).
     #[cfg(test)]
     #[allow(dead_code)]
-    pub(crate) fn get_budget(&self, scope: &str) -> Option<f32> {
+    pub(crate) fn get_budget(&self, scope: &str) -> Option<Duration> {
         let state = self.state.lock();
         state.config.budgets.get(scope).copied()
     }
@@ -388,22 +391,6 @@ mod tests {
     use super::*;
     use std::thread;
     use std::time::Duration;
-
-    #[test]
-    fn test_profiler_config_default() {
-        let config = ProfilerConfig::default();
-        assert!(config.enabled);
-        assert!(config.persist_to_disk);
-        assert!(config.budgets.contains_key("game_loop"));
-    }
-
-    #[test]
-    fn test_profiler_config_release() {
-        let config = ProfilerConfig::default_release();
-        assert!(!config.enabled);
-        assert!(!config.persist_to_disk);
-        assert!(config.budgets.is_empty());
-    }
 
     #[test]
     fn test_profiler_creation() {
@@ -473,7 +460,7 @@ mod tests {
 
         let state = profiler.state.lock();
         assert!(state.config.budgets.contains_key("test_scope"));
-        assert_eq!(state.config.budgets.get("test_scope"), Some(&5.0));
+        assert_eq!(state.config.budgets.get("test_scope"), Some(&Duration::from_millis(5)));
     }
 
     #[test]
@@ -497,7 +484,7 @@ mod tests {
     #[test]
     fn test_circular_buffer() {
         let mut config = ProfilerConfig::default();
-        config.circular_buffer_frames = 2;
+        config.retention.circular_buffer_frames = 2;
 
         let profiler = Profiler::new(config);
 

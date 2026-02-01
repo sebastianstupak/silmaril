@@ -1,0 +1,204 @@
+# =============================================================================
+# Cargo Configuration Template
+# =============================================================================
+# This file demonstrates how to enable native CPU features for maximum
+# performance. Copy this file to `.cargo/config.toml` to apply settings
+# project-wide, or use RUSTFLAGS environment variable for per-build control.
+#
+# IMPORTANT: The actual `.cargo/config.toml` is gitignored to allow per-machine
+# customization. DO NOT commit your local config.toml to version control.
+# =============================================================================
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATION: Native CPU Features
+# =============================================================================
+# Uncomment ONE of the following configurations based on your needs:
+
+# -----------------------------------------------------------------------------
+# Option 1: MAXIMUM PERFORMANCE (Recommended for Local Development)
+# -----------------------------------------------------------------------------
+# Enables all CPU features supported by your machine (AVX2, FMA, SSE4.2, etc.)
+#
+# Performance: 10-30% faster math operations, 2-5x faster batch processing
+# Compatibility: Only works on your CPU or similar/newer CPUs
+# Use for: Local development, benchmarking, maximum performance
+#
+# [build]
+# rustflags = ["-C", "target-cpu=native"]
+
+# -----------------------------------------------------------------------------
+# Option 2: BALANCED (Recommended for Distribution)
+# -----------------------------------------------------------------------------
+# Targets common CPUs from 2015+ with SSE4.2, FMA, and AVX2
+#
+# Performance: 25-30% faster math, 5x faster batch operations
+# Compatibility: ~90% of desktop CPUs (Intel 4th gen+, AMD Ryzen+)
+# Use for: Steam releases, itch.io, public downloads
+#
+# [build]
+# rustflags = ["-C", "target-feature=+sse4.2,+fma,+avx2"]
+
+# -----------------------------------------------------------------------------
+# Option 3: WIDE COMPATIBILITY
+# -----------------------------------------------------------------------------
+# Targets CPUs from 2013+ with SSE4.2 and FMA (no AVX2)
+#
+# Performance: 15-20% faster math operations
+# Compatibility: ~95% of desktop CPUs (Intel 2nd gen+, AMD Bulldozer+)
+# Use for: Maximum compatibility while keeping good performance
+#
+# [build]
+# rustflags = ["-C", "target-feature=+sse4.2,+fma"]
+
+# -----------------------------------------------------------------------------
+# Option 4: MAXIMUM COMPATIBILITY (Default)
+# -----------------------------------------------------------------------------
+# No additional flags - uses baseline x86_64 features (SSE2)
+#
+# Performance: Baseline (slowest)
+# Compatibility: 100% of x86_64 CPUs
+# Use for: Unknown target hardware, very old CPUs
+#
+# [build]
+# # No rustflags needed - this is the default
+
+# =============================================================================
+# Performance Comparison
+# =============================================================================
+#
+# | Configuration | Vec3 Dot | Batch 10K | Compatibility |
+# |---------------|----------|-----------|---------------|
+# | Native        | 1.5 ns   | 8.1 µs    | Your CPU only |
+# | AVX2+FMA      | 1.5 ns   | 8.1 µs    | ~90% (2015+)  |
+# | FMA only      | 1.6 ns   | 14.8 µs   | ~95% (2013+)  |
+# | Baseline      | 2.1 ns   | 40.6 µs   | 100%          |
+#
+# See engine/math/PERFORMANCE.md for detailed benchmarks.
+
+# =============================================================================
+# How to Use This Template
+# =============================================================================
+#
+# 1. Copy this file:
+#    cp .cargo/config.toml.example .cargo/config.toml
+#
+# 2. Uncomment your preferred configuration above
+#
+# 3. Build and test:
+#    cargo build --release
+#    cargo bench  # Verify performance gains
+#
+# 4. Alternative: Use environment variable (overrides config.toml)
+#    RUSTFLAGS="-C target-cpu=native" cargo build --release
+#
+# =============================================================================
+# Verifying Enabled Features
+# =============================================================================
+#
+# Check which CPU features are enabled in your build:
+#
+#   cargo rustc --release -- --print cfg | grep target_feature
+#
+# During compilation, engine-math shows enabled features:
+#
+#   engine-math CPU features:
+#     SSE4.2: enabled
+#     FMA:    enabled
+#     AVX2:   enabled
+#     AVX512: disabled
+#
+# =============================================================================
+# Troubleshooting
+# =============================================================================
+#
+# Q: "Illegal instruction" crash when running the binary?
+# A: Your CPU doesn't support the enabled features. Rebuild with lower
+#    feature set (Option 3 or 4) or run on a newer CPU.
+#
+# Q: No performance improvement after enabling native features?
+# A: 1. Verify features are enabled: cargo rustc -- --print cfg
+#    2. Make sure you're building in release mode: cargo build --release
+#    3. Run benchmarks to measure: cargo bench
+#
+# Q: Want different settings for different build profiles?
+# A: Use environment variables instead of config.toml:
+#    RUSTFLAGS="-C target-cpu=native" cargo build --release
+#
+# =============================================================================
+# Additional Resources
+# =============================================================================
+#
+# - CPU Features Guide: engine/math/CPU_FEATURES.md
+# - Performance Benchmarks: engine/math/PERFORMANCE.md
+# - Project Documentation: README.md (Performance Optimization section)
+#
+# =============================================================================
+
+# =============================================================================
+# Other Configuration (Keep These)
+# =============================================================================
+# The settings below are separate from CPU optimization and should generally
+# be kept as-is.
+
+[target.'cfg(all())']
+rustflags = ["-D", "warnings"]  # Deny warnings in CI
+
+[build]
+jobs = 4  # Parallel compilation
+
+# =============================================================================
+# Test Configuration
+# =============================================================================
+
+[env]
+RUST_BACKTRACE = "1"
+RUST_TEST_THREADS = "4"
+
+[profile.test]
+debug = true
+opt-level = 1  # Optimize dependencies for faster test execution
+
+# =============================================================================
+# Benchmark Configuration
+# =============================================================================
+
+[alias]
+bench-all = "bench --workspace"
+bench-core = "bench -p engine-core"
+bench-math = "bench -p engine-math"
+bench-renderer = "bench -p engine-renderer"
+bench-networking = "bench -p engine-networking"
+
+# Coverage aliases
+cov = "llvm-cov --html --open"
+cov-all = "llvm-cov --all-features --workspace --html --open"
+cov-lcov = "llvm-cov --all-features --workspace --lcov --output-path lcov.info"
+
+# Test aliases
+test-all = "test --workspace --all-features"
+test-unit = "test --lib --all-features"
+test-integration = "test --tests --all-features"
+test-doc = "test --doc --all-features"
+test-quick = "test --lib --no-fail-fast"
+
+# =============================================================================
+# Lints
+# =============================================================================
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+todo = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+pedantic = "warn"
+nursery = "warn"
+
+cast_precision_loss = "allow"
+module_name_repetitions = "allow"

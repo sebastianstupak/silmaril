@@ -1,0 +1,227 @@
+name: PGO Release Build
+
+# This workflow builds PGO-optimized binaries for production releases
+# Expected performance gain: 5-15% over regular release builds
+# Only runs on tags or manual trigger to avoid long CI times
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      upload_artifacts:
+        description: 'Upload PGO artifacts'
+        required: false
+        default: 'true'
+
+env:
+  CARGO_TERM_COLOR: always
+  PROFILE_DIR: /tmp/pgo-data
+
+jobs:
+  pgo-build:
+    name: PGO Build - ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: client-linux-x64-pgo
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: client-windows-x64-pgo.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: client-macos-x64-pgo
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: llvm-tools-preview
+
+      # Install platform dependencies
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install vulkan-sdk libxcb1-dev libx11-dev llvm
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile VulkanSDK.exe
+          .\VulkanSDK.exe /S
+
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install molten-vk llvm
+
+      # Cache dependencies
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: pgo-${{ matrix.target }}
+
+      # Step 1: Build instrumented binary
+      - name: Build instrumented binary
+        shell: bash
+        run: |
+          echo "Building instrumented binary for PGO..."
+          mkdir -p $PROFILE_DIR
+          export RUSTFLAGS="-C profile-generate=$PROFILE_DIR"
+          cargo build --release --bin client --target ${{ matrix.target }}
+
+      # Step 2: Run workload to collect profile data
+      # Note: We run a subset of benchmarks to keep CI time reasonable
+      - name: Collect profile data
+        shell: bash
+        run: |
+          echo "Collecting PGO profile data..."
+          export LLVM_PROFILE_FILE="$PROFILE_DIR/pgo-%p-%m.profraw"
+
+          # Run representative workload (subset for CI)
+          cargo bench --package engine-core --bench pgo_workload -- --sample-size 10 || true
+          cargo bench --package engine-physics --bench integration_bench -- '1000|10000' --sample-size 10 || true
+          cargo bench --package engine-math --bench simd_benches -- --sample-size 10 || true
+
+          # Check if profile data was generated
+          PROFRAW_COUNT=$(find $PROFILE_DIR -name "*.profraw" 2>/dev/null | wc -l)
+          echo "Generated $PROFRAW_COUNT profile data files"
+
+          if [ "$PROFRAW_COUNT" -eq 0 ]; then
+            echo "Warning: No profile data generated, falling back to regular build"
+            exit 1
+          fi
+
+      # Step 3: Merge profile data
+      - name: Merge profile data
+        if: success()
+        shell: bash
+        run: |
+          echo "Merging profile data..."
+
+          # Find llvm-profdata
+          if command -v llvm-profdata >/dev/null 2>&1; then
+            LLVM_PROFDATA=llvm-profdata
+          elif command -v rustup >/dev/null 2>&1; then
+            LLVM_PROFDATA=$(rustup which --toolchain stable llvm-profdata)
+          else
+            echo "Error: llvm-profdata not found"
+            exit 1
+          fi
+
+          # Merge all .profraw files
+          $LLVM_PROFDATA merge -o $PROFILE_DIR/merged.profdata $PROFILE_DIR/*.profraw
+          echo "Profile data merged successfully"
+
+      # Step 4: Build PGO-optimized binary
+      - name: Build PGO-optimized binary
+        if: success()
+        shell: bash
+        run: |
+          echo "Building PGO-optimized binary..."
+          export RUSTFLAGS="-C profile-use=$PROFILE_DIR/merged.profdata -C llvm-args=-pgo-warn-missing-function"
+          cargo build --release --bin client --target ${{ matrix.target }}
+          echo "PGO-optimized build complete"
+
+      # Fallback: Build regular release if PGO failed
+      - name: Build regular release (fallback)
+        if: failure()
+        shell: bash
+        run: |
+          echo "PGO workflow failed, building regular release binary..."
+          unset RUSTFLAGS
+          cargo build --release --bin client --target ${{ matrix.target }}
+
+      # Upload PGO-optimized binary
+      - name: Upload PGO binary
+        if: github.event.inputs.upload_artifacts != 'false'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/client${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+
+      # Optional: Upload profile data for analysis
+      - name: Upload profile data
+        if: success() && github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: pgo-profile-data-${{ matrix.os }}
+          path: ${{ env.PROFILE_DIR }}/*.profdata
+
+  # Optional: Compare PGO vs non-PGO performance
+  benchmark-comparison:
+    name: PGO Performance Comparison
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install vulkan-sdk libxcb1-dev libx11-dev llvm
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run PGO comparison
+        run: |
+          # Make scripts executable
+          chmod +x scripts/*.sh
+
+          # Run comparison script
+          ./scripts/compare_pgo_performance.sh
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pgo-benchmark-comparison
+          path: target/criterion/
+
+  create-pgo-release:
+    name: Create PGO Release
+    needs: pgo-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download all PGO artifacts
+      - uses: actions/download-artifact@v3
+
+      # Create release with PGO binaries
+      - name: Create PGO Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            client-linux-x64-pgo/client
+            client-windows-x64-pgo.exe/client.exe
+            client-macos-x64-pgo/client
+          body: |
+            ## PGO-Optimized Release
+
+            This release includes binaries built with Profile-Guided Optimization (PGO).
+
+            **Expected Performance:** 5-15% faster than standard release builds
+
+            **Optimizations:**
+            - Hot path optimization based on runtime profiling
+            - Improved branch prediction
+            - Better instruction cache utilization
+            - Optimized code layout
+
+            See [README.md#profile-guided-optimization-pgo](https://github.com/${{ github.repository }}/blob/main/README.md#profile-guided-optimization-pgo) for details.
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

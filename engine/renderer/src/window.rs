@@ -116,10 +116,7 @@ impl Window {
 
         // Validate dimensions
         if config.width == 0 || config.height == 0 {
-            return Err(WindowError::InvalidDimensions {
-                width: config.width,
-                height: config.height,
-            });
+            return Err(WindowError::invaliddimensions(config.width, config.height));
         }
 
         // Create event loop with platform-specific settings
@@ -128,11 +125,11 @@ impl Window {
         let event_loop = EventLoop::builder()
             .with_any_thread(true)
             .build()
-            .map_err(|e| WindowError::EventLoopError { details: e.to_string() })?;
+            .map_err(|e| WindowError::eventlooperror(e.to_string()))?;
 
         #[cfg(not(target_os = "windows"))]
         let event_loop =
-            EventLoop::new().map_err(|e| WindowError::EventLoopError { details: e.to_string() })?;
+            EventLoop::new().map_err(|e| WindowError::eventlooperror(e.to_string()))?;
 
         // Build window attributes
         let mut window_attrs = WindowAttributes::default()
@@ -153,7 +150,7 @@ impl Window {
         #[allow(deprecated)]
         let winit_window = event_loop
             .create_window(window_attrs)
-            .map_err(|e| WindowError::CreationFailed { details: e.to_string() })?;
+            .map_err(|e| WindowError::creationfailed(e.to_string()))?;
 
         debug!("Window created successfully");
 

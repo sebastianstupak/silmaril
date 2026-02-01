@@ -40,19 +40,25 @@
 #![warn(clippy::print_stdout)]
 #![warn(clippy::print_stderr)]
 
+pub mod command;
 pub mod context;
 pub mod error;
+pub mod framebuffer;
 pub mod offscreen;
 pub mod render_pass;
 pub mod surface;
 pub mod swapchain;
+pub mod sync;
 pub mod window;
 
 // Re-export commonly used types
+pub use command::{CommandBuffer, CommandError, CommandPool};
 pub use context::{QueueFamilies, VulkanContext};
 pub use error::RendererError;
+pub use framebuffer::{create_framebuffers, Framebuffer, FramebufferError};
 pub use offscreen::OffscreenTarget;
 pub use render_pass::{RenderPass, RenderPassConfig, RenderPassError};
 pub use surface::{Surface, SurfaceError};
 pub use swapchain::Swapchain;
+pub use sync::{create_sync_objects, FrameSyncObjects, SyncError};
 pub use window::{Window, WindowConfig, WindowError, WindowEventType};

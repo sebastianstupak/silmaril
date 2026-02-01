@@ -3,12 +3,12 @@
 //! NOTE: This module provides basic physics components for engine-core.
 //! Advanced physics functionality is available in `engine-physics`.
 
+use crate::ecs::Component;
 use crate::math::Vec3;
-use engine_macros::Component;
 use serde::{Deserialize, Serialize};
 
 /// Velocity component (linear velocity in units/second)
-#[derive(Component, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Velocity {
     /// X velocity
     pub x: f32,
@@ -45,6 +45,8 @@ impl Default for Velocity {
         Self::zero()
     }
 }
+
+impl Component for Velocity {}
 
 #[cfg(test)]
 mod tests {

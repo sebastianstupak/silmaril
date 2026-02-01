@@ -3,6 +3,7 @@
 **A fully automatable game engine optimized for AI agent workflows**
 
 [![CI Status](https://img.shields.io/github/workflow/status/your-org/agent-game-engine/CI)](https://github.com/your-org/agent-game-engine/actions)
+[![Benchmark Status](https://img.shields.io/github/workflow/status/your-org/agent-game-engine/Benchmark%20Regression?label=benchmarks)](https://github.com/your-org/agent-game-engine/actions/workflows/benchmark-regression.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/your-org/agent-game-engine)](https://codecov.io/gh/your-org/agent-game-engine)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-orange)](https://www.rust-lang.org/)
@@ -90,6 +91,8 @@ cargo run --release
 - [Error Handling](docs/error-handling.md) - Custom error types
 - [Testing Strategy](docs/testing-strategy.md) - Test requirements
 - [Performance Targets](docs/performance-targets.md) - Industry benchmarks
+- [Build Tiers](docs/build-tiers.md) - Platform-specific optimized builds
+- [WASM SIMD](docs/wasm-simd.md) - WebAssembly SIMD optimization (2-4x speedup)
 - [Coding Standards](docs/rules/coding-standards.md) - Style guide
 
 ---
@@ -227,6 +230,102 @@ cargo build --features profiling
 | Memory (server/1000 players) | < 8GB | ✅ 7.2GB |
 
 **See:** [docs/performance-targets.md](docs/performance-targets.md)
+
+---
+
+## 🚀 **Performance Optimization**
+
+### Enable Native CPU Features
+
+For maximum performance, compile with native CPU optimizations to enable AVX2, FMA, and SSE4.2 instructions:
+
+```bash
+# Build with all features supported by your CPU
+RUSTFLAGS="-C target-cpu=native" cargo build --release
+
+# Run benchmarks with native features
+RUSTFLAGS="-C target-cpu=native" cargo bench
+```
+
+**Expected Performance Gains:**
+- **10-30% faster** math operations (Vec3, Transform)
+- **2-3x faster** batch physics processing (SIMD operations)
+- **15% faster** dot products and vector operations (FMA)
+
+**Why This Matters:**
+Modern CPUs support advanced SIMD (Single Instruction, Multiple Data) instructions that can process multiple values simultaneously. By enabling `target-cpu=native`, the compiler generates code optimized for your specific CPU, unlocking these features.
+
+**Trade-off:**
+The compiled binary will only run on CPUs with similar or better features. For maximum compatibility across different machines, omit this flag (slower but portable).
+
+**For More Details:**
+- [engine/math/CPU_FEATURES.md](engine/math/CPU_FEATURES.md) - Full CPU feature documentation
+- [engine/math/PERFORMANCE.md](engine/math/PERFORMANCE.md) - Benchmarks and optimization strategies
+- [.cargo/config.toml.example](.cargo/config.toml.example) - Project-wide configuration template
+
+### Profile-Guided Optimization (PGO)
+
+For production builds, use Profile-Guided Optimization to achieve an additional **5-15% performance gain** by optimizing hot paths based on actual runtime behavior.
+
+**Quick Start:**
+
+```bash
+# 1. Build instrumented binary
+./scripts/build_pgo_instrumented.sh
+
+# 2. Run representative workload to collect profile data
+./scripts/run_pgo_workload.sh
+
+# 3. Build optimized binary with profile data
+./scripts/build_pgo_optimized.sh
+```
+
+**What PGO Does:**
+- Optimizes branch prediction based on actual execution patterns
+- Improves code layout for better instruction cache utilization
+- Inlines hot functions more aggressively
+- Places hot code paths close together in memory
+
+**Expected Performance Gains:**
+- **5-15% faster** overall performance on typical workloads
+- **10-20% better** branch prediction accuracy
+- **Reduced instruction cache misses** in hot loops
+- **Better register allocation** in frequently executed code
+
+**Representative Workload:**
+
+The PGO workload includes:
+- **Physics simulation**: 1K, 10K, 100K entities with SIMD integration
+- **ECS queries**: Various query patterns (single, multi-component, mutable)
+- **Entity operations**: Spawn, despawn, component add/remove
+- **Math operations**: Vector operations, transforms, SIMD processing
+- **Rendering queries**: Typical render loop access patterns
+
+**When to Use PGO:**
+- **Release builds** for production deployment
+- **CI builds** for performance-critical releases
+- After major changes to hot paths to recalibrate optimization
+
+**Trade-offs:**
+- Slower build process (requires 3 builds instead of 1)
+- Profile data is specific to the workload used
+- Best results when profiling workload matches production usage
+
+**Automated Comparison:**
+
+To measure actual performance gain:
+
+```bash
+# Compare PGO vs non-PGO performance
+./scripts/compare_pgo_performance.sh
+
+# View detailed reports
+open target/criterion/report/index.html
+```
+
+**For More Details:**
+- [scripts/README.md](scripts/README.md) - PGO workflow documentation
+- [Rust PGO Guide](https://doc.rust-lang.org/rustc/profile-guided-optimization.html)
 
 ---
 

@@ -17,6 +17,10 @@ tracing = "0.1"
 engine-macros = { path = "../macros" }
 engine-math = { path = "../math", features = ["serde", "simd"] }
 
+# Optional profiling support
+agent-game-engine-profiling = { path = "../profiling", optional = true }
+puffin = { version = "0.19", optional = true }
+
 # Platform abstractions
 winit = { version = "0.29", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
@@ -35,6 +39,8 @@ core-foundation = "0.9"
 default = []
 window = ["winit", "raw-window-handle"]
 backtrace = []
+profiling = ["agent-game-engine-profiling/profiling-puffin", "puffin"]
+metrics = ["agent-game-engine-profiling/metrics"]
 
 [build-dependencies]
 engine-build-utils = { path = "../build-utils" }
@@ -42,6 +48,7 @@ engine-build-utils = { path = "../build-utils" }
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.4"
+iai-callgrind = "0.16"
 
 [[bench]]
 name = "ecs_benchmarks"
@@ -80,5 +87,13 @@ name = "cache_benches"
 harness = false
 
 [[bench]]
+name = "allocator_benches"
+harness = false
+
+[[bench]]
 name = "world_benches"
+harness = false
+
+[[bench]]
+name = "spatial_benches"
 harness = false

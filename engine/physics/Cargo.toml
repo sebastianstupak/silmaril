@@ -10,9 +10,14 @@ repository.workspace = true
 rapier3d = "0.18"
 engine-core = { path = "../core" }
 engine-math = { path = "../math", features = ["serde", "simd"] }
+agent-game-engine-profiling = { path = "../profiling", optional = true }
+puffin = { version = "0.19", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 glam = "0.25"
 rayon = "1.10"
+
+[features]
+profiling = ["dep:agent-game-engine-profiling", "agent-game-engine-profiling/profiling-puffin", "puffin"]
 
 [build-dependencies]
 engine-build-utils = { path = "../build-utils" }
@@ -22,4 +27,16 @@ criterion = "0.5"
 
 [[bench]]
 name = "integration_bench"
+harness = false
+
+[[bench]]
+name = "physics_integration_comparison"
+harness = false
+
+[[bench]]
+name = "parallel_threshold_bench"
+harness = false
+
+[[bench]]
+name = "threshold_standalone"
 harness = false

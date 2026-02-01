@@ -14,7 +14,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use engine_core::ecs::{Component, World};
 use engine_core::math::{Transform, Vec3};
-use engine_core::physics_components::{Velocity, RigidBody, Collider};
+use engine_core::physics_components::Velocity;
 
 // ============================================================================
 // Component Definitions for Benchmarking
@@ -28,6 +28,7 @@ struct Health {
 impl Component for Health {}
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct Damage {
     amount: f32,
 }
@@ -35,6 +36,7 @@ impl Component for Damage {}
 
 #[derive(Debug, Clone, Copy)]
 struct Player {
+    #[allow(dead_code)]
     id: u32,
 }
 impl Component for Player {}
@@ -47,6 +49,7 @@ impl Component for Enemy {}
 
 #[derive(Debug, Clone, Copy)]
 struct Projectile {
+    #[allow(dead_code)]
     damage: f32,
 }
 impl Component for Projectile {}
@@ -131,15 +134,14 @@ fn bench_iterate_single_component(c: &mut Criterion) {
                 let mut world = World::new();
                 for i in 0..count {
                     let entity = world.spawn();
-                    world.add(entity, Transform {
-                        position: Vec3::new(i as f32, 0.0, 0.0),
-                        ..Default::default()
-                    });
+                    let mut transform = Transform::default();
+                    transform.position = Vec3::new(i as f32, 0.0, 0.0);
+                    world.add(entity, transform);
                 }
 
                 b.iter(|| {
                     let mut sum = 0.0f32;
-                    for transform in world.query::<&Transform>() {
+                    for (_entity, transform) in world.query::<&Transform>() {
                         sum += black_box(transform.position.x);
                     }
                     black_box(sum);
@@ -164,10 +166,9 @@ fn bench_iterate_two_components(c: &mut Criterion) {
                 let mut world = World::new();
                 for i in 0..count {
                     let entity = world.spawn();
-                    world.add(entity, Transform {
-                        position: Vec3::new(i as f32, 0.0, 0.0),
-                        ..Default::default()
-                    });
+                    let mut transform = Transform::default();
+                    transform.position = Vec3::new(i as f32, 0.0, 0.0);
+                    world.add(entity, transform);
                     world.add(entity, Velocity {
                         x: 1.0,
                         y: 0.0,
@@ -177,7 +178,7 @@ fn bench_iterate_two_components(c: &mut Criterion) {
 
                 b.iter(|| {
                     let mut sum = 0.0f32;
-                    for (transform, velocity) in world.query::<(&Transform, &Velocity)>() {
+                    for (_entity, (transform, velocity)) in world.query::<(&Transform, &Velocity)>() {
                         sum += black_box(transform.position.x + velocity.x);
                     }
                     black_box(sum);
@@ -189,8 +190,8 @@ fn bench_iterate_two_components(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_iterate_five_components(c: &mut Criterion) {
-    let mut group = c.benchmark_group("iterate_five_components");
+fn bench_iterate_four_components(c: &mut Criterion) {
+    let mut group = c.benchmark_group("iterate_four_components");
 
     for count in [1_000, 10_000, 100_000].iter() {
         group.throughput(Throughput::Elements(*count as u64));
@@ -206,17 +207,15 @@ fn bench_iterate_five_components(c: &mut Criterion) {
                     world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
                     world.add(entity, Health { current: 100.0, max: 100.0 });
                     world.add(entity, Player { id: i as u32 });
-                    world.add(entity, RigidBody::Dynamic);
                 }
 
                 b.iter(|| {
                     let mut sum = 0.0f32;
-                    for (_t, v, h, _p, _rb) in world.query::<(
+                    for (_entity, (_t, v, h, _p)) in world.query::<(
                         &Transform,
                         &Velocity,
                         &Health,
                         &Player,
-                        &RigidBody,
                     )>() {
                         sum += black_box(v.x + h.current);
                     }
@@ -333,7 +332,7 @@ fn bench_query_filtering(c: &mut Criterion) {
 
                 b.iter(|| {
                     let mut found = 0;
-                    for (_transform, _player) in world.query::<(&Transform, &Player)>() {
+                    for (_entity, (_transform, _player)) in world.query::<(&Transform, &Player)>() {
                         found += 1;
                     }
                     black_box(found);
@@ -386,7 +385,7 @@ fn bench_game_simulation(c: &mut Criterion) {
         let mut world = World::new();
 
         // 600 enemies
-        for i in 0..600 {
+        for _ in 0..600 {
             let entity = world.spawn();
             world.add(entity, Transform::default());
             world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
@@ -416,19 +415,19 @@ fn bench_game_simulation(c: &mut Criterion) {
             let dt = 1.0 / 60.0;
 
             // Update positions
-            for (mut transform, velocity) in world.query::<(&mut Transform, &Velocity)>() {
+            for (_entity, (transform, velocity)) in world.query_mut::<(&mut Transform, &Velocity)>() {
                 transform.position.x += velocity.x * dt;
                 transform.position.y += velocity.y * dt;
                 transform.position.z += velocity.z * dt;
             }
 
             // AI update
-            for enemy in world.query::<&mut Enemy>() {
+            for (_entity, enemy) in world.query_mut::<&mut Enemy>() {
                 enemy.ai_state = (enemy.ai_state + 1) % 4;
             }
 
             // Health regen
-            for health in world.query::<&mut Health>() {
+            for (_entity, health) in world.query_mut::<&mut Health>() {
                 if health.current < health.max {
                     health.current = (health.current + 1.0).min(health.max);
                 }
@@ -458,7 +457,7 @@ criterion_group!(
     config = Criterion::default()
         .sample_size(100)
         .measurement_time(std::time::Duration::from_secs(10));
-    targets = bench_iterate_single_component, bench_iterate_two_components, bench_iterate_five_components
+    targets = bench_iterate_single_component, bench_iterate_two_components, bench_iterate_four_components
 );
 
 criterion_group!(

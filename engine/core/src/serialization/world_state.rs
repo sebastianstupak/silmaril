@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
 /// Entity metadata for serialization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EntityMetadata {
@@ -78,19 +81,35 @@ impl WorldState {
     /// // ... add entities and components ...
     /// let snapshot = WorldState::snapshot(&world);
     /// ```
-    pub fn snapshot(_world: &World) -> Self {
-        let entities = Vec::new();
-        let components = HashMap::new();
+    pub fn snapshot(world: &World) -> Self {
+        #[cfg(feature = "profiling")]
+        profile_scope!("world_snapshot", ProfileCategory::Serialization);
 
-        // Get all entities from the world
-        // Note: This requires adding a method to World to iterate entities
-        // For now, we'll use a placeholder implementation
+        let mut entities = Vec::new();
+        let mut components = HashMap::new();
 
-        let entity_count = 0;
-        let component_count = 0;
+        // Iterate all entities and collect their state
+        for entity in world.entities() {
+            if !world.is_alive(entity) {
+                continue;
+            }
 
-        // Placeholder: In a complete implementation, we'd iterate all entities
-        // and collect their components using World's public API
+            // Add entity metadata
+            entities.push(EntityMetadata {
+                entity,
+                generation: entity.generation(),
+                alive: true,
+            });
+
+            // Get all components for this entity
+            let entity_components = world.get_all_components(entity);
+            if !entity_components.is_empty() {
+                components.insert(entity, entity_components);
+            }
+        }
+
+        let entity_count = entities.len();
+        let component_count: usize = components.values().map(|v| v.len()).sum();
 
         Self {
             entities,
@@ -122,20 +141,26 @@ impl WorldState {
     /// snapshot.restore(&mut world);
     /// ```
     pub fn restore(&self, world: &mut World) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("world_restore", ProfileCategory::Serialization);
+
         world.clear();
 
+        // Restore entities and components
         for entity_meta in &self.entities {
             if !entity_meta.alive {
                 continue;
             }
 
-            // Spawn entity
-            // Note: We need to add a method to World to spawn with specific ID/generation
-            let _entity = world.spawn();
+            // Spawn entity with the exact same ID and generation
+            world.spawn_with_id(entity_meta.entity);
 
-            // Add components
-            // Note: We need a way to add components from ComponentData enum
-            // This will be implemented when we extend World's API
+            // Add all components for this entity
+            if let Some(entity_components) = self.components.get(&entity_meta.entity) {
+                for component_data in entity_components {
+                    world.add_component_data(entity_meta.entity, component_data.clone());
+                }
+            }
         }
     }
 }
@@ -148,6 +173,9 @@ impl Default for WorldState {
 
 impl Serializable for WorldState {
     fn serialize(&self, format: Format) -> Result<Vec<u8>, SerializationError> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("worldstate_serialize", ProfileCategory::Serialization);
+
         match format {
             Format::Yaml => serde_yaml::to_string(self)
                 .map(|s| s.into_bytes())
@@ -162,6 +190,9 @@ impl Serializable for WorldState {
     }
 
     fn deserialize(data: &[u8], format: Format) -> Result<Self, SerializationError> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("worldstate_deserialize", ProfileCategory::Serialization);
+
         match format {
             Format::Yaml => {
                 let s = std::str::from_utf8(data)
@@ -183,6 +214,9 @@ impl Serializable for WorldState {
         mut writer: W,
         format: Format,
     ) -> Result<(), SerializationError> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("worldstate_serialize_to", ProfileCategory::Serialization);
+
         let bytes = Serializable::serialize(self, format)?;
         writer.write_all(&bytes)?;
         Ok(())

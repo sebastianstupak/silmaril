@@ -35,6 +35,7 @@ use tokio::net::{TcpListener, TcpStream};
 #[cfg(feature = "admin")]
 use tokio::sync::mpsc;
 
+#[cfg(feature = "admin")]
 use std::net::SocketAddr;
 
 #[cfg(feature = "admin")]
@@ -270,6 +271,7 @@ async fn handle_client(
 }
 
 /// Get help text
+#[cfg(feature = "admin")]
 fn get_help_text() -> String {
     r#"
 Available Commands:
@@ -300,16 +302,25 @@ Examples:
     .to_string()
 }
 
-// Stub implementation when admin feature is disabled
+/// Stub admin console implementation when admin feature is disabled
+///
+/// This is a no-op implementation that logs a warning when started.
 #[cfg(not(feature = "admin"))]
 pub struct AdminConsole;
 
 #[cfg(not(feature = "admin"))]
 impl AdminConsole {
+    /// Create a new stub admin console
+    ///
+    /// # Arguments
+    /// * `_addr` - Ignored (admin feature is disabled)
     pub fn new(_addr: &str) -> Self {
         Self
     }
 
+    /// Start the stub admin console (no-op)
+    ///
+    /// Logs a warning that the admin feature is disabled.
     pub async fn start(self) -> Result<(), Box<dyn std::error::Error>> {
         warn!("Admin console feature is disabled");
         Ok(())

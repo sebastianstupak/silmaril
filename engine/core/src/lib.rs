@@ -9,6 +9,7 @@
 
 #![warn(missing_docs)]
 
+pub mod allocators;
 pub mod ecs;
 pub mod error;
 pub mod gameplay;
@@ -17,8 +18,10 @@ pub mod physics_components;
 pub mod platform;
 pub mod rendering;
 pub mod serialization;
+pub mod spatial;
 
 // Re-export commonly used types
+pub use allocators::{Arena, FrameAllocator, PoolAllocator};
 pub use ecs::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet, World};
 pub use error::{EngineError, ErrorCode, ErrorSeverity};
 pub use gameplay::Health;
@@ -26,3 +29,4 @@ pub use math::{Quat, Transform, Vec3};
 pub use physics_components::Velocity;
 pub use platform::PlatformError;
 pub use rendering::MeshRenderer;
+pub use spatial::{Aabb, BoundingBox, Bvh, RayCast, RayHit, SpatialGrid, SpatialGridConfig, SpatialQuery};

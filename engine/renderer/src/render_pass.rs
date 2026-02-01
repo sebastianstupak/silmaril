@@ -141,9 +141,7 @@ impl RenderPass {
 
         let render_pass =
             unsafe { device.create_render_pass(&render_pass_info, None) }.map_err(|e| {
-                RenderPassError::CreationFailed {
-                    details: format!("vkCreateRenderPass failed: {}", e),
-                }
+                RenderPassError::creationfailed(format!("vkCreateRenderPass failed: {}", e))
             })?;
 
         debug!(render_pass = ?render_pass, "Render pass created successfully");
@@ -184,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_render_pass_error_display() {
-        let err = RenderPassError::CreationFailed { details: "test error".to_string() };
+        let err = RenderPassError::creationfailed("test error".to_string());
         let msg = err.to_string();
         assert!(msg.contains("CreationFailed") || msg.contains("test error"));
     }

@@ -50,7 +50,7 @@ fn bench_iterate_entities(c: &mut Criterion) {
 
                 b.iter(|| {
                     let mut sum = 0;
-                    for _transform in world.query::<&Transform>() {
+                    for (_entity, _transform) in world.query::<&Transform>() {
                         sum += 1;
                     }
                     black_box(sum);

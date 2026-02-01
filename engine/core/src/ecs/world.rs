@@ -8,6 +8,9 @@ use super::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet};
 use std::any::TypeId;
 use std::collections::HashMap;
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
 /// World container - owns all entities and components
 ///
 /// The World is the central data structure in the ECS. It manages:
@@ -72,6 +75,9 @@ impl World {
     /// world.register::<Health>();
     /// ```
     pub fn register<T: Component>(&mut self) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("component_register", ProfileCategory::ECS);
+
         let type_id = TypeId::of::<T>();
         if !self.components.contains_key(&type_id) {
             self.components
@@ -94,6 +100,9 @@ impl World {
     /// ```
     #[inline]
     pub fn spawn(&mut self) -> Entity {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_spawn", ProfileCategory::ECS);
+
         self.entities.allocate()
     }
 
@@ -114,6 +123,9 @@ impl World {
     /// ```
     #[inline]
     pub fn despawn(&mut self, entity: Entity) -> bool {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_despawn", ProfileCategory::ECS);
+
         if !self.entities.is_alive(entity) {
             return false;
         }
@@ -151,6 +163,9 @@ impl World {
     /// ```
     #[inline]
     pub fn add<T: Component>(&mut self, entity: Entity, component: T) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("component_add", ProfileCategory::ECS);
+
         // Extra defensive: verify entity is alive
         // Note: This check is always active for safety, even in release builds
         assert!(
@@ -210,6 +225,9 @@ impl World {
     /// ```
     #[inline]
     pub fn get<T: Component>(&self, entity: Entity) -> Option<&T> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("component_get", ProfileCategory::ECS);
+
         let type_id = TypeId::of::<T>();
         let storage = self.components.get(&type_id)?;
         let storage = storage.as_any().downcast_ref::<SparseSet<T>>()?;
@@ -237,6 +255,9 @@ impl World {
     /// ```
     #[inline]
     pub fn get_mut<T: Component>(&mut self, entity: Entity) -> Option<&mut T> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("component_get_mut", ProfileCategory::ECS);
+
         let type_id = TypeId::of::<T>();
         let storage = self.components.get_mut(&type_id)?;
         let storage = storage.as_any_mut().downcast_mut::<SparseSet<T>>()?;
@@ -263,6 +284,9 @@ impl World {
     /// ```
     #[inline]
     pub fn remove<T: Component>(&mut self, entity: Entity) -> Option<T> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("component_remove", ProfileCategory::ECS);
+
         let type_id = TypeId::of::<T>();
         let storage = self.components.get_mut(&type_id)?;
         let storage = storage.as_any_mut().downcast_mut::<SparseSet<T>>()?;
@@ -327,10 +351,125 @@ impl World {
     ///
     /// This removes all data from the world but keeps component registrations.
     pub fn clear(&mut self) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("world_clear", ProfileCategory::ECS);
+
         self.entities.clear();
-        for _storage in self.components.values_mut() {
-            // Clear all component storages
-            // TODO: Implement ComponentStorage trait for proper type-erased clearing
+        for storage in self.components.values_mut() {
+            storage.clear();
+        }
+    }
+
+    /// Iterate all alive entities
+    ///
+    /// This is useful for serialization and debugging.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::World;
+    /// let mut world = World::new();
+    /// world.spawn();
+    /// world.spawn();
+    ///
+    /// let count = world.entities().count();
+    /// assert_eq!(count, 2);
+    /// ```
+    pub fn entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.entities.entities()
+    }
+
+    /// Spawn an entity with a specific ID and generation (for deserialization)
+    ///
+    /// This is used when restoring world state from a snapshot.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entity is already alive.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::{World, Entity};
+    /// let mut world = World::new();
+    /// let entity = Entity::new(42, 5);
+    /// world.spawn_with_id(entity);
+    /// assert!(world.is_alive(entity));
+    /// ```
+    pub fn spawn_with_id(&mut self, entity: Entity) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_spawn_with_id", ProfileCategory::ECS);
+
+        self.entities.allocate_with_id(entity);
+    }
+
+    /// Get all components for an entity (for serialization)
+    ///
+    /// Returns a vector of ComponentData containing all components
+    /// attached to the entity. Used for world state snapshots.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use engine_core::ecs::World;
+    /// # let world = World::new();
+    /// # let entity = world.entities().next().unwrap();
+    /// let components = world.get_all_components(entity);
+    /// println!("Entity has {} components", components.len());
+    /// ```
+    pub fn get_all_components(&self, entity: Entity) -> Vec<crate::serialization::ComponentData> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("world_get_all_components", ProfileCategory::ECS);
+
+        let mut result = Vec::new();
+
+        // Check each registered component type
+        for storage in self.components.values() {
+            if let Some(component_data) = storage.get_component_data(entity) {
+                result.push(component_data);
+            }
+        }
+
+        result
+    }
+
+    /// Add a component from ComponentData enum (for deserialization)
+    ///
+    /// This is used when restoring world state from a snapshot.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entity is not alive or if the component type is not registered.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use engine_core::ecs::World;
+    /// # use engine_core::serialization::ComponentData;
+    /// # use engine_core::math::Transform;
+    /// # let mut world = World::new();
+    /// # let entity = world.spawn();
+    /// # world.register::<Transform>();
+    /// let component_data = ComponentData::Transform(Transform::default());
+    /// world.add_component_data(entity, component_data);
+    /// ```
+    pub fn add_component_data(&mut self, entity: Entity, component_data: crate::serialization::ComponentData) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("world_add_component_data", ProfileCategory::ECS);
+
+        match component_data {
+            crate::serialization::ComponentData::Transform(t) => {
+                self.add(entity, t);
+            }
+            crate::serialization::ComponentData::Health(h) => {
+                self.add(entity, h);
+            }
+            crate::serialization::ComponentData::Velocity(v) => {
+                self.add(entity, v);
+            }
+            crate::serialization::ComponentData::MeshRenderer(m) => {
+                self.add(entity, m);
+            }
         }
     }
 

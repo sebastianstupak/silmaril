@@ -9,6 +9,19 @@
 //! - Automatic resize handling
 //! - Minimal allocations during recreation
 
+// Tracy profiling macros (no-op when profiling feature disabled)
+#[cfg(feature = "profiling")]
+macro_rules! profile_scope {
+    ($name:expr) => {
+        let _tracy_span = tracy_client::span!($name);
+    };
+}
+
+#[cfg(not(feature = "profiling"))]
+macro_rules! profile_scope {
+    ($name:expr) => {};
+}
+
 use crate::context::VulkanContext;
 use crate::error::RendererError;
 use ash::vk;
@@ -62,9 +75,7 @@ impl Swapchain {
         let capabilities = unsafe {
             surface_loader
                 .get_physical_device_surface_capabilities(context.physical_device, surface)
-                .map_err(|e| RendererError::SurfaceCapabilitiesQueryFailed {
-                    reason: format!("{:?}", e),
-                })?
+                .map_err(|e| RendererError::surfacecapabilitiesqueryfailed(format!("{:?}", e)))?
         };
 
         // Choose surface format (prefer SRGB)
@@ -126,7 +137,7 @@ impl Swapchain {
         // queue_family_indices array stays in scope.
         let swapchain = unsafe {
             swapchain_loader.create_swapchain(&create_info, None).map_err(|e| {
-                RendererError::SwapchainCreationFailed { reason: format!("{:?}", e) }
+                RendererError::swapchaincreationfailed(format!("{:?}", e))
             })?
         };
 
@@ -135,7 +146,7 @@ impl Swapchain {
         // The returned images are owned by the swapchain and remain valid until swapchain destruction.
         let images = unsafe {
             swapchain_loader.get_swapchain_images(swapchain).map_err(|e| {
-                RendererError::SwapchainImageRetrievalFailed { reason: format!("{:?}", e) }
+                RendererError::swapchainmageretrievalfailed(format!("{:?}", e))
             })?
         };
 
@@ -170,6 +181,8 @@ impl Swapchain {
         width: u32,
         height: u32,
     ) -> Result<(), RendererError> {
+        profile_scope!("Swapchain::recreate");
+
         info!(
             old_extent = ?self.extent,
             new_extent = ?(width, height),
@@ -202,9 +215,7 @@ impl Swapchain {
         let capabilities = unsafe {
             surface_loader
                 .get_physical_device_surface_capabilities(context.physical_device, surface)
-                .map_err(|e| RendererError::SurfaceCapabilitiesQueryFailed {
-                    reason: format!("{:?}", e),
-                })?
+                .map_err(|e| RendererError::surfacecapabilitiesqueryfailed(format!("{:?}", e)))?
         };
 
         // Recalculate extent
@@ -263,7 +274,7 @@ impl Swapchain {
         // old_swapchain (if not null) is valid and we're replacing it.
         let new_swapchain = unsafe {
             self.loader.create_swapchain(&create_info, None).map_err(|e| {
-                RendererError::SwapchainCreationFailed { reason: format!("{:?}", e) }
+                RendererError::swapchaincreationfailed(format!("{:?}", e))
             })?
         };
 
@@ -278,7 +289,7 @@ impl Swapchain {
         // SAFETY: new_swapchain is valid, just created above.
         let images = unsafe {
             self.loader.get_swapchain_images(new_swapchain).map_err(|e| {
-                RendererError::SwapchainImageRetrievalFailed { reason: format!("{:?}", e) }
+                RendererError::swapchainmageretrievalfailed(format!("{:?}", e))
             })?
         };
 
@@ -317,6 +328,8 @@ impl Swapchain {
         semaphore: vk::Semaphore,
         fence: vk::Fence,
     ) -> Result<(u32, bool), RendererError> {
+        profile_scope!("Swapchain::acquire_next_image");
+
         // SAFETY: self.swapchain is valid. Semaphore and fence must be valid (caller's responsibility).
         // u64::MAX timeout means wait indefinitely (VSync handles timing).
         unsafe {
@@ -369,6 +382,8 @@ impl Swapchain {
         image_index: u32,
         wait_semaphores: &[vk::Semaphore],
     ) -> Result<bool, RendererError> {
+        profile_scope!("Swapchain::present");
+
         let swapchains = [self.swapchain];
         let image_indices = [image_index];
 
@@ -428,17 +443,19 @@ fn choose_surface_format(
     physical_device: vk::PhysicalDevice,
     surface: vk::SurfaceKHR,
 ) -> Result<vk::SurfaceFormatKHR, RendererError> {
+    profile_scope!("choose_surface_format");
+
     // SAFETY: physical_device and surface are valid. This query only reads supported formats.
     let formats = unsafe {
         surface_loader
             .get_physical_device_surface_formats(physical_device, surface)
-            .map_err(|e| RendererError::SurfaceFormatQueryFailed { reason: format!("{:?}", e) })?
+            .map_err(|e| RendererError::surfaceformatqueryfailed(format!("{:?}", e)))?
     };
 
     if formats.is_empty() {
-        return Err(RendererError::SurfaceFormatQueryFailed {
-            reason: "No surface formats available".to_string(),
-        });
+        return Err(RendererError::surfaceformatqueryfailed(
+            "No surface formats available".to_string(),
+        ));
     }
 
     // Comprehensive fallback chain
@@ -496,6 +513,8 @@ fn choose_present_mode(
     physical_device: vk::PhysicalDevice,
     surface: vk::SurfaceKHR,
 ) -> Result<vk::PresentModeKHR, RendererError> {
+    profile_scope!("choose_present_mode");
+
     // SAFETY: physical_device and surface are valid. This query only reads supported present modes.
     let modes = unsafe {
         surface_loader
@@ -599,6 +618,8 @@ fn create_image_views(
     images: &[vk::Image],
     format: vk::Format,
 ) -> Result<Vec<vk::ImageView>, RendererError> {
+    profile_scope!("create_image_views");
+
     images
         .iter()
         .map(|&image| {

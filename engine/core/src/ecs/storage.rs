@@ -27,6 +27,9 @@
 use super::{Component, Entity};
 use std::any::Any;
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
 /// Type-erased component storage trait
 ///
 /// Provides type-erased access to component storage operations,
@@ -47,6 +50,14 @@ pub trait ComponentStorage: Any {
 
     /// Get a mutable reference to self as &mut dyn Any for downcasting
     fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Get component as ComponentData (for serialization)
+    ///
+    /// Returns None if the entity doesn't have this component.
+    fn get_component_data(&self, entity: Entity) -> Option<crate::serialization::ComponentData>;
+
+    /// Clear all components (type-erased)
+    fn clear(&mut self);
 }
 
 /// Sparse-set storage for a single component type
@@ -130,6 +141,9 @@ impl<T: Component> SparseSet<T> {
     /// ```
     #[inline]
     pub fn insert(&mut self, entity: Entity, component: T) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_insert", ProfileCategory::ECS);
+
         // Ensure sparse array is large enough
         let idx = entity.id() as usize;
         if idx >= self.sparse.len() {
@@ -188,6 +202,9 @@ impl<T: Component> SparseSet<T> {
     /// ```
     #[inline]
     pub fn remove(&mut self, entity: Entity) -> Option<T> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_remove", ProfileCategory::ECS);
+
         let idx = entity.id() as usize;
         let dense_idx = self.sparse.get_mut(idx)?.take()?;
 
@@ -246,6 +263,9 @@ impl<T: Component> SparseSet<T> {
     /// OPTIMIZATION: Uses unchecked access where provably safe to eliminate bounds checks.
     #[inline(always)]
     pub fn get(&self, entity: Entity) -> Option<&T> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_get", ProfileCategory::ECS);
+
         let idx = entity.id() as usize;
         // SAFETY: We check bounds explicitly before using get_unchecked
         if idx >= self.sparse.len() {
@@ -272,6 +292,9 @@ impl<T: Component> SparseSet<T> {
     /// OPTIMIZATION: Uses unchecked access where provably safe to eliminate bounds checks.
     #[inline(always)]
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_get_mut", ProfileCategory::ECS);
+
         let idx = entity.id() as usize;
         // SAFETY: We check bounds explicitly before using get_unchecked
         if idx >= self.sparse.len() {
@@ -296,6 +319,9 @@ impl<T: Component> SparseSet<T> {
     /// OPTIMIZATION: Manual bounds check + unchecked access for faster codegen.
     #[inline(always)]
     pub fn contains(&self, entity: Entity) -> bool {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_contains", ProfileCategory::ECS);
+
         let idx = entity.id() as usize;
         // SAFETY: Explicit bounds check before unchecked access
         idx < self.sparse.len() && unsafe { self.sparse.get_unchecked(idx).is_some() }
@@ -305,11 +331,17 @@ impl<T: Component> SparseSet<T> {
     ///
     /// Iteration order is not guaranteed and may change after insertions/removals.
     pub fn iter(&self) -> impl Iterator<Item = (Entity, &T)> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_iter", ProfileCategory::ECS);
+
         self.dense.iter().copied().zip(self.components.iter())
     }
 
     /// Iterate over all (entity, component) pairs with mutable component access
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_iter_mut", ProfileCategory::ECS);
+
         self.dense.iter().copied().zip(self.components.iter_mut())
     }
 
@@ -327,6 +359,9 @@ impl<T: Component> SparseSet<T> {
 
     /// Clear all components
     pub fn clear(&mut self) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("storage_clear", ProfileCategory::ECS);
+
         self.sparse.clear();
         self.dense.clear();
         self.components.clear();
@@ -431,6 +466,39 @@ impl<T: Component> ComponentStorage for SparseSet<T> {
     #[inline(always)]
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn get_component_data(&self, entity: Entity) -> Option<crate::serialization::ComponentData> {
+        // Import ComponentData and all component types
+        use crate::serialization::ComponentData;
+        use crate::gameplay::Health;
+        use crate::math::Transform;
+        use crate::physics_components::Velocity;
+        use crate::rendering::MeshRenderer;
+        use std::any::TypeId;
+
+        let type_id = TypeId::of::<T>();
+
+        // Match on the type and convert to ComponentData
+        if type_id == TypeId::of::<Transform>() {
+            let storage = self.as_any().downcast_ref::<SparseSet<Transform>>()?;
+            storage.get(entity).cloned().map(ComponentData::Transform)
+        } else if type_id == TypeId::of::<Health>() {
+            let storage = self.as_any().downcast_ref::<SparseSet<Health>>()?;
+            storage.get(entity).cloned().map(ComponentData::Health)
+        } else if type_id == TypeId::of::<Velocity>() {
+            let storage = self.as_any().downcast_ref::<SparseSet<Velocity>>()?;
+            storage.get(entity).cloned().map(ComponentData::Velocity)
+        } else if type_id == TypeId::of::<MeshRenderer>() {
+            let storage = self.as_any().downcast_ref::<SparseSet<MeshRenderer>>()?;
+            storage.get(entity).cloned().map(ComponentData::MeshRenderer)
+        } else {
+            None
+        }
+    }
+
+    fn clear(&mut self) {
+        self.clear();
     }
 }
 

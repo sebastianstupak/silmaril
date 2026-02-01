@@ -7,6 +7,9 @@ use crate::components::Velocity;
 use engine_core::ecs::World;
 use engine_core::math::Transform;
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::profile_scope;
+
 /// Standard physics integration system (scalar).
 ///
 /// Updates entity positions based on velocity:
@@ -16,6 +19,9 @@ use engine_core::math::Transform;
 /// Processes entities one at a time. For better performance with many entities,
 /// use `physics_integration_system_simd` which processes 4-8 entities at once.
 pub fn physics_integration_system(world: &mut World, dt: f32) {
+    #[cfg(feature = "profiling")]
+    profile_scope!("physics_integration_system");
+
     // Query for all entities with Transform and Velocity
     for (_entity, (transform, velocity)) in world.query_mut::<(&mut Transform, &Velocity)>() {
         // Scalar operation: process one entity at a time

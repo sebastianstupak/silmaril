@@ -54,7 +54,29 @@
       "Bash(powershell -Command:*)",
       "Bash(timeout /t 30 /nobreak)",
       "Bash(timeout /t 2)",
-      "Bash(timeout 60 tail:*)"
+      "Bash(timeout 60 tail:*)",
+      "Bash(test:*)",
+      "Bash(du:*)",
+      "Bash(git restore:*)",
+      "Bash(git diff:*)",
+      "Bash(set:*)",
+      "Bash(mkdir:*)",
+      "Bash(1)",
+      "Bash(git rm:*)",
+      "Bash(rustup target:*)",
+      "Bash(chmod +x \"D:\\\\dev\\\\agent-game-engine\\\\scripts\\\\build_all_tiers.sh\")",
+      "Bash(chmod:*)",
+      "Bash(wasm-pack build:*)",
+      "Bash(git reset:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(wasm-pack:*)",
+      "Bash(wasm-tools print:*)",
+      "Bash(timeout 120 tail -f:*)",
+      "Bash(awk:*)",
+      "Bash(wmic cpu get NumberOfCores,NumberOfLogicalProcessors)",
+      "Bash($env:RUST_MIN_STACK=\"16777216\")",
+      "Bash(timeout 120 cat:*)",
+      "Bash(target/release/deps/simple_benches-*.exe)"
     ]
   }
 }

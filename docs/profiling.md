@@ -779,6 +779,283 @@ std::thread::spawn(move || {
 
 ---
 
+## 🔥 **Tracy Profiler Integration**
+
+### **What is Tracy?**
+
+Tracy is a real-time, nanosecond precision profiler designed for games and real-time applications. It provides:
+
+- **Ultra-low overhead**: < 10ns per scope (5-20x faster than Puffin)
+- **Real-time visualization**: See performance data as it happens
+- **Remote profiling**: Profile on one machine, analyze on another
+- **Frame-accurate timeline**: Perfect for identifying frame spikes
+- **Memory profiling**: Track allocations and memory usage
+- **GPU profiling**: Timeline for GPU operations (future support)
+
+### **When to Use Tracy vs Puffin**
+
+**Use Tracy when:**
+- Profiling hot paths called thousands of times per frame
+- Need real-time feedback during optimization
+- Require nanosecond precision timing
+- Working on performance-critical code
+- Remote profiling on embedded/mobile devices
+
+**Use Puffin when:**
+- Need web-based viewer (no separate download)
+- Want Chrome Tracing export built-in
+- Prefer self-contained Rust solution
+- Acceptable overhead (50-200ns per scope)
+
+**Performance Comparison:**
+```
+Overhead per scope:
+  Tracy:  < 10ns  (best for hot paths)
+  Puffin: 50-200ns (good for systems)
+  Metrics: 1-2μs (lightweight always-on)
+```
+
+### **Setup**
+
+#### **1. Download Tracy Profiler**
+
+Get the latest release from: https://github.com/wolfpld/tracy/releases
+
+Windows users can use the pre-built binary. Linux/macOS users may need to compile from source.
+
+#### **2. Build with Tracy Enabled**
+
+```bash
+# Build application with Tracy
+cargo build --features profiling-tracy --release
+
+# Or for development
+cargo build --features profiling-tracy
+```
+
+**Important:** Tracy and Puffin are mutually exclusive. Only one can be enabled at a time.
+
+#### **3. Run and Connect**
+
+```bash
+# Run your application
+./target/release/your_app
+
+# In another terminal/window, launch Tracy profiler
+tracy
+
+# Connect to localhost in the Tracy GUI
+```
+
+### **Usage**
+
+#### **Basic Profiling**
+
+```rust
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
+fn game_loop() {
+    profile_scope!("game_loop");
+
+    physics_update();
+    render_frame();
+}
+
+fn physics_update() {
+    profile_scope!("physics_update", ProfileCategory::Physics);
+
+    // Physics code here
+}
+```
+
+#### **Hot Path Instrumentation**
+
+Tracy's ultra-low overhead makes it ideal for hot paths:
+
+```rust
+// SIMD batch processing (called 1000s of times per frame)
+fn process_batch_8_simd(transforms: &mut [Transform], velocities: &[Vec3], dt: f32) {
+    profile_scope!("process_batch_8_simd", ProfileCategory::Physics);
+
+    // With Tracy's < 10ns overhead, this has negligible impact
+    // even when called 1000+ times per frame
+}
+
+// Transform composition (called for every entity)
+pub fn compose(&self, other: &Transform) -> Transform {
+    profile_scope!("transform_compose", ProfileCategory::ECS);
+
+    // Ultra-low overhead profiling
+    let composed_affine = other.affine * self.affine;
+    // ...
+}
+```
+
+#### **Frame Markers**
+
+Use Tracy backend for frame management:
+
+```rust
+use agent_game_engine_profiling::TracyBackend;
+
+let mut backend = TracyBackend::new();
+
+loop {
+    backend.begin_frame();
+
+    // Game loop code with profile_scope! calls
+
+    backend.end_frame();
+}
+```
+
+### **Example**
+
+See `engine/profiling/examples/tracy_profiling.rs` for a complete example:
+
+```bash
+cargo run --example tracy_profiling --features profiling-tracy
+```
+
+This example demonstrates:
+- Frame markers and timeline
+- Categorized scopes
+- Nested scope hierarchies
+- Real-time performance visualization
+
+### **Best Practices**
+
+#### **1. Use for Hot Paths**
+
+Tracy's low overhead makes it perfect for profiling code called frequently:
+
+```rust
+// ✅ GOOD: Hot path with Tracy
+fn query_entities(world: &World) {
+    profile_scope!("query_entities", ProfileCategory::ECS);
+
+    for entity in entities {
+        profile_scope!("entity_update");  // < 10ns overhead
+        // Process entity
+    }
+}
+```
+
+#### **2. Combine with Metrics**
+
+Use Tracy for development, metrics for production:
+
+```rust
+#[cfg(feature = "profiling-tracy")]
+use agent_game_engine_profiling::profile_scope;
+
+#[cfg(not(feature = "profiling-tracy"))]
+macro_rules! profile_scope {
+    ($name:expr) => {};
+    ($name:expr, $cat:expr) => {};
+}
+
+fn game_loop(profiler: &Profiler) {
+    // Tracy scope (dev only)
+    profile_scope!("game_loop");
+
+    // Metrics (always available with feature flag)
+    #[cfg(feature = "metrics")]
+    let _guard = profiler.scope("game_loop", ProfileCategory::ECS);
+
+    // Game code
+}
+```
+
+#### **3. Remote Profiling**
+
+Tracy supports remote profiling for consoles/mobile:
+
+```rust
+// On embedded device
+cargo build --target aarch64-unknown-linux-gnu --features profiling-tracy
+
+// Tracy automatically connects over network
+// Configure tracy-client for your target IP
+```
+
+### **Instrumented Hot Paths**
+
+The following hot paths are instrumented with Tracy:
+
+**Physics (engine/physics/src/systems/integration_simd.rs):**
+- `physics_integration_system_simd` - Main integration system
+- `process_parallel` - Parallel processing
+- `process_sequential` - Sequential SIMD
+- `process_batch_8_simd` - AVX2 8-wide processing
+- `process_batch_4_simd` - SSE 4-wide processing
+
+**ECS (engine/core/src/ecs/query.rs):**
+- Query iteration (via existing profiling)
+- Component access patterns
+- Filter evaluation
+
+**Math (engine/math/src/transform.rs):**
+- Transform operations are inlined, profiling at call sites
+- Compose, transform_point, transform_vector
+
+### **Troubleshooting**
+
+#### **Tracy Client Won't Connect**
+
+```bash
+# Check firewall settings
+# Tracy uses port 8086 by default
+
+# On Linux, allow incoming connections
+sudo ufw allow 8086
+```
+
+#### **Build Errors with tracy-client**
+
+```bash
+# Ensure tracy-client is up to date
+cargo update -p tracy-client
+
+# Check feature flags
+cargo build --features profiling-tracy --verbose
+```
+
+#### **High Overhead**
+
+If you see higher than expected overhead:
+- Ensure release build: `--release`
+- Check Tracy is not in capture mode when not needed
+- Verify no debug symbols in release build
+
+### **Zero-Cost Abstraction**
+
+When Tracy is disabled, all code compiles to nothing:
+
+```rust
+// With profiling-tracy feature: ~10ns overhead
+profile_scope!("my_function");
+
+// Without profiling-tracy feature: 0ns overhead (compiled away)
+profile_scope!("my_function");
+```
+
+Assembly verification:
+```bash
+# Build without Tracy
+cargo build --release
+objdump -d target/release/your_app > no_tracy.asm
+
+# Build with Tracy
+cargo build --release --features profiling-tracy
+objdump -d target/release/your_app > with_tracy.asm
+
+# Compare: only tracy_client::span calls added
+diff no_tracy.asm with_tracy.asm
+```
+
+---
+
 ## 📖 **References**
 
 ### **Industry Standards**
@@ -797,4 +1074,5 @@ std::thread::spawn(move || {
 ---
 
 **Last Updated:** 2026-02-01
-**Status:** Architecture defined, ready for Phase 0 implementation
+**Status:** ✅ Implementation Complete (Phase 0.5)
+**Completion Report:** [../PHASE_0_5_PROFILING_COMPLETE.md](../PHASE_0_5_PROFILING_COMPLETE.md)

@@ -17,6 +17,9 @@ use super::{Component, Entity, SparseSet, World};
 use std::any::TypeId;
 use std::marker::PhantomData;
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
 /// Prefetch a memory location for reading
 ///
 /// Uses compiler intrinsics to hint that we'll access this memory soon.
@@ -258,6 +261,9 @@ impl<T: Component> Query for &T {
     type Item<'a> = (Entity, &'a T);
 
     fn fetch(world: &World) -> QueryIter<'_, Self> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("query_fetch_single", ProfileCategory::ECS);
+
         let type_id = TypeId::of::<T>();
         let len = world
             .components
@@ -383,6 +389,9 @@ impl<T: Component> Query for &mut T {
     }
 
     fn fetch_mut(world: &mut World) -> QueryIterMut<'_, Self> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("query_fetch_mut_single", ProfileCategory::ECS);
+
         let type_id = TypeId::of::<T>();
         let len = world
             .components
@@ -576,6 +585,9 @@ impl<A: Component, B: Component> Query for (&A, &B) {
     type Item<'a> = (Entity, (&'a A, &'a B));
 
     fn fetch(world: &World) -> QueryIter<'_, Self> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("query_fetch_tuple2", ProfileCategory::ECS);
+
         let type_id_a = TypeId::of::<A>();
         let type_id_b = TypeId::of::<B>();
 
@@ -722,6 +734,9 @@ impl<A: Component, B: Component> Query for (&mut A, &mut B) {
     }
 
     fn fetch_mut(world: &mut World) -> QueryIterMut<'_, Self> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("query_fetch_mut_tuple2", ProfileCategory::ECS);
+
         let type_id_a = TypeId::of::<A>();
         let type_id_b = TypeId::of::<B>();
 
@@ -788,6 +803,24 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&mut A, &mut
             // OPTIMIZATION: Use direct index access instead of iter().nth() (O(1) vs O(n))
             // Find next entity that has both components
             while self.current_index < storage_a.len() {
+                // ENHANCED PREFETCH: Prefetch multiple entities ahead for mutable iteration
+                // This is critical for write performance as it hides memory latency
+                const PREFETCH_DISTANCE: usize = 3;
+
+                for offset in 1..=PREFETCH_DISTANCE {
+                    let prefetch_idx = self.current_index + offset;
+                    if prefetch_idx < storage_a.len() {
+                        if let Some(next_entity) = storage_a.get_dense_entity(prefetch_idx) {
+                            if let Some(next_a) = storage_a.get(next_entity) {
+                                prefetch_read(next_a as *const A);
+                            }
+                            if let Some(next_b) = storage_b.get(next_entity) {
+                                prefetch_read(next_b as *const B);
+                            }
+                        }
+                    }
+                }
+
                 let entity = storage_a.get_dense_entity(self.current_index)?;
                 self.current_index += 1;
 
@@ -825,6 +858,9 @@ impl<A: Component, B: Component> Query for (&A, &mut B) {
     }
 
     fn fetch_mut(world: &mut World) -> QueryIterMut<'_, Self> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("query_fetch_mut_mixed2", ProfileCategory::ECS);
+
         let type_id_a = TypeId::of::<A>();
         let type_id_b = TypeId::of::<B>();
 
@@ -924,6 +960,9 @@ impl<A: Component, B: Component> Query for (&mut A, &B) {
     }
 
     fn fetch_mut(world: &mut World) -> QueryIterMut<'_, Self> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("query_fetch_mut_mixed2", ProfileCategory::ECS);
+
         let type_id_a = TypeId::of::<A>();
         let type_id_b = TypeId::of::<B>();
 
@@ -1030,6 +1069,9 @@ macro_rules! impl_query_tuple {
             type Item<'a> = (Entity, (&'a $first $(, &'a $rest)*));
 
             fn fetch(world: &World) -> QueryIter<'_, Self> {
+                #[cfg(feature = "profiling")]
+                profile_scope!("query_fetch_tuple_n", ProfileCategory::ECS);
+
                 // Return empty if any component type is not registered
                 let first_id = TypeId::of::<$first>();
                 if world.components.get(&first_id).is_none() {
@@ -1156,6 +1198,9 @@ macro_rules! impl_query_tuple_mut {
             }
 
             fn fetch_mut(world: &mut World) -> QueryIterMut<'_, Self> {
+                #[cfg(feature = "profiling")]
+                profile_scope!("query_fetch_mut_tuple_n", ProfileCategory::ECS);
+
                 // Return empty if any component type is not registered
                 let first_id = TypeId::of::<$first>();
                 if world.components.get(&first_id).is_none() {
@@ -1284,6 +1329,7 @@ pub enum BatchSize {
 /// This enables efficient SIMD processing by providing components in configurable batch sizes.
 /// The iterator prefetches the next batch while processing the current one for better
 /// cache utilization.
+#[allow(dead_code)]
 pub struct BatchQueryIter<'a, T: Component> {
     storage: Option<&'a SparseSet<T>>,
     current_index: usize,
@@ -1505,6 +1551,7 @@ pub struct BatchableQueryIter<'a, A: Component, B: Component> {
 }
 
 impl<'a, A: Component, B: Component> BatchableQueryIter<'a, A, B> {
+    #[allow(dead_code)]
     fn new(world: &'a mut World) -> Self {
         Self { world, _phantom: PhantomData }
     }

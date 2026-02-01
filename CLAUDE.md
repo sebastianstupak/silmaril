@@ -290,7 +290,7 @@ engine/game-logic/
 | Networking | TCP + UDP | Critical data via TCP, positions via UDP |
 | Logging | `tracing` | Structured, async, production-ready |
 | Testing | Cargo test + proptest | Standard + property-based |
-| Profiling | Tracy | Industry-standard game profiler |
+| Profiling | Puffin | Rust-native profiler with Chrome Tracing export |
 
 **See:** [docs/architecture.md](docs/architecture.md) for complete architecture
 

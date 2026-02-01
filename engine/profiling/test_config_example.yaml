@@ -1,0 +1,14 @@
+profiling:
+  enabled: true
+  persist: true
+  output_dir: "test_output"
+  max_file_size_mb: 50
+  format: chrome_trace
+  retention:
+    circular_buffer_frames: 500
+    save_on_budget_exceeded: true
+    save_on_crash: false
+
+budgets:
+  test_scope: 10.5ms
+  another_test: 2s

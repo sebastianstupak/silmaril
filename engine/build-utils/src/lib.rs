@@ -8,6 +8,8 @@ mod module_check;
 mod print_check;
 mod scanner;
 
+pub mod cpu_features;
+
 pub use error_check::{check_error_types_use_macro, ErrorCheckConfig};
 pub use module_check::{check_module_structure, ModuleCheckConfig};
 pub use print_check::{check_no_print_statements, PrintCheckConfig};

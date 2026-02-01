@@ -76,9 +76,7 @@ impl Surface {
                 None, // No custom allocator
             )
         }
-        .map_err(|e| SurfaceError::CreationFailed {
-            details: format!("ash_window::create_surface failed: {}", e),
-        })?;
+        .map_err(|e| SurfaceError::creationfailed(format!("ash_window::create_surface failed: {}", e)))?;
 
         // Create surface loader for queries
         let surface_loader = ash::khr::surface::Instance::new(entry, instance);
@@ -134,9 +132,7 @@ impl Surface {
                 self.surface,
             )
         }
-        .map_err(|e| SurfaceError::QueryFailed {
-            details: format!("Failed to query surface support: {}", e),
-        })
+        .map_err(|e| SurfaceError::queryfailed(format!("Failed to query surface support: {}", e)))
     }
 }
 
@@ -155,11 +151,11 @@ mod tests {
 
     #[test]
     fn test_surface_error_display() {
-        let err = SurfaceError::CreationFailed { details: "test error".to_string() };
+        let err = SurfaceError::creationfailed("test error".to_string());
         let msg = err.to_string();
         assert!(msg.contains("CreationFailed") || msg.contains("test error"));
 
-        let err2 = SurfaceError::QueryFailed { details: "query failed".to_string() };
+        let err2 = SurfaceError::queryfailed("query failed".to_string());
         let msg2 = err2.to_string();
         assert!(msg2.contains("QueryFailed") || msg2.contains("query failed"));
     }

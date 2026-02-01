@@ -9,6 +9,19 @@
 //! - Minimal allocations during creation
 //! - Proper memory cleanup in Drop
 
+// Tracy profiling macros (no-op when profiling feature disabled)
+#[cfg(feature = "profiling")]
+macro_rules! profile_scope {
+    ($name:expr) => {
+        let _tracy_span = tracy_client::span!($name);
+    };
+}
+
+#[cfg(not(feature = "profiling"))]
+macro_rules! profile_scope {
+    ($name:expr) => {};
+}
+
 use crate::context::VulkanContext;
 use crate::error::RendererError;
 use ash::vk;
@@ -68,6 +81,7 @@ impl OffscreenTarget {
         format: Option<vk::Format>,
         with_depth: bool,
     ) -> Result<Self, RendererError> {
+        profile_scope!("OffscreenTarget::new");
         Self::new_with_samples(
             context,
             width,
@@ -97,6 +111,7 @@ impl OffscreenTarget {
         with_depth: bool,
         sample_count: vk::SampleCountFlags,
     ) -> Result<Self, RendererError> {
+        profile_scope!("OffscreenTarget::new_with_samples");
         let format = format.unwrap_or(vk::Format::B8G8R8A8_SRGB);
         let extent = vk::Extent2D { width, height };
 
@@ -177,6 +192,8 @@ impl OffscreenTarget {
         width: u32,
         height: u32,
     ) -> Result<(), RendererError> {
+        profile_scope!("OffscreenTarget::resize");
+
         if width == self.extent.width && height == self.extent.height {
             info!("Resize requested with same dimensions, ignoring");
             return Ok(());
@@ -190,52 +207,65 @@ impl OffscreenTarget {
 
         // Wait for device to be idle
         // SAFETY: self.device is valid. device_wait_idle ensures no operations are in flight.
-        unsafe {
-            self.device.device_wait_idle().map_err(|e| RendererError::DeviceLost {
-                reason: format!("Failed to wait for device idle: {:?}", e),
-            })?;
+        {
+            profile_scope!("device_wait_idle");
+            unsafe {
+                self.device.device_wait_idle().map_err(|e| {
+                    RendererError::devicelost(format!("Failed to wait for device idle: {:?}", e))
+                })?;
+            }
         }
 
         // Destroy old resources
         // SAFETY: All resources are valid, owned by this struct. Device is idle.
         // We destroy views before images (correct dependency order).
-        unsafe {
-            self.device.destroy_image_view(self.color_image_view, None);
-            if let Some(view) = self.depth_image_view {
-                self.device.destroy_image_view(view, None);
+        {
+            profile_scope!("destroy_old_resources");
+            unsafe {
+                self.device.destroy_image_view(self.color_image_view, None);
+                if let Some(view) = self.depth_image_view {
+                    self.device.destroy_image_view(view, None);
+                }
+                self.device.destroy_image(self.color_image, None);
+                if let Some(image) = self.depth_image {
+                    self.device.destroy_image(image, None);
+                }
             }
-            self.device.destroy_image(self.color_image, None);
-            if let Some(image) = self.depth_image {
-                self.device.destroy_image(image, None);
-            }
-        }
 
-        // Free allocations
-        drop(self.color_allocation.take());
-        drop(self.depth_allocation.take());
+            // Free allocations
+            drop(self.color_allocation.take());
+            drop(self.depth_allocation.take());
+        }
 
         // Create new resources
         let extent = vk::Extent2D { width, height };
 
-        let (color_image, color_allocation) = create_image(
-            &context.device,
-            &context.allocator,
-            extent,
-            self.format,
-            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
-            self.sample_count,
-        )?;
+        let (color_image, color_allocation) = {
+            profile_scope!("create_color_image");
+            create_image(
+                &context.device,
+                &context.allocator,
+                extent,
+                self.format,
+                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
+                self.sample_count,
+            )?
+        };
 
-        let color_image_view = create_image_view(
-            &context.device,
-            color_image,
-            self.format,
-            vk::ImageAspectFlags::COLOR,
-        )?;
+        let color_image_view = {
+            profile_scope!("create_color_image_view");
+            create_image_view(
+                &context.device,
+                color_image,
+                self.format,
+                vk::ImageAspectFlags::COLOR,
+            )?
+        };
 
         let (depth_image, depth_image_view, depth_allocation) = if let Some(depth_fmt) =
             self.depth_format
         {
+            profile_scope!("create_depth_resources");
             let (image, allocation) = create_image(
                 &context.device,
                 &context.allocator,
@@ -395,6 +425,8 @@ fn create_image(
     usage: vk::ImageUsageFlags,
     sample_count: vk::SampleCountFlags,
 ) -> Result<(vk::Image, gpu_alloc::Allocation), RendererError> {
+    profile_scope!("create_image");
+
     // Create image
     let create_info = vk::ImageCreateInfo::default()
         .image_type(vk::ImageType::TYPE_2D)
@@ -408,15 +440,16 @@ fn create_image(
         .sharing_mode(vk::SharingMode::EXCLUSIVE)
         .initial_layout(vk::ImageLayout::UNDEFINED);
 
-    let image = unsafe {
-        // SAFETY: create_info is valid and device is valid
-        device
-            .create_image(&create_info, None)
-            .map_err(|e| RendererError::ImageCreationFailed {
-                width: extent.width,
-                height: extent.height,
-                reason: format!("{:?}", e),
-            })?
+    let image = {
+        profile_scope!("vkCreateImage");
+        unsafe {
+            // SAFETY: create_info is valid and device is valid
+            device
+                .create_image(&create_info, None)
+                .map_err(|e| {
+                    RendererError::imagecreationfailed(extent.width, extent.height, format!("{:?}", e))
+                })?
+        }
     };
 
     // Get memory requirements
@@ -436,6 +469,7 @@ fn create_image(
 
     // Allocate memory (scoped lock)
     let allocation = {
+        profile_scope!("allocate_image_memory");
         let mut allocator_lock = allocator.lock().unwrap();
         allocator_lock
             .allocate(&gpu_alloc::AllocationCreateDesc {
@@ -445,21 +479,25 @@ fn create_image(
                 linear: false,
                 allocation_scheme: gpu_allocator::vulkan::AllocationScheme::GpuAllocatorManaged,
             })
-            .map_err(|e| RendererError::MemoryAllocationFailed {
-                size: mem_requirements.size,
-                reason: format!("{:?}", e),
+            .map_err(|e| {
+                RendererError::memoryallocationfailed(mem_requirements.size, format!("{:?}", e))
             })?
     };
 
     // Bind memory to image
-    unsafe {
-        // SAFETY: allocation is valid and matches memory requirements
-        device
-            .bind_image_memory(image, allocation.memory(), allocation.offset())
-            .map_err(|e| RendererError::MemoryAllocationFailed {
-                size: mem_requirements.size,
-                reason: format!("Failed to bind image memory: {:?}", e),
-            })?;
+    {
+        profile_scope!("bind_image_memory");
+        unsafe {
+            // SAFETY: allocation is valid and matches memory requirements
+            device
+                .bind_image_memory(image, allocation.memory(), allocation.offset())
+                .map_err(|e| {
+                    RendererError::memoryallocationfailed(
+                        mem_requirements.size,
+                        format!("Failed to bind image memory: {:?}", e),
+                    )
+                })?;
+        }
     }
 
     Ok((image, allocation))
@@ -473,6 +511,8 @@ fn create_image_view(
     format: vk::Format,
     aspect_mask: vk::ImageAspectFlags,
 ) -> Result<vk::ImageView, RendererError> {
+    profile_scope!("create_image_view");
+
     let create_info = vk::ImageViewCreateInfo::default()
         .image(image)
         .view_type(vk::ImageViewType::TYPE_2D)
@@ -495,7 +535,7 @@ fn create_image_view(
     unsafe {
         device
             .create_image_view(&create_info, None)
-            .map_err(|e| RendererError::ImageViewCreationFailed { reason: format!("{:?}", e) })
+            .map_err(|e| RendererError::imageviewcreationfailed(format!("{:?}", e)))
     }
 }
 
@@ -511,6 +551,8 @@ fn create_image_view(
 /// Result is cached in CACHED_DEPTH_FORMAT to avoid repeated queries.
 #[instrument(skip(context))]
 fn find_depth_format(context: &VulkanContext) -> Result<vk::Format, RendererError> {
+    profile_scope!("find_depth_format");
+
     const DEPTH_FORMAT_CANDIDATES: &[vk::Format] = &[
         vk::Format::D32_SFLOAT,         // Best: 32-bit float, no stencil
         vk::Format::D32_SFLOAT_S8_UINT, // Good: 32-bit float + 8-bit stencil
@@ -519,11 +561,14 @@ fn find_depth_format(context: &VulkanContext) -> Result<vk::Format, RendererErro
     ];
 
     for &format in DEPTH_FORMAT_CANDIDATES {
-        let properties = unsafe {
-            // SAFETY: context.physical_device is valid
-            context
-                .instance
-                .get_physical_device_format_properties(context.physical_device, format)
+        let properties = {
+            profile_scope!("query_format_properties");
+            unsafe {
+                // SAFETY: context.physical_device is valid
+                context
+                    .instance
+                    .get_physical_device_format_properties(context.physical_device, format)
+            }
         };
 
         // Check if format supports depth/stencil attachment in optimal tiling
@@ -541,11 +586,11 @@ fn find_depth_format(context: &VulkanContext) -> Result<vk::Format, RendererErro
         }
     }
 
-    Err(RendererError::ImageCreationFailed {
-        width: 0,
-        height: 0,
-        reason: "No suitable depth format found (tried D32_SFLOAT, D32_SFLOAT_S8_UINT, D24_UNORM_S8_UINT, D16_UNORM)".to_string(),
-    })
+    Err(RendererError::imagecreationfailed(
+        0,
+        0,
+        "No suitable depth format found (tried D32_SFLOAT, D32_SFLOAT_S8_UINT, D24_UNORM_S8_UINT, D16_UNORM)".to_string(),
+    ))
 }
 
 /// Transition image layout with pipeline barrier.

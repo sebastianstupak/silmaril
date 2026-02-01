@@ -5,6 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "profiling")]
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
 /// Entity handle - opaque, copyable, hashable
 ///
 /// Entities use generational indices to prevent use-after-free bugs.
@@ -104,6 +107,9 @@ impl EntityAllocator {
     /// Panics if the maximum number of entities (2^32) is exceeded.
     #[inline]
     pub fn allocate(&mut self) -> Entity {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_allocate", ProfileCategory::ECS);
+
         if let Some(id) = self.free_list.pop() {
             // Reuse freed ID with incremented generation
             let id_usize = id as usize;
@@ -154,6 +160,9 @@ impl EntityAllocator {
     /// ```
     #[inline]
     pub fn free(&mut self, entity: Entity) -> bool {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_free", ProfileCategory::ECS);
+
         if !self.is_alive(entity) {
             return false;
         }
@@ -197,6 +206,9 @@ impl EntityAllocator {
     /// ```
     #[inline]
     pub fn allocate_batch(&mut self, count: usize) -> Vec<Entity> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_allocate_batch", ProfileCategory::ECS);
+
         let mut entities = Vec::with_capacity(count);
 
         // First, drain as many from the free list as possible
@@ -295,8 +307,87 @@ impl EntityAllocator {
     /// This removes all entity data and resets the allocator to its initial state.
     #[inline]
     pub fn clear(&mut self) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_allocator_clear", ProfileCategory::ECS);
+
         self.generations.clear();
         self.free_list.clear();
+    }
+
+    /// Iterate all alive entities
+    ///
+    /// This is useful for serialization and debugging. The iteration order
+    /// is not guaranteed and should not be relied upon.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::entity::EntityAllocator;
+    /// let mut allocator = EntityAllocator::new();
+    /// let e1 = allocator.allocate();
+    /// let e2 = allocator.allocate();
+    ///
+    /// let entities: Vec<_> = allocator.entities().collect();
+    /// assert_eq!(entities.len(), 2);
+    /// ```
+    pub fn entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.generations
+            .iter()
+            .enumerate()
+            .filter_map(move |(id, &generation)| {
+                let entity = Entity {
+                    id: id as u32,
+                    generation,
+                };
+                if self.is_alive(entity) {
+                    Some(entity)
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Allocate an entity with a specific ID and generation (for deserialization)
+    ///
+    /// This is used when restoring entity state from a snapshot. It ensures
+    /// the entity allocator can recreate entities with their exact original IDs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entity is already alive or if the generation is invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::entity::{Entity, EntityAllocator};
+    /// let mut allocator = EntityAllocator::new();
+    /// let entity = Entity::new(5, 2);
+    /// allocator.allocate_with_id(entity);
+    /// assert!(allocator.is_alive(entity));
+    /// ```
+    pub fn allocate_with_id(&mut self, entity: Entity) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("entity_allocate_with_id", ProfileCategory::ECS);
+
+        let id = entity.id as usize;
+
+        // Ensure we have space for this ID
+        if id >= self.generations.len() {
+            self.generations.resize(id + 1, u32::MAX);
+        }
+
+        // Verify this entity isn't already alive
+        assert!(
+            !self.is_alive(entity),
+            "Cannot allocate entity {:?} - already alive",
+            entity
+        );
+
+        // Remove from free list if present
+        self.free_list.retain(|&free_id| free_id != entity.id);
+
+        // Set the generation
+        self.generations[id] = entity.generation;
     }
 }
 

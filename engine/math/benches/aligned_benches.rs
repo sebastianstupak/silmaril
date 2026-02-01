@@ -211,7 +211,7 @@ fn bench_bulk_physics_integration(c: &mut Criterion) {
                     .map(|i| Vec3x4::splat(Vec3::new(i as f32, i as f32, i as f32)))
                     .collect();
                 let velocities: Vec<Vec3x4> =
-                    (0..num_chunks).map(|i| Vec3x4::splat(Vec3::new(0.1, 0.2, 0.3))).collect();
+                    (0..num_chunks).map(|_| Vec3x4::splat(Vec3::new(0.1, 0.2, 0.3))).collect();
                 let accelerations: Vec<Vec3x4> =
                     (0..num_chunks).map(|_| Vec3x4::splat(Vec3::new(0.0, -9.81, 0.0))).collect();
                 let dt = 0.016;

@@ -13,6 +13,7 @@
 //! # Feature Flags
 //!
 //! - `profiling-puffin`: Enable Puffin profiler backend (50-200ns overhead per scope)
+//! - `profiling-tracy`: Enable Tracy profiler backend (< 10ns overhead per scope)
 //! - `metrics`: Enable lightweight metrics collection (1-2μs per frame)
 //! - `config`: Enable YAML configuration file support
 //! - `backtrace`: Enable backtrace capture (for debugging)
@@ -20,11 +21,11 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use agent_game_engine_profiling::{Profiler, ProfilerConfig, profile_scope};
+//! use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory, profile_scope};
 //!
 //! # #[cfg(feature = "metrics")]
 //! # {
-//! let mut profiler = Profiler::new(ProfilerConfig::default());
+//! let profiler = Profiler::new(ProfilerConfig::default());
 //!
 //! // Begin a frame
 //! profiler.begin_frame();
@@ -79,9 +80,29 @@
 #![warn(clippy::unwrap_used)]
 #![warn(clippy::expect_used)]
 
+mod config;
+mod feedback_metrics;
 mod profiler;
+pub mod query;
 
-pub use profiler::{FrameMetrics, Profiler, ProfilerConfig, ScopeGuard};
+#[cfg(any(feature = "profiling-puffin", feature = "profiling-tracy"))]
+pub mod backends;
+
+#[cfg(feature = "profiling-puffin")]
+pub mod export;
+
+pub use config::{
+    format_duration, parse_duration, ConfigError, ProfileFormat, ProfilerConfig, RetentionConfig,
+};
+pub use feedback_metrics::AgentFeedbackMetrics;
+pub use profiler::{FrameMetrics, Profiler, ScopeGuard};
+pub use query::{AggregateMetrics, QueryBuilder, TimelineEvent};
+
+#[cfg(feature = "profiling-puffin")]
+pub use backends::PuffinBackend;
+
+#[cfg(feature = "profiling-tracy")]
+pub use backends::TracyBackend;
 
 /// Categories for organizing profiling data by subsystem.
 ///
@@ -161,7 +182,36 @@ impl std::fmt::Display for ProfileCategory {
 ///     // Physics code here
 /// }
 /// ```
-#[cfg(feature = "profiling-puffin")]
+#[cfg(feature = "profiling-tracy")]
+#[macro_export]
+macro_rules! profile_scope {
+    ($name:expr) => {
+        // When Tracy is enabled, use tracy_client directly
+        // Tracy's span! macro creates a guard that auto-ends on drop
+        let _tracy_span = tracy_client::span!($name);
+    };
+    ($name:expr, $category:expr) => {
+        // Tracy requires string literals at compile time for optimal performance.
+        // Categories are not directly supported, so we just use the name.
+        // Users can manually prefix names with categories in the string literal if needed.
+        // Example: profile_scope!("Physics::update") instead of profile_scope!("update", ProfileCategory::Physics)
+        let _tracy_span = tracy_client::span!($name);
+        // Silence unused variable warning
+        let _ = $category;
+    };
+}
+
+/// Profile scope macro for Puffin backend.
+///
+/// Records a profiling scope with optional category.
+///
+/// # Examples
+///
+/// ```ignore
+/// profile_scope!("my_function");
+/// profile_scope!("my_function", ProfileCategory::ECS);
+/// ```
+#[cfg(all(feature = "profiling-puffin", not(feature = "profiling-tracy")))]
 #[macro_export]
 macro_rules! profile_scope {
     ($name:expr) => {
@@ -177,7 +227,7 @@ macro_rules! profile_scope {
 /// Zero-cost version of `profile_scope!` when profiling is disabled.
 ///
 /// This macro expands to nothing, ensuring zero runtime overhead.
-#[cfg(not(feature = "profiling-puffin"))]
+#[cfg(not(any(feature = "profiling-puffin", feature = "profiling-tracy")))]
 #[macro_export]
 macro_rules! profile_scope {
     ($name:expr) => {};

@@ -42,17 +42,34 @@ impl FileSystemBackend for NativeFileSystem {
     }
 
     fn normalize_path(&self, path: &Path) -> PathBuf {
-        // Convert the path to an absolute path and normalize it
-        // This handles . and .. components
-        let mut components = Vec::new();
+        // Optimized path normalization with pre-allocation
+        // Target: <500ns for simple paths, <2us for complex paths
+
+        // Fast path: if path has no special components, return as-is
+        let path_str = path.as_os_str();
+        let has_special = {
+            let bytes = path_str.as_encoded_bytes();
+            bytes.windows(2).any(|w| w == b"/." || w == b"/..")
+                || bytes.starts_with(b"./")
+                || bytes.starts_with(b"../")
+        };
+
+        if !has_special {
+            return path.to_path_buf();
+        }
+
+        // Slow path: normalize components
+        // Pre-allocate with estimated capacity to avoid reallocation
+        let component_count = path.components().count();
+        let mut components = Vec::with_capacity(component_count);
 
         for component in path.components() {
             match component {
                 std::path::Component::CurDir => {
-                    // Skip current directory markers
+                    // Skip current directory markers (.)
                 }
                 std::path::Component::ParentDir => {
-                    // Go up one level
+                    // Go up one level (..)
                     components.pop();
                 }
                 _ => {

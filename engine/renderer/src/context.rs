@@ -142,9 +142,7 @@ impl VulkanContext {
         let entry = unsafe {
             ash::Entry::load().map_err(|e| {
                 error!(error = ?e, "Failed to load Vulkan library");
-                RendererError::InstanceCreationFailed {
-                    reason: format!("Failed to load Vulkan library: {:?}", e),
-                }
+                RendererError::instancecreationfailed(format!("Failed to load Vulkan library: {:?}", e))
             })?
         };
 
@@ -240,9 +238,7 @@ impl VulkanContext {
         unsafe {
             self.device.device_wait_idle().map_err(|e| {
                 error!(error = ?e, "Failed to wait for device idle");
-                RendererError::QueueSubmissionFailed {
-                    reason: format!("Device wait idle failed: {:?}", e),
-                }
+                RendererError::queuesubmissionfailed(format!("Device wait idle failed: {:?}", e))
             })
         }
     }
@@ -323,9 +319,7 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
     if vk::api_version_major(api_version) < 1
         || (vk::api_version_major(api_version) == 1 && vk::api_version_minor(api_version) < 1)
     {
-        return Err(RendererError::InstanceCreationFailed {
-            reason: "Vulkan 1.1 or higher required".to_string(),
-        });
+        return Err(RendererError::instancecreationfailed("Vulkan 1.1 or higher required".to_string()));
     }
 
     // Application info
@@ -369,9 +363,7 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
         // It returns a Vec of layer properties, no pointer manipulation needed.
         let available_layers = unsafe {
             entry.enumerate_instance_layer_properties().map_err(|e| {
-                RendererError::InstanceCreationFailed {
-                    reason: format!("Failed to enumerate layers: {:?}", e),
-                }
+                RendererError::instancecreationfailed(format!("Failed to enumerate layers: {:?}", e))
             })?
         };
 
@@ -388,9 +380,9 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
                     layer = ?required_layer,
                     "Validation layer not available"
                 );
-                return Err(RendererError::ValidationLayerNotAvailable {
-                    layer_name: required_layer.to_string_lossy().into_owned(),
-                });
+                return Err(RendererError::validationlayernotavailable(
+                    required_layer.to_string_lossy().into_owned(),
+                ));
             }
         }
 
@@ -418,7 +410,7 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
     unsafe {
         entry.create_instance(&create_info, None).map_err(|e| {
             error!(error = ?e, "Failed to create Vulkan instance");
-            RendererError::InstanceCreationFailed { reason: format!("{:?}", e) }
+            RendererError::instancecreationfailed(format!("{:?}", e))
         })
     }
 }
@@ -456,7 +448,7 @@ fn setup_debug_messenger(
             .create_debug_utils_messenger(&create_info, None)
             .map_err(|e| {
                 warn!(error = ?e, "Failed to create debug messenger");
-                RendererError::DebugMessengerCreationFailed { reason: format!("{:?}", e) }
+                RendererError::debugmessengercreationfailed(format!("{:?}", e))
             })?
     };
 
@@ -588,11 +580,11 @@ fn select_physical_device(
     let physical_devices = unsafe {
         instance
             .enumerate_physical_devices()
-            .map_err(|e| RendererError::DeviceEnumerationFailed { reason: format!("{:?}", e) })?
+            .map_err(|e| RendererError::deviceenumerationfailed(format!("{:?}", e)))?
     };
 
     if physical_devices.is_empty() {
-        return Err(RendererError::NoSuitableGpu { available_devices: 0 });
+        return Err(RendererError::nosuitablegpu(0));
     }
 
     info!(device_count = physical_devices.len(), "Found physical devices");
@@ -671,7 +663,7 @@ fn select_physical_device(
     }
 
     if candidates.is_empty() {
-        return Err(RendererError::NoSuitableGpu { available_devices: physical_devices.len() });
+        return Err(RendererError::nosuitablegpu(physical_devices.len()));
     }
 
     // Sort by score (descending)
@@ -705,7 +697,7 @@ fn find_queue_families(
     let graphics = queue_families
         .iter()
         .position(|qf| qf.queue_flags.contains(vk::QueueFlags::GRAPHICS))
-        .ok_or_else(|| RendererError::QueueFamilyNotFound { queue_type: "graphics".to_string() })?
+        .ok_or_else(|| RendererError::queuefamilynotfound("graphics".to_string()))?
         as u32;
 
     // Find dedicated transfer queue (prefer dedicated, fallback to graphics)
@@ -742,9 +734,7 @@ fn find_queue_families(
                 break;
             }
         }
-        present_idx.ok_or_else(|| RendererError::QueueFamilyNotFound {
-            queue_type: "present".to_string(),
-        })?
+        present_idx.ok_or_else(|| RendererError::queuefamilynotfound("present".to_string()))?
     } else {
         graphics // Use graphics queue if no surface
     };
@@ -793,7 +783,7 @@ fn create_logical_device(
     // All pointers in create_info (queue_create_infos, extensions) remain valid for this call.
     let device = unsafe {
         instance.create_device(physical_device, &create_info, None).map_err(|e| {
-            RendererError::LogicalDeviceCreationFailed { reason: format!("{:?}", e) }
+            RendererError::logicaldevicecreationfailed(format!("{:?}", e))
         })?
     };
 
@@ -825,7 +815,7 @@ fn create_allocator(
         buffer_device_address: false,
         allocation_sizes: Default::default(),
     })
-    .map_err(|e| RendererError::MemoryAllocationFailed { size: 0, reason: format!("{:?}", e) })?;
+    .map_err(|e| RendererError::memoryallocationfailed(0, format!("{:?}", e)))?;
 
     info!("GPU allocator created");
 

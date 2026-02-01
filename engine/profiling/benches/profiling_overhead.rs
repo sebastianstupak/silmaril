@@ -6,8 +6,10 @@
 //! - Overhead when profiling OFF: <1ns per scope
 //! - Overhead when profiling ON: <200ns per scope
 
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+#[cfg(feature = "metrics")]
 use agent_game_engine_profiling::{ProfileCategory, Profiler, ProfilerConfig};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 /// Baseline: No profiling at all (control group).
 fn baseline_no_profiling(c: &mut Criterion) {
@@ -171,7 +173,20 @@ fn disabled_profiler_overhead(c: &mut Criterion) {
 }
 
 // Conditional benchmark groups based on features
-#[cfg(feature = "metrics")]
+#[cfg(all(feature = "metrics", not(feature = "profiling-puffin")))]
+criterion_group!(
+    benches,
+    baseline_no_profiling,
+    profiling_enabled_overhead,
+    scope_creation_overhead,
+    nested_scopes_overhead,
+    many_sequential_scopes,
+    frame_begin_end_overhead,
+    disabled_profiler_overhead,
+    profiling_disabled_overhead
+);
+
+#[cfg(all(feature = "metrics", feature = "profiling-puffin"))]
 criterion_group!(
     benches,
     baseline_no_profiling,
@@ -183,7 +198,10 @@ criterion_group!(
     disabled_profiler_overhead
 );
 
-#[cfg(not(feature = "metrics"))]
+#[cfg(all(not(feature = "metrics"), not(feature = "profiling-puffin")))]
 criterion_group!(benches, baseline_no_profiling, profiling_disabled_overhead);
+
+#[cfg(all(not(feature = "metrics"), feature = "profiling-puffin"))]
+criterion_group!(benches, baseline_no_profiling);
 
 criterion_main!(benches);

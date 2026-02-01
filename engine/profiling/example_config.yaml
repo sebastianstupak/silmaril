@@ -1,0 +1,38 @@
+# Example profiling configuration file
+# This demonstrates the YAML format for profiler configuration
+
+profiling:
+  # Enable profiling data collection
+  enabled: true
+
+  # Persist profiling data to disk
+  persist: true
+
+  # Output directory for profiling data files
+  output_dir: "profiling_data/"
+
+  # Maximum file size in MB before rotation
+  max_file_size_mb: 100
+
+  # Output format: chrome_trace or json
+  format: chrome_trace
+
+  # Retention configuration
+  retention:
+    # Number of frames to keep in circular buffer
+    circular_buffer_frames: 1000
+
+    # Save data when a performance budget is exceeded
+    save_on_budget_exceeded: true
+
+    # Save data on crash (requires crash handler integration)
+    save_on_crash: true
+
+# Performance budgets for specific scopes
+# Format: scope_name: duration (ms, us, or s)
+budgets:
+  game_loop: 16.0ms       # 60 FPS target
+  physics_step: 5.0ms     # Physics simulation budget
+  rendering: 8.0ms        # Rendering budget
+  networking: 2.0ms       # Networking budget
+  audio: 1.0ms            # Audio processing budget

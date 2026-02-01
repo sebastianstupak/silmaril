@@ -5,6 +5,49 @@ rustflags = ["-D", "warnings"]  # Deny warnings in CI
 jobs = 4  # Parallel compilation
 
 # =============================================================================
+# Platform-Specific Build Tiers
+# =============================================================================
+# See: docs/CPU_FEATURES.md for tier descriptions and compatibility
+
+# Tier 1: Baseline (x86-64 with SSE2) - 100% compatible
+# Default x86_64 target - maximum compatibility
+[target.x86_64-pc-windows-msvc]
+# No additional flags - uses SSE2 baseline
+
+[target.x86_64-unknown-linux-gnu]
+# No additional flags - uses SSE2 baseline
+
+[target.x86_64-apple-darwin]
+# No additional flags - uses SSE2 baseline
+
+# Tier 2: Modern (x86-64-v3: AVX2 + FMA + SSE4.2) - ~95% compatible
+# Intel Haswell (2013+), AMD Excavator (2015+)
+[target.x86_64-v3-pc-windows-msvc]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+[target.x86_64-v3-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+[target.x86_64-v3-apple-darwin]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+# Tier 3: High-end (x86-64-v4: AVX2 + AVX512) - ~70% compatible
+# Intel Skylake-X (2017+), AMD Zen 4 (2022+)
+[target.x86_64-v4-pc-windows-msvc]
+rustflags = ["-C", "target-cpu=x86-64-v4"]
+
+[target.x86_64-v4-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v4"]
+
+[target.x86_64-v4-apple-darwin]
+rustflags = ["-C", "target-cpu=x86-64-v4"]
+
+# Development: Native CPU (maximum performance, not portable)
+# Uncomment to enable for local development
+# [build]
+# rustflags = ["-C", "target-cpu=native"]
+
+# =============================================================================
 # Test Configuration
 # =============================================================================
 
@@ -16,6 +59,8 @@ jobs = 4  # Parallel compilation
 [env]
 RUST_BACKTRACE = "1"
 RUST_TEST_THREADS = "4"
+# Increase stack size for Vulkan tests (16MB to handle validation layers)
+RUST_MIN_STACK = "16777216"
 
 # Profile for running tests
 [profile.test]

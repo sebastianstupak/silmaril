@@ -119,17 +119,76 @@ cargo build --features metrics
 
 ---
 
-## 📊 **Chrome Tracing Export**
+## 📊 **Profiling Visualization**
 
-Export profiling data for visualization:
+### **Puffin Web Viewer (Recommended)**
+
+The easiest way to visualize profiling data in real-time:
 
 ```rust
-// Export last 1000 frames
-let trace_json = profiler.export_chrome_trace(0..1000);
-std::fs::write("profiling_session.json", trace_json)?;
+use agent_game_engine_profiling::backends::PuffinBackend;
+
+// Initialize Puffin backend
+let mut backend = PuffinBackend::new();
+
+// Optional: Start HTTP server for remote viewing
+#[cfg(feature = "puffin_http")]
+backend.start_server("0.0.0.0:8585");
+
+// In your game loop
+loop {
+    backend.begin_frame();
+
+    // Your game code with profile_scope!() macros
+    {
+        profile_scope!("game_logic", ProfileCategory::ECS);
+        // ...
+    }
+
+    backend.end_frame();
+}
 ```
 
-**Visualize:** Load `profiling_session.json` in `chrome://tracing`
+**View in browser:**
+
+1. Install the Puffin viewer:
+   ```bash
+   cargo install puffin_viewer
+   ```
+
+2. Run the viewer:
+   ```bash
+   puffin_viewer
+   ```
+
+3. Connect to `localhost:8585` in the viewer
+
+The Puffin viewer provides:
+- Real-time frame-by-frame profiling
+- Thread visualization
+- Scope timing histograms
+- Frame time graphs
+- Zoom and filter capabilities
+
+### **Chrome Tracing Export**
+
+Export profiling data for offline analysis:
+
+```rust
+use agent_game_engine_profiling::backends::PuffinBackend;
+
+let backend = PuffinBackend::new();
+
+// ... run your game with profiling ...
+
+// Export to Chrome Trace format
+let trace_json = backend.export_chrome_trace();
+std::fs::write("trace.json", trace_json)?;
+```
+
+**Visualize:**
+- Load `trace.json` in `chrome://tracing` (Chrome/Chromium browsers)
+- Load in Perfetto UI: https://ui.perfetto.dev/
 
 **Timeline view:**
 ```
@@ -330,14 +389,67 @@ cargo bench profiling_overhead
 
 ---
 
+## 🔥 **Tracy Profiler (Advanced)**
+
+For ultra-low overhead profiling of hot paths:
+
+**See:** [TRACY_QUICKSTART.md](TRACY_QUICKSTART.md) for complete Tracy guide
+
+### **Quick Start**
+
+```bash
+# 1. Download Tracy profiler
+#    https://github.com/wolfpld/tracy/releases
+
+# 2. Build with Tracy
+cargo build --release --features profiling-tracy
+
+# 3. Run your app
+./target/release/your_app
+
+# 4. Launch Tracy and connect to localhost
+```
+
+### **Why Tracy?**
+
+- **< 10ns overhead** (5-20x faster than Puffin)
+- Ideal for hot paths called thousands of times per frame
+- Real-time analysis with nanosecond precision
+- Remote profiling support
+
+### **Example**
+
+```rust
+use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+
+// Hot path - only ~10ns overhead per call
+fn process_entity() {
+    profile_scope!("process_entity", ProfileCategory::ECS);
+
+    // Even nested scopes have minimal impact
+    for component in components {
+        profile_scope!("update_component");
+        // ...
+    }
+}
+```
+
+**Run example:**
+```bash
+cargo run --example tracy_profiling --features profiling-tracy
+```
+
+---
+
 ## 📚 **Documentation**
 
 ### **Architecture**
 - [docs/profiling.md](../../docs/profiling.md) - Complete architecture documentation
+- [TRACY_QUICKSTART.md](TRACY_QUICKSTART.md) - Tracy profiler quick start guide
 - [docs/tasks/phase0-profiling.md](../../docs/tasks/phase0-profiling.md) - Implementation plan
-- [docs/decisions/profiling-phase0.md](../../docs/decisions/profiling-phase0.md) - Decision record
 
 ### **Examples**
+- [examples/tracy_profiling.rs](examples/tracy_profiling.rs) - **Tracy profiler example** ⭐
 - [examples/basic_profiling.rs](examples/basic_profiling.rs) - Basic usage
 - [examples/ai_agent_metrics.rs](examples/ai_agent_metrics.rs) - AI agent integration
 - [examples/chrome_trace_export.rs](examples/chrome_trace_export.rs) - Export and visualization
@@ -455,13 +567,18 @@ std::thread::spawn(move || {
 
 ## 📊 **Performance Overhead**
 
-| Configuration | Overhead per scope | Frame overhead (500 scopes) |
-|---------------|-------------------|-----------------------------|
-| **Release (no features)** | 0ns (compiled away) | 0ms |
-| **--features metrics** | ~1ns | ~0.0005ms |
-| **--features profiling-puffin** | ~50-200ns | ~0.1-0.6ms |
+| Configuration | Overhead per scope | Frame overhead (500 scopes) | Best For |
+|---------------|-------------------|-----------------------------|----------|
+| **Release (no features)** | 0ns (compiled away) | 0ms | Production builds |
+| **--features metrics** | ~1ns | ~0.0005ms | Always-on monitoring |
+| **--features profiling-tracy** | **< 10ns** | **< 0.005ms** | **Hot path profiling** ⭐ |
+| **--features profiling-puffin** | ~50-200ns | ~0.1-0.6ms | System-level profiling |
 
-**Recommendation:** Use `--features dev` for development, no features for release.
+**Recommendations:**
+- **Production:** No features (zero overhead)
+- **Development:** `--features dev` (Puffin for system profiling)
+- **Hot path optimization:** `--features profiling-tracy` (minimal overhead)
+- **Always-on metrics:** `--features metrics` (lightweight monitoring)
 
 ---
 
@@ -484,4 +601,5 @@ See [CLAUDE.md](../../CLAUDE.md) for development guidelines.
 ---
 
 **Last Updated:** 2026-02-01
-**Status:** Phase 0 implementation (in progress)
+**Status:** ✅ Complete and Production-Ready (Phase 0.5)
+**Completion Report:** [../../PHASE_0_5_PROFILING_COMPLETE.md](../../PHASE_0_5_PROFILING_COMPLETE.md)

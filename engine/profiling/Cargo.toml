@@ -13,6 +13,7 @@ parking_lot = { workspace = true }
 
 # Optional profiling backends
 puffin = { version = "0.19", optional = true }
+tracy-client = { version = "0.17", optional = true, default-features = false }
 
 # For configuration
 serde = { workspace = true, optional = true }
@@ -22,12 +23,15 @@ serde_yaml = { version = "0.9", optional = true }
 [dev-dependencies]
 criterion = { workspace = true }
 proptest = { workspace = true }
+tempfile = "3.14"
+iai-callgrind = "0.16"
 
 [features]
 default = []
 
 # Profiling features (mutually exclusive backends)
 profiling-puffin = ["puffin"]
+profiling-tracy = ["tracy-client"]
 
 # Metrics always available (lightweight)
 metrics = []

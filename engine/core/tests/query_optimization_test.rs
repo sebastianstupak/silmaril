@@ -194,27 +194,33 @@ fn test_cache_locality_doesnt_affect_behavior() {
 }
 
 #[test]
-fn test_sparse_set_batch_access() {
-    use engine_core::ecs::SparseSet;
+fn test_batch_query_access() {
+    use engine_core::ecs::World;
 
-    let mut storage = SparseSet::<Position>::new();
+    let mut world = World::new();
+    world.register::<Position>();
 
     // Add 8 components
     for i in 0..8 {
-        let entity = engine_core::ecs::Entity::new(i, 0);
-        storage.insert(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+        let entity = world.spawn();
+        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
     }
 
-    // Batch access should work
-    if let Some((entities, components)) = storage.get_batch::<4>(0) {
+    // Batch access through query_batch4 should work
+    let batches: Vec<_> = world.query_batch4::<Position>().collect();
+
+    // We should get at least one batch of 4
+    assert!(!batches.is_empty());
+
+    // Each batch should have 4 elements
+    for (entities, components) in &batches {
         assert_eq!(entities.len(), 4);
         assert_eq!(components.len(), 4);
 
-        for (i, comp) in components.iter().enumerate() {
-            assert_eq!(comp.x, i as f32);
+        // Verify components are present (order may vary)
+        for comp in components.iter() {
+            assert!(comp.x >= 0.0 && comp.x < 8.0);
         }
-    } else {
-        panic!("Batch access failed");
     }
 }
 
