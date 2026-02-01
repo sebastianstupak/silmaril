@@ -151,9 +151,16 @@ impl VulkanContext {
 
         let instance = create_instance(&entry, app_name)?;
 
-        // 2. Set up debug messenger (debug builds only)
+        // 2. Set up debug messenger (debug builds only, unless disabled for benchmarks)
         #[cfg(debug_assertions)]
-        let (debug_messenger, debug_utils_loader) = setup_debug_messenger(&entry, &instance)?;
+        let (debug_messenger, debug_utils_loader) = {
+            let disable_validation = std::env::var("DISABLE_VULKAN_VALIDATION").is_ok();
+            if disable_validation {
+                (None, None)
+            } else {
+                setup_debug_messenger(&entry, &instance)?
+            }
+        };
 
         // 3. Select physical device
         let (physical_device, physical_device_properties) =
@@ -241,7 +248,11 @@ impl VulkanContext {
     ///
     /// # Warning
     /// Only use this for benchmarks! Validation layers catch bugs during development.
-    #[cfg(any(test, bench))]
+    ///
+    /// # Example
+    /// ```no_run
+    /// let context = VulkanContext::new_for_benchmarks("BenchApp", None, None)?;
+    /// ```
     pub fn new_for_benchmarks(
         app_name: &str,
         surface_provider: Option<&dyn Fn(&ash::Entry, &ash::Instance) -> Result<vk::SurfaceKHR, RendererError>>,
@@ -364,9 +375,14 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
     #[cfg(not(any(debug_assertions, target_os = "macos")))]
     let extension_names = vec![];
 
-    // Add debug utils extension in debug builds
+    // Add debug utils extension in debug builds (unless disabled for benchmarks)
     #[cfg(debug_assertions)]
-    extension_names.push(ash::ext::debug_utils::NAME.as_ptr());
+    {
+        let disable_validation = std::env::var("DISABLE_VULKAN_VALIDATION").is_ok();
+        if !disable_validation {
+            extension_names.push(ash::ext::debug_utils::NAME.as_ptr());
+        }
+    }
 
     // Add portability enumeration for macOS
     #[cfg(target_os = "macos")]
@@ -390,38 +406,39 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
         } else {
             layer_name_ptrs = VALIDATION_LAYERS.iter().map(|name| name.as_ptr()).collect();
 
-        // Check if validation layers are available
-        // SAFETY: enumerate_instance_layer_properties only queries available layers.
-        // It returns a Vec of layer properties, no pointer manipulation needed.
-        let available_layers = unsafe {
-            entry.enumerate_instance_layer_properties().map_err(|e| {
-                RendererError::instancecreationfailed(format!(
-                    "Failed to enumerate layers: {:?}",
-                    e
-                ))
-            })?
-        };
+            // Check if validation layers are available
+            // SAFETY: enumerate_instance_layer_properties only queries available layers.
+            // It returns a Vec of layer properties, no pointer manipulation needed.
+            let available_layers = unsafe {
+                entry.enumerate_instance_layer_properties().map_err(|e| {
+                    RendererError::instancecreationfailed(format!(
+                        "Failed to enumerate layers: {:?}",
+                        e
+                    ))
+                })?
+            };
 
-        for required_layer in VALIDATION_LAYERS.iter() {
-            let found = available_layers.iter().any(|layer| {
-                // SAFETY: layer_name is a fixed array in VkLayerProperties.
-                // Vulkan spec guarantees it's null-terminated UTF-8.
-                let layer_name = unsafe { CStr::from_ptr(layer.layer_name.as_ptr()) };
-                layer_name == required_layer.as_c_str()
-            });
+            for required_layer in VALIDATION_LAYERS.iter() {
+                let found = available_layers.iter().any(|layer| {
+                    // SAFETY: layer_name is a fixed array in VkLayerProperties.
+                    // Vulkan spec guarantees it's null-terminated UTF-8.
+                    let layer_name = unsafe { CStr::from_ptr(layer.layer_name.as_ptr()) };
+                    layer_name == required_layer.as_c_str()
+                });
 
-            if !found {
-                warn!(
-                    layer = ?required_layer,
-                    "Validation layer not available"
-                );
-                return Err(RendererError::validationlayernotavailable(
-                    required_layer.to_string_lossy().into_owned(),
-                ));
+                if !found {
+                    warn!(
+                        layer = ?required_layer,
+                        "Validation layer not available"
+                    );
+                    return Err(RendererError::validationlayernotavailable(
+                        required_layer.to_string_lossy().into_owned(),
+                    ));
+                }
             }
-        }
 
-        info!(layers = ?*VALIDATION_LAYERS, "Enabling validation layers");
+            info!(layers = ?*VALIDATION_LAYERS, "Enabling validation layers");
+        }
     }
 
     #[cfg(not(debug_assertions))]

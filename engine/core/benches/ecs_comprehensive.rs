@@ -21,7 +21,7 @@ use engine_core::physics_components::Velocity;
 // ============================================================================
 
 fn setup_world() -> World {
-    let mut world = setup_world();
+    let mut world = World::new();
     world.register::<Transform>();
     world.register::<Velocity>();
     world.register::<Health>();

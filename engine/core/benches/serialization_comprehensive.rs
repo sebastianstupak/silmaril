@@ -25,7 +25,7 @@ use engine_core::serialization::WorldState;
 // ============================================================================
 
 fn setup_world() -> World {
-    let mut world = setup_world();
+    let mut world = World::new();
     world.register::<Transform>();
     world.register::<Velocity>();
     world.register::<Health>();

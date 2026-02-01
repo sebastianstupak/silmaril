@@ -22,11 +22,18 @@ use std::time::Duration;
 /// - Minimal extensions
 /// - No debug messenger overhead
 fn create_bench_context() -> Option<VulkanContext> {
-    // Note: VulkanContext::new() in debug builds always enables validation layers
-    // We need to use it as-is for now, but this is a known limitation
-    //
-    // TODO Phase 1.7: Add VulkanContext::new_no_validation() for benchmarks
-    VulkanContext::new("BenchContext", None, None).ok()
+    // Use new_for_benchmarks() which disables validation layers
+    // This is critical for accurate performance measurements
+    match VulkanContext::new_for_benchmarks("BenchContext", None, None) {
+        Ok(ctx) => {
+            eprintln!("✅ Vulkan context created (validation layers: DISABLED)");
+            Some(ctx)
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to create Vulkan context: {:?}", e);
+            None
+        }
+    }
 }
 
 /// Helper to ensure GPU is idle between benchmark iterations
