@@ -92,6 +92,11 @@ pub struct PhysicsConfig {
     /// Requires CPU support (detected at runtime)
     /// Default: true
     pub enable_simd: bool,
+
+    /// Enable deterministic mode for replay/multiplayer
+    /// Forces fixed timestep, disables parallelism/SIMD, and ensures reproducibility
+    /// Default: false
+    pub deterministic: bool,
 }
 
 impl Default for PhysicsConfig {
@@ -105,6 +110,7 @@ impl Default for PhysicsConfig {
             solver_iterations: 8,
             enable_parallel: true,
             enable_simd: true,
+            deterministic: false,
         }
     }
 }
@@ -134,8 +140,19 @@ impl PhysicsConfig {
             enable_parallel: false, // Parallelism breaks determinism
             enable_simd: false,     // SIMD may vary across CPUs
             solver_iterations: 10,  // More iterations for stability
+            deterministic: true,    // Enable deterministic flag
             ..Default::default()
         }
+    }
+
+    /// Enable deterministic mode on existing config
+    pub fn with_deterministic(mut self, enabled: bool) -> Self {
+        self.deterministic = enabled;
+        if enabled {
+            self.enable_parallel = false;
+            self.enable_simd = false;
+        }
+        self
     }
 
     /// Get timestep in seconds

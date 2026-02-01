@@ -1,0 +1,4 @@
+# Development Scripts Dependencies
+# Install with: pip install -r requirements.txt
+
+psutil>=5.9.0    # Process management and system utilities

@@ -25,6 +25,20 @@ pub struct PhysicsContactForceEvent {
 }
 
 use crossbeam_channel;
+use std::collections::HashSet;
+
+/// Result of a raycast query
+#[derive(Debug, Clone)]
+pub struct RaycastHit {
+    /// Entity that was hit
+    pub entity: u64,
+    /// Distance along ray to hit point
+    pub distance: f32,
+    /// World-space hit point
+    pub point: Vec3,
+    /// Surface normal at hit point
+    pub normal: Vec3,
+}
 
 /// Physics world - manages all physics simulation
 ///
@@ -86,6 +100,16 @@ pub struct PhysicsWorld {
     /// Contact force events from last step
     contact_force_events: Vec<PhysicsContactForceEvent>,
 
+    /// Trigger enter events from last step
+    trigger_enter_events: Vec<(u64, u64)>,
+
+    /// Trigger exit events from last step
+    trigger_exit_events: Vec<(u64, u64)>,
+
+    /// Active trigger pairs (trigger_entity, other_entity)
+    /// Used to detect enter/exit events
+    active_trigger_pairs: HashSet<(u64, u64)>,
+
     /// Accumulated time for fixed timestep
     accumulator: f32,
 
@@ -102,6 +126,20 @@ impl PhysicsWorld {
         // Configure based on mode
         if let PhysicsMode::Deterministic { .. } = config.mode {
             integration_params.max_ccd_substeps = config.max_substeps as usize;
+        }
+
+        // Apply deterministic configuration
+        if config.deterministic {
+            // Ensure fixed timestep with no variation
+            integration_params.dt = config.timestep();
+            // Disable non-deterministic features at integration level
+            integration_params.max_ccd_substeps = config.max_substeps as usize;
+
+            tracing::info!(
+                timestep = %config.timestep(),
+                solver_iterations = config.solver_iterations,
+                "Physics world initialized in deterministic mode"
+            );
         }
 
         Self {
@@ -123,6 +161,9 @@ impl PhysicsWorld {
             entity_desired_mass: HashMap::new(),
             collision_events: Vec::new(),
             contact_force_events: Vec::new(),
+            trigger_enter_events: Vec::new(),
+            trigger_exit_events: Vec::new(),
+            active_trigger_pairs: HashSet::new(),
             accumulator: 0.0,
             frame_count: 0,
             config,
@@ -206,11 +247,16 @@ impl PhysicsWorld {
             self.contact_force_events.push(event);
         }
 
+        // Process trigger events
+        self.process_trigger_events();
+
         tracing::trace!(
             frame = self.frame_count,
             bodies = self.rigid_body_set.len(),
             colliders = self.collider_set.len(),
             collisions = self.collision_events.len(),
+            triggers_enter = self.trigger_enter_events.len(),
+            triggers_exit = self.trigger_exit_events.len(),
             "Physics step complete"
         );
     }
@@ -444,20 +490,73 @@ impl PhysicsWorld {
         }
     }
 
+    /// Add joint between two entities
+    ///
+    /// Both entities must have rigid bodies already added.
+    /// Returns the joint handle if successful.
+    pub fn add_joint(
+        &mut self,
+        entity1: u64,
+        entity2: u64,
+        joint: &crate::joints::Joint,
+    ) -> Option<crate::joints::JointHandle> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("add_joint", ProfileCategory::Physics);
+
+        let body1 = *self.entity_to_body.get(&entity1)?;
+        let body2 = *self.entity_to_body.get(&entity2)?;
+
+        let rapier_joint = joint.to_rapier();
+        let handle = self.impulse_joint_set.insert(body1, body2, rapier_joint, true);
+
+        tracing::debug!(
+            entity1 = entity1,
+            entity2 = entity2,
+            joint_handle = ?handle,
+            "Added joint"
+        );
+
+        Some(handle)
+    }
+
+    /// Remove joint
+    pub fn remove_joint(&mut self, handle: crate::joints::JointHandle) -> bool {
+        #[cfg(feature = "profiling")]
+        profile_scope!("remove_joint", ProfileCategory::Physics);
+
+        let removed = self.impulse_joint_set.remove(handle, true).is_some();
+
+        if removed {
+            tracing::debug!(joint_handle = ?handle, "Removed joint");
+        }
+
+        removed
+    }
+
+    /// Get number of joints
+    pub fn joint_count(&self) -> usize {
+        self.impulse_joint_set.len()
+    }
+
     /// Raycast (find first hit)
+    ///
+    /// Returns: (entity_id, distance, hit_point, normal)
     pub fn raycast(
         &self,
         origin: Vec3,
         direction: Vec3,
         max_distance: f32,
-    ) -> Option<(u64, f32, Vec3)> {
+    ) -> Option<RaycastHit> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("raycast_single", ProfileCategory::Physics);
+
         let ray = Ray::new(
             point![origin.x, origin.y, origin.z],
             vector![direction.x, direction.y, direction.z],
         );
 
         self.query_pipeline
-            .cast_ray(
+            .cast_ray_and_get_normal(
                 &self.rigid_body_set,
                 &self.collider_set,
                 &ray,
@@ -465,14 +564,79 @@ impl PhysicsWorld {
                 true,
                 QueryFilter::default(),
             )
-            .and_then(|(handle, toi)| {
+            .and_then(|(handle, intersection)| {
                 let collider = self.collider_set.get(handle)?;
                 let rb_handle = collider.parent()?;
                 let entity_id = self.body_to_entity.get(&rb_handle)?;
 
-                let hit_point = origin + direction * toi;
-                Some((*entity_id, toi, hit_point))
+                let hit_point = origin + direction * intersection.toi;
+                let normal =
+                    Vec3::new(intersection.normal.x, intersection.normal.y, intersection.normal.z);
+
+                Some(RaycastHit {
+                    entity: *entity_id,
+                    distance: intersection.toi,
+                    point: hit_point,
+                    normal,
+                })
             })
+    }
+
+    /// Raycast all (find all hits along ray, sorted by distance)
+    ///
+    /// Returns all hits sorted from nearest to farthest.
+    pub fn raycast_all(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        max_distance: f32,
+    ) -> Vec<RaycastHit> {
+        #[cfg(feature = "profiling")]
+        profile_scope!("raycast_all", ProfileCategory::Physics);
+
+        let ray = Ray::new(
+            point![origin.x, origin.y, origin.z],
+            vector![direction.x, direction.y, direction.z],
+        );
+
+        let mut hits = Vec::new();
+
+        self.query_pipeline.intersections_with_ray(
+            &self.rigid_body_set,
+            &self.collider_set,
+            &ray,
+            max_distance,
+            QueryFilter::default(),
+            |handle, intersection| {
+                if let Some(collider) = self.collider_set.get(handle) {
+                    if let Some(rb_handle) = collider.parent() {
+                        if let Some(&entity_id) = self.body_to_entity.get(&rb_handle) {
+                            let hit_point = origin + direction * intersection.toi;
+                            let normal = Vec3::new(
+                                intersection.normal.x,
+                                intersection.normal.y,
+                                intersection.normal.z,
+                            );
+
+                            hits.push(RaycastHit {
+                                entity: entity_id,
+                                distance: intersection.toi,
+                                point: hit_point,
+                                normal,
+                            });
+                        }
+                    }
+                }
+                true // Continue iterating
+            },
+        );
+
+        // Sort by distance (nearest first)
+        hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+
+        tracing::trace!(hits = hits.len(), "Raycast all complete");
+
+        hits
     }
 
     /// Get collision events from last step
@@ -503,6 +667,97 @@ impl PhysicsWorld {
     /// Get entity ID from collider handle (for event translation)
     pub fn get_entity_from_collider(&self, handle: ColliderHandle) -> Option<&u64> {
         self.collider_to_entity.get(&handle)
+    }
+
+    /// Get all entity IDs in the physics world
+    ///
+    /// Returns an iterator over all entity IDs that have physics bodies.
+    /// This is used for deterministic state hashing and snapshots.
+    pub fn entity_ids(&self) -> impl Iterator<Item = u64> + '_ {
+        self.entity_to_body.keys().copied()
+    }
+
+    /// Get trigger enter events from last step
+    pub fn trigger_enter_events(&self) -> &[(u64, u64)] {
+        &self.trigger_enter_events
+    }
+
+    /// Get trigger exit events from last step
+    pub fn trigger_exit_events(&self) -> &[(u64, u64)] {
+        &self.trigger_exit_events
+    }
+
+    /// Process trigger events from collision events
+    ///
+    /// Detects when entities enter/exit sensor colliders and generates
+    /// trigger events accordingly.
+    fn process_trigger_events(&mut self) {
+        #[cfg(feature = "profiling")]
+        profile_scope!("process_trigger_events", ProfileCategory::Physics);
+
+        self.trigger_enter_events.clear();
+        self.trigger_exit_events.clear();
+
+        // Build set of currently active trigger pairs from collision events
+        let mut current_pairs = HashSet::new();
+
+        for collision_event in &self.collision_events {
+            match collision_event {
+                CollisionEvent::Started(h1, h2, _flags) => {
+                    // Check if either collider is a sensor
+                    let c1 = self.collider_set.get(*h1);
+                    let c2 = self.collider_set.get(*h2);
+
+                    if let (Some(c1), Some(c2)) = (c1, c2) {
+                        let is_sensor_1 = c1.is_sensor();
+                        let is_sensor_2 = c2.is_sensor();
+
+                        // Only process if at least one is a sensor
+                        if is_sensor_1 || is_sensor_2 {
+                            // Get entity IDs
+                            if let (Some(&e1), Some(&e2)) = (
+                                self.collider_to_entity.get(h1),
+                                self.collider_to_entity.get(h2),
+                            ) {
+                                // Determine which is the trigger (sensor) and which is the other
+                                let (trigger, other) = if is_sensor_1 && !is_sensor_2 {
+                                    (e1, e2)
+                                } else if is_sensor_2 && !is_sensor_1 {
+                                    (e2, e1)
+                                } else {
+                                    // Both are sensors or neither, use first as trigger
+                                    (e1, e2)
+                                };
+
+                                current_pairs.insert((trigger, other));
+                            }
+                        }
+                    }
+                }
+                CollisionEvent::Stopped(_, _, _) => {
+                    // We'll detect exits by comparing with previous frame
+                }
+            }
+        }
+
+        // Detect new trigger pairs (enters)
+        for &pair in &current_pairs {
+            if !self.active_trigger_pairs.contains(&pair) {
+                self.trigger_enter_events.push(pair);
+                tracing::trace!(trigger = pair.0, other = pair.1, "Trigger enter");
+            }
+        }
+
+        // Detect removed trigger pairs (exits)
+        for &pair in &self.active_trigger_pairs {
+            if !current_pairs.contains(&pair) {
+                self.trigger_exit_events.push(pair);
+                tracing::trace!(trigger = pair.0, other = pair.1, "Trigger exit");
+            }
+        }
+
+        // Update active pairs
+        self.active_trigger_pairs = current_pairs;
     }
 
     /// Convert collider shape component to Rapier shape

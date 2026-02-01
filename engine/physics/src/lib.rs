@@ -9,22 +9,29 @@
 
 #![warn(missing_docs)]
 
+pub mod character_controller;
 pub mod components;
 pub mod config;
+pub mod deterministic;
 pub mod events;
 pub mod sync;
 pub mod systems;
 pub mod world;
 
 // Re-exports
+pub use character_controller::CharacterController;
 pub use components::{
     Collider, ColliderShape, CombineMode, PhysicsMaterial, RigidBody, RigidBodyType, Velocity,
 };
 pub use config::{PhysicsConfig, PhysicsMode};
+pub use deterministic::{
+    create_snapshot, hash_physics_state, restore_snapshot, DeterministicError, PhysicsInput,
+    PhysicsSnapshot, RecordedFrame, ReplayPlayer, ReplayRecorder,
+};
 pub use events::{
     BodySleepEvent, BodyWakeEvent, CollisionEndEvent, CollisionStartEvent, ContactForceEvent,
     TriggerEnterEvent, TriggerExitEvent,
 };
 pub use sync::{build_entity_mapping, PhysicsSyncConfig, PhysicsSyncSystem};
 pub use systems::{physics_integration_system, physics_integration_system_simd};
-pub use world::PhysicsWorld;
+pub use world::{PhysicsWorld, RaycastHit};

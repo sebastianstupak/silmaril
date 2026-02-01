@@ -47,3 +47,7 @@ harness = false
 [[bench]]
 name = "component_benches"
 harness = false
+
+[[bench]]
+name = "character_benches"
+harness = false

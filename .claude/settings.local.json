@@ -83,7 +83,10 @@
       "Bash(powershell -ExecutionPolicy Bypass -Command \"Get-Help ./scripts/benchmark_all_platforms.ps1 | Select-Object -First 15\")",
       "Bash(powershell -ExecutionPolicy Bypass -File ./scripts/benchmark_all_platforms.ps1 -Help)",
       "Bash(bcb97d7 \")",
-      "Bash(just:*)"
+      "Bash(just:*)",
+      "Bash(timeout 30 type:*)",
+      "Bash(wmic process where \"name=''serialization_benches-0d2f62414ef4c06b.exe''\" get commandline,processid)",
+      "Bash(timeout /t 30)"
     ]
   }
 }

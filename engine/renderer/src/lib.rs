@@ -40,6 +40,7 @@
 #![warn(clippy::print_stdout)]
 #![warn(clippy::print_stderr)]
 
+pub mod buffer;
 pub mod command;
 pub mod context;
 pub mod error;
@@ -54,6 +55,7 @@ pub mod sync;
 pub mod window;
 
 // Re-export commonly used types
+pub use buffer::{GpuBuffer, GpuMesh, IndexBuffer, VertexBuffer};
 pub use command::{CommandBuffer, CommandError, CommandPool};
 pub use context::{QueueFamilies, VulkanContext};
 pub use error::RendererError;

@@ -107,7 +107,7 @@ Install these tools for enhanced development experience:
 # Dependency auditing and policy enforcement
 cargo install cargo-deny
 
-# Auto-rebuild on file changes (hot reload)
+# Auto-rebuild on file changes (hot reload) - RECOMMENDED
 cargo install cargo-watch
 
 # CPU profiling with flamegraphs
@@ -115,7 +115,27 @@ cargo install flamegraph
 
 # Code coverage
 cargo install cargo-tarpaulin
+
+# Just command runner (if not installed)
+cargo install just
 ```
+
+#### **Python Dependencies for Dev Scripts**
+
+The development workflow uses Python helper scripts. Install dependencies:
+
+```bash
+# Install Python dependencies
+pip install -r scripts/dev/requirements.txt
+
+# Or use a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r scripts/dev/requirements.txt
+```
+
+**Required:**
+- `psutil` - Process management and system utilities
 
 ### **IDE Setup**
 
@@ -169,15 +189,85 @@ Add to your shell profile (`.bashrc`, `.zshrc`, etc.) for persistence.
 
 ### **1. Start Dev Environment**
 
-```bash
-# Local (processes)
-./scripts/dev.sh local
+The engine provides a comprehensive `just dev` workflow system with multiple development modes:
 
-# Docker (containers, recommended for multiplayer)
-./scripts/dev.sh docker
+#### **Basic Development**
+
+```bash
+# Full development environment (client + server with auto-reload)
+just dev
+
+# Client only
+just dev-client
+
+# Server only
+just dev-server
 ```
 
-**Hot-reload enabled:** Edit code → Auto rebuild → Auto restart
+**Features:**
+- Auto-reload on code changes (requires `cargo-watch`)
+- Graceful shutdown on Ctrl+C
+- Color-coded output
+- Port conflict detection
+
+#### **Enhanced Development Modes**
+
+```bash
+# With live log streaming (pretty formatted, color-coded)
+just dev-logs-live
+
+# With profiler attached (Puffin)
+just dev-profiler
+
+# With debugger ready (full debug symbols)
+just dev-debug
+
+# In release mode (optimized but debuggable)
+just dev-release
+
+# With Vulkan validation layers (slower, catches bugs)
+just dev-validation
+
+# Headless mode (no rendering, for testing)
+just dev-headless
+```
+
+#### **Multiplayer Testing**
+
+```bash
+# Run multiple clients for local multiplayer testing
+just dev-multi 3  # Spawns 3 clients + 1 server
+```
+
+#### **Utility Commands**
+
+```bash
+# Check environment status
+just dev-status
+
+# Stop all dev processes
+just dev-stop-all
+
+# Clean and reset environment
+just dev-clean
+
+# Quick benchmarks
+just dev-benchmark
+```
+
+#### **Hot-Reload**
+
+When `cargo-watch` is installed, code changes automatically trigger rebuild and restart:
+
+```bash
+# Install cargo-watch
+cargo install cargo-watch
+
+# Now just dev will auto-reload on changes
+just dev
+```
+
+**Edit code → Auto rebuild → Auto restart**
 
 ---
 

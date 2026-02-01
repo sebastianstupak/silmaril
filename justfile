@@ -985,19 +985,459 @@ watch-test:
 check-compile:
     cargo check --all-targets --all-features
 
-# === Docker ===
+# === Development Workflow ===
 
-# Start development environment (with hot-reload)
+# Start full development environment (client + server with auto-reload)
 dev:
-    docker-compose -f docker-compose.dev.yml up
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
 
-# Start development environment (detached)
-dev-detached:
-    docker-compose -f docker-compose.dev.yml up -d
+    print("Starting Development Environment...")
+    print()
 
-# Stop development environment
-dev-stop:
-    docker-compose -f docker-compose.dev.yml down
+    # Check for cargo-watch
+    try:
+        subprocess.run(["cargo", "watch", "--version"], capture_output=True, check=True)
+    except:
+        print("WARNING: cargo-watch not installed. Install with:")
+        print("   cargo install cargo-watch")
+        print()
+        print("Starting without auto-reload...")
+        subprocess.run([sys.executable, "scripts/dev/orchestrator.py", "full"])
+        sys.exit(0)
+
+    # Check ports
+    port_check = subprocess.run([sys.executable, "scripts/dev/port-checker.py"])
+    if port_check.returncode != 0:
+        sys.exit(1)
+
+    # Start with cargo-watch for auto-reload
+    print("[OK] Starting with auto-reload enabled")
+    print()
+    subprocess.run([sys.executable, "scripts/dev/orchestrator.py", "full"])
+
+# Run client only (development mode with auto-reload)
+dev-client:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Starting Client (Development Mode)...")
+    print()
+
+    # Check for cargo-watch
+    try:
+        subprocess.run(["cargo", "watch", "--version"], capture_output=True, check=True)
+        # Use cargo-watch for auto-reload
+        subprocess.run([
+            "cargo", "watch",
+            "-x", "run --bin client",
+            "-w", "engine/core",
+            "-w", "engine/renderer",
+            "-w", "engine/binaries/client"
+        ])
+    except:
+        print("WARNING: cargo-watch not installed, running without auto-reload")
+        print()
+        subprocess.run(["cargo", "run", "--bin", "client"])
+
+# Run server only (development mode with auto-reload)
+dev-server:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Starting Server (Development Mode)...")
+    print()
+
+    # Check for cargo-watch
+    try:
+        subprocess.run(["cargo", "watch", "--version"], capture_output=True, check=True)
+        # Use cargo-watch for auto-reload
+        subprocess.run([
+            "cargo", "watch",
+            "-x", "run --bin server",
+            "-w", "engine/core",
+            "-w", "engine/networking",
+            "-w", "engine/binaries/server"
+        ])
+    except:
+        print("WARNING: cargo-watch not installed, running without auto-reload")
+        print()
+        subprocess.run(["cargo", "run", "--bin", "server"])
+
+# Development with live log streaming (pretty formatted)
+dev-logs-live:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("Starting Development with Live Logs...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "debug"
+
+    # Start and pipe through log formatter
+    proc = subprocess.Popen(
+        ["cargo", "run", "--bin", "server"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
+
+    formatter = subprocess.Popen(
+        [sys.executable, "scripts/dev/log-formatter.py", "--level", "DEBUG"],
+        stdin=proc.stdout,
+        text=True
+    )
+
+    try:
+        formatter.wait()
+    except KeyboardInterrupt:
+        proc.terminate()
+        formatter.terminate()
+
+# Development with profiler attached (Puffin)
+dev-profiler:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("Starting Development with Profiler...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "info"
+
+    # Build with profiling enabled
+    print("Building with profiling support...")
+    subprocess.run(["cargo", "build", "--features", "profiling-puffin"], check=True)
+
+    print()
+    print("[OK] Profiling enabled")
+    print("Connect puffin_viewer to localhost:8585")
+    print()
+
+    # Run the server with profiling
+    subprocess.run(["cargo", "run", "--bin", "server", "--features", "profiling-puffin"], env=env)
+
+# Development with debugger ready (extra debug symbols)
+dev-debug:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+    import platform
+
+    print("Starting Development in Debug Mode...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "debug"
+    env["RUST_BACKTRACE"] = "full"
+    env["RUSTFLAGS"] = "-C debuginfo=2"
+
+    print("Building with full debug symbols...")
+    subprocess.run(["cargo", "build", "--bin", "client"], env=env, check=True)
+
+    binary = "target/debug/client.exe" if platform.system() == "Windows" else "target/debug/client"
+
+    print()
+    print("[OK] Debug build complete")
+    print(f"Binary: {binary}")
+    print()
+    print("Debugger attachment instructions:")
+    print()
+
+    if platform.system() == "Windows":
+        print("Visual Studio:")
+        print("  1. Debug > Attach to Process")
+        print("  2. Select client.exe")
+        print()
+        print("VS Code:")
+        print("  1. Run > Attach to Process")
+        print("  2. Select client.exe")
+    else:
+        print("LLDB:")
+        print(f"  lldb {binary}")
+        print()
+        print("GDB:")
+        print(f"  gdb {binary}")
+        print()
+        print("VS Code:")
+        print("  1. Set breakpoints")
+        print("  2. Run > Start Debugging (F5)")
+
+    print()
+    input("Press Enter to start the client...")
+    subprocess.run([binary], env=env)
+
+# Development with hot reload (assets only, no code reload)
+dev-hot-reload:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Starting Development with Asset Hot Reload...")
+    print()
+
+    # Note: Full hot-reload to be implemented in Phase 3
+    print("WARNING: Asset hot-reload not yet implemented (Phase 3)")
+    print("Starting normal development mode instead...")
+    print()
+
+    subprocess.run(["just", "dev"])
+
+# Development in release mode (optimized but debuggable)
+dev-release:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("Starting Development in Release Mode...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "info"
+
+    print("Building optimized binaries...")
+    subprocess.run(["cargo", "build", "--bin", "server", "--release"], check=True)
+    subprocess.run(["cargo", "build", "--bin", "client", "--release"], check=True)
+
+    print()
+    print("[OK] Release build complete")
+    print("Starting optimized server and client...")
+    print()
+
+    subprocess.run([sys.executable, "scripts/dev/orchestrator.py", "full"])
+
+# Clean and restart dev environment
+dev-clean:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Cleaning Development Environment...")
+    print()
+
+    # Stop all processes
+    print("1. Stopping all processes...")
+    subprocess.run([sys.executable, "scripts/dev/process-manager.py", "stop-all"])
+
+    print()
+    print("2. Cleaning build artifacts...")
+    subprocess.run(["cargo", "clean"])
+
+    print()
+    print("3. Cleaning process state...")
+    subprocess.run([sys.executable, "scripts/dev/process-manager.py", "clean"])
+
+    print()
+    print("[OK] Development environment cleaned")
+    print()
+    print("To restart:")
+    print("  just dev")
+
+# Check dev environment status
+dev-status:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("=" * 60)
+    print("Development Environment Status")
+    print("=" * 60)
+    print()
+
+    # Check running processes
+    print("Running Processes:")
+    print("-" * 60)
+    subprocess.run([sys.executable, "scripts/dev/process-manager.py", "status"])
+
+    print()
+    print("Port Status:")
+    print("-" * 60)
+    subprocess.run([sys.executable, "scripts/dev/port-checker.py"])
+
+    print()
+    print("Build Status:")
+    print("-" * 60)
+    result = subprocess.run(["cargo", "check", "--all-targets"], capture_output=True)
+    if result.returncode == 0:
+        print("[OK] Project compiles successfully")
+    else:
+        print("[ERROR] Project has compilation errors")
+
+    print()
+    print("=" * 60)
+
+# Stop all dev instances
+dev-stop-all:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Stopping All Development Processes...")
+    print()
+    subprocess.run([sys.executable, "scripts/dev/process-manager.py", "stop-all"])
+
+# Quick dev benchmarks (fast iteration)
+dev-benchmark:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Running Quick Benchmarks...")
+    print()
+
+    benchmarks = [
+        ("ECS World", "engine-core", "world_benches"),
+        ("ECS Query", "engine-core", "query_benches"),
+        ("Math SIMD", "engine-math", "simd_benches"),
+    ]
+
+    for name, package, bench in benchmarks:
+        print(f"Running: {name}")
+        subprocess.run([
+            "cargo", "bench",
+            "--package", package,
+            "--bench", bench,
+            "--",
+            "--sample-size", "10",
+            "--warm-up-time", "1",
+            "--measurement-time", "3"
+        ])
+        print()
+
+    print("[OK] Quick benchmarks complete")
+    print("Full benchmark report: target/criterion/report/index.html")
+
+# Development with full tracing (Chrome trace format)
+dev-trace:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("Starting Development with Tracing...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "trace"
+
+    # Note: Chrome trace export to be implemented
+    print("WARNING: Chrome trace export not yet implemented")
+    print("Starting with TRACE level logging instead...")
+    print()
+
+    subprocess.run(["cargo", "run", "--bin", "server"], env=env)
+
+# Development with Vulkan validation layers
+dev-validation:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+    import platform
+
+    print("Starting Development with Validation Layers...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "debug"
+
+    # Set Vulkan validation layer path
+    if platform.system() == "Windows":
+        # Assume Vulkan SDK is installed
+        env["VK_LAYER_PATH"] = "C:\\VulkanSDK\\Bin"
+    elif platform.system() == "Linux":
+        env["VK_LAYER_PATH"] = "/usr/share/vulkan/explicit_layer.d"
+    elif platform.system() == "Darwin":
+        env["VK_LAYER_PATH"] = "/usr/local/share/vulkan/explicit_layer.d"
+
+    env["VK_INSTANCE_LAYERS"] = "VK_LAYER_KHRONOS_validation"
+
+    print("[OK] Vulkan validation layers enabled")
+    print("WARNING: Performance will be slower")
+    print()
+
+    subprocess.run(["cargo", "run", "--bin", "client"], env=env)
+
+# Development with metrics dashboard
+dev-metrics:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    print("Starting Development with Metrics...")
+    print()
+
+    # Note: Metrics dashboard to be implemented in Phase 3
+    print("WARNING: Metrics dashboard not yet implemented (Phase 3)")
+    print("Starting normal development mode...")
+    print()
+
+    subprocess.run(["just", "dev"])
+
+# Run multiple clients for multiplayer testing
+dev-multi count="2":
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    count = int("{{count}}")
+
+    print(f"Starting {count} Clients + 1 Server...")
+    print()
+
+    # Check ports
+    port_check = subprocess.run([sys.executable, "scripts/dev/port-checker.py"])
+    if port_check.returncode != 0:
+        sys.exit(1)
+
+    print()
+    subprocess.run([sys.executable, "scripts/dev/orchestrator.py", "multi", str(count)])
+
+# Headless development (no rendering)
+dev-headless:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+    import os
+
+    print("Starting Headless Development...")
+    print()
+
+    env = os.environ.copy()
+    env["RUST_LOG"] = "info"
+
+    # Build with headless feature
+    print("Building with headless support...")
+    subprocess.run([
+        "cargo", "build",
+        "--bin", "client",
+        "--features", "headless"
+    ], env=env)
+
+    print()
+    print("[OK] Starting headless client")
+    print()
+
+    subprocess.run([
+        "cargo", "run",
+        "--bin", "client",
+        "--features", "headless"
+    ], env=env)
+
+# === Docker ===
 
 # Start production environment
 prod:
@@ -1006,10 +1446,6 @@ prod:
 # Stop production environment
 prod-stop:
     docker-compose down
-
-# View server logs (dev)
-dev-logs:
-    docker-compose -f docker-compose.dev.yml logs -f server
 
 # View server logs (production)
 prod-logs:

@@ -55,9 +55,12 @@ impl Entity {
     }
 
     /// Create a new entity (internal use only, prefer EntityAllocator)
+    ///
+    /// This method is public to allow for testing and serialization,
+    /// but should not be used in normal code. Use EntityAllocator instead.
     #[inline]
     #[allow(dead_code)]
-    pub(crate) fn new(id: u32, generation: u32) -> Self {
+    pub fn new(id: u32, generation: u32) -> Self {
         Self { id, generation }
     }
 }
