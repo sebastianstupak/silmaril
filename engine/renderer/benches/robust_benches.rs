@@ -214,7 +214,7 @@ fn bench_render_pass_creation(c: &mut Criterion) {
     group.bench_function("create_basic", |b| {
         b.iter_custom(|iters| {
             let start = std::time::Instant::now();
-            for i in 0..iters {
+            for _ in 0..iters {
                 let rp = RenderPass::new(
                     &context.device,
                     RenderPassConfig {
@@ -228,10 +228,8 @@ fn bench_render_pass_creation(c: &mut Criterion) {
                 .expect("Failed to create render pass");
                 black_box(rp);
 
-                // Add delay every 5 iterations to let GPU settle
-                if i % 5 == 4 {
-                    sync_gpu(&context.device);
-                }
+                // Sync after every iteration to prevent crashes
+                sync_gpu(&context.device);
             }
             start.elapsed()
         });
@@ -240,7 +238,7 @@ fn bench_render_pass_creation(c: &mut Criterion) {
     group.bench_function("create_with_depth", |b| {
         b.iter_custom(|iters| {
             let start = std::time::Instant::now();
-            for i in 0..iters {
+            for _ in 0..iters {
                 let rp = RenderPass::new(
                     &context.device,
                     RenderPassConfig {
@@ -254,9 +252,8 @@ fn bench_render_pass_creation(c: &mut Criterion) {
                 .expect("Failed to create render pass");
                 black_box(rp);
 
-                if i % 5 == 4 {
-                    sync_gpu(&context.device);
-                }
+                // Sync after every iteration
+                sync_gpu(&context.device);
             }
             start.elapsed()
         });
@@ -321,20 +318,20 @@ fn bench_offscreen_with_depth(c: &mut Criterion) {
     };
 
     let mut group = c.benchmark_group("offscreen_target");
-    group.sample_size(10);
-    group.measurement_time(Duration::from_secs(15));
+    group.sample_size(5);
+    group.measurement_time(Duration::from_secs(20));
+    group.warm_up_time(Duration::from_secs(2));
 
     group.bench_function("1080p_with_depth", |b| {
         b.iter_custom(|iters| {
             let start = std::time::Instant::now();
-            for i in 0..iters {
+            for _ in 0..iters {
                 let target = OffscreenTarget::new(&context, 1920, 1080, None, true)
                     .expect("Failed to create offscreen target with depth");
                 black_box(target);
 
-                if i % 2 == 1 {
-                    sync_gpu(&context.device);
-                }
+                // Sync after EVERY iteration
+                sync_gpu(&context.device);
             }
             start.elapsed()
         });
