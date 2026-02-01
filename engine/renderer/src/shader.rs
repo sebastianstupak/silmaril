@@ -25,7 +25,7 @@ impl ShaderModule {
     pub fn from_spirv(device: &ash::Device, code: &[u8]) -> Result<Self, RendererError> {
         // SPIR-V must be 4-byte aligned
         if code.len() % 4 != 0 {
-            return Err(RendererError::shadercreationfailed(
+            return Err(RendererError::shadermodulecreationfailed(
                 "SPIR-V bytecode is not 4-byte aligned".to_string(),
             ));
         }
@@ -43,7 +43,7 @@ impl ShaderModule {
             device
                 .create_shader_module(&create_info, None)
                 .map_err(|e| {
-                    RendererError::shadercreationfailed(format!("Failed to create shader module: {:?}", e))
+                    RendererError::shadermodulecreationfailed(format!("Failed to create shader module: {:?}", e))
                 })?
         };
 
@@ -63,7 +63,7 @@ impl ShaderModule {
     #[instrument(skip(device))]
     pub fn from_file(device: &ash::Device, path: &str) -> Result<Self, RendererError> {
         let code = std::fs::read(path).map_err(|e| {
-            RendererError::shadercreationfailed(format!("Failed to read shader file {}: {:?}", path, e))
+            RendererError::shadermodulecreationfailed(format!("Failed to read shader file {}: {:?}", path, e))
         })?;
 
         Self::from_spirv(device, &code)

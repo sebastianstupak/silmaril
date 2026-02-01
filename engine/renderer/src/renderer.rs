@@ -44,22 +44,19 @@ impl Renderer {
                 .map_err(|e| RendererError::instancecreationfailed(format!("Failed to load Vulkan: {:?}", e)))?
         };
 
-        // 3. Create surface wrapper (will create VkSurfaceKHR internally)
-        let surface = Surface::new(&entry, &{
-            // Need to create instance first to create surface
-            // Create temp instance just to get extension requirements
-            let required_extensions = window.required_extensions();
+        // 3. Create temporary context to get instance for surface creation
+        let temp_context = VulkanContext::new(app_name, None, None)?;
 
-            // Create VulkanContext (it will create the instance)
-            let context = VulkanContext::new(app_name, None, None)?;
-            context.instance
-        }, &window)
-        .map_err(|e| RendererError::surfacecreationfailed(format!("Surface creation failed: {:?}", e)))?;
+        // 4. Create surface using temporary context's instance
+        let surface = Surface::new(&entry, &temp_context.instance, &window)
+            .map_err(|e| RendererError::surfacecreationfailed(format!("Surface creation failed: {:?}", e)))?;
 
-        // 4. Create Vulkan context with surface
+        // 5. Create final Vulkan context with surface (this ensures proper device selection)
         let context = VulkanContext::new(app_name, Some(surface.handle()), Some(surface.loader()))?;
 
-        // 5. Create swapchain
+        // Temp context gets dropped here, but surface was created and is valid
+
+        // 6. Create swapchain
         let swapchain = Swapchain::new(
             &context,
             surface.handle(),
@@ -69,7 +66,7 @@ impl Renderer {
             None,
         )?;
 
-        // 6. Create render pass (simple color attachment, clear to color)
+        // 7. Create render pass (simple color attachment, clear to color)
         let render_pass = RenderPass::new(
             &context.device,
             RenderPassConfig {
@@ -79,33 +76,42 @@ impl Renderer {
                 load_op: vk::AttachmentLoadOp::CLEAR,
                 store_op: vk::AttachmentStoreOp::STORE,
             },
-        )?;
+        )
+        .map_err(|e| RendererError::renderpasscreationfailed(format!("{:?}", e)))?;
 
-        // 7. Create framebuffers (one per swapchain image)
+        // 8. Create framebuffers (one per swapchain image)
         let framebuffers = create_framebuffers(
             &context.device,
             render_pass.handle(),
             &swapchain.image_views,
             swapchain.extent,
-        )?;
+        )
+        .map_err(|e| RendererError::framebuffercreationfailed(format!("{:?}", e)))?;
 
-        // 8. Create command pool
+        // 9. Create command pool
         let command_pool = CommandPool::new(
             &context.device,
             context.queue_families.graphics,
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-        )?;
+        )
+        .map_err(|e| RendererError::commandpoolcreationfailed(format!("{:?}", e)))?;
 
-        // 9. Allocate command buffers (one per frame in flight)
+        // 10. Allocate command buffers (one per frame in flight)
         const FRAMES_IN_FLIGHT: u32 = 2;
-        let command_buffers = command_pool.allocate(
-            &context.device,
-            vk::CommandBufferLevel::PRIMARY,
-            FRAMES_IN_FLIGHT,
-        )?;
+        let command_buffers = command_pool
+            .allocate(
+                &context.device,
+                vk::CommandBufferLevel::PRIMARY,
+                FRAMES_IN_FLIGHT,
+            )
+            .map_err(|e| RendererError::commandbufferallocationfailed(FRAMES_IN_FLIGHT, format!("{:?}", e)))?
+            .into_iter()
+            .map(CommandBuffer::from_handle)
+            .collect();
 
-        // 10. Create synchronization objects
-        let sync_objects = create_sync_objects(&context.device, FRAMES_IN_FLIGHT as usize)?;
+        // 11. Create synchronization objects
+        let sync_objects = create_sync_objects(&context.device, FRAMES_IN_FLIGHT)
+            .map_err(|e| RendererError::syncobjectcreationfailed("frame sync".to_string(), format!("{:?}", e)))?;
 
         info!(
             width = width,
@@ -173,8 +179,8 @@ impl Renderer {
                 .map_err(|e| match e {
                     vk::Result::ERROR_OUT_OF_DATE_KHR => RendererError::swapchainoutofdate(),
                     _ => RendererError::swapchainacquisitionfailed(format!("{:?}", e)),
-                })?.
-.0 as usize
+                })?
+                .0 as usize
         };
 
         // Reset fence after acquiring image

@@ -8,6 +8,8 @@
 //! Parallel iteration is safe because:
 //! - Each thread processes disjoint sets of entities (no data races)
 //! - Immutable queries use shared references (safe concurrent reads)
+
+#![allow(missing_docs)]
 //! - Mutable queries split data into non-overlapping chunks (one writer per chunk)
 //!
 //! # Examples

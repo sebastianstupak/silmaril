@@ -68,27 +68,35 @@ fn bench_single_component_iter(c: &mut Criterion) {
         let world = create_world_with_entities(*entity_count);
         group.throughput(Throughput::Elements(*entity_count as u64));
 
-        // Single-threaded
+        // Single-threaded (using rayon with 1 thread)
         group.bench_with_input(
             BenchmarkId::new("sequential", entity_count),
             entity_count,
             |b, _| {
                 b.iter(|| {
-                    let sum: f32 = world.query::<&Position>().map(|(_, pos)| pos.x).sum();
-                    black_box(sum);
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(1)
+                        .build()
+                        .unwrap()
+                        .install(|| {
+                            let sum: f32 = world
+                                .par_query::<Position>()
+                                .map(|(_, pos)| pos.x)
+                                .sum();
+                            black_box(sum);
+                        });
                 });
             },
         );
 
-        // Parallel
+        // Parallel (default thread count)
         group.bench_with_input(
             BenchmarkId::new("parallel", entity_count),
             entity_count,
             |b, _| {
                 b.iter(|| {
                     let sum: f32 = world
-                        .query::<&Position>()
-                        .par_iter()
+                        .par_query::<Position>()
                         .map(|(_, pos)| pos.x)
                         .sum();
                     black_box(sum);
@@ -114,12 +122,18 @@ fn bench_single_component_iter_mut(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    world.query::<&mut Position>().for_each(|(_, pos)| {
-                        pos.x += 1.0;
-                        pos.y += 1.0;
-                        pos.z += 1.0;
-                        black_box(pos);
-                    });
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(1)
+                        .build()
+                        .unwrap()
+                        .install(|| {
+                            world.par_query_mut::<Position>().for_each(|(_, pos)| {
+                                pos.x += 1.0;
+                                pos.y += 1.0;
+                                pos.z += 1.0;
+                                black_box(pos);
+                            });
+                        });
                 });
             },
         );
@@ -131,7 +145,7 @@ fn bench_single_component_iter_mut(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    world.query::<&mut Position>().par_iter_mut().for_each(|(_, pos)| {
+                    world.par_query_mut::<Position>().for_each(|(_, pos)| {
                         pos.x += 1.0;
                         pos.y += 1.0;
                         pos.z += 1.0;
@@ -159,11 +173,17 @@ fn bench_two_component_iter(c: &mut Criterion) {
             entity_count,
             |b, _| {
                 b.iter(|| {
-                    let sum: f32 = world
-                        .query::<(&Position, &Velocity)>()
-                        .map(|(_, (pos, vel))| pos.x + vel.x)
-                        .sum();
-                    black_box(sum);
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(1)
+                        .build()
+                        .unwrap()
+                        .install(|| {
+                            let sum: f32 = world
+                                .par_query2::<Position, Velocity>()
+                                .map(|(_, (pos, vel))| pos.x + vel.x)
+                                .sum();
+                            black_box(sum);
+                        });
                 });
             },
         );
@@ -175,8 +195,7 @@ fn bench_two_component_iter(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     let sum: f32 = world
-                        .query::<(&Position, &Velocity)>()
-                        .par_iter()
+                        .par_query2::<Position, Velocity>()
                         .map(|(_, (pos, vel))| pos.x + vel.x)
                         .sum();
                     black_box(sum);
@@ -202,12 +221,20 @@ fn bench_two_component_iter_mut(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    world.query::<(&mut Position, &Velocity)>().for_each(|(_, (pos, vel))| {
-                        pos.x += vel.x;
-                        pos.y += vel.y;
-                        pos.z += vel.z;
-                        black_box(pos);
-                    });
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(1)
+                        .build()
+                        .unwrap()
+                        .install(|| {
+                            world
+                                .par_query2_mut::<Position, Velocity>()
+                                .for_each(|(_, (pos, vel))| {
+                                    pos.x += vel.x;
+                                    pos.y += vel.y;
+                                    pos.z += vel.z;
+                                    black_box(pos);
+                                });
+                        });
                 });
             },
         );
@@ -220,8 +247,7 @@ fn bench_two_component_iter_mut(c: &mut Criterion) {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
                     world
-                        .query::<(&mut Position, &Velocity)>()
-                        .par_iter_mut()
+                        .par_query2_mut::<Position, Velocity>()
                         .for_each(|(_, (pos, vel))| {
                             pos.x += vel.x;
                             pos.y += vel.y;
@@ -236,7 +262,7 @@ fn bench_two_component_iter_mut(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark realistic physics-style workload
+/// Benchmark realistic physics-style workload (2-component)
 fn bench_physics_workload(c: &mut Criterion) {
     let mut group = c.benchmark_group("physics_workload");
 
@@ -250,16 +276,21 @@ fn bench_physics_workload(c: &mut Criterion) {
             |b, _| {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
-                    world
-                        .query::<(&mut Position, &Velocity, &Mass)>()
-                        .for_each(|(_, (pos, vel, mass))| {
-                            // Simulate simple physics step with mass-adjusted velocity
-                            let dt = 0.016; // 60 FPS
-                            let force_scale = 1.0 / mass.value;
-                            pos.x += vel.x * dt * force_scale;
-                            pos.y += vel.y * dt * force_scale;
-                            pos.z += vel.z * dt * force_scale;
-                            black_box(pos);
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(1)
+                        .build()
+                        .unwrap()
+                        .install(|| {
+                            world
+                                .par_query2_mut::<Position, Velocity>()
+                                .for_each(|(_, (pos, vel))| {
+                                    // Simulate simple physics step
+                                    let dt = 0.016; // 60 FPS
+                                    pos.x += vel.x * dt;
+                                    pos.y += vel.y * dt;
+                                    pos.z += vel.z * dt;
+                                    black_box(pos);
+                                });
                         });
                 });
             },
@@ -273,15 +304,13 @@ fn bench_physics_workload(c: &mut Criterion) {
                 let mut world = create_world_with_entities(*entity_count);
                 b.iter(|| {
                     world
-                        .query::<(&mut Position, &Velocity, &Mass)>()
-                        .par_iter_mut()
-                        .for_each(|(_, (pos, vel, mass))| {
-                            // Simulate simple physics step with mass-adjusted velocity
+                        .par_query2_mut::<Position, Velocity>()
+                        .for_each(|(_, (pos, vel))| {
+                            // Simulate simple physics step
                             let dt = 0.016; // 60 FPS
-                            let force_scale = 1.0 / mass.value;
-                            pos.x += vel.x * dt * force_scale;
-                            pos.y += vel.y * dt * force_scale;
-                            pos.z += vel.z * dt * force_scale;
+                            pos.x += vel.x * dt;
+                            pos.y += vel.y * dt;
+                            pos.z += vel.z * dt;
                             black_box(pos);
                         });
                 });
@@ -306,8 +335,17 @@ fn bench_parallel_overhead(c: &mut Criterion) {
             entity_count,
             |b, _| {
                 b.iter(|| {
-                    let sum: f32 = world.query::<&Position>().map(|(_, pos)| pos.x).sum();
-                    black_box(sum);
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(1)
+                        .build()
+                        .unwrap()
+                        .install(|| {
+                            let sum: f32 = world
+                                .par_query::<Position>()
+                                .map(|(_, pos)| pos.x)
+                                .sum();
+                            black_box(sum);
+                        });
                 });
             },
         );
@@ -319,8 +357,7 @@ fn bench_parallel_overhead(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     let sum: f32 = world
-                        .query::<&Position>()
-                        .par_iter()
+                        .par_query::<Position>()
                         .map(|(_, pos)| pos.x)
                         .sum();
                     black_box(sum);
@@ -353,8 +390,7 @@ fn bench_thread_scaling(c: &mut Criterion) {
                         .unwrap()
                         .install(|| {
                             let sum: f32 = world
-                                .query::<(&Position, &Velocity)>()
-                                .par_iter()
+                                .par_query2::<Position, Velocity>()
                                 .map(|(_, (pos, vel))| pos.x + vel.x)
                                 .sum();
                             black_box(sum);
