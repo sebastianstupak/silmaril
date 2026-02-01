@@ -1,0 +1,74 @@
+// FlatBuffers schema for WorldState serialization
+// For zero-copy network serialization in Phase 2
+
+namespace agent_game_engine.serialization;
+
+// Entity metadata
+table EntityMetadata {
+    id: uint64;
+    generation: uint32;
+    alive: bool = true;
+}
+
+// Component types enumeration
+union ComponentData {
+    Transform,
+    Health,
+    Velocity,
+    MeshRenderer,
+}
+
+// Transform component
+table Transform {
+    position_x: float;
+    position_y: float;
+    position_z: float;
+    rotation_x: float;
+    rotation_y: float;
+    rotation_z: float;
+    rotation_w: float;
+    scale_x: float = 1.0;
+    scale_y: float = 1.0;
+    scale_z: float = 1.0;
+}
+
+// Health component
+table Health {
+    current: float;
+    max: float;
+}
+
+// Velocity component
+table Velocity {
+    x: float;
+    y: float;
+    z: float;
+}
+
+// MeshRenderer component
+table MeshRenderer {
+    mesh_id: uint64;
+    material_id: uint64;
+}
+
+// Entity with components
+table Entity {
+    metadata: EntityMetadata (required);
+    components: [ComponentData];
+}
+
+// World metadata
+table WorldMetadata {
+    version: uint32;
+    timestamp: uint64;
+    entity_count: uint64;
+    component_count: uint64;
+}
+
+// Complete world state
+table WorldState {
+    metadata: WorldMetadata (required);
+    entities: [Entity];
+}
+
+root_type WorldState;

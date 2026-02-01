@@ -179,8 +179,13 @@ impl Serializable for WorldState {
             Format::Bincode => bincode::serialize(self)
                 .map_err(|e| SerializationError::bincodeserialize(e.to_string())),
             Format::FlatBuffers => {
-                // FlatBuffers implementation will be added in the next step
-                Err(SerializationError::flatbuffersserialize("Not yet implemented".to_string()))
+                // FlatBuffers implementation deferred to Phase 2 (Networking)
+                // Schema defined in schema/world_state.fbs
+                // Will use flatc to generate Rust code and implement zero-copy serialization
+                // For now, Bincode provides excellent performance for local serialization
+                Err(SerializationError::flatbuffersserialize(
+                    "FlatBuffers serialization deferred to Phase 2 - use Bincode for now".to_string()
+                ))
             }
         }
     }
@@ -199,8 +204,13 @@ impl Serializable for WorldState {
             Format::Bincode => bincode::deserialize(data)
                 .map_err(|e| SerializationError::bincodedeserialize(e.to_string())),
             Format::FlatBuffers => {
-                // FlatBuffers implementation will be added in the next step
-                Err(SerializationError::flatbuffersdeserialize("Not yet implemented".to_string()))
+                // FlatBuffers implementation deferred to Phase 2 (Networking)
+                // Schema defined in schema/world_state.fbs
+                // Will use flatc to generate Rust code and implement zero-copy deserialization
+                // For now, Bincode provides excellent performance for local deserialization
+                Err(SerializationError::flatbuffersdeserialize(
+                    "FlatBuffers deserialization deferred to Phase 2 - use Bincode for now".to_string()
+                ))
             }
         }
     }

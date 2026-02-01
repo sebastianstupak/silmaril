@@ -172,3 +172,226 @@ fn test_serialization_format_comparison() {
 
     assert_eq!(yaml_restored.metadata.version, bincode_restored.metadata.version);
 }
+
+/// Test full World snapshot and restore with YAML format
+#[test]
+fn test_world_snapshot_restore_yaml() {
+    let mut world = World::new();
+    world.register::<Transform>();
+    world.register::<Health>();
+    world.register::<MeshRenderer>();
+
+    // Create 10 entities with various components
+    for i in 0..10 {
+        let entity = world.spawn();
+        world.add(entity, Transform::default());
+        world.add(entity, Health::new(100.0 - (i as f32 * 5.0), 100.0));
+
+        if i % 2 == 0 {
+            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 1000));
+        }
+    }
+
+    let initial_count = world.entity_count();
+    assert_eq!(initial_count, 10, "Should have 10 entities");
+
+    // Snapshot the world
+    let snapshot = WorldState::snapshot(&world);
+    assert_eq!(snapshot.metadata.entity_count, 10, "Snapshot should have 10 entities");
+    assert!(snapshot.metadata.component_count >= 20, "Should have at least 20 components (Transform + Health for all)");
+
+    // Serialize to YAML
+    let yaml_bytes = Serializable::serialize(&snapshot, Format::Yaml)
+        .expect("YAML serialization should succeed");
+
+    // Verify it's human-readable
+    let yaml_string = String::from_utf8(yaml_bytes.clone()).expect("YAML should be valid UTF-8");
+    assert!(yaml_string.contains("Transform"), "YAML should mention Transform");
+    assert!(yaml_string.contains("Health"), "YAML should mention Health");
+
+    // Deserialize
+    let restored_snapshot = <WorldState as Serializable>::deserialize(&yaml_bytes, Format::Yaml)
+        .expect("YAML deserialization should succeed");
+
+    // Verify metadata
+    assert_eq!(restored_snapshot.metadata.entity_count, 10);
+    assert_eq!(restored_snapshot.entities.len(), 10);
+
+    // Restore to a new world
+    let mut new_world = World::new();
+    new_world.register::<Transform>();
+    new_world.register::<Health>();
+    new_world.register::<MeshRenderer>();
+
+    restored_snapshot.restore(&mut new_world);
+
+    assert_eq!(new_world.entity_count(), 10, "Restored world should have 10 entities");
+}
+
+/// Test full World snapshot and restore with Bincode format
+#[test]
+fn test_world_snapshot_restore_bincode() {
+    let mut world = World::new();
+    world.register::<Transform>();
+    world.register::<Health>();
+    world.register::<MeshRenderer>();
+
+    // Create 100 entities for a more realistic test
+    for i in 0..100 {
+        let entity = world.spawn();
+        world.add(entity, Transform::default());
+        world.add(entity, Health::new(100.0 - (i as f32 % 100.0), 100.0));
+
+        if i % 3 == 0 {
+            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 5000));
+        }
+    }
+
+    assert_eq!(world.entity_count(), 100, "Should have 100 entities");
+
+    // Snapshot the world
+    let snapshot = WorldState::snapshot(&world);
+    assert_eq!(snapshot.metadata.entity_count, 100);
+
+    // Serialize to Bincode
+    let bincode_bytes = Serializable::serialize(&snapshot, Format::Bincode)
+        .expect("Bincode serialization should succeed");
+
+    // Bincode should be compact (rough estimate: < 50 bytes per entity on average)
+    let bytes_per_entity = bincode_bytes.len() / 100;
+    assert!(bytes_per_entity < 200, "Bincode should be compact: {} bytes/entity", bytes_per_entity);
+
+    // Deserialize
+    let restored_snapshot = <WorldState as Serializable>::deserialize(&bincode_bytes, Format::Bincode)
+        .expect("Bincode deserialization should succeed");
+
+    assert_eq!(restored_snapshot.metadata.entity_count, 100);
+    assert_eq!(restored_snapshot.entities.len(), 100);
+
+    // Restore to new world
+    let mut new_world = World::new();
+    new_world.register::<Transform>();
+    new_world.register::<Health>();
+    new_world.register::<MeshRenderer>();
+
+    restored_snapshot.restore(&mut new_world);
+
+    assert_eq!(new_world.entity_count(), 100, "Restored world should have 100 entities");
+}
+
+/// Test large world with 1000 entities
+#[test]
+fn test_large_world_serialization() {
+    let mut world = World::new();
+    world.register::<Transform>();
+    world.register::<Health>();
+    world.register::<MeshRenderer>();
+
+    // Create 1000 entities
+    for i in 0..1000 {
+        let entity = world.spawn();
+        world.add(entity, Transform::default());
+        world.add(entity, Health::new(100.0 - (i as f32 % 100.0), 100.0));
+
+        if i % 4 == 0 {
+            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 10000));
+        }
+    }
+
+    assert_eq!(world.entity_count(), 1000);
+
+    // Snapshot
+    let snapshot = WorldState::snapshot(&world);
+    assert_eq!(snapshot.metadata.entity_count, 1000);
+
+    // Test Bincode (fastest format)
+    let bincode_bytes = Serializable::serialize(&snapshot, Format::Bincode)
+        .expect("Should serialize 1000 entities");
+
+    // Deserialize
+    let restored = <WorldState as Serializable>::deserialize(&bincode_bytes, Format::Bincode)
+        .expect("Should deserialize 1000 entities");
+
+    assert_eq!(restored.metadata.entity_count, 1000);
+    assert_eq!(restored.entities.len(), 1000);
+
+    // Verify component count is preserved
+    assert_eq!(snapshot.metadata.component_count, restored.metadata.component_count);
+}
+
+/// Test serialization with Writer/Reader interfaces
+#[test]
+fn test_serialize_to_writer() {
+    let mut world = World::new();
+    world.register::<Transform>();
+    world.register::<Health>();
+
+    for i in 0..50 {
+        let entity = world.spawn();
+        world.add(entity, Transform::default());
+        world.add(entity, Health::new(50.0 + i as f32, 100.0));
+    }
+
+    let snapshot = WorldState::snapshot(&world);
+
+    // Serialize to a buffer
+    let mut buffer = Vec::new();
+    Serializable::serialize_to(&snapshot, &mut buffer, Format::Bincode)
+        .expect("Should serialize to writer");
+
+    assert!(!buffer.is_empty(), "Buffer should contain data");
+
+    // Deserialize from reader
+    let cursor = std::io::Cursor::new(buffer);
+    let restored = <WorldState as Serializable>::deserialize_from(cursor, Format::Bincode)
+        .expect("Should deserialize from reader");
+
+    assert_eq!(restored.metadata.entity_count, 50);
+}
+
+/// Test delta compression with real world modifications
+#[test]
+fn test_delta_with_world_changes() {
+    let mut world1 = World::new();
+    world1.register::<Transform>();
+    world1.register::<Health>();
+
+    // Create initial state
+    for _ in 0..20 {
+        let entity = world1.spawn();
+        world1.add(entity, Transform::default());
+        world1.add(entity, Health::new(100.0, 100.0));
+    }
+
+    let snapshot1 = WorldState::snapshot(&world1);
+
+    // Modify 5 entities (25% of world)
+    let mut world2 = World::new();
+    world2.register::<Transform>();
+    world2.register::<Health>();
+    snapshot1.restore(&mut world2);
+
+    let entities: Vec<_> = world2.entities().collect();
+    for entity in entities.iter().take(5) {
+        if let Some(health) = world2.get_mut::<Health>(*entity) {
+            health.damage(30.0);
+        }
+    }
+
+    let mut snapshot2 = WorldState::snapshot(&world2);
+    snapshot2.metadata.version = snapshot1.metadata.version + 1;
+
+    // Compute delta
+    let delta = WorldStateDelta::compute(&snapshot1, &snapshot2);
+
+    // Delta should only contain modified components
+    assert!(delta.modified_components.len() <= 5, "Should have at most 5 modified components");
+
+    // Delta should be smaller than full state for small changes
+    let delta_bytes = bincode::serialize(&delta).unwrap();
+    let full_bytes = bincode::serialize(&snapshot2).unwrap();
+
+    assert!(delta_bytes.len() < full_bytes.len(),
+        "Delta ({} bytes) should be smaller than full state ({} bytes) for 25% change",
+        delta_bytes.len(), full_bytes.len());
+}

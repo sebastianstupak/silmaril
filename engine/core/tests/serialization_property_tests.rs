@@ -173,6 +173,27 @@ proptest! {
         prop_assert_eq!(restored.metadata.entity_count, 0);
     }
 
+    /// Test that large worlds serialize correctly
+    #[test]
+    fn test_large_world_bincode(entity_count in 100usize..1000) {
+        let mut world = World::new();
+        world.register::<Transform>();
+        world.register::<Health>();
+
+        for i in 0..entity_count {
+            let entity = world.spawn();
+            world.add(entity, Transform::default());
+            world.add(entity, Health::new((i % 100) as f32, 100.0));
+        }
+
+        let snapshot = WorldState::snapshot(&world);
+        let bytes = snapshot.serialize(Format::Bincode).unwrap();
+        let restored = WorldState::deserialize(&bytes, Format::Bincode).unwrap();
+
+        prop_assert_eq!(restored.metadata.entity_count, entity_count);
+        prop_assert_eq!(snapshot.entities.len(), restored.entities.len());
+    }
+
     /// Test that component count is preserved
     #[test]
     fn test_component_count_preserved(
