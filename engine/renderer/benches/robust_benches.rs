@@ -354,13 +354,14 @@ fn bench_command_pool_creation(c: &mut Criterion) {
     };
 
     let mut group = c.benchmark_group("command_pool");
-    group.sample_size(20);
-    group.measurement_time(Duration::from_secs(10));
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(15));
+    group.warm_up_time(Duration::from_secs(2));
 
     group.bench_function("create_resettable", |b| {
         b.iter_custom(|iters| {
             let start = std::time::Instant::now();
-            for i in 0..iters {
+            for _ in 0..iters {
                 let pool = CommandPool::new(
                     &context.device,
                     context.queue_families.graphics,
@@ -369,9 +370,8 @@ fn bench_command_pool_creation(c: &mut Criterion) {
                 .expect("Failed to create pool");
                 black_box(pool);
 
-                if i % 10 == 9 {
-                    sync_gpu(&context.device);
-                }
+                // Sync after every iteration
+                sync_gpu(&context.device);
             }
             start.elapsed()
         });
@@ -380,7 +380,7 @@ fn bench_command_pool_creation(c: &mut Criterion) {
     group.bench_function("create_transient", |b| {
         b.iter_custom(|iters| {
             let start = std::time::Instant::now();
-            for i in 0..iters {
+            for _ in 0..iters {
                 let pool = CommandPool::new(
                     &context.device,
                     context.queue_families.graphics,
@@ -389,9 +389,8 @@ fn bench_command_pool_creation(c: &mut Criterion) {
                 .expect("Failed to create pool");
                 black_box(pool);
 
-                if i % 10 == 9 {
-                    sync_gpu(&context.device);
-                }
+                // Sync after every iteration
+                sync_gpu(&context.device);
             }
             start.elapsed()
         });
