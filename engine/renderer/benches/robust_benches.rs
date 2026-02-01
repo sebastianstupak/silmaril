@@ -41,10 +41,13 @@ fn create_bench_context() -> Option<VulkanContext> {
 fn sync_gpu(device: &ash::Device) {
     unsafe {
         // Wait for all queues to be idle
-        device.device_wait_idle().ok();
+        if let Err(e) = device.device_wait_idle() {
+            eprintln!("⚠️  GPU sync failed: {:?}", e);
+        }
     }
-    // Small delay to allow driver/GPU state to settle
-    std::thread::sleep(Duration::from_micros(100));
+    // Longer delay to allow driver/GPU state to fully settle
+    // This helps prevent driver crashes on Windows
+    std::thread::sleep(Duration::from_millis(1));
 }
 
 // =============================================================================
@@ -203,9 +206,10 @@ fn bench_render_pass_creation(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("render_pass");
 
-    // Reduce sample count to avoid driver crashes
-    group.sample_size(20);
-    group.measurement_time(Duration::from_secs(10));
+    // Very low sample count to avoid driver crashes
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(15));
+    group.warm_up_time(Duration::from_secs(2));
 
     group.bench_function("create_basic", |b| {
         b.iter_custom(|iters| {
@@ -276,9 +280,10 @@ fn bench_offscreen_targets(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("offscreen_target");
 
-    // Very low sample count due to GPU memory allocation
-    group.sample_size(10);
-    group.measurement_time(Duration::from_secs(15));
+    // Extremely low sample count due to GPU memory allocation
+    group.sample_size(5);
+    group.measurement_time(Duration::from_secs(20));
+    group.warm_up_time(Duration::from_secs(2));
 
     for (name, width, height) in [("720p", 1280, 720), ("1080p", 1920, 1080), ("1440p", 2560, 1440)]
     {
@@ -288,15 +293,14 @@ fn bench_offscreen_targets(c: &mut Criterion) {
             |b, &(w, h)| {
                 b.iter_custom(|iters| {
                     let start = std::time::Instant::now();
-                    for i in 0..iters {
+                    for _ in 0..iters {
                         let target = OffscreenTarget::new(&context, w, h, None, false)
                             .expect("Failed to create offscreen target");
                         black_box(target);
 
                         // GPU memory allocation needs time to settle
-                        if i % 2 == 1 {
-                            sync_gpu(&context.device);
-                        }
+                        // Sync after EVERY iteration to prevent crashes
+                        sync_gpu(&context.device);
                     }
                     start.elapsed()
                 });
