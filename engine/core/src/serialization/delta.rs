@@ -53,10 +53,7 @@ impl WorldStateDelta {
             .collect();
 
         // Find removed entities
-        let removed_entities: Vec<_> = old_entities
-            .difference(&new_entities)
-            .copied()
-            .collect();
+        let removed_entities: Vec<_> = old_entities.difference(&new_entities).copied().collect();
 
         // Find modified and removed components
         let mut modified_components = HashMap::new();

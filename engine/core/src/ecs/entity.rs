@@ -262,10 +262,11 @@ impl EntityAllocator {
         let id = entity.id as usize;
         // Fast path: bounds check then direct comparison
         // This is faster than .get().map() chain due to reduced branching
-        id < self.generations.len() && unsafe {
-            // SAFETY: We just verified id < len
-            *self.generations.get_unchecked(id) == entity.generation
-        }
+        id < self.generations.len()
+            && unsafe {
+                // SAFETY: We just verified id < len
+                *self.generations.get_unchecked(id) == entity.generation
+            }
     }
 
     /// Get the number of allocated entities (alive + freed)

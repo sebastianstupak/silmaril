@@ -26,17 +26,10 @@ pub trait Serializable: Serialize + for<'de> Deserialize<'de> {
         Self: Sized;
 
     /// Serialize to writer
-    fn serialize_to<W: Write>(
-        &self,
-        writer: W,
-        format: Format,
-    ) -> Result<(), SerializationError>;
+    fn serialize_to<W: Write>(&self, writer: W, format: Format) -> Result<(), SerializationError>;
 
     /// Deserialize from reader
-    fn deserialize_from<R: Read>(
-        reader: R,
-        format: Format,
-    ) -> Result<Self, SerializationError>
+    fn deserialize_from<R: Read>(reader: R, format: Format) -> Result<Self, SerializationError>
     where
         Self: Sized;
 }

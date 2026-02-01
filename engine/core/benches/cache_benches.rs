@@ -6,7 +6,7 @@
 //! - Cache line utilization
 //! - Memory allocation patterns
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use engine_core::ecs::{Component, Entity, World};
 
 #[derive(Debug, Clone, Copy)]
@@ -28,6 +28,7 @@ struct Velocity {
 impl Component for Velocity {}
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct Health {
     current: f32,
     max: f32,
@@ -50,11 +51,7 @@ fn bench_sequential_access(c: &mut Criterion) {
                 // Create entities sequentially
                 for i in 0..count {
                     let entity = world.spawn();
-                    world.add(entity, Position {
-                        x: i as f32,
-                        y: 0.0,
-                        z: 0.0,
-                    });
+                    world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
                 }
 
                 b.iter(|| {
@@ -88,11 +85,7 @@ fn bench_random_access(c: &mut Criterion) {
                 let entities: Vec<Entity> = (0..count)
                     .map(|i| {
                         let entity = world.spawn();
-                        world.add(entity, Position {
-                            x: i as f32,
-                            y: 0.0,
-                            z: 0.0,
-                        });
+                        world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
                         entity
                     })
                     .collect();
@@ -131,16 +124,8 @@ fn bench_two_component_iteration(c: &mut Criterion) {
                 // Create entities with both components
                 for i in 0..count {
                     let entity = world.spawn();
-                    world.add(entity, Position {
-                        x: i as f32,
-                        y: 0.0,
-                        z: 0.0,
-                    });
-                    world.add(entity, Velocity {
-                        x: 1.0,
-                        y: 0.0,
-                        z: 0.0,
-                    });
+                    world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+                    world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
                 }
 
                 b.iter(|| {
@@ -170,11 +155,7 @@ fn bench_allocation_patterns(c: &mut Criterion) {
             // Allocate without pre-reserving capacity
             for i in 0..1000 {
                 let entity = world.spawn();
-                world.add(entity, Position {
-                    x: i as f32,
-                    y: 0.0,
-                    z: 0.0,
-                });
+                world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
             }
             black_box(world);
         });
@@ -189,11 +170,7 @@ fn bench_allocation_patterns(c: &mut Criterion) {
             // this should have fewer reallocations
             for i in 0..1000 {
                 let entity = world.spawn();
-                world.add(entity, Position {
-                    x: i as f32,
-                    y: 0.0,
-                    z: 0.0,
-                });
+                world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
             }
             black_box(world);
         });
@@ -213,10 +190,7 @@ fn bench_cache_line_utilization(c: &mut Criterion) {
 
         for i in 0..10000 {
             let entity = world.spawn();
-            world.add(entity, Health {
-                current: i as f32,
-                max: 100.0,
-            });
+            world.add(entity, Health { current: i as f32, max: 100.0 });
         }
 
         b.iter(|| {
@@ -241,9 +215,7 @@ fn bench_cache_line_utilization(c: &mut Criterion) {
 
         for i in 0..10000 {
             let entity = world.spawn();
-            world.add(entity, LargeComponent {
-                data: [i as f32; 16],
-            });
+            world.add(entity, LargeComponent { data: [i as f32; 16] });
         }
 
         b.iter(|| {
@@ -267,16 +239,8 @@ fn bench_physics_simulation(c: &mut Criterion) {
 
         for i in 0..10000 {
             let entity = world.spawn();
-            world.add(entity, Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            });
-            world.add(entity, Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            });
+            world.add(entity, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
         }
 
         b.iter(|| {

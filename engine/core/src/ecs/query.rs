@@ -2,11 +2,46 @@
 //!
 //! Provides ergonomic iteration over entities with specific component combinations.
 //! Supports single components, tuples, optional components, and mixed mutability.
+//!
+//! # Performance Optimizations
+//!
+//! This module includes several performance optimizations:
+//! - Memory prefetching for better cache utilization
+//! - Fast-path for single-component queries
+//! - Cached storage pointers to avoid repeated type lookups
+//! - Batch iteration support for SIMD processing
+//! - Optimized component access patterns with minimal virtual dispatch
 
 use super::storage::ComponentStorage;
 use super::{Component, Entity, SparseSet, World};
 use std::any::TypeId;
 use std::marker::PhantomData;
+
+/// Prefetch a memory location for reading
+///
+/// Uses compiler intrinsics to hint that we'll access this memory soon.
+/// The CPU can start loading it into cache before we actually need it.
+///
+/// SAFETY: Prefetching is always safe - it's just a hint to the CPU.
+/// Even if the pointer is invalid, prefetch is a no-op.
+#[inline(always)]
+fn prefetch_read<T>(ptr: *const T) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        // Use x86 prefetch intrinsic (T0 = fetch to all cache levels)
+        unsafe {
+            core::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(
+                ptr as *const i8,
+            );
+        }
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        // On other architectures, rely on the compiler's prefetch hints
+        // Most compilers will optimize this away or use the appropriate intrinsic
+        let _ = ptr; // Avoid unused variable warning
+    }
+}
 
 /// Branch prediction hint: marks a function as cold (rarely executed)
 ///
@@ -256,6 +291,17 @@ impl<'a, T: Component> Iterator for QueryIter<'a, &T> {
 
         // OPTIMIZATION: Use direct index access instead of nth() for O(1) vs O(n)
         while likely(self.current_index < storage.len()) {
+            // PREFETCH OPTIMIZATION: Load next entity's component into cache while processing current
+            // This exploits instruction-level parallelism in modern CPUs
+            if self.current_index + 1 < storage.len() {
+                if let Some(next_entity) = storage.get_dense_entity(self.current_index + 1) {
+                    if let Some(next_component) = storage.get(next_entity) {
+                        // Prefetch the next component into L1 cache
+                        prefetch_read(next_component as *const T);
+                    }
+                }
+            }
+
             // OPTIMIZATION: get_dense_entity should always succeed in valid iteration
             let entity = match storage.get_dense_entity(self.current_index) {
                 Some(e) => e,
@@ -574,6 +620,18 @@ impl<'a, A: Component, B: Component> Iterator for QueryIter<'a, (&A, &B)> {
         // OPTIMIZATION: Direct index access (O(1) per iteration instead of O(n) with nth())
         // Iterate storage_a and check if entity exists in storage_b
         while likely(self.current_index < storage_a.len()) {
+            // PREFETCH OPTIMIZATION: Prefetch next entity's components into cache
+            if self.current_index + 1 < storage_a.len() {
+                if let Some(next_entity) = storage_a.get_dense_entity(self.current_index + 1) {
+                    if let Some(next_a) = storage_a.get(next_entity) {
+                        prefetch_read(next_a as *const A);
+                    }
+                    if let Some(next_b) = storage_b.get(next_entity) {
+                        prefetch_read(next_b as *const B);
+                    }
+                }
+            }
+
             // OPTIMIZATION: get_dense_entity should always succeed
             let entity = match storage_a.get_dense_entity(self.current_index) {
                 Some(e) => e,
@@ -1201,6 +1259,201 @@ impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J);
 impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J, K);
 impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J, K, L);
 
+//
+// Batch Iteration Support for SIMD
+//
+
+/// Batch iterator that returns chunks of 4 components at a time
+///
+/// This enables SIMD processing by providing components in groups of 4.
+/// Use this with SIMD types from engine-math (Vec3x4, etc.)
+pub struct BatchQueryIter4<'a, T: Component> {
+    storage: Option<&'a SparseSet<T>>,
+    current_index: usize,
+    len: usize,
+}
+
+impl<'a, T: Component> BatchQueryIter4<'a, T> {
+    /// Creates a new batch iterator for querying components in groups of 4.
+    /// Returns an empty iterator if the component type is not registered.
+    pub fn new(world: &'a World) -> Self {
+        let type_id = TypeId::of::<T>();
+        let (storage, len) = match world.components.get(&type_id) {
+            Some(storage_trait) => {
+                let storage = storage_trait.as_any().downcast_ref::<SparseSet<T>>().unwrap();
+                (Some(storage), storage.len())
+            }
+            None => {
+                // Return empty iterator if component not registered
+                (None, 0)
+            }
+        };
+
+        Self { storage, current_index: 0, len }
+    }
+}
+
+impl<'a, T: Component> Iterator for BatchQueryIter4<'a, T> {
+    /// Returns ([Entity; 4], [&T; 4]) for each complete batch of 4
+    type Item = ([Entity; 4], [&'a T; 4]);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        // Return None if no storage (component not registered)
+        let storage = self.storage?;
+
+        // Check if we have at least 4 remaining
+        if self.current_index + 4 > self.len {
+            return None;
+        }
+
+        // PREFETCH: Load data for next batch while processing current
+        if self.current_index + 8 <= self.len {
+            for i in 4..8 {
+                if let Some(entity) = storage.get_dense_entity(self.current_index + i) {
+                    if let Some(component) = storage.get(entity) {
+                        prefetch_read(component as *const T);
+                    }
+                }
+            }
+        }
+
+        // Collect 4 entities and components
+        let mut entities = [Entity::new(0, 0); 4];
+        let mut components: [Option<&'a T>; 4] = [None; 4];
+
+        for i in 0..4 {
+            let idx = self.current_index + i;
+            if let Some(entity) = storage.get_dense_entity(idx) {
+                entities[i] = entity;
+                components[i] = storage.get(entity);
+            }
+        }
+
+        self.current_index += 4;
+
+        // Only return if all 4 components are present
+        // This handles sparse scenarios where not all entities have the component
+        if components.iter().all(|c| c.is_some()) {
+            Some((
+                entities,
+                [
+                    components[0].unwrap(),
+                    components[1].unwrap(),
+                    components[2].unwrap(),
+                    components[3].unwrap(),
+                ],
+            ))
+        } else {
+            // Skip to next batch if current batch is incomplete
+            self.next()
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = (self.len.saturating_sub(self.current_index)) / 4;
+        (0, Some(remaining)) // Lower bound is 0 due to potential sparse data
+    }
+}
+
+/// Batch iterator that returns chunks of 8 components at a time
+///
+/// This enables AVX2 SIMD processing by providing components in groups of 8.
+/// Use this with SIMD types from engine-math (Vec3x8, etc.)
+pub struct BatchQueryIter8<'a, T: Component> {
+    storage: Option<&'a SparseSet<T>>,
+    current_index: usize,
+    len: usize,
+}
+
+impl<'a, T: Component> BatchQueryIter8<'a, T> {
+    /// Creates a new batch iterator for querying components in groups of 8.
+    /// Returns an empty iterator if the component type is not registered.
+    pub fn new(world: &'a World) -> Self {
+        let type_id = TypeId::of::<T>();
+        let (storage, len) = match world.components.get(&type_id) {
+            Some(storage_trait) => {
+                let storage = storage_trait.as_any().downcast_ref::<SparseSet<T>>().unwrap();
+                (Some(storage), storage.len())
+            }
+            None => {
+                // Return empty iterator if component not registered
+                (None, 0)
+            }
+        };
+
+        Self { storage, current_index: 0, len }
+    }
+}
+
+impl<'a, T: Component> Iterator for BatchQueryIter8<'a, T> {
+    /// Returns ([Entity; 8], [&T; 8]) for each complete batch of 8
+    type Item = ([Entity; 8], [&'a T; 8]);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        // Return None if no storage (component not registered)
+        let storage = self.storage?;
+
+        // Check if we have at least 8 remaining
+        if self.current_index + 8 > self.len {
+            return None;
+        }
+
+        // PREFETCH: Load data for next batch while processing current
+        if self.current_index + 16 <= self.len {
+            for i in 8..16 {
+                if let Some(entity) = storage.get_dense_entity(self.current_index + i) {
+                    if let Some(component) = storage.get(entity) {
+                        prefetch_read(component as *const T);
+                    }
+                }
+            }
+        }
+
+        // Collect 8 entities and components
+        let mut entities = [Entity::new(0, 0); 8];
+        let mut components: [Option<&'a T>; 8] = [None; 8];
+
+        for i in 0..8 {
+            let idx = self.current_index + i;
+            if let Some(entity) = storage.get_dense_entity(idx) {
+                entities[i] = entity;
+                components[i] = storage.get(entity);
+            }
+        }
+
+        self.current_index += 8;
+
+        // Only return if all 8 components are present
+        if components.iter().all(|c| c.is_some()) {
+            Some((
+                entities,
+                [
+                    components[0].unwrap(),
+                    components[1].unwrap(),
+                    components[2].unwrap(),
+                    components[3].unwrap(),
+                    components[4].unwrap(),
+                    components[5].unwrap(),
+                    components[6].unwrap(),
+                    components[7].unwrap(),
+                ],
+            ))
+        } else {
+            // Skip to next batch if current batch is incomplete
+            self.next()
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = (self.len.saturating_sub(self.current_index)) / 8;
+        (0, Some(remaining)) // Lower bound is 0 due to potential sparse data
+    }
+}
+
 // Add query methods to World
 impl World {
     /// Query entities with specific components
@@ -1246,6 +1499,54 @@ impl World {
     /// ```
     pub fn query_mut<Q: Query>(&mut self) -> QueryIterMut<'_, Q> {
         Q::fetch_mut(self)
+    }
+
+    /// Query entities in batches of 4 for SIMD processing
+    ///
+    /// Returns an iterator that yields chunks of 4 (Entity, Component) pairs at a time.
+    /// This is optimized for SIMD processing with Vec3x4, etc.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// # use engine_core::ecs::{World, Component};
+    /// # struct Position { x: f32, y: f32, z: f32 }
+    /// # impl Component for Position {}
+    /// # let mut world = World::new();
+    /// # world.register::<Position>();
+    /// // Process 4 positions at a time with SIMD
+    /// for (entities, positions) in world.query_batch4::<Position>() {
+    ///     // Convert to SIMD types and process
+    ///     // let pos_simd = Vec3x4::from_array_of_vec3(&positions);
+    ///     // ...
+    /// }
+    /// ```
+    pub fn query_batch4<T: Component>(&self) -> BatchQueryIter4<'_, T> {
+        BatchQueryIter4::new(self)
+    }
+
+    /// Query entities in batches of 8 for AVX2 SIMD processing
+    ///
+    /// Returns an iterator that yields chunks of 8 (Entity, Component) pairs at a time.
+    /// This is optimized for AVX2 SIMD processing with Vec3x8, etc.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// # use engine_core::ecs::{World, Component};
+    /// # struct Position { x: f32, y: f32, z: f32 }
+    /// # impl Component for Position {}
+    /// # let mut world = World::new();
+    /// # world.register::<Position>();
+    /// // Process 8 positions at a time with AVX2 SIMD
+    /// for (entities, positions) in world.query_batch8::<Position>() {
+    ///     // Convert to SIMD types and process
+    ///     // let pos_simd = Vec3x8::from_array_of_vec3(&positions);
+    ///     // ...
+    /// }
+    /// ```
+    pub fn query_batch8<T: Component>(&self) -> BatchQueryIter8<'_, T> {
+        BatchQueryIter8::new(self)
     }
 }
 

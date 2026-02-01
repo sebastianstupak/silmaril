@@ -16,10 +16,10 @@ use std::any::TypeId;
 pub enum ComponentData {
     /// Transform component
     Transform(Transform),
-    /// Velocity component
-    Velocity(Velocity),
     /// Health component
     Health(Health),
+    /// Velocity component
+    Velocity(Velocity),
     /// Mesh renderer component
     MeshRenderer(MeshRenderer),
 }
@@ -29,8 +29,8 @@ impl ComponentData {
     pub fn type_id(&self) -> TypeId {
         match self {
             Self::Transform(_) => TypeId::of::<Transform>(),
-            Self::Velocity(_) => TypeId::of::<Velocity>(),
             Self::Health(_) => TypeId::of::<Health>(),
+            Self::Velocity(_) => TypeId::of::<Velocity>(),
             Self::MeshRenderer(_) => TypeId::of::<MeshRenderer>(),
         }
     }
@@ -39,8 +39,8 @@ impl ComponentData {
     pub fn type_name(&self) -> &'static str {
         match self {
             Self::Transform(_) => "Transform",
-            Self::Velocity(_) => "Velocity",
             Self::Health(_) => "Health",
+            Self::Velocity(_) => "Velocity",
             Self::MeshRenderer(_) => "MeshRenderer",
         }
     }

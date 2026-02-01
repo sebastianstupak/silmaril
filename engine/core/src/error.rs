@@ -30,64 +30,173 @@ use std::fmt;
 #[repr(u32)]
 pub enum ErrorCode {
     // Core ECS (1000-1099)
+    /// Entity not found in the world
     EntityNotFound = 1000,
+    /// Component not found on entity
     ComponentNotFound = 1001,
+    /// Archetype not found in world storage
     ArchetypeNotFound = 1002,
+    /// Invalid entity ID provided
     InvalidEntityId = 1003,
+    /// Component already exists on entity
     ComponentAlreadyExists = 1004,
 
     // Serialization (1100-1199)
+    /// General serialization failure
     SerializationFailed = 1100,
+    /// General deserialization failure
     DeserializationFailed = 1101,
+    /// YAML serialization failed
     YamlSerializeFailed = 1102,
+    /// YAML deserialization failed
     YamlDeserializeFailed = 1103,
+    /// Bincode serialization failed
     BincodeSerializeFailed = 1104,
+    /// Bincode deserialization failed
     BincodeDeserializeFailed = 1105,
+    /// FlatBuffers serialization failed
     FlatbuffersSerializeFailed = 1106,
+    /// FlatBuffers deserialization failed
     FlatbuffersDeserializeFailed = 1107,
+    /// Invalid data format
     InvalidFormat = 1108,
+    /// Version mismatch in serialized data
     VersionMismatch = 1109,
 
     // Platform (1200-1299)
+    /// Window creation failed
     WindowCreationFailed = 1200,
+    /// Vulkan surface creation failed
     SurfaceCreationFailed = 1201,
+    /// Input system initialization failed
     InputInitFailed = 1202,
+    /// Time system initialization failed
     TimeInitFailed = 1203,
+    /// Filesystem operation failed
     FileSystemError = 1204,
+    /// Threading operation failed
     ThreadingError = 1205,
+    /// Platform not supported
     PlatformNotSupported = 1206,
 
     // Rendering (1300-1399)
+    /// Vulkan initialization failed
     VulkanInitFailed = 1300,
-    ShaderCompileFailed = 1301,
-    TextureLoadFailed = 1302,
-    MeshLoadFailed = 1303,
-    SwapchainCreationFailed = 1304,
+    /// Vulkan instance creation failed
+    InstanceCreationFailed = 1301,
+    /// No suitable GPU found
+    NoSuitableGpu = 1302,
+    /// Physical device enumeration failed
+    DeviceEnumerationFailed = 1303,
+    /// Logical device creation failed
+    LogicalDeviceCreationFailed = 1304,
+    /// Queue family not found
+    QueueFamilyNotFound = 1305,
+    /// Extension not supported
+    ExtensionNotSupported = 1306,
+    /// Validation layer not available
+    ValidationLayerNotAvailable = 1307,
+    /// Debug messenger creation failed
+    DebugMessengerCreationFailed = 1308,
+    /// Memory allocation failed
+    MemoryAllocationFailed = 1309,
+    /// Buffer creation failed
+    BufferCreationFailed = 1310,
+    /// Image creation failed
+    ImageCreationFailed = 1311,
+    /// Image view creation failed
+    ImageViewCreationFailed = 1312,
+    /// Swapchain creation failed
+    SwapchainCreationFailed = 1313,
+    /// Surface creation failed (moved from Platform)
+    SurfaceCreationFailedRenderer = 1314,
+    /// Surface capabilities query failed
+    SurfaceCapabilitiesQueryFailed = 1315,
+    /// Surface format query failed
+    SurfaceFormatQueryFailed = 1316,
+    /// Present mode query failed
+    PresentModeQueryFailed = 1317,
+    /// Command pool creation failed
+    CommandPoolCreationFailed = 1318,
+    /// Command buffer allocation failed
+    CommandBufferAllocationFailed = 1319,
+    /// Shader compilation failed
+    ShaderCompileFailed = 1320,
+    /// Shader module creation failed
+    ShaderModuleCreationFailed = 1321,
+    /// Pipeline creation failed
+    PipelineCreationFailed = 1322,
+    /// Pipeline cache creation failed
+    PipelineCacheCreationFailed = 1323,
+    /// Render pass creation failed
+    RenderPassCreationFailed = 1324,
+    /// Framebuffer creation failed
+    FramebufferCreationFailed = 1325,
+    /// Descriptor set layout creation failed
+    DescriptorSetLayoutCreationFailed = 1326,
+    /// Descriptor pool creation failed
+    DescriptorPoolCreationFailed = 1327,
+    /// Descriptor set allocation failed
+    DescriptorSetAllocationFailed = 1328,
+    /// Texture loading failed
+    TextureLoadFailed = 1329,
+    /// Mesh loading failed
+    MeshLoadFailed = 1330,
+    /// Synchronization object creation failed
+    SyncObjectCreationFailed = 1331,
+    /// GPU memory mapping failed
+    MemoryMappingFailed = 1332,
+    /// Command buffer recording failed
+    CommandBufferRecordingFailed = 1333,
+    /// Queue submission failed
+    QueueSubmissionFailed = 1334,
+    /// Present failed
+    PresentFailed = 1335,
+    /// Swapchain out of date
+    SwapchainOutOfDate = 1336,
+    /// Swapchain suboptimal
+    SwapchainSuboptimal = 1337,
+    /// Device lost
+    DeviceLost = 1338,
 
     // Networking (1400-1499)
+    /// Network connection failed
     ConnectionFailed = 1400,
+    /// Socket bind failed
     BindFailed = 1401,
+    /// Network send failed
     SendFailed = 1402,
+    /// Network receive failed
     ReceiveFailed = 1403,
+    /// Network protocol error
     ProtocolError = 1404,
 
     // Physics (1500-1599)
+    /// Physics system initialization failed
     PhysicsInitFailed = 1500,
+    /// Collision detection failed
     CollisionDetectionFailed = 1501,
 
     // Audio (1600-1699)
+    /// Audio system initialization failed
     AudioInitFailed = 1600,
+    /// Sound file load failed
     SoundLoadFailed = 1601,
 
     // LOD (1700-1799)
+    /// LOD system initialization failed
     LodInitFailed = 1700,
 
     // Interest Management (1800-1899)
+    /// Interest management initialization failed
     InterestInitFailed = 1800,
 
     // Auto-update (1900-1999)
+    /// Update check failed
     UpdateCheckFailed = 1900,
+    /// Update download failed
     UpdateDownloadFailed = 1901,
+    /// Update installation failed
     UpdateInstallFailed = 1902,
 }
 
@@ -124,8 +233,11 @@ impl fmt::Display for ErrorCode {
 /// - Critical: Failures that require engine shutdown or restart
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ErrorSeverity {
+    /// Non-fatal issues that don't prevent operation
     Warning,
+    /// Failures that prevent a specific operation but don't crash the engine
     Error,
+    /// Failures that require engine shutdown or restart
     Critical,
 }
 
@@ -166,37 +278,84 @@ pub trait EngineError: std::error::Error + Send + Sync {
     /// Get the severity level.
     fn severity(&self) -> ErrorSeverity;
 
+    /// Get the backtrace for this error, if available.
+    ///
+    /// Backtraces are only captured when the `backtrace` feature is enabled.
+    /// This provides detailed information about where the error occurred.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// if let Some(backtrace) = err.backtrace() {
+    ///     println!("Error occurred at:\n{}", backtrace);
+    /// }
+    /// ```
+    fn backtrace(&self) -> Option<&std::backtrace::Backtrace> {
+        None
+    }
+
     /// Log this error using structured logging.
     ///
     /// This method is automatically called by the error handling infrastructure.
     /// The default implementation uses `tracing` to emit structured log events.
+    /// When the `backtrace` feature is enabled, backtraces are included in logs.
     fn log(&self) {
         use tracing::{error, warn};
 
         match self.severity() {
             ErrorSeverity::Warning => {
-                warn!(
-                    error_code = %self.code(),
-                    error_message = %self,
-                    subsystem = self.code().subsystem(),
-                    "Engine warning"
-                );
+                if let Some(bt) = self.backtrace() {
+                    warn!(
+                        error_code = %self.code(),
+                        error_message = %self,
+                        subsystem = self.code().subsystem(),
+                        backtrace = %bt,
+                        "Engine warning"
+                    );
+                } else {
+                    warn!(
+                        error_code = %self.code(),
+                        error_message = %self,
+                        subsystem = self.code().subsystem(),
+                        "Engine warning"
+                    );
+                }
             }
             ErrorSeverity::Error => {
-                error!(
-                    error_code = %self.code(),
-                    error_message = %self,
-                    subsystem = self.code().subsystem(),
-                    "Engine error"
-                );
+                if let Some(bt) = self.backtrace() {
+                    error!(
+                        error_code = %self.code(),
+                        error_message = %self,
+                        subsystem = self.code().subsystem(),
+                        backtrace = %bt,
+                        "Engine error"
+                    );
+                } else {
+                    error!(
+                        error_code = %self.code(),
+                        error_message = %self,
+                        subsystem = self.code().subsystem(),
+                        "Engine error"
+                    );
+                }
             }
             ErrorSeverity::Critical => {
-                error!(
-                    error_code = %self.code(),
-                    error_message = %self,
-                    subsystem = self.code().subsystem(),
-                    "CRITICAL ENGINE ERROR"
-                );
+                if let Some(bt) = self.backtrace() {
+                    error!(
+                        error_code = %self.code(),
+                        error_message = %self,
+                        subsystem = self.code().subsystem(),
+                        backtrace = %bt,
+                        "CRITICAL ENGINE ERROR"
+                    );
+                } else {
+                    error!(
+                        error_code = %self.code(),
+                        error_message = %self,
+                        subsystem = self.code().subsystem(),
+                        "CRITICAL ENGINE ERROR"
+                    );
+                }
             }
         }
     }

@@ -7,13 +7,15 @@
 //!
 //! Run with: cargo bench --bench serialization_benches
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use engine_core::ecs::{Entity, EntityAllocator};
 use engine_core::gameplay::Health;
 use engine_core::math::Transform;
 use engine_core::physics_components::Velocity;
 use engine_core::rendering::MeshRenderer;
-use engine_core::serialization::{ComponentData, Format, Serializable, WorldState, WorldStateDelta};
-use engine_core::ecs::{Entity, EntityAllocator};
+use engine_core::serialization::{
+    ComponentData, Format, Serializable, WorldState, WorldStateDelta,
+};
 
 // Helper to create a WorldState with N entities
 fn create_world_state_with_entities(count: usize) -> WorldState {
@@ -28,10 +30,7 @@ fn create_world_state_with_entities(count: usize) -> WorldState {
         components.push(ComponentData::Transform(Transform::default()));
 
         // Add Health to all entities
-        components.push(ComponentData::Health(Health::new(
-            100.0 - (i as f32 % 100.0),
-            100.0,
-        )));
+        components.push(ComponentData::Health(Health::new(100.0 - (i as f32 % 100.0), 100.0)));
 
         // Add Velocity to half the entities
         if i % 2 == 0 {
@@ -44,10 +43,8 @@ fn create_world_state_with_entities(count: usize) -> WorldState {
 
         // Add MeshRenderer to 1/3 of entities
         if i % 3 == 0 {
-            components.push(ComponentData::MeshRenderer(MeshRenderer::new(
-                i as u64,
-                i as u64 + 1000,
-            )));
+            components
+                .push(ComponentData::MeshRenderer(MeshRenderer::new(i as u64, i as u64 + 1000)));
         }
 
         state.entities.push(engine_core::serialization::EntityMetadata {
@@ -91,10 +88,9 @@ fn bench_yaml_deserialization(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let restored = <WorldState as Serializable>::deserialize(
-                    black_box(&bytes),
-                    Format::Yaml,
-                ).unwrap();
+                let restored =
+                    <WorldState as Serializable>::deserialize(black_box(&bytes), Format::Yaml)
+                        .unwrap();
                 black_box(restored);
             });
         });
@@ -131,10 +127,9 @@ fn bench_bincode_deserialization(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let restored = <WorldState as Serializable>::deserialize(
-                    black_box(&bytes),
-                    Format::Bincode,
-                ).unwrap();
+                let restored =
+                    <WorldState as Serializable>::deserialize(black_box(&bytes), Format::Bincode)
+                        .unwrap();
                 black_box(restored);
             });
         });
@@ -152,7 +147,8 @@ fn bench_delta_compute(c: &mut Criterion) {
 
         // Modify 10% of entities
         let modifications = (size / 10).max(1);
-        let entities_to_modify: Vec<Entity> = new_state.components.keys().take(modifications).copied().collect();
+        let entities_to_modify: Vec<Entity> =
+            new_state.components.keys().take(modifications).copied().collect();
         for entity in entities_to_modify {
             if let Some(components) = new_state.components.get_mut(&entity) {
                 for comp in components.iter_mut() {
@@ -185,7 +181,8 @@ fn bench_delta_apply(c: &mut Criterion) {
 
         // Modify 10% of entities
         let modifications = (size / 10).max(1);
-        let entities_to_modify: Vec<Entity> = new_state.components.keys().take(modifications).copied().collect();
+        let entities_to_modify: Vec<Entity> =
+            new_state.components.keys().take(modifications).copied().collect();
         for entity in entities_to_modify {
             if let Some(components) = new_state.components.get_mut(&entity) {
                 for comp in components.iter_mut() {
@@ -220,9 +217,11 @@ fn bench_delta_vs_full_size(c: &mut Criterion) {
         let mut new_state = old_state.clone();
 
         // Modify specified percentage of entities
-        let modifications = (size * modification_percent) / 100;
-        for i in 0..modifications {
-            if let Some(components) = new_state.components.get_mut(&Entity { id: i as u32, generation: 0 }) {
+        let modifications = ((size * modification_percent) / 100).max(1);
+        let entities_to_modify: Vec<Entity> =
+            new_state.components.keys().take(modifications).copied().collect();
+        for entity in entities_to_modify {
+            if let Some(components) = new_state.components.get_mut(&entity) {
                 for comp in components.iter_mut() {
                     if let ComponentData::Health(ref mut health) = comp {
                         health.current -= 10.0;
@@ -243,7 +242,7 @@ fn bench_delta_vs_full_size(c: &mut Criterion) {
                     let bytes = bincode::serialize(black_box(&delta)).unwrap();
                     black_box(bytes);
                 });
-            }
+            },
         );
 
         // Print size comparison

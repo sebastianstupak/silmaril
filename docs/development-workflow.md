@@ -36,6 +36,135 @@ cargo run --release
 
 ---
 
+## 🛠️ **Setting Up Development Environment**
+
+### **Initial Setup**
+
+After cloning the repository, run the setup script to install git hooks and configure your development environment:
+
+```bash
+# From repository root
+./scripts/setup-hooks.sh
+```
+
+This script will:
+- Install pre-commit hooks for code quality checks
+- Verify optional development tools are installed
+- Configure your local git repository
+
+### **Pre-commit Hooks**
+
+Pre-commit hooks automatically run before each commit to ensure code quality. They check:
+
+1. **Code Formatting** - Ensures code follows Rust style guidelines
+   ```bash
+   cargo fmt --check
+   ```
+
+2. **Linting** - Catches common mistakes and enforces best practices
+   ```bash
+   cargo clippy --all-targets -- -D warnings
+   ```
+
+3. **Unit Tests** - Verifies basic functionality still works
+   ```bash
+   cargo test --lib
+   ```
+
+4. **Dependency Checks** - Ensures no banned dependencies (requires `cargo-deny`)
+   ```bash
+   cargo deny check bans
+   ```
+
+5. **Common Issues** - Detects patterns that violate project standards:
+   - `println!`/`eprintln!`/`dbg!` usage (use `tracing` instead)
+   - `anyhow::Result` usage (use custom error types)
+   - `Box<dyn Error>` usage (use custom error types)
+
+### **Manual Hook Execution**
+
+To run pre-commit checks manually without committing:
+
+```bash
+.git/hooks/pre-commit
+```
+
+### **Bypassing Hooks** (Not Recommended)
+
+In rare cases where you need to commit without running hooks:
+
+```bash
+git commit --no-verify
+```
+
+**Warning:** Only use this for work-in-progress commits on feature branches. Never bypass hooks on main branch commits.
+
+### **Optional Development Tools**
+
+Install these tools for enhanced development experience:
+
+```bash
+# Dependency auditing and policy enforcement
+cargo install cargo-deny
+
+# Auto-rebuild on file changes (hot reload)
+cargo install cargo-watch
+
+# CPU profiling with flamegraphs
+cargo install flamegraph
+
+# Code coverage
+cargo install cargo-tarpaulin
+```
+
+### **IDE Setup**
+
+#### **VS Code**
+
+Recommended extensions:
+- `rust-analyzer` - Rust language support
+- `CodeLLDB` - Debugging
+- `crates` - Dependency management
+- `Better TOML` - TOML syntax highlighting
+
+Settings (`.vscode/settings.json`):
+```json
+{
+  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.cargo.features": "all",
+  "editor.formatOnSave": true
+}
+```
+
+#### **IntelliJ IDEA / CLion**
+
+- Install Rust plugin
+- Enable "Run clippy on save"
+- Enable "Format on save"
+
+### **Environment Variables**
+
+For development, set these environment variables:
+
+```bash
+# Verbose logging
+export RUST_LOG=debug
+
+# Backtrace on panic
+export RUST_BACKTRACE=1
+
+# Enable Vulkan validation layers
+export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d  # Linux
+# Windows: set VK_LAYER_PATH=C:\VulkanSDK\Bin
+
+# Tracy profiling
+export TRACY_ENABLE=1
+```
+
+Add to your shell profile (`.bashrc`, `.zshrc`, etc.) for persistence.
+
+---
+
 ## 🔄 **Daily Development Loop**
 
 ### **1. Start Dev Environment**

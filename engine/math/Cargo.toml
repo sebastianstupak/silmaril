@@ -1,0 +1,47 @@
+[package]
+name = "engine-math"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+glam = { version = "0.29", features = ["bytemuck", "serde", "fast-math"] }
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+# SIMD support
+wide = "0.7"  # Portable SIMD library
+
+[features]
+default = []
+serde = ["dep:serde", "glam/serde"]
+simd = []
+
+[dev-dependencies]
+criterion = "0.5"
+
+[build-dependencies]
+engine-build-utils = { path = "../build-utils" }
+
+[[bench]]
+name = "vec3_benches"
+harness = false
+
+[[bench]]
+name = "simd_benches"
+harness = false
+required-features = ["simd"]
+
+[[bench]]
+name = "aligned_benches"
+harness = false
+required-features = ["simd"]
+
+[[bench]]
+name = "transform_benches"
+harness = false
+
+# Note: Profile configurations are defined in workspace root Cargo.toml
+# For best SIMD performance, compile with: RUSTFLAGS="-C target-cpu=native"
+# This enables all CPU features (SSE4.2, FMA, AVX2, etc.) available on your machine

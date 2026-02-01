@@ -1,8 +1,10 @@
 [package]
 name = "engine-interest"
-version = "0.1.0"
-edition = "2021"
-authors = ["Agent Game Engine Team"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 engine-core = { path = "../core" }

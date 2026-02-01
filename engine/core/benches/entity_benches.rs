@@ -99,31 +99,23 @@ fn bench_allocate_batch_vs_loop(c: &mut Criterion) {
     let mut group = c.benchmark_group("batch_vs_loop");
 
     for count in [100, 1_000, 10_000].iter() {
-        group.bench_with_input(
-            BenchmarkId::new("batch", count),
-            count,
-            |b, &count| {
-                b.iter(|| {
-                    let mut alloc = EntityAllocator::new();
-                    black_box(alloc.allocate_batch(count));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("batch", count), count, |b, &count| {
+            b.iter(|| {
+                let mut alloc = EntityAllocator::new();
+                black_box(alloc.allocate_batch(count));
+            });
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("loop", count),
-            count,
-            |b, &count| {
-                b.iter(|| {
-                    let mut alloc = EntityAllocator::new();
-                    let mut entities = Vec::with_capacity(count);
-                    for _ in 0..count {
-                        entities.push(alloc.allocate());
-                    }
-                    black_box(entities);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("loop", count), count, |b, &count| {
+            b.iter(|| {
+                let mut alloc = EntityAllocator::new();
+                let mut entities = Vec::with_capacity(count);
+                for _ in 0..count {
+                    entities.push(alloc.allocate());
+                }
+                black_box(entities);
+            });
+        });
     }
 
     group.finish();

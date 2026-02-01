@@ -25,6 +25,7 @@ Build a **fully automatable game engine** optimized for AI agent workflows with:
 - **Error Handling** → [docs/error-handling.md](docs/error-handling.md) ⚠️ MANDATORY
 - **Platform-Specific Code** → [docs/platform-abstraction.md](docs/platform-abstraction.md) ⚠️ MANDATORY
 - **Testing** → [docs/testing-strategy.md](docs/testing-strategy.md) ⚠️ MANDATORY
+- **Profiling & Performance** → [docs/profiling.md](docs/profiling.md) ⚠️ MANDATORY
 
 - **ECS System** → [docs/ecs.md](docs/ecs.md)
 - **Networking** → [docs/networking.md](docs/networking.md)
@@ -34,6 +35,7 @@ Build a **fully automatable game engine** optimized for AI agent workflows with:
 - **LOD System** → [docs/lod.md](docs/lod.md)
 - **Interest Management** → [docs/interest-management.md](docs/interest-management.md)
 
+- **Profiling & Observability** → [docs/profiling.md](docs/profiling.md)
 - **Performance** → [docs/performance-targets.md](docs/performance-targets.md)
 - **Architecture** → [docs/architecture.md](docs/architecture.md)
 - **Dev Workflow** → [docs/development-workflow.md](docs/development-workflow.md)
@@ -153,7 +155,39 @@ fn apply_damage(world: &mut World, target: Entity, damage: f32) {
 
 ---
 
-### **5. Testing - All Types Required**
+### **5. Profiling - Instrument Performance-Critical Code**
+
+```rust
+use engine_profiling::{profile_scope, ProfileCategory};
+
+// ❌ FORBIDDEN - Performance-critical code without profiling
+fn expensive_physics_loop() {
+    for entity in entities {
+        // Can't measure if this is slow!
+    }
+}
+
+// ✅ CORRECT - Instrument to enable performance validation
+#[profile(category = "Physics")]
+fn expensive_physics_loop() {
+    profile_scope!("physics_loop");
+    for entity in entities {
+        // Now we can measure and optimize
+    }
+}
+```
+
+**Key Rules:**
+- Instrument ALL performance-critical paths (systems, queries, rendering)
+- Use appropriate categories (ECS, Rendering, Physics, Networking, etc.)
+- Don't over-instrument (not every getter/setter)
+- Profiling compiles to nothing in release builds (zero cost)
+
+**See:** [docs/profiling.md](docs/profiling.md) for complete profiling architecture
+
+---
+
+### **6. Testing - All Types Required**
 
 Every feature MUST include:
 - **Unit tests** (in same file or `tests/` module)
@@ -198,7 +232,7 @@ mod proptests {
 
 ---
 
-### **6. Performance - Industry Standards**
+### **7. Performance - Industry Standards**
 
 All code must meet these targets:
 
@@ -212,9 +246,11 @@ All code must meet these targets:
 
 **See:** [docs/performance-targets.md](docs/performance-targets.md)
 
+**Validation:** Use profiling infrastructure (Phase 0) to verify all targets
+
 ---
 
-### **7. Code Organization - Vertical Slices**
+### **8. Code Organization - Vertical Slices**
 
 Each crate/module must be:
 - **< 1000 lines** in main lib.rs

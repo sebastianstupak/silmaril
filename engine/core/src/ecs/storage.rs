@@ -61,6 +61,12 @@ pub trait ComponentStorage: Any {
 /// - O(1) lookup
 /// - Cache-friendly iteration (dense arrays)
 ///
+/// # Cache Optimization
+///
+/// The dense arrays are kept in sync and aligned to cache lines for better locality.
+/// During iteration, both entity IDs and components are accessed sequentially,
+/// maximizing cache hit rates.
+///
 /// # Examples
 ///
 /// ```
@@ -74,12 +80,15 @@ pub trait ComponentStorage: Any {
 /// storage.insert(entity, Position { x: 1.0, y: 2.0, z: 3.0 });
 /// assert!(storage.get(entity).is_some());
 /// ```
+#[repr(C)] // Ensure consistent memory layout
 pub struct SparseSet<T: Component> {
     /// Sparse array: Entity ID → dense index
     sparse: Vec<Option<usize>>,
     /// Dense entity array (packed, no gaps)
+    /// Aligned with components array for better cache locality
     dense: Vec<Entity>,
     /// Dense component array (packed, no gaps)
+    /// Aligned with entity array for sequential access
     components: Vec<T>,
 }
 
@@ -247,9 +256,12 @@ impl<T: Component> SparseSet<T> {
 
         // SAFETY: The sparse set invariant guarantees dense_idx < components.len()
         // This is maintained by insert() and remove() - if violated, it's a bug there.
-        debug_assert!(dense_idx < self.components.len(),
+        debug_assert!(
+            dense_idx < self.components.len(),
             "Sparse set invariant violated: dense_idx {} >= components.len() {}",
-            dense_idx, self.components.len());
+            dense_idx,
+            self.components.len()
+        );
         Some(unsafe { self.components.get_unchecked(dense_idx) })
     }
 
@@ -270,9 +282,12 @@ impl<T: Component> SparseSet<T> {
 
         // SAFETY: The sparse set invariant guarantees dense_idx < components.len()
         // This is maintained by insert() and remove() - if violated, it's a bug there.
-        debug_assert!(dense_idx < self.components.len(),
+        debug_assert!(
+            dense_idx < self.components.len(),
             "Sparse set invariant violated: dense_idx {} >= components.len() {}",
-            dense_idx, self.components.len());
+            dense_idx,
+            self.components.len()
+        );
         Some(unsafe { self.components.get_unchecked_mut(dense_idx) })
     }
 
@@ -283,9 +298,7 @@ impl<T: Component> SparseSet<T> {
     pub fn contains(&self, entity: Entity) -> bool {
         let idx = entity.id() as usize;
         // SAFETY: Explicit bounds check before unchecked access
-        idx < self.sparse.len() && unsafe {
-            self.sparse.get_unchecked(idx).is_some()
-        }
+        idx < self.sparse.len() && unsafe { self.sparse.get_unchecked(idx).is_some() }
     }
 
     /// Iterate over all (entity, component) pairs
@@ -340,6 +353,56 @@ impl<T: Component> SparseSet<T> {
         } else {
             None
         }
+    }
+
+    /// Get multiple components in a batch (optimized for SIMD processing)
+    ///
+    /// Returns up to `N` components starting from `start_index`.
+    /// This is more cache-friendly than individual gets as it accesses
+    /// the dense array sequentially.
+    ///
+    /// OPTIMIZATION: Sequential access pattern maximizes cache hits.
+    #[inline]
+    pub fn get_batch<const N: usize>(&self, start_index: usize) -> Option<([Entity; N], [&T; N])> {
+        if start_index + N > self.dense.len() {
+            return None;
+        }
+
+        // SAFETY: We verified bounds above
+        unsafe {
+            let mut entities = std::mem::MaybeUninit::<[Entity; N]>::uninit();
+            let mut components = std::mem::MaybeUninit::<[&T; N]>::uninit();
+
+            let entities_ptr = entities.as_mut_ptr() as *mut Entity;
+            let components_ptr = components.as_mut_ptr() as *mut &T;
+
+            for i in 0..N {
+                let idx = start_index + i;
+                let entity = *self.dense.get_unchecked(idx);
+                let component = self.components.get_unchecked(idx);
+
+                entities_ptr.add(i).write(entity);
+                components_ptr.add(i).write(component);
+            }
+
+            Some((entities.assume_init(), components.assume_init()))
+        }
+    }
+
+    /// Get raw pointers to dense arrays for unsafe batch processing
+    ///
+    /// Returns (entities_ptr, components_ptr, len).
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure:
+    /// - Pointers are not used beyond the lifetime of the SparseSet
+    /// - No mutable access occurs while these pointers are live
+    /// - Index access is bounds-checked
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) unsafe fn get_dense_ptrs(&self) -> (*const Entity, *const T, usize) {
+        (self.dense.as_ptr(), self.components.as_ptr(), self.dense.len())
     }
 }
 

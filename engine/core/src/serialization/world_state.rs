@@ -1,6 +1,6 @@
 //! WorldState snapshot and restoration
 
-use super::{ComponentData, Format, SerializationError, Serializable};
+use super::{ComponentData, Format, Serializable, SerializationError};
 use crate::ecs::{Entity, World};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -149,23 +149,14 @@ impl Default for WorldState {
 impl Serializable for WorldState {
     fn serialize(&self, format: Format) -> Result<Vec<u8>, SerializationError> {
         match format {
-            Format::Yaml => {
-                serde_yaml::to_string(self)
-                    .map(|s| s.into_bytes())
-                    .map_err(|e| SerializationError::YamlSerialize {
-                        details: e.to_string(),
-                    })
-            }
-            Format::Bincode => {
-                bincode::serialize(self).map_err(|e| SerializationError::BincodeSerialize {
-                    details: e.to_string(),
-                })
-            }
+            Format::Yaml => serde_yaml::to_string(self)
+                .map(|s| s.into_bytes())
+                .map_err(|e| SerializationError::yamlserialize(e.to_string())),
+            Format::Bincode => bincode::serialize(self)
+                .map_err(|e| SerializationError::bincodeserialize(e.to_string())),
             Format::FlatBuffers => {
                 // FlatBuffers implementation will be added in the next step
-                Err(SerializationError::FlatBuffersSerialize {
-                    details: "Not yet implemented".to_string(),
-                })
+                Err(SerializationError::flatbuffersserialize("Not yet implemented".to_string()))
             }
         }
     }
@@ -173,27 +164,16 @@ impl Serializable for WorldState {
     fn deserialize(data: &[u8], format: Format) -> Result<Self, SerializationError> {
         match format {
             Format::Yaml => {
-                let s = std::str::from_utf8(data).map_err(|e| {
-                    SerializationError::Utf8Error {
-                        details: e.to_string(),
-                    }
-                })?;
-                serde_yaml::from_str(s).map_err(|e| SerializationError::YamlDeserialize {
-                    details: e.to_string(),
-                })
+                let s = std::str::from_utf8(data)
+                    .map_err(|e| SerializationError::utf8error(e.to_string()))?;
+                serde_yaml::from_str(s)
+                    .map_err(|e| SerializationError::yamldeserialize(e.to_string()))
             }
-            Format::Bincode => {
-                bincode::deserialize(data).map_err(|e| {
-                    SerializationError::BincodeDeserialize {
-                        details: e.to_string(),
-                    }
-                })
-            }
+            Format::Bincode => bincode::deserialize(data)
+                .map_err(|e| SerializationError::bincodedeserialize(e.to_string())),
             Format::FlatBuffers => {
                 // FlatBuffers implementation will be added in the next step
-                Err(SerializationError::FlatBuffersDeserialize {
-                    details: "Not yet implemented".to_string(),
-                })
+                Err(SerializationError::flatbuffersdeserialize("Not yet implemented".to_string()))
             }
         }
     }

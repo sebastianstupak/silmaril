@@ -1,13 +1,12 @@
-//! Engine Physics
+//! Physics module for the agent game engine.
 //!
-//! Provides physics simulation:
-//! - Rigid body dynamics
-//! - Collision detection
-//! - Raycasting
-//! - Character controller
-//!
-//! This crate is a placeholder. Implementation will follow Phase 3 tasks.
+//! Integrates Rapier physics engine with ECS and provides SIMD-optimized systems.
 
 #![warn(missing_docs)]
 
-// TODO: Implement based on docs/tasks/phase3-physics.md
+pub mod components;
+pub mod systems;
+
+// Re-exports
+pub use components::Velocity;
+pub use systems::{physics_integration_system, physics_integration_system_simd};

@@ -1,0 +1,22 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling serde_core v1.0.228
+error: could not write output to D:\dev\agent-game-engine\target\release\build\serde_core-0a786f2d86d255e0\build_script_build-0a786f2d86d255e0.a0f3omm314zv35ka0yl7zc9qu.rcgu.o: permission denied
+
+error: could not compile `serde_core` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: linking with `link.exe` failed: exit code: 1104
+  |
+  = note: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe" "/NOLOGO" "C:\\Users\\sebas\\AppData\\Local\\Temp\\rustceNHpGr\\symbols.o" "<2 object files omitted>" "<sysroot>\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib/{libstd-*,libpanic_unwind-*,libcfg_if-*,libwindows_targets-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libunwind-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "kernel32.lib" "kernel32.lib" "kernel32.lib" "ntdll.lib" "userenv.lib" "ws2_32.lib" "dbghelp.lib" "/defaultlib:msvcrt" "/NXCOMPAT" "/OUT:D:\\dev\\agent-game-engine\\target\\release\\build\\quote-a749e545682ffd59\\build_script_build-a749e545682ffd59.exe" "/OPT:REF,NOICF" "/DEBUG" "/PDBALTPATH:%_PDB%" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\intrinsic.natvis" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\liballoc.natvis" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\libcore.natvis" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\libstd.natvis"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: LINK : fatal error LNK1104: cannot open file 'D:\dev\agent-game-engine\target\release\build\quote-a749e545682ffd59\build_script_build-a749e545682ffd59.exe'␍
+          
+
+error: could not compile `quote` (build script) due to 1 previous error

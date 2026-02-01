@@ -21,18 +21,20 @@ Build a fully automatable game engine optimized for AI agents with:
 
 | Phase | Duration | Key Deliverables | Status |
 |-------|----------|------------------|--------|
-| **Phase 0** | 1 week | Documentation, project structure | 🟢 In Progress |
+| **Phase 0** | 2-3 weeks | Documentation, project structure, **profiling** | 🟢 In Progress |
 | **Phase 1** | 3-4 weeks | Core ECS + Basic Rendering | ⚪ Not Started |
 | **Phase 2** | 3-4 weeks | Networking + Client/Server | ⚪ Not Started |
 | **Phase 3** | 3-4 weeks | Physics + Audio + LOD | ⚪ Not Started |
 | **Phase 4** | 2-3 weeks | Polish + Production Features | ⚪ Not Started |
 | **Phase 5** | 2-3 weeks | Examples + Documentation | ⚪ Not Started |
 
-**Total Estimated Time:** 13-19 weeks (3-5 months)
+**Total Estimated Time:** 14-21 weeks (3.5-5 months)
+
+**Key Change:** Profiling infrastructure moved from Phase 4 to Phase 0. This enables performance validation from day one.
 
 ---
 
-## 📋 **Phase 0: Documentation & Foundation** (Week 1)
+## 📋 **Phase 0: Documentation & Foundation** (Weeks 1-3)
 
 **Status:** 🟢 In Progress
 
@@ -41,6 +43,7 @@ Build a fully automatable game engine optimized for AI agents with:
 - Set up repository structure
 - Configure CI/CD for all platforms
 - Establish development workflow
+- **Implement profiling infrastructure for performance validation**
 
 ### **Tasks**
 
@@ -85,16 +88,39 @@ Build a fully automatable game engine optimized for AI agents with:
 - [ ] docker-compose.dev.yml
 - [ ] VSCode settings.json (recommended extensions)
 
+#### **0.5 Profiling Infrastructure** ⚠️ **MUST READ:** [docs/tasks/phase0-profiling.md](docs/tasks/phase0-profiling.md)
+- [ ] Core profiling infrastructure (macros, API)
+- [ ] Puffin integration (primary profiler)
+- [ ] Tracy integration (optional, advanced)
+- [ ] AI agent feedback metrics
+- [ ] Query API for programmatic access
+- [ ] Configuration system (YAML + env vars)
+- [ ] Performance budget warnings
+- [ ] CI benchmark regression detection
+- [ ] Integration with engine-core
+- [ ] Documentation and examples
+
+**Time Estimate:** 8.5-9.5 days (~2 weeks)
+
+**Rationale:** Profiling infrastructure MUST be in Phase 0 to enable performance validation throughout all later phases. You can't fix what you don't measure. This enables:
+- Validating Phase 1 ECS performance targets in real-time
+- Profiling rendering performance as it's built
+- Catching performance regressions immediately
+- AI agent feedback loops from day one
+
 **Deliverables:**
 - ✅ Complete documentation structure
 - ✅ CI/CD passing on all Tier 1 platforms
 - ✅ Dev environment working locally
+- ✅ Profiling infrastructure ready (zero overhead in release)
 
 ---
 
-## 🏗️ **Phase 1: Core ECS + Basic Rendering** (Weeks 2-5)
+## 🏗️ **Phase 1: Core ECS + Basic Rendering** (Weeks 4-8)
 
 **Status:** ⚪ Not Started
+
+**Prerequisites:** Phase 0 profiling infrastructure must be complete
 
 ### **Goals**
 - Custom ECS with full query support
@@ -102,6 +128,7 @@ Build a fully automatable game engine optimized for AI agents with:
 - Cross-platform window management
 - Offscreen frame capture for agent feedback
 - Simple Transform + MeshRenderer components
+- **Validate all performance targets using Phase 0 profiling**
 
 ### **Tasks**
 
@@ -430,10 +457,11 @@ Build a fully automatable game engine optimized for AI agents with:
 ### **Goals**
 - Auto-update system
 - Advanced rendering (PBR, lighting, shadows)
-- Performance profiling integration
-- Production-ready logging
+- **Advanced profiling features** (GPU profiling, graphical UI)
 - Save/load system
 - Hot-reload for dev
+
+**Note:** Basic profiling infrastructure completed in Phase 0. This phase adds GPU profiling and graphical profiling UI.
 
 ### **Tasks**
 
@@ -465,14 +493,17 @@ Build a fully automatable game engine optimized for AI agents with:
 
 **Time Estimate:** 5-7 days
 
-#### **4.4 Tracy Profiling** ⚠️ **MUST READ:** [docs/tasks/phase4-profiling-integration.md](docs/tasks/phase4-profiling-integration.md)
-- [ ] Tracy integration
-- [ ] #[instrument] macro usage
-- [ ] Frame markers
-- [ ] GPU profiling zones
-- [ ] Documentation
+#### **4.4 Advanced Profiling Features** ⚠️ **MUST READ:** [docs/tasks/phase4-advanced-profiling.md](docs/tasks/phase4-advanced-profiling.md)
+- [ ] GPU profiling (Vulkan timestamp queries)
+- [ ] GPU memory profiling
+- [ ] Graphical profiling UI (in-engine timeline view)
+- [ ] Flamegraph visualization
+- [ ] Thread visualization timeline
+- [ ] Integration with existing Phase 0 profiling
 
-**Time Estimate:** 2-3 days
+**Time Estimate:** 4-5 days
+
+**Note:** CPU profiling infrastructure completed in Phase 0. This adds GPU-specific profiling and visual UI.
 
 #### **4.5 Hot-Reload Dev Environment** ⚠️ **MUST READ:** [docs/tasks/phase4-hot-reload.md](docs/tasks/phase4-hot-reload.md)
 - [ ] File watcher (notify crate)

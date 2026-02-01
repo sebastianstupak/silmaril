@@ -1,8 +1,10 @@
 [package]
 name = "engine-core"
-version = "0.1.0"
-edition = "2021"
-authors = ["Agent Game Engine Team"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
 [dependencies]
 rayon = "1.8"
@@ -12,12 +14,34 @@ serde_yaml = "0.9"
 bincode = "1.3"
 flatbuffers = "24.3"
 tracing = "0.1"
+engine-macros = { path = "../macros" }
+engine-math = { path = "../math", features = ["serde", "simd"] }
+
+# Platform abstractions
+winit = { version = "0.29", optional = true }
+raw-window-handle = { version = "0.6", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["profileapi", "synchapi", "processthreadsapi", "winbase"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.25"
+core-foundation = "0.9"
+
+[features]
+default = []
+window = ["winit", "raw-window-handle"]
+backtrace = []
 
 [build-dependencies]
-flatc-rust = "0.2"
+engine-build-utils = { path = "../build-utils" }
 
 [dev-dependencies]
 criterion = "0.5"
+proptest = "1.4"
 
 [[bench]]
 name = "ecs_benchmarks"
@@ -45,4 +69,16 @@ harness = false
 
 [[bench]]
 name = "serialization_benches"
+harness = false
+
+[[bench]]
+name = "platform_benches"
+harness = false
+
+[[bench]]
+name = "cache_benches"
+harness = false
+
+[[bench]]
+name = "world_benches"
 harness = false

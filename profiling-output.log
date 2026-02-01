@@ -1,0 +1,9 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+   Compiling engine-core v0.1.0 (D:\dev\agent-game-engine\engine\core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 09s
+Error: could not find dtrace and could not profile using blondie: NotAnAdmin

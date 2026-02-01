@@ -103,11 +103,44 @@ cargo fmt
 # Check format
 cargo fmt --check
 
-# Clippy (deny warnings)
-cargo clippy -- -D warnings
+# Clippy with strict lints (deny warnings + pedantic mode)
+cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic
 ```
 
 **CI blocks merge if formatting or clippy fails.**
+
+### **Workspace Lints**
+
+The workspace `Cargo.toml` defines strict clippy lints that apply to all crates:
+
+```toml
+[workspace.lints.clippy]
+# Deny correctness and suspicious lints - these indicate bugs
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+
+# Warn on performance issues
+perf = { level = "warn", priority = -1 }
+
+# Warn on pedantic lints - code quality and style
+pedantic = { level = "warn", priority = -1 }
+
+# Specific important lints
+missing_docs = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+```
+
+**Key lint categories:**
+- **`correctness`**: Lints that detect likely bugs (e.g., wrong method calls, logic errors)
+- **`suspicious`**: Lints for code that looks incorrect (e.g., suspicious patterns)
+- **`perf`**: Performance-related issues (e.g., unnecessary allocations)
+- **`pedantic`**: Strict code quality checks (e.g., missing docs, verbose code)
+
+**Specific enforced lints:**
+- **`missing_docs`**: Warn on public items without documentation
+- **`unwrap_used`**: Warn on `.unwrap()` calls (prefer proper error handling)
+- **`expect_used`**: Warn on `.expect()` calls (prefer proper error handling)
 
 ---
 

@@ -1,0 +1,109 @@
+# cargo-deny configuration for agent-game-engine
+# Enforces architectural rules at dependency level
+# Run with: cargo deny check
+#
+# Documentation: https://embarkstudios.github.io/cargo-deny/
+
+# This section is considered when running `cargo deny check advisories`
+# Check for security vulnerabilities in dependencies
+[advisories]
+# The url(s) of the advisory databases to use
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+# A list of advisory IDs to ignore
+ignore = [
+    # Add specific advisories here if needed
+    # Unmaintained crates - will address in future work
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1.3.3 - will migrate to rkyv in Phase 2" },
+    { id = "RUSTSEC-2024-0436", reason = "paste - indirect dependency via physics crate" },
+    { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile - indirect dependency via reqwest" },
+]
+
+# This section is considered when running `cargo deny check licenses`
+[licenses]
+# We use Apache-2.0, be permissive with dependencies
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",               # Symphonia audio library
+    "Unicode-3.0",           # ICU library
+    "Unicode-DFS-2016",
+    "0BSD",
+]
+
+# The confidence threshold for detecting a license from license text
+confidence-threshold = 0.8
+
+# Allow 1 or more licenses on a per-crate basis
+exceptions = [
+    # ring uses a custom license but is widely accepted in the Rust ecosystem
+    { allow = ["OpenSSL"], crate = "ring" },
+]
+
+# Some crates don't have (easily) machine readable licensing information
+[[licenses.clarify]]
+crate = "ring"
+expression = "OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+# This section is considered when running `cargo deny check bans`
+# ARCHITECTURAL ENFORCEMENT via dependency bans
+[bans]
+# Lint level for when multiple versions of the same crate are detected
+multiple-versions = "warn"
+
+# Lint level for when a crate version requirement is `*`
+wildcards = "allow"
+
+# The graph highlighting used when creating dotgraphs for crates with multiple versions
+highlight = "all"
+
+# List of crates to deny - CRITICAL: These bans enforce CLAUDE.md architectural rules
+deny = [
+    # BAN: anyhow in engine crates (examples/dev-tools can use it)
+    # REASON: CLAUDE.md mandates custom error types via define_error! macro
+    # See: docs/error-handling.md
+    { crate = "anyhow", wrappers = ["engine-core", "engine-renderer", "engine-networking", "engine-physics", "engine-audio", "engine-lod", "engine-interest", "engine-auto-update", "engine-observability", "engine-macros"] },
+    # BAN: openssl (use rustls instead for better cross-platform support)
+    { crate = "openssl", reason = "Use rustls for better cross-platform support and security" },
+    { crate = "openssl-sys", reason = "Use rustls for better cross-platform support and security" },
+]
+
+# List of crates that are allowed despite multiple versions
+# These are commonly duplicated and generally harmless
+skip = [
+    # Windows ecosystem crates often have version conflicts
+    { crate = "windows-sys", reason = "Different versions from winit/ash/etc - unavoidable" },
+    { crate = "windows_x86_64_msvc", reason = "Windows target support" },
+    { crate = "windows_aarch64_msvc", reason = "Windows ARM support" },
+
+    # Proc macro crates
+    { crate = "syn", reason = "Macro crates often need different versions" },
+    { crate = "quote", reason = "Macro crates often need different versions" },
+    { crate = "proc-macro2", reason = "Macro crates often need different versions" },
+
+    # Very stable crates where duplicates are harmless
+    { crate = "bitflags", reason = "Very stable API, duplicates are harmless" },
+    { crate = "autocfg", reason = "Build-time only, duplicates are harmless" },
+]
+
+# This section is considered when running `cargo deny check sources`
+[sources]
+# Lint level for what to happen when a crate from a git repository is encountered
+unknown-git = "warn"
+
+# Lint level for what to happen when a crate from a crate registry that is not in the allow list is encountered
+unknown-registry = "warn"
+
+# List of URLs for allowed crate registries
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+# No git dependencies allowed (use crates.io)
+allow-git = []

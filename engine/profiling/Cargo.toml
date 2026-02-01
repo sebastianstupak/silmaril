@@ -1,0 +1,50 @@
+[package]
+name = "agent-game-engine-profiling"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Workspace dependencies
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+# Optional profiling backends
+puffin = { version = "0.19", optional = true }
+
+# For configuration
+serde = { workspace = true, optional = true }
+serde_json = { version = "1.0", optional = true }
+serde_yaml = { version = "0.9", optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
+
+[features]
+default = []
+
+# Profiling features (mutually exclusive backends)
+profiling-puffin = ["puffin"]
+
+# Metrics always available (lightweight)
+metrics = []
+
+# Configuration support
+config = ["serde", "serde_json", "serde_yaml"]
+
+# Backtrace support
+backtrace = []
+
+[lib]
+name = "agent_game_engine_profiling"
+path = "src/lib.rs"
+
+[[bench]]
+name = "profiling_overhead"
+harness = false
+
+[lints]
+workspace = true
