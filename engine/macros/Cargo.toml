@@ -18,6 +18,10 @@ proc-macro2 = "1.0"
 # Optional backtrace support (passed through from engine-core)
 backtrace = []
 
+# Client/server features for testing macros
+client = []
+server = []
+
 [dev-dependencies]
 trybuild = "1.0"
 engine-core = { path = "../core" }

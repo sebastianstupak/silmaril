@@ -105,6 +105,14 @@ baselines/
 # Benchmark data files
 *.bench
 benchmark_*.json
+benchmark_*.txt
+bench_*.txt
+*_bench.txt
+*_bench_*.txt
+
+# Test result files
+test_results*.txt
+*_results.txt
 
 # CI/CD artifacts
 # Build and test artifacts from CI
