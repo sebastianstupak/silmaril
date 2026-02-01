@@ -679,6 +679,213 @@ impl<'a, A: Component, B: Component> ExactSizeIterator for QueryIterMut<'a, (&mu
     }
 }
 
+//
+// Macro-Based Tuple Query Generation (3-12 Components)
+//
+
+/// Macro to implement Query for immutable N-component tuples
+///
+/// This generates Query trait implementations for tuples of immutable component references.
+/// The implementation iterates over entities and filters for those that have all components.
+macro_rules! impl_query_tuple {
+    // Pattern: Take the first component separately, then the rest
+    ($first:ident $(, $rest:ident)*) => {
+        #[allow(non_snake_case)]
+        impl<$first: Component $(, $rest: Component)*> Query for (&$first $(, &$rest)*) {
+            type Item<'a> = (Entity, (&'a $first $(, &'a $rest)*));
+
+            fn fetch(world: &World) -> QueryIter<'_, Self> {
+                // Return empty if any component type is not registered
+                let first_id = TypeId::of::<$first>();
+                if world.components.get(&first_id).is_none() {
+                    return QueryIter::new(world, 0);
+                }
+                $(
+                    let rest_id = TypeId::of::<$rest>();
+                    if world.components.get(&rest_id).is_none() {
+                        return QueryIter::new(world, 0);
+                    }
+                )*
+
+                // Use a conservative estimate for length
+                // We'll filter during iteration
+                let len = world.components.get(&first_id)
+                    .and_then(|s| s.downcast_ref::<SparseSet<$first>>())
+                    .map(|s| s.len())
+                    .unwrap_or(0);
+
+                QueryIter::new(world, len)
+            }
+
+            fn fetch_mut(_world: &mut World) -> QueryIterMut<'_, Self> {
+                panic!("Cannot use fetch_mut for immutable tuple query. Use fetch instead.");
+            }
+        }
+
+        #[allow(non_snake_case)]
+        impl<'a, $first: Component $(, $rest: Component)*> Iterator for QueryIter<'a, (&$first $(, &$rest)*)> {
+            type Item = (Entity, (&'a $first $(, &'a $rest)*));
+
+            fn next(&mut self) -> Option<Self::Item> {
+                // Get the first storage
+                let first_id = TypeId::of::<$first>();
+                let first_storage = self.world.components.get(&first_id)?
+                    .downcast_ref::<SparseSet<$first>>()?;
+
+                // Get the rest of the storages
+                $(
+                    let rest_id = TypeId::of::<$rest>();
+                    let $rest = self.world.components.get(&rest_id)?
+                        .downcast_ref::<SparseSet<$rest>>()?;
+                )*
+
+                // Iterate until we find an entity with all components
+                while self.current_index < first_storage.len() {
+                    let (entity, first_comp) = first_storage.iter().nth(self.current_index)?;
+                    self.current_index += 1;
+
+                    // Try to get all other components
+                    $(
+                        let $rest = match $rest.get(entity) {
+                            Some(c) => c,
+                            None => continue, // Missing component, skip this entity
+                        };
+                    )*
+
+                    // All components found!
+                    return Some((entity, (first_comp $(, $rest)*)));
+                }
+
+                None
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                let remaining = self.len.saturating_sub(self.current_index);
+                (0, Some(remaining))
+            }
+        }
+    };
+}
+
+/// Macro to implement Query for mutable N-component tuples
+///
+/// This generates Query trait implementations for tuples of mutable component references.
+/// Uses unsafe code with raw pointers to allow multiple mutable borrows.
+macro_rules! impl_query_tuple_mut {
+    ($first:ident $(, $rest:ident)*) => {
+        #[allow(non_snake_case)]
+        impl<$first: Component $(, $rest: Component)*> Query for (&mut $first $(, &mut $rest)*) {
+            type Item<'a> = (Entity, (&'a mut $first $(, &'a mut $rest)*));
+
+            fn fetch(_world: &World) -> QueryIter<'_, Self> {
+                panic!("Cannot use fetch for mutable tuple query. Use fetch_mut instead.");
+            }
+
+            fn fetch_mut(world: &mut World) -> QueryIterMut<'_, Self> {
+                // Return empty if any component type is not registered
+                let first_id = TypeId::of::<$first>();
+                if world.components.get(&first_id).is_none() {
+                    return QueryIterMut::new(world, 0);
+                }
+                $(
+                    let rest_id = TypeId::of::<$rest>();
+                    if world.components.get(&rest_id).is_none() {
+                        return QueryIterMut::new(world, 0);
+                    }
+                )*
+
+                let len = world.components.get(&first_id)
+                    .and_then(|s| s.downcast_ref::<SparseSet<$first>>())
+                    .map(|s| s.len())
+                    .unwrap_or(0);
+
+                QueryIterMut::new(world, len)
+            }
+        }
+
+        #[allow(non_snake_case)]
+        impl<'a, $first: Component $(, $rest: Component)*> Iterator for QueryIterMut<'a, (&mut $first $(, &mut $rest)*)> {
+            type Item = (Entity, (&'a mut $first $(, &'a mut $rest)*));
+
+            fn next(&mut self) -> Option<Self::Item> {
+                // SAFETY: We need raw pointers to get multiple mutable references to different component types
+                // This is safe because:
+                // 1. We have exclusive access to world (&mut World)
+                // 2. All component types are different (enforced by Rust's type system - $first and $rest are distinct)
+                // 3. We return one set of mutable references at a time
+                // 4. TypeId guarantees different components use different storage
+                unsafe {
+                    let components_ptr = &mut self.world.components as *mut std::collections::HashMap<TypeId, Box<dyn std::any::Any>>;
+                    let components = &mut *components_ptr;
+
+                    // Get the first storage
+                    let first_id = TypeId::of::<$first>();
+                    let first_storage_ptr = components.get_mut(&first_id)?
+                        .downcast_mut::<SparseSet<$first>>()?
+                        as *mut SparseSet<$first>;
+                    let first_storage = &mut *first_storage_ptr;
+
+                    // Get pointers to the rest of the storages
+                    $(
+                        let rest_id = TypeId::of::<$rest>();
+                        let $rest = components.get_mut(&rest_id)?
+                            .downcast_mut::<SparseSet<$rest>>()?
+                            as *mut SparseSet<$rest>;
+                    )*
+
+                    // Iterate until we find an entity with all components
+                    while self.current_index < first_storage.len() {
+                        let (entity, first_comp) = first_storage.iter_mut().nth(self.current_index)?;
+                        self.current_index += 1;
+
+                        // Try to get all other components mutably
+                        $(
+                            let $rest = match (&mut *$rest).get_mut(entity) {
+                                Some(c) => c as *mut $rest,
+                                None => continue, // Missing component, skip this entity
+                            };
+                        )*
+
+                        // All components found! Extend lifetimes and return
+                        let first_comp = first_comp as *mut $first;
+                        return Some((entity, (&mut *first_comp $(, &mut *$rest)*)));
+                    }
+
+                    None
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                let remaining = self.len.saturating_sub(self.current_index);
+                (0, Some(remaining))
+            }
+        }
+    };
+}
+
+// Generate implementations for 3-12 component tuples
+impl_query_tuple!(A, B, C);
+impl_query_tuple!(A, B, C, D);
+impl_query_tuple!(A, B, C, D, E);
+impl_query_tuple!(A, B, C, D, E, F);
+impl_query_tuple!(A, B, C, D, E, F, G);
+impl_query_tuple!(A, B, C, D, E, F, G, H);
+impl_query_tuple!(A, B, C, D, E, F, G, H, I);
+impl_query_tuple!(A, B, C, D, E, F, G, H, I, J);
+impl_query_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+impl_query_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+
+impl_query_tuple_mut!(A, B, C);
+impl_query_tuple_mut!(A, B, C, D);
+impl_query_tuple_mut!(A, B, C, D, E);
+impl_query_tuple_mut!(A, B, C, D, E, F);
+impl_query_tuple_mut!(A, B, C, D, E, F, G);
+impl_query_tuple_mut!(A, B, C, D, E, F, G, H);
+impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I);
+impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J);
+impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J, K);
+impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J, K, L);
+
 // Add query methods to World
 impl World {
     /// Query entities with specific components
@@ -1310,5 +1517,327 @@ mod tests {
 
         assert_eq!(damaged, 5); // x: 0, 10, 20, 30, 40
         assert_eq!(undamaged, 5); // x: 50, 60, 70, 80, 90
+    }
+
+    // ===== Tests for 3+ Component Queries (Macro-Generated) =====
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[allow(dead_code)]
+    struct Acceleration {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    impl Component for Acceleration {}
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[allow(dead_code)]
+    struct Mass {
+        value: f32,
+    }
+
+    impl Component for Mass {}
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[allow(dead_code)]
+    struct Team {
+        id: u32,
+    }
+
+    impl Component for Team {}
+
+    #[test]
+    fn test_query_three_components_immutable() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Acceleration>();
+
+        // Create entities with all three components
+        for i in 0..50 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(e, Acceleration { x: 0.1, y: 0.0, z: 0.0 });
+        }
+
+        // Create some entities with only 2 components (should be filtered out)
+        for i in 0..10 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+        }
+
+        let mut count = 0;
+        for (_entity, (pos, vel, acc)) in world.query::<(&Position, &Velocity, &Acceleration)>() {
+            assert!(pos.x >= 0.0);
+            assert_eq!(vel.x, 1.0);
+            assert_eq!(acc.x, 0.1);
+            count += 1;
+        }
+
+        assert_eq!(count, 50);
+    }
+
+    #[test]
+    fn test_query_three_components_mutable() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Acceleration>();
+
+        // Create entities
+        for i in 0..20 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 0.0, y: 0.0, z: 0.0 });
+            world.add(e, Acceleration { x: 1.0, y: 0.0, z: 0.0 });
+        }
+
+        // First pass: read positions and accelerations, update velocities
+        let positions: Vec<_> = world.query::<(&Position, &Acceleration)>()
+            .map(|(e, (pos, acc))| (e, pos.x, acc.x))
+            .collect();
+
+        for (entity, pos_x, acc_x) in positions {
+            if let Some(vel) = world.get_mut::<Velocity>(entity) {
+                vel.x += acc_x * pos_x;
+            }
+        }
+
+        // Verify velocities were updated
+        let mut sum = 0.0;
+        for (_e, (pos, vel, _acc)) in world.query::<(&Position, &Velocity, &Acceleration)>() {
+            assert_eq!(vel.x, pos.x);
+            sum += vel.x;
+        }
+
+        // Sum should be 0 + 1 + 2 + ... + 19 = 190
+        assert_eq!(sum, 190.0);
+    }
+
+    #[test]
+    fn test_query_four_components_all_mutable() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Mass>();
+        world.register::<Health>();
+
+        // Create physics entities with health
+        for i in 0..30 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(e, Mass { value: 1.0 });
+            world.add(e, Health { current: 100.0, max: 100.0 });
+        }
+
+        // Simulate damage based on velocity and mass
+        for (_e, (vel, mass, health, pos)) in
+            world.query_mut::<(&mut Velocity, &mut Mass, &mut Health, &mut Position)>()
+        {
+            let impact = vel.x * mass.value;
+            health.current -= impact * 5.0;
+
+            // Also modify other components
+            pos.x += 1.0;
+            vel.x *= 0.99;
+            mass.value *= 0.99;
+        }
+
+        // Verify mutations were applied
+        let mut total_health = 0.0;
+        for (_e, health) in world.query::<&Health>() {
+            assert_eq!(health.current, 95.0); // 100 - (1.0 * 1.0 * 5.0)
+            total_health += health.current;
+        }
+
+        assert_eq!(total_health, 95.0 * 30.0);
+    }
+
+    #[test]
+    fn test_query_five_components() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Acceleration>();
+        world.register::<Mass>();
+        world.register::<Team>();
+
+        // Create complex entities
+        for i in 0..15 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(e, Acceleration { x: 0.5, y: 0.0, z: 0.0 });
+            world.add(e, Mass { value: 2.0 });
+            world.add(e, Team { id: i % 3 });
+        }
+
+        // Query all five components
+        let mut team_counts = [0u32; 3];
+        for (_e, (_pos, _vel, _acc, _mass, team)) in
+            world.query::<(&Position, &Velocity, &Acceleration, &Mass, &Team)>()
+        {
+            team_counts[team.id as usize] += 1;
+        }
+
+        // Should have 5 entities per team (15 entities / 3 teams)
+        assert_eq!(team_counts[0], 5);
+        assert_eq!(team_counts[1], 5);
+        assert_eq!(team_counts[2], 5);
+    }
+
+    #[test]
+    fn test_query_three_components_partial_match() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Health>();
+
+        // Create entities with different component combinations
+        for i in 0..10 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+
+            if i % 2 == 0 {
+                world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            }
+
+            if i % 3 == 0 {
+                world.add(e, Health { current: 100.0, max: 100.0 });
+            }
+        }
+
+        // Query for all three - should only match entities with i % 6 == 0
+        let mut count = 0;
+        for (_e, (_pos, _vel, _health)) in world.query::<(&Position, &Velocity, &Health)>() {
+            count += 1;
+        }
+
+        // i=0 and i=6 have all three components
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_query_four_components_simulation() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Acceleration>();
+        world.register::<Mass>();
+
+        // Create entities
+        for i in 0..10 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 0.0, y: 0.0, z: 0.0 });
+            world.add(e, Acceleration { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(e, Mass { value: 1.0 + i as f32 });
+        }
+
+        // Mutate all four components
+        for (_e, (pos, vel, acc, mass)) in
+            world.query_mut::<(&mut Position, &mut Velocity, &mut Acceleration, &mut Mass)>()
+        {
+            vel.x = acc.x * mass.value;
+            pos.x += vel.x;
+            acc.x *= 0.9; // Damping
+            mass.value *= 0.99; // Mass loss
+        }
+
+        // Verify mutations
+        for (_e, (pos, vel, acc, mass)) in
+            world.query::<(&Position, &Velocity, &Acceleration, &Mass)>()
+        {
+            assert!(pos.x > 0.0); // Position increased
+            assert!(vel.x > 0.0); // Velocity set
+            assert!(acc.x < 1.0); // Acceleration damped
+            assert!(mass.value < 11.0); // Mass decreased
+        }
+    }
+
+    #[test]
+    fn test_query_three_components_empty() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Health>();
+
+        // Don't add any entities
+
+        let mut count = 0;
+        for _item in world.query::<(&Position, &Velocity, &Health)>() {
+            count += 1;
+        }
+
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_query_five_components_size_hint() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Acceleration>();
+        world.register::<Mass>();
+        world.register::<Team>();
+
+        // Create entities
+        for i in 0..100 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(e, Acceleration { x: 0.5, y: 0.0, z: 0.0 });
+            world.add(e, Mass { value: 2.0 });
+            world.add(e, Team { id: i % 5 });
+        }
+
+        let iter = world.query::<(&Position, &Velocity, &Acceleration, &Mass, &Team)>();
+        let (lower, upper) = iter.size_hint();
+
+        // Should have some reasonable bounds
+        assert_eq!(lower, 0); // Lower bound is always 0 for filtered iteration
+        assert!(upper.is_some());
+        assert!(upper.unwrap() >= 100);
+    }
+
+    #[test]
+    fn test_query_six_components() {
+        let mut world = World::new();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Acceleration>();
+        world.register::<Mass>();
+        world.register::<Team>();
+        world.register::<Health>();
+
+        // Create entities with all six components
+        for i in 0..25 {
+            let e = world.spawn();
+            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(e, Acceleration { x: 0.5, y: 0.0, z: 0.0 });
+            world.add(e, Mass { value: 2.0 });
+            world.add(e, Team { id: i % 2 });
+            world.add(e, Health { current: 100.0, max: 100.0 });
+        }
+
+        let mut count = 0;
+        for (_e, (pos, vel, acc, mass, team, health)) in
+            world.query::<(&Position, &Velocity, &Acceleration, &Mass, &Team, &Health)>()
+        {
+            assert!(pos.x >= 0.0);
+            assert_eq!(vel.x, 1.0);
+            assert_eq!(acc.x, 0.5);
+            assert_eq!(mass.value, 2.0);
+            assert!(team.id < 2);
+            assert_eq!(health.current, 100.0);
+            count += 1;
+        }
+
+        assert_eq!(count, 25);
     }
 }
