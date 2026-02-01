@@ -620,14 +620,21 @@ impl<'a, A: Component, B: Component> Iterator for QueryIter<'a, (&A, &B)> {
         // OPTIMIZATION: Direct index access (O(1) per iteration instead of O(n) with nth())
         // Iterate storage_a and check if entity exists in storage_b
         while likely(self.current_index < storage_a.len()) {
-            // PREFETCH OPTIMIZATION: Prefetch next entity's components into cache
-            if self.current_index + 1 < storage_a.len() {
-                if let Some(next_entity) = storage_a.get_dense_entity(self.current_index + 1) {
-                    if let Some(next_a) = storage_a.get(next_entity) {
-                        prefetch_read(next_a as *const A);
-                    }
-                    if let Some(next_b) = storage_b.get(next_entity) {
-                        prefetch_read(next_b as *const B);
+            // ENHANCED PREFETCH OPTIMIZATION: Prefetch multiple cache lines ahead
+            // Modern CPUs have hardware prefetchers that work best with predictable access patterns
+            // Prefetching 2-4 entities ahead gives best performance on most architectures
+            const PREFETCH_DISTANCE: usize = 3;
+
+            for offset in 1..=PREFETCH_DISTANCE {
+                let prefetch_idx = self.current_index + offset;
+                if prefetch_idx < storage_a.len() {
+                    if let Some(next_entity) = storage_a.get_dense_entity(prefetch_idx) {
+                        if let Some(next_a) = storage_a.get(next_entity) {
+                            prefetch_read(next_a as *const A);
+                        }
+                        if let Some(next_b) = storage_b.get(next_entity) {
+                            prefetch_read(next_b as *const B);
+                        }
                     }
                 }
             }
@@ -1263,6 +1270,43 @@ impl_query_tuple_mut!(A, B, C, D, E, F, G, H, I, J, K, L);
 // Batch Iteration Support for SIMD
 //
 
+/// Batch size configuration for query iteration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchSize {
+    /// Process 4 entities at once (SSE/NEON)
+    Four = 4,
+    /// Process 8 entities at once (AVX2)
+    Eight = 8,
+}
+
+/// Batch iterator that returns chunks of components for SIMD processing
+///
+/// This enables efficient SIMD processing by providing components in configurable batch sizes.
+/// The iterator prefetches the next batch while processing the current one for better
+/// cache utilization.
+pub struct BatchQueryIter<'a, T: Component> {
+    storage: Option<&'a SparseSet<T>>,
+    current_index: usize,
+    len: usize,
+    batch_size: usize,
+}
+
+impl<'a, T: Component> BatchQueryIter<'a, T> {
+    /// Creates a new batch iterator with the specified batch size
+    pub fn new(world: &'a World, batch_size: BatchSize) -> Self {
+        let type_id = TypeId::of::<T>();
+        let (storage, len) = match world.components.get(&type_id) {
+            Some(storage_trait) => {
+                let storage = storage_trait.as_any().downcast_ref::<SparseSet<T>>().unwrap();
+                (Some(storage), storage.len())
+            }
+            None => (None, 0),
+        };
+
+        Self { storage, current_index: 0, len, batch_size: batch_size as usize }
+    }
+}
+
 /// Batch iterator that returns chunks of 4 components at a time
 ///
 /// This enables SIMD processing by providing components in groups of 4.
@@ -1451,6 +1495,126 @@ impl<'a, T: Component> Iterator for BatchQueryIter8<'a, T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = (self.len.saturating_sub(self.current_index)) / 8;
         (0, Some(remaining)) // Lower bound is 0 due to potential sparse data
+    }
+}
+
+/// Wrapper that provides batch iteration methods for query iterators
+pub struct BatchableQueryIter<'a, A: Component, B: Component> {
+    world: &'a mut World,
+    _phantom: PhantomData<(A, B)>,
+}
+
+impl<'a, A: Component, B: Component> BatchableQueryIter<'a, A, B> {
+    fn new(world: &'a mut World) -> Self {
+        Self { world, _phantom: PhantomData }
+    }
+
+    /// Create a batch iterator for processing entities in groups
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Process 8 entities at a time with SIMD
+    /// for batch in world.query_mut::<(&mut Transform, &Velocity)>().batch(8) {
+    ///     // batch contains up to 8 entities with their components
+    /// }
+    /// ```
+    pub fn batch(self, size: usize) -> BatchQueryIterMut2<'a, A, B> {
+        BatchQueryIterMut2::new(self.world, size)
+    }
+}
+
+/// Batch iterator for two-component mutable queries
+///
+/// Processes entities in batches for better cache utilization and SIMD processing.
+/// Prefetches the next batch while processing the current one.
+pub struct BatchQueryIterMut2<'a, A: Component, B: Component> {
+    world: &'a mut World,
+    current_index: usize,
+    batch_size: usize,
+    _phantom: PhantomData<(A, B)>,
+}
+
+impl<'a, A: Component, B: Component> BatchQueryIterMut2<'a, A, B> {
+    fn new(world: &'a mut World, batch_size: usize) -> Self {
+        Self { world, current_index: 0, batch_size, _phantom: PhantomData }
+    }
+}
+
+impl<'a, A: Component, B: Component> Iterator for BatchQueryIterMut2<'a, A, B> {
+    type Item = Vec<(Entity, (&'a mut A, &'a mut B))>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let type_id_a = TypeId::of::<A>();
+        let type_id_b = TypeId::of::<B>();
+
+        // SAFETY: Extend lifetimes for batch iteration
+        unsafe {
+            let storage_a_ptr =
+                self.world
+                    .components
+                    .get_mut(&type_id_a)?
+                    .as_any_mut()
+                    .downcast_mut::<SparseSet<A>>()? as *mut SparseSet<A>;
+
+            let storage_b_ptr =
+                self.world
+                    .components
+                    .get_mut(&type_id_b)?
+                    .as_any_mut()
+                    .downcast_mut::<SparseSet<B>>()? as *mut SparseSet<B>;
+
+            let storage_a = &mut *storage_a_ptr;
+            let storage_b = &mut *storage_b_ptr;
+
+            let mut batch = Vec::with_capacity(self.batch_size);
+
+            // Prefetch next batch while processing current
+            let prefetch_start = self.current_index + self.batch_size;
+            if prefetch_start < storage_a.len() {
+                for i in 0..self.batch_size.min(4) {
+                    let prefetch_idx = prefetch_start + i;
+                    if prefetch_idx >= storage_a.len() {
+                        break;
+                    }
+                    if let Some(entity) = storage_a.get_dense_entity(prefetch_idx) {
+                        if let Some(comp_a) = storage_a.get(entity) {
+                            prefetch_read(comp_a as *const A);
+                        }
+                        if let Some(comp_b) = storage_b.get(entity) {
+                            prefetch_read(comp_b as *const B);
+                        }
+                    }
+                }
+            }
+
+            // Collect batch
+            while batch.len() < self.batch_size && self.current_index < storage_a.len() {
+                let entity = match storage_a.get_dense_entity(self.current_index) {
+                    Some(e) => e,
+                    None => {
+                        self.current_index += 1;
+                        continue;
+                    }
+                };
+                self.current_index += 1;
+
+                if let (Some(comp_a), Some(comp_b)) =
+                    (storage_a.get_mut(entity), storage_b.get_mut(entity))
+                {
+                    let comp_a_ptr = comp_a as *mut A;
+                    let comp_b_ptr = comp_b as *mut B;
+                    batch.push((entity, (&mut *comp_a_ptr, &mut *comp_b_ptr)));
+                }
+            }
+
+            if batch.is_empty() {
+                None
+            } else {
+                Some(batch)
+            }
+        }
     }
 }
 

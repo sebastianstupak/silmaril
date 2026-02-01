@@ -58,8 +58,17 @@ opt-level = 3  # Optimize dependencies even in debug
 
 [profile.release]
 lto = "thin"
-codegen-units = 1
+codegen-units = 16
 opt-level = 3
+strip = false  # Keep symbols for profiling
+
+[profile.release-server]
+# Server profile: Optimize for size + throughput
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+opt-level = "z"  # Optimize for size
+strip = true     # Remove symbols (smaller binary)
 
 [profile.bench]
 inherits = "release"

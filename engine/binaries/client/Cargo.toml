@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 description = "Client binary for Agent Game Engine"
 
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
 [dependencies]
 # Core engine
 engine-core = { path = "../../core" }
