@@ -17,6 +17,22 @@ use engine_core::math::{Transform, Vec3};
 use engine_core::physics_components::Velocity;
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+fn setup_world() -> World {
+    let mut world = setup_world();
+    world.register::<Transform>();
+    world.register::<Velocity>();
+    world.register::<Health>();
+    world.register::<Player>();
+    world.register::<Enemy>();
+    world.register::<Projectile>();
+    world.register::<Damage>();
+    world
+}
+
+// ============================================================================
 // Component Definitions for Benchmarking
 // ============================================================================
 
@@ -67,7 +83,7 @@ fn bench_entity_spawning(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             b.iter_batched(
-                || World::new(),
+                || setup_world(),
                 |mut world| {
                     for _ in 0..count {
                         black_box(world.spawn());
@@ -89,7 +105,7 @@ fn bench_entity_spawning_with_components(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             b.iter_batched(
-                || World::new(),
+                || setup_world(),
                 |mut world| {
                     for i in 0..count {
                         let entity = world.spawn();
@@ -120,7 +136,7 @@ fn bench_iterate_single_component(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             // Setup: Create world with entities
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
@@ -148,7 +164,7 @@ fn bench_iterate_two_components(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
@@ -177,7 +193,7 @@ fn bench_iterate_four_components(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 world.add(entity, Transform::default());
@@ -210,7 +226,7 @@ fn bench_component_add(c: &mut Criterion) {
 
     // Target: <100ns per operation
     group.bench_function("add_single_component", |b| {
-        let mut world = World::new();
+        let mut world = setup_world();
         let entities: Vec<_> = (0..1000).map(|_| world.spawn()).collect();
         let mut idx = 0;
 
@@ -230,7 +246,7 @@ fn bench_component_remove(c: &mut Criterion) {
     group.bench_function("remove_single_component", |b| {
         b.iter_batched(
             || {
-                let mut world = World::new();
+                let mut world = setup_world();
                 let entities: Vec<_> = (0..1000)
                     .map(|_| {
                         let e = world.spawn();
@@ -257,7 +273,7 @@ fn bench_component_get(c: &mut Criterion) {
 
     // Target: <20ns per operation (pointer deref + bounds check)
     group.bench_function("get_single_component", |b| {
-        let mut world = World::new();
+        let mut world = setup_world();
         let entities: Vec<_> = (0..1000)
             .map(|i| {
                 let e = world.spawn();
@@ -289,7 +305,7 @@ fn bench_query_filtering(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::new("sparse_10_percent", count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 world.add(entity, Transform::default());
@@ -324,7 +340,7 @@ fn bench_memory_per_entity(c: &mut Criterion) {
     for count in [1_000, 10_000, 100_000].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             b.iter(|| {
-                let mut world = World::new();
+                let mut world = setup_world();
                 for _ in 0..count {
                     let entity = world.spawn();
                     black_box(entity);
@@ -347,7 +363,7 @@ fn bench_game_simulation(c: &mut Criterion) {
 
     // Simulate realistic game: 1000 entities with mixed components
     group.bench_function("simulate_1000_entities_frame", |b| {
-        let mut world = World::new();
+        let mut world = setup_world();
 
         // 600 enemies
         for _ in 0..600 {

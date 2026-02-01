@@ -36,6 +36,7 @@ fn bench_iterate_entities(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             let mut world = World::new();
+            world.register::<Transform>();
             for _ in 0..count {
                 let entity = world.spawn();
                 world.add(entity, Transform::default());

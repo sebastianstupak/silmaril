@@ -21,6 +21,19 @@ use engine_core::physics_components::Velocity;
 use engine_core::serialization::WorldState;
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+fn setup_world() -> World {
+    let mut world = setup_world();
+    world.register::<Transform>();
+    world.register::<Velocity>();
+    world.register::<Health>();
+    world.register::<Player>();
+    world
+}
+
+// ============================================================================
 // Component Definitions for Benchmarking
 // ============================================================================
 
@@ -49,7 +62,7 @@ fn bench_entity_snapshot_serialization(c: &mut Criterion) {
     // Target: <10μs per entity (full snapshot)
     // Note: We benchmark single-entity world as proxy for entity serialization
     group.bench_function("single_entity_full", |b| {
-        let mut world = World::new();
+        let mut world = setup_world();
         let entity = world.spawn();
         world.add(entity, Transform::default());
         world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
@@ -72,7 +85,7 @@ fn bench_world_serialization(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::new("full_snapshot", count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
@@ -101,7 +114,7 @@ fn bench_world_deserialization(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("full_snapshot", count), count, |b, &count| {
             // Setup: Create serialized world state
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
@@ -114,7 +127,7 @@ fn bench_world_deserialization(c: &mut Criterion) {
             let serialized_state = WorldState::snapshot(&world);
 
             b.iter(|| {
-                let mut new_world = World::new();
+                let mut new_world = setup_world();
                 serialized_state.restore(&mut new_world);
                 black_box(new_world);
             });
@@ -136,7 +149,7 @@ fn bench_serialization_roundtrip(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
@@ -150,7 +163,7 @@ fn bench_serialization_roundtrip(c: &mut Criterion) {
                 let state = WorldState::snapshot(black_box(&world));
 
                 // Deserialize
-                let mut new_world = World::new();
+                let mut new_world = setup_world();
                 state.restore(&mut new_world);
 
                 black_box(new_world);
@@ -173,7 +186,7 @@ fn bench_yaml_serialization(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*count as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
@@ -203,7 +216,7 @@ fn bench_serialized_size(c: &mut Criterion) {
     // Measure memory overhead of serialization
     for count in [100, 1_000, 10_000].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
-            let mut world = World::new();
+            let mut world = setup_world();
             for i in 0..count {
                 let entity = world.spawn();
                 let mut transform = Transform::default();
