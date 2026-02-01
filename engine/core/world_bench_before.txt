@@ -1,0 +1,15 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+    Blocking waiting for file lock on build directory
+   Compiling engine-core v0.1.0 (D:\dev\agent-game-engine\engine\core)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 3m 11s
+     Running benches\world_benches.rs (D:\dev\agent-game-engine\target\release\deps\world_benches-c70a7b564e6fe6ae.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

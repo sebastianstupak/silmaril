@@ -3,42 +3,9 @@
 //! Provides ergonomic iteration over entities with specific component combinations.
 //! Supports single components, tuples, optional components, and mixed mutability.
 
-use super::storage::ComponentStorage;
 use super::{Component, Entity, SparseSet, World};
 use std::any::TypeId;
 use std::marker::PhantomData;
-
-/// Branch prediction hint: marks a function as cold (rarely executed)
-///
-/// OPTIMIZATION: Helps the compiler generate better assembly for hot paths
-/// by moving unlikely code out of the hot path.
-#[inline(always)]
-#[cold]
-fn cold() {}
-
-/// Hint that this condition is likely to be true
-///
-/// OPTIMIZATION: Helps CPU branch predictor by biasing toward the expected path.
-/// Use when a branch is taken >90% of the time.
-#[inline(always)]
-fn likely(b: bool) -> bool {
-    if !b {
-        cold();
-    }
-    b
-}
-
-/// Hint that this condition is unlikely to be true
-///
-/// OPTIMIZATION: Helps CPU branch predictor by biasing toward the expected path.
-/// Use when a branch is taken <10% of the time.
-#[inline(always)]
-fn unlikely(b: bool) -> bool {
-    if b {
-        cold();
-    }
-    b
-}
 
 /// Trait for types that can be queried from the world
 ///
@@ -87,14 +54,6 @@ pub trait Query {
 ///
 /// This iterator yields tuples of (Entity, components) for all entities
 /// that match the query.
-///
-/// OPTIMIZATION: We store a cached reference to the World to allow filter checks,
-/// but the actual storage references are fetched fresh each iteration.
-/// For single-component queries, we could cache the storage ref, but that would
-/// complicate the generic design. The current approach keeps the API flexible.
-///
-/// For two-component queries, we cache the TypeId values to avoid recomputing
-/// them on every next() call, and we also cache storage pointers for better performance.
 pub struct QueryIter<'a, Q: Query> {
     /// Reference to the world being queried
     world: &'a World,
@@ -211,7 +170,12 @@ pub struct QueryIterMut<'a, Q: Query> {
 impl<'a, Q: Query> QueryIterMut<'a, Q> {
     /// Create a new mutable query iterator
     pub(crate) fn new(world: &'a mut World, len: usize) -> Self {
-        Self { world, current_index: 0, len, _phantom: PhantomData }
+        Self {
+            world,
+            current_index: 0,
+            len,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -227,7 +191,7 @@ impl<T: Component> Query for &T {
         let len = world
             .components
             .get(&type_id)
-            .and_then(|storage| storage.as_any().downcast_ref::<SparseSet<T>>())
+            .and_then(|storage: &Box<dyn std::any::Any>| storage.downcast_ref::<SparseSet<T>>())
             .map(|storage: &SparseSet<T>| storage.len())
             .unwrap_or(0);
 
@@ -242,80 +206,31 @@ impl<T: Component> Query for &T {
 impl<'a, T: Component> Iterator for QueryIter<'a, &T> {
     type Item = (Entity, &'a T);
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        // CRITICAL OPTIMIZATION: Use get_storage() to bypass virtual dispatch
-        //
-        // Instead of going through the ComponentStorage trait (.as_any().downcast_ref()),
-        // we use World::get_storage() which does the downcast directly. This eliminates
-        // one level of virtual dispatch.
-        //
-        // With #[inline] on get_storage(), the compiler can optimize this further.
-
-        let storage = self.world.get_storage::<T>()?;
-
-        // OPTIMIZATION: Use direct index access instead of nth() for O(1) vs O(n)
-        while likely(self.current_index < storage.len()) {
-            // OPTIMIZATION: get_dense_entity should always succeed in valid iteration
-            let entity = match storage.get_dense_entity(self.current_index) {
-                Some(e) => e,
-                None => {
-                    self.current_index += 1;
-                    continue;
-                }
-            };
-            self.current_index += 1;
-
-            // OPTIMIZATION: Most queries have no filters, so these checks are usually skipped
-            // Apply filters (if any)
-            if unlikely(!self.with_filters.is_empty()) {
-                let mut passes_with = true;
-                for filter_type_id in &self.with_filters {
-                    if !self.world.has_component_by_id(entity, *filter_type_id) {
-                        passes_with = false;
-                        break;
-                    }
-                }
-                if !passes_with {
-                    continue;
-                }
-            }
-
-            if unlikely(!self.without_filters.is_empty()) {
-                let mut passes_without = true;
-                for filter_type_id in &self.without_filters {
-                    if self.world.has_component_by_id(entity, *filter_type_id) {
-                        passes_without = false;
-                        break;
-                    }
-                }
-                if !passes_without {
-                    continue;
-                }
-            }
-
-            // OPTIMIZATION: storage.get() should always succeed for valid entities
-            // Entity passes all filters, return component
-            if likely(storage.get(entity).is_some()) {
-                // SAFETY: We just checked that get() returns Some
-                return Some((entity, unsafe { storage.get(entity).unwrap_unchecked() }));
-            }
+        if self.current_index >= self.len {
+            return None;
         }
 
-        None
+        let type_id = TypeId::of::<T>();
+        let storage = self
+            .world
+            .components
+            .get(&type_id)?
+            .downcast_ref::<SparseSet<T>>()?;
+
+        // Get the nth item from the storage
+        let result = storage
+            .iter()
+            .nth(self.current_index)
+            .map(|(entity, component)| (entity, component));
+
+        self.current_index += 1;
+        result
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.len.saturating_sub(self.current_index);
-        // Lower bound is 0 if we have filters (since we don't know how many will pass)
-        // Otherwise it's `remaining` (all entities have the component)
-        let lower = if self.with_filters.is_empty() && self.without_filters.is_empty() {
-            remaining
-        } else {
-            0
-        };
-        (lower, Some(remaining))
+        (remaining, Some(remaining))
     }
 }
 
@@ -341,7 +256,7 @@ impl<T: Component> Query for &mut T {
         let len = world
             .components
             .get(&type_id)
-            .and_then(|storage| storage.as_any().downcast_ref::<SparseSet<T>>())
+            .and_then(|storage: &Box<dyn std::any::Any>| storage.downcast_ref::<SparseSet<T>>())
             .map(|storage: &SparseSet<T>| storage.len())
             .unwrap_or(0);
 
@@ -352,7 +267,6 @@ impl<T: Component> Query for &mut T {
 impl<'a, T: Component> Iterator for QueryIterMut<'a, &mut T> {
     type Item = (Entity, &'a mut T);
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_index >= self.len {
             return None;
@@ -370,24 +284,26 @@ impl<'a, T: Component> Iterator for QueryIterMut<'a, &mut T> {
                 .world
                 .components
                 .get_mut(&type_id)?
-                .as_any_mut()
-                .downcast_mut::<SparseSet<T>>()? as *mut SparseSet<T>;
+                .downcast_mut::<SparseSet<T>>()?
+                as *mut SparseSet<T>;
             &mut *storage_ptr
         };
 
-        // OPTIMIZATION: Use direct index access instead of nth() for O(1) vs O(n)
-        let entity = storage.get_dense_entity(self.current_index)?;
-        let component = storage.get_mut(entity).map(|comp| {
-            // SAFETY: Extend lifetime to 'a
-            // This is safe because we have exclusive access via &mut World
-            unsafe { &mut *(comp as *mut T) }
-        })?;
+        // Get the nth item from the storage
+        let result = storage
+            .iter_mut()
+            .nth(self.current_index)
+            .map(|(entity, component)| {
+                // SAFETY: Extend lifetime to 'a
+                // This is safe because we have exclusive access via &mut World
+                let component = unsafe { &mut *(component as *mut T) };
+                (entity, component)
+            });
 
         self.current_index += 1;
-        Some((entity, component))
+        result
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.len.saturating_sub(self.current_index);
         (remaining, Some(remaining))
@@ -423,7 +339,7 @@ impl<T: Component> Query for Option<&T> {
         let len = world
             .components
             .get(&type_id)
-            .and_then(|storage| storage.as_any().downcast_ref::<SparseSet<T>>())
+            .and_then(|storage| storage.downcast_ref::<SparseSet<T>>())
             .map(|storage| storage.len())
             .unwrap_or(0);
 
@@ -441,8 +357,11 @@ impl<'a, T: Component> Iterator for QueryIter<'a, Option<&T>> {
     fn next(&mut self) -> Option<Self::Item> {
         let type_id = TypeId::of::<T>();
 
-        let storage =
-            self.world.components.get(&type_id)?.as_any().downcast_ref::<SparseSet<T>>()?;
+        let storage = self
+            .world
+            .components
+            .get(&type_id)?
+            .downcast_ref::<SparseSet<T>>()?;
 
         if self.current_index >= storage.len() {
             return None;
@@ -475,7 +394,7 @@ impl<T: Component> Query for Option<&mut T> {
         let len = world
             .components
             .get(&type_id)
-            .and_then(|storage| storage.as_any().downcast_ref::<SparseSet<T>>())
+            .and_then(|storage| storage.downcast_ref::<SparseSet<T>>())
             .map(|storage| storage.len())
             .unwrap_or(0);
 
@@ -496,8 +415,8 @@ impl<'a, T: Component> Iterator for QueryIterMut<'a, Option<&mut T>> {
                 .world
                 .components
                 .get_mut(&type_id)?
-                .as_any_mut()
-                .downcast_mut::<SparseSet<T>>()? as *mut SparseSet<T>;
+                .downcast_mut::<SparseSet<T>>()?
+                as *mut SparseSet<T>;
             &mut *storage_ptr
         };
 
@@ -537,12 +456,12 @@ impl<A: Component, B: Component> Query for (&A, &B) {
         let storage_a = world
             .components
             .get(&type_id_a)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<A>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<A>>());
 
         let storage_b = world
             .components
             .get(&type_id_b)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<B>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<B>>());
 
         // If either storage is missing, return empty iterator
         let (storage_a, storage_b) = match (storage_a, storage_b) {
@@ -564,68 +483,32 @@ impl<A: Component, B: Component> Query for (&A, &B) {
 impl<'a, A: Component, B: Component> Iterator for QueryIter<'a, (&A, &B)> {
     type Item = (Entity, (&'a A, &'a B));
 
-    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        // CRITICAL OPTIMIZATION: Get storage once per next() call
-        // The get_storage() call does TypeId::of and HashMap lookup
-        let storage_a = self.world.get_storage::<A>()?;
-        let storage_b = self.world.get_storage::<B>()?;
+        let type_id_a = TypeId::of::<A>();
+        let type_id_b = TypeId::of::<B>();
 
-        // OPTIMIZATION: Direct index access (O(1) per iteration instead of O(n) with nth())
-        // Iterate storage_a and check if entity exists in storage_b
-        while likely(self.current_index < storage_a.len()) {
-            // OPTIMIZATION: get_dense_entity should always succeed
-            let entity = match storage_a.get_dense_entity(self.current_index) {
-                Some(e) => e,
-                None => {
-                    self.current_index += 1;
-                    continue;
-                }
-            };
+        let storage_a = self
+            .world
+            .components
+            .get(&type_id_a)?
+            .downcast_ref::<SparseSet<A>>()?;
+
+        let storage_b = self
+            .world
+            .components
+            .get(&type_id_b)?
+            .downcast_ref::<SparseSet<B>>()?;
+
+        // Iterate storage_a using indexed access (O(1) per iteration instead of O(n) with nth())
+        // For each entity, check if it exists in storage_b
+        while self.current_index < storage_a.len() {
+            let entity = storage_a.get_dense_entity(self.current_index)?;
             self.current_index += 1;
 
-            // OPTIMIZATION: Early exit if component B is missing (likely in sparse scenarios)
-            // In dense scenarios where all entities have both components, this is always Some
-            let comp_b = match storage_b.get(entity) {
-                Some(c) => c,
-                None => continue,
-            };
-
-            // OPTIMIZATION: Most queries don't use filters, so hint these as unlikely
-            // Apply filters (if any)
-            // Check with filters - entity must have all of these
-            if unlikely(!self.with_filters.is_empty()) {
-                let mut passes_with = true;
-                for filter_type_id in &self.with_filters {
-                    if !self.world.has_component_by_id(entity, *filter_type_id) {
-                        passes_with = false;
-                        break;
-                    }
-                }
-                if !passes_with {
-                    continue;
-                }
-            }
-
-            // Check without filters - entity must NOT have any of these
-            if unlikely(!self.without_filters.is_empty()) {
-                let mut passes_without = true;
-                for filter_type_id in &self.without_filters {
-                    if self.world.has_component_by_id(entity, *filter_type_id) {
-                        passes_without = false;
-                        break;
-                    }
-                }
-                if !passes_without {
-                    continue;
-                }
-            }
-
-            // OPTIMIZATION: storage_a.get() should always succeed since we're iterating it
-            // Entity has both components and passes filters
-            if likely(storage_a.get(entity).is_some()) {
-                // SAFETY: We just verified that get() returns Some
-                let comp_a = unsafe { storage_a.get(entity).unwrap_unchecked() };
+            // Check if entity has component B (O(1) lookup in sparse set)
+            if let Some(comp_b) = storage_b.get(entity) {
+                // Entity has both components
+                let comp_a = storage_a.get(entity)?;
                 return Some((entity, (comp_a, comp_b)));
             }
         }
@@ -633,20 +516,17 @@ impl<'a, A: Component, B: Component> Iterator for QueryIter<'a, (&A, &B)> {
         None
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.len.saturating_sub(self.current_index);
-        // For two-component queries, we need to check both components,
-        // so we don't know the exact count without iterating
-        // Lower bound is always 0 for two-component queries
         (0, Some(remaining))
     }
 }
 
-// Note: We don't implement ExactSizeIterator for immutable two-component queries
-// because we don't pre-filter during fetch (we use min(storage_a.len(), storage_b.len())).
-// The actual count requires iteration to determine which entities have both components.
-// For mutable queries, we do pre-filter, so ExactSizeIterator can be implemented there.
+impl<'a, A: Component, B: Component> ExactSizeIterator for QueryIter<'a, (&A, &B)> {
+    fn len(&self) -> usize {
+        self.len.saturating_sub(self.current_index)
+    }
+}
 
 // Mutable two-component tuple query
 impl<A: Component, B: Component> Query for (&mut A, &mut B) {
@@ -664,12 +544,12 @@ impl<A: Component, B: Component> Query for (&mut A, &mut B) {
         let storage_a = world
             .components
             .get(&type_id_a)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<A>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<A>>());
 
         let storage_b = world
             .components
             .get(&type_id_b)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<B>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<B>>());
 
         // If either storage is missing, return empty iterator
         let (storage_a, storage_b) = match (storage_a, storage_b) {
@@ -679,9 +559,15 @@ impl<A: Component, B: Component> Query for (&mut A, &mut B) {
 
         // Count entities that have both components
         let len = if storage_a.len() <= storage_b.len() {
-            storage_a.iter().filter(|(entity, _)| storage_b.contains(*entity)).count()
+            storage_a
+                .iter()
+                .filter(|(entity, _)| storage_b.contains(*entity))
+                .count()
         } else {
-            storage_b.iter().filter(|(entity, _)| storage_a.contains(*entity)).count()
+            storage_b
+                .iter()
+                .filter(|(entity, _)| storage_a.contains(*entity))
+                .count()
         };
 
         QueryIterMut::new(world, len)
@@ -691,8 +577,11 @@ impl<A: Component, B: Component> Query for (&mut A, &mut B) {
 impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&mut A, &mut B)> {
     type Item = (Entity, (&'a mut A, &'a mut B));
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        if self.current_index >= self.len {
+            return None;
+        }
+
         let type_id_a = TypeId::of::<A>();
         let type_id_b = TypeId::of::<B>();
 
@@ -701,29 +590,27 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&mut A, &mut
         // 1. We have exclusive access to world (&mut World)
         // 2. We return one mutable reference pair at a time
         // 3. The borrow checker ensures no aliasing
-        // 4. A and B are different types (different TypeIds)
         unsafe {
-            let storage_a_ptr =
-                self.world
-                    .components
-                    .get_mut(&type_id_a)?
-                    .as_any_mut()
-                    .downcast_mut::<SparseSet<A>>()? as *mut SparseSet<A>;
+            let storage_a_ptr = self
+                .world
+                .components
+                .get_mut(&type_id_a)?
+                .downcast_mut::<SparseSet<A>>()?
+                as *mut SparseSet<A>;
 
-            let storage_b_ptr =
-                self.world
-                    .components
-                    .get_mut(&type_id_b)?
-                    .as_any_mut()
-                    .downcast_mut::<SparseSet<B>>()? as *mut SparseSet<B>;
+            let storage_b_ptr = self
+                .world
+                .components
+                .get_mut(&type_id_b)?
+                .downcast_mut::<SparseSet<B>>()?
+                as *mut SparseSet<B>;
 
             let storage_a = &mut *storage_a_ptr;
             let storage_b = &mut *storage_b_ptr;
 
-            // OPTIMIZATION: Use direct index access instead of iter().nth() (O(1) vs O(n))
             // Find next entity that has both components
-            while self.current_index < storage_a.len() {
-                let entity = storage_a.get_dense_entity(self.current_index)?;
+            loop {
+                let (entity, _) = storage_a.iter().nth(self.current_index)?;
                 self.current_index += 1;
 
                 if storage_b.contains(entity) {
@@ -732,16 +619,17 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&mut A, &mut
                     let comp_b = &mut *(storage_b.get_mut(entity)? as *mut B);
                     return Some((entity, (comp_a, comp_b)));
                 }
-            }
 
-            None
+                if self.current_index >= storage_a.len() {
+                    return None;
+                }
+            }
         }
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.len.saturating_sub(self.current_index);
-        (0, Some(remaining))
+        (remaining, Some(remaining))
     }
 }
 
@@ -766,12 +654,12 @@ impl<A: Component, B: Component> Query for (&A, &mut B) {
         let storage_a = world
             .components
             .get(&type_id_a)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<A>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<A>>());
 
         let storage_b = world
             .components
             .get(&type_id_b)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<B>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<B>>());
 
         let (storage_a, storage_b) = match (storage_a, storage_b) {
             (Some(a), Some(b)) => (a, b),
@@ -779,9 +667,15 @@ impl<A: Component, B: Component> Query for (&A, &mut B) {
         };
 
         let len = if storage_a.len() <= storage_b.len() {
-            storage_a.iter().filter(|(entity, _)| storage_b.contains(*entity)).count()
+            storage_a
+                .iter()
+                .filter(|(entity, _)| storage_b.contains(*entity))
+                .count()
         } else {
-            storage_b.iter().filter(|(entity, _)| storage_a.contains(*entity)).count()
+            storage_b
+                .iter()
+                .filter(|(entity, _)| storage_a.contains(*entity))
+                .count()
         };
 
         QueryIterMut::new(world, len)
@@ -805,24 +699,24 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&A, &mut B)>
         // 2. A and B are different component types (different TypeIds)
         // 3. We return one reference pair at a time
         unsafe {
-            let components_ptr = &mut self.world.components
-                as *mut std::collections::HashMap<TypeId, Box<dyn ComponentStorage>>;
+            let components_ptr = &mut self.world.components as *mut std::collections::HashMap<TypeId, Box<dyn std::any::Any>>;
             let components = &mut *components_ptr;
 
-            let storage_a_ptr =
-                components.get(&type_id_a)?.as_any().downcast_ref::<SparseSet<A>>()?
-                    as *const SparseSet<A>;
+            let storage_a_ptr = components
+                .get(&type_id_a)?
+                .downcast_ref::<SparseSet<A>>()?
+                as *const SparseSet<A>;
 
-            let storage_b_ptr =
-                components.get_mut(&type_id_b)?.as_any_mut().downcast_mut::<SparseSet<B>>()?
-                    as *mut SparseSet<B>;
+            let storage_b_ptr = components
+                .get_mut(&type_id_b)?
+                .downcast_mut::<SparseSet<B>>()?
+                as *mut SparseSet<B>;
 
             let storage_a = &*storage_a_ptr;
             let storage_b = &mut *storage_b_ptr;
 
-            // OPTIMIZATION: Use direct index access instead of iter().nth() (O(1) vs O(n))
-            while self.current_index < storage_a.len() {
-                let entity = storage_a.get_dense_entity(self.current_index)?;
+            loop {
+                let (entity, _) = storage_a.iter().nth(self.current_index)?;
                 self.current_index += 1;
 
                 if let (Some(comp_a), Some(comp_b)) =
@@ -832,9 +726,11 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&A, &mut B)>
                     let comp_b_ptr = comp_b as *mut B;
                     return Some((entity, (&*comp_a_ptr, &mut *comp_b_ptr)));
                 }
-            }
 
-            None
+                if self.current_index >= storage_a.len() {
+                    return None;
+                }
+            }
         }
     }
 
@@ -865,12 +761,12 @@ impl<A: Component, B: Component> Query for (&mut A, &B) {
         let storage_a = world
             .components
             .get(&type_id_a)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<A>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<A>>());
 
         let storage_b = world
             .components
             .get(&type_id_b)
-            .and_then(|s| s.as_any().downcast_ref::<SparseSet<B>>());
+            .and_then(|s| s.downcast_ref::<SparseSet<B>>());
 
         let (storage_a, storage_b) = match (storage_a, storage_b) {
             (Some(a), Some(b)) => (a, b),
@@ -878,9 +774,15 @@ impl<A: Component, B: Component> Query for (&mut A, &B) {
         };
 
         let len = if storage_a.len() <= storage_b.len() {
-            storage_a.iter().filter(|(entity, _)| storage_b.contains(*entity)).count()
+            storage_a
+                .iter()
+                .filter(|(entity, _)| storage_b.contains(*entity))
+                .count()
         } else {
-            storage_b.iter().filter(|(entity, _)| storage_a.contains(*entity)).count()
+            storage_b
+                .iter()
+                .filter(|(entity, _)| storage_a.contains(*entity))
+                .count()
         };
 
         QueryIterMut::new(world, len)
@@ -904,24 +806,24 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&mut A, &B)>
         // 2. A and B are different component types (different TypeIds)
         // 3. We return one reference pair at a time
         unsafe {
-            let components_ptr = &mut self.world.components
-                as *mut std::collections::HashMap<TypeId, Box<dyn ComponentStorage>>;
+            let components_ptr = &mut self.world.components as *mut std::collections::HashMap<TypeId, Box<dyn std::any::Any>>;
             let components = &mut *components_ptr;
 
-            let storage_a_ptr =
-                components.get_mut(&type_id_a)?.as_any_mut().downcast_mut::<SparseSet<A>>()?
-                    as *mut SparseSet<A>;
+            let storage_a_ptr = components
+                .get_mut(&type_id_a)?
+                .downcast_mut::<SparseSet<A>>()?
+                as *mut SparseSet<A>;
 
-            let storage_b_ptr =
-                components.get(&type_id_b)?.as_any().downcast_ref::<SparseSet<B>>()?
-                    as *const SparseSet<B>;
+            let storage_b_ptr = components
+                .get(&type_id_b)?
+                .downcast_ref::<SparseSet<B>>()?
+                as *const SparseSet<B>;
 
             let storage_a = &mut *storage_a_ptr;
             let storage_b = &*storage_b_ptr;
 
-            // OPTIMIZATION: Use direct index access instead of iter().nth() (O(1) vs O(n))
-            while self.current_index < storage_a.len() {
-                let entity = storage_a.get_dense_entity(self.current_index)?;
+            loop {
+                let (entity, _) = storage_a.iter().nth(self.current_index)?;
                 self.current_index += 1;
 
                 if let (Some(comp_a), Some(comp_b)) =
@@ -931,9 +833,11 @@ impl<'a, A: Component, B: Component> Iterator for QueryIterMut<'a, (&mut A, &B)>
                     let comp_b_ptr = comp_b as *const B;
                     return Some((entity, (&mut *comp_a_ptr, &*comp_b_ptr)));
                 }
-            }
 
-            None
+                if self.current_index >= storage_a.len() {
+                    return None;
+                }
+            }
         }
     }
 
@@ -980,7 +884,7 @@ macro_rules! impl_query_tuple {
                 // Use a conservative estimate for length
                 // We'll filter during iteration
                 let len = world.components.get(&first_id)
-                    .and_then(|s| s.as_any().downcast_ref::<SparseSet<$first>>())
+                    .and_then(|s| s.downcast_ref::<SparseSet<$first>>())
                     .map(|s| s.len())
                     .unwrap_or(0);
 
@@ -997,31 +901,22 @@ macro_rules! impl_query_tuple {
             type Item = (Entity, (&'a $first $(, &'a $rest)*));
 
             fn next(&mut self) -> Option<Self::Item> {
-                // OPTIMIZATION: Use get_storage() to bypass virtual dispatch
-                let first_storage = self.world.get_storage::<$first>()?;
+                // Get the first storage
+                let first_id = TypeId::of::<$first>();
+                let first_storage = self.world.components.get(&first_id)?
+                    .downcast_ref::<SparseSet<$first>>()?;
 
                 // Get the rest of the storages
                 $(
-                    let $rest = self.world.get_storage::<$rest>()?;
+                    let rest_id = TypeId::of::<$rest>();
+                    let $rest = self.world.components.get(&rest_id)?
+                        .downcast_ref::<SparseSet<$rest>>()?;
                 )*
 
-                // OPTIMIZATION: Use direct index access instead of iter().nth() (O(1) vs O(n))
                 // Iterate until we find an entity with all components
-                while likely(self.current_index < first_storage.len()) {
-                    let entity = match first_storage.get_dense_entity(self.current_index) {
-                        Some(e) => e,
-                        None => {
-                            self.current_index += 1;
-                            continue;
-                        }
-                    };
+                while self.current_index < first_storage.len() {
+                    let (entity, first_comp) = first_storage.iter().nth(self.current_index)?;
                     self.current_index += 1;
-
-                    // Get first component
-                    let first_comp = match first_storage.get(entity) {
-                        Some(c) => c,
-                        None => continue,
-                    };
 
                     // Try to get all other components
                     $(
@@ -1031,37 +926,7 @@ macro_rules! impl_query_tuple {
                         };
                     )*
 
-                    // OPTIMIZATION: Most queries don't use filters
-                    // Apply filters (if any)
-                    // Check with filters - entity must have all of these
-                    if unlikely(!self.with_filters.is_empty()) {
-                        let mut passes_with = true;
-                        for filter_type_id in &self.with_filters {
-                            if !self.world.has_component_by_id(entity, *filter_type_id) {
-                                passes_with = false;
-                                break;
-                            }
-                        }
-                        if !passes_with {
-                            continue;
-                        }
-                    }
-
-                    // Check without filters - entity must NOT have any of these
-                    if unlikely(!self.without_filters.is_empty()) {
-                        let mut passes_without = true;
-                        for filter_type_id in &self.without_filters {
-                            if self.world.has_component_by_id(entity, *filter_type_id) {
-                                passes_without = false;
-                                break;
-                            }
-                        }
-                        if !passes_without {
-                            continue;
-                        }
-                    }
-
-                    // All components found and filters passed!
+                    // All components found!
                     return Some((entity, (first_comp $(, $rest)*)));
                 }
 
@@ -1104,7 +969,7 @@ macro_rules! impl_query_tuple_mut {
                 )*
 
                 let len = world.components.get(&first_id)
-                    .and_then(|s| s.as_any().downcast_ref::<SparseSet<$first>>())
+                    .and_then(|s| s.downcast_ref::<SparseSet<$first>>())
                     .map(|s| s.len())
                     .unwrap_or(0);
 
@@ -1124,13 +989,13 @@ macro_rules! impl_query_tuple_mut {
                 // 3. We return one set of mutable references at a time
                 // 4. TypeId guarantees different components use different storage
                 unsafe {
-                    let components_ptr = &mut self.world.components as *mut std::collections::HashMap<TypeId, Box<dyn ComponentStorage>>;
+                    let components_ptr = &mut self.world.components as *mut std::collections::HashMap<TypeId, Box<dyn std::any::Any>>;
                     let components = &mut *components_ptr;
 
                     // Get the first storage
                     let first_id = TypeId::of::<$first>();
                     let first_storage_ptr = components.get_mut(&first_id)?
-                        .as_any_mut().downcast_mut::<SparseSet<$first>>()?
+                        .downcast_mut::<SparseSet<$first>>()?
                         as *mut SparseSet<$first>;
                     let first_storage = &mut *first_storage_ptr;
 
@@ -1138,21 +1003,14 @@ macro_rules! impl_query_tuple_mut {
                     $(
                         let rest_id = TypeId::of::<$rest>();
                         let $rest = components.get_mut(&rest_id)?
-                            .as_any_mut().downcast_mut::<SparseSet<$rest>>()?
+                            .downcast_mut::<SparseSet<$rest>>()?
                             as *mut SparseSet<$rest>;
                     )*
 
-                    // OPTIMIZATION: Use direct index access instead of iter_mut().nth() (O(1) vs O(n))
                     // Iterate until we find an entity with all components
                     while self.current_index < first_storage.len() {
-                        let entity = first_storage.get_dense_entity(self.current_index)?;
+                        let (entity, first_comp) = first_storage.iter_mut().nth(self.current_index)?;
                         self.current_index += 1;
-
-                        // Get first component mutably
-                        let first_comp = match first_storage.get_mut(entity) {
-                            Some(c) => c as *mut $first,
-                            None => continue,
-                        };
 
                         // Try to get all other components mutably
                         $(
@@ -1163,6 +1021,7 @@ macro_rules! impl_query_tuple_mut {
                         )*
 
                         // All components found! Extend lifetimes and return
+                        let first_comp = first_comp as *mut $first;
                         return Some((entity, (&mut *first_comp $(, &mut *$rest)*)));
                     }
 
@@ -1289,7 +1148,14 @@ mod tests {
 
         for i in 0..100 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         let mut count = 0;
@@ -1307,7 +1173,14 @@ mod tests {
         world.register::<Position>();
 
         let e = world.spawn();
-        world.add(e, Position { x: 1.0, y: 2.0, z: 3.0 });
+        world.add(
+            e,
+            Position {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
+        );
 
         for (_entity, position) in world.query_mut::<&mut Position>() {
             position.x = 5.0;
@@ -1334,16 +1207,33 @@ mod tests {
         // Create 100 entities with Position
         for i in 0..100 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Collect first 50 entities to avoid borrow checker issues
-        let entities_to_update: Vec<Entity> =
-            world.query::<&Position>().take(50).map(|(entity, _)| entity).collect();
+        let entities_to_update: Vec<Entity> = world
+            .query::<&Position>()
+            .take(50)
+            .map(|(entity, _)| entity)
+            .collect();
 
         // Only 50 have Velocity
         for entity in entities_to_update {
-            world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(
+                entity,
+                Velocity {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         assert_eq!(world.query::<&Position>().count(), 100);
@@ -1357,7 +1247,14 @@ mod tests {
 
         for i in 0..10 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         let query = world.query::<&Position>();
@@ -1373,7 +1270,14 @@ mod tests {
 
         for i in 0..10 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         let query = world.query::<&Position>();
@@ -1387,7 +1291,10 @@ mod tests {
 
         for _i in 0..10 {
             let e = world.spawn();
-            world.add(e, Health { current: 100.0, max: 100.0 });
+            world.add(e, Health {
+                current: 100.0,
+                max: 100.0,
+            });
         }
 
         // First pass: damage all entities
@@ -1413,16 +1320,44 @@ mod tests {
 
         // Entity with both components
         let e1 = world.spawn();
-        world.add(e1, Position { x: 1.0, y: 2.0, z: 3.0 });
-        world.add(e1, Velocity { x: 0.1, y: 0.2, z: 0.3 });
+        world.add(
+            e1,
+            Position {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
+        );
+        world.add(
+            e1,
+            Velocity {
+                x: 0.1,
+                y: 0.2,
+                z: 0.3,
+            },
+        );
 
         // Entity with only Position
         let e2 = world.spawn();
-        world.add(e2, Position { x: 4.0, y: 5.0, z: 6.0 });
+        world.add(
+            e2,
+            Position {
+                x: 4.0,
+                y: 5.0,
+                z: 6.0,
+            },
+        );
 
         // Entity with only Velocity
         let e3 = world.spawn();
-        world.add(e3, Velocity { x: 0.4, y: 0.5, z: 0.6 });
+        world.add(
+            e3,
+            Velocity {
+                x: 0.4,
+                y: 0.5,
+                z: 0.6,
+            },
+        );
 
         // Query should only return e1
         let mut count = 0;
@@ -1445,8 +1380,22 @@ mod tests {
         // Create entities with both components
         for i in 0..10 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
-            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
+            world.add(
+                e,
+                Velocity {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Update positions using velocity
@@ -1473,8 +1422,22 @@ mod tests {
         world.register::<Velocity>();
 
         let e = world.spawn();
-        world.add(e, Position { x: 0.0, y: 0.0, z: 0.0 });
-        world.add(e, Velocity { x: 1.0, y: 2.0, z: 3.0 });
+        world.add(
+            e,
+            Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+        world.add(
+            e,
+            Velocity {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
+        );
 
         // Read position, modify velocity
         for (_entity, (position, velocity)) in world.query_mut::<(&Position, &mut Velocity)>() {
@@ -1492,8 +1455,22 @@ mod tests {
         world.register::<Velocity>();
 
         let e = world.spawn();
-        world.add(e, Position { x: 0.0, y: 0.0, z: 0.0 });
-        world.add(e, Velocity { x: 5.0, y: 0.0, z: 0.0 });
+        world.add(
+            e,
+            Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+        world.add(
+            e,
+            Velocity {
+                x: 5.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
 
         // Modify position, read velocity
         for (_entity, (position, velocity)) in world.query_mut::<(&mut Position, &Velocity)>() {
@@ -1513,15 +1490,32 @@ mod tests {
         // Create 100 entities with Position
         for i in 0..100 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Only first 50 also have Velocity
-        let entities_with_pos: Vec<Entity> =
-            world.query::<&Position>().take(50).map(|(e, _)| e).collect();
+        let entities_with_pos: Vec<Entity> = world
+            .query::<&Position>()
+            .take(50)
+            .map(|(e, _)| e)
+            .collect();
 
         for e in entities_with_pos {
-            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Velocity {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Query both should return 50
@@ -1549,13 +1543,27 @@ mod tests {
         // Entities with Position only
         for i in 0..10 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Entities with Velocity only
         for _i in 0..10 {
             let e = world.spawn();
-            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Velocity {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // No entities have both
@@ -1571,8 +1579,22 @@ mod tests {
 
         for i in 0..20 {
             let e = world.spawn();
-            world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
-            world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: i as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
+            world.add(
+                e,
+                Velocity {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         let query = world.query::<(&Position, &Velocity)>();
@@ -1598,8 +1620,22 @@ mod tests {
         // Create moving entities
         for i in 0..5 {
             let e = world.spawn();
-            world.add(e, Position { x: 0.0, y: i as f32 * 10.0, z: 0.0 });
-            world.add(e, Velocity { x: (i + 1) as f32, y: 0.0, z: 0.0 });
+            world.add(
+                e,
+                Position {
+                    x: 0.0,
+                    y: i as f32 * 10.0,
+                    z: 0.0,
+                },
+            );
+            world.add(
+                e,
+                Velocity {
+                    x: (i + 1) as f32,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Simulate 10 frames
@@ -1628,8 +1664,18 @@ mod tests {
         // Create entities with health at various positions
         for i in 0..10 {
             let e = world.spawn();
-            world.add(e, Health { current: 100.0, max: 100.0 });
-            world.add(e, Position { x: i as f32 * 10.0, y: 0.0, z: 0.0 });
+            world.add(e, Health {
+                current: 100.0,
+                max: 100.0,
+            });
+            world.add(
+                e,
+                Position {
+                    x: i as f32 * 10.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            );
         }
 
         // Damage entities in a specific area (x < 50)
@@ -1731,8 +1777,7 @@ mod tests {
         }
 
         // First pass: read positions and accelerations, update velocities
-        let positions: Vec<_> = world
-            .query::<(&Position, &Acceleration)>()
+        let positions: Vec<_> = world.query::<(&Position, &Acceleration)>()
             .map(|(e, (pos, acc))| (e, pos.x, acc.x))
             .collect();
 
@@ -2032,8 +2077,3 @@ mod tests {
         }
     }
 }
-
-// Include filter tests
-#[cfg(test)]
-#[path = "query_filter_tests.rs"]
-mod query_filter_tests;

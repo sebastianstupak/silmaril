@@ -51,14 +51,7 @@ fn setup_world_single_component(entity_count: usize) -> World {
 
     for i in 0..entity_count {
         let e = world.spawn();
-        world.add(
-            e,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
     }
 
     world
@@ -71,22 +64,8 @@ fn setup_world_two_components(entity_count: usize) -> World {
 
     for i in 0..entity_count {
         let e = world.spawn();
-        world.add(
-            e,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            e,
-            Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
     }
 
     world
@@ -100,30 +79,9 @@ fn setup_world_three_components(entity_count: usize) -> World {
 
     for i in 0..entity_count {
         let e = world.spawn();
-        world.add(
-            e,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            e,
-            Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            e,
-            Acceleration {
-                x: 0.1,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+        world.add(e, Acceleration { x: 0.1, y: 0.0, z: 0.0 });
     }
 
     world
@@ -139,38 +97,11 @@ fn setup_world_five_components(entity_count: usize) -> World {
 
     for i in 0..entity_count {
         let e = world.spawn();
-        world.add(
-            e,
-            Position {
-                x: i as f32,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            e,
-            Velocity {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
-        world.add(
-            e,
-            Acceleration {
-                x: 0.1,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
+        world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
+        world.add(e, Acceleration { x: 0.1, y: 0.0, z: 0.0 });
         world.add(e, Mass { value: 1.0 });
-        world.add(
-            e,
-            Health {
-                current: 100.0,
-                max: 100.0,
-            },
-        );
+        world.add(e, Health { current: 100.0, max: 100.0 });
     }
 
     world
@@ -242,8 +173,7 @@ fn bench_query_two_components_mut(c: &mut Criterion) {
             b.iter_batched(
                 || setup_world_two_components(size),
                 |mut world| {
-                    for (_entity, (pos, vel)) in
-                        world.query_mut::<(&mut Position, &mut Velocity)>()
+                    for (_entity, (pos, vel)) in world.query_mut::<(&mut Position, &mut Velocity)>()
                     {
                         pos.x += black_box(vel.x);
                     }
@@ -339,23 +269,9 @@ fn bench_query_sparse_components(c: &mut Criterion) {
             // Only 10% of entities have both components
             for i in 0..size {
                 let e = world.spawn();
-                world.add(
-                    e,
-                    Position {
-                        x: i as f32,
-                        y: 0.0,
-                        z: 0.0,
-                    },
-                );
+                world.add(e, Position { x: i as f32, y: 0.0, z: 0.0 });
                 if i % 10 == 0 {
-                    world.add(
-                        e,
-                        Velocity {
-                            x: 1.0,
-                            y: 0.0,
-                            z: 0.0,
-                        },
-                    );
+                    world.add(e, Velocity { x: 1.0, y: 0.0, z: 0.0 });
                 }
             }
 

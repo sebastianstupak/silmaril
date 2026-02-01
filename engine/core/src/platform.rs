@@ -14,9 +14,6 @@ pub struct PlatformInfo {
 impl PlatformInfo {
     /// Detects the current platform
     pub fn detect() -> Self {
-        Self {
-            os: std::env::consts::OS.to_string(),
-            arch: std::env::consts::ARCH.to_string(),
-        }
+        Self { os: std::env::consts::OS.to_string(), arch: std::env::consts::ARCH.to_string() }
     }
 }

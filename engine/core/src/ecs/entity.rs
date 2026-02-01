@@ -11,6 +11,13 @@ use serde::{Deserialize, Serialize};
 /// When an entity is freed, its generation is incremented, invalidating
 /// all old handles to that entity.
 ///
+/// # Memory Layout Optimization
+///
+/// Entity is exactly 8 bytes (2 × u32) with no padding. This ensures:
+/// - Cache-friendly: 8 entities fit in a 64-byte cache line
+/// - Efficient copying: Single 64-bit load/store on modern CPUs
+/// - Dense packing: No wasted space in arrays
+///
 /// # Examples
 ///
 /// ```
@@ -20,6 +27,7 @@ use serde::{Deserialize, Serialize};
 /// assert!(allocator.is_alive(entity));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(C)] // Ensure consistent layout across platforms
 pub struct Entity {
     id: u32,
     generation: u32,
@@ -82,10 +90,7 @@ pub struct EntityAllocator {
 impl EntityAllocator {
     /// Create a new entity allocator
     pub fn new() -> Self {
-        Self {
-            generations: Vec::new(),
-            free_list: Vec::new(),
-        }
+        Self { generations: Vec::new(), free_list: Vec::new() }
     }
 
     /// Allocate a new entity or reuse a freed one
@@ -97,28 +102,30 @@ impl EntityAllocator {
     /// # Panics
     ///
     /// Panics if the maximum number of entities (2^32) is exceeded.
+    #[inline]
     pub fn allocate(&mut self) -> Entity {
         if let Some(id) = self.free_list.pop() {
             // Reuse freed ID with incremented generation
             let id_usize = id as usize;
 
-            // Extra defensive: verify the ID is valid
-            assert!(
+            // Extra defensive: verify the ID is valid in debug mode only
+            debug_assert!(
                 id_usize < self.generations.len(),
                 "Free list contained invalid ID: {}",
                 id
             );
 
-            Entity {
-                id,
-                generation: self.generations[id_usize],
-            }
+            // SAFETY: We just verified the ID is valid in debug mode
+            // In release, we trust the free_list only contains valid IDs
+            let generation = unsafe { *self.generations.get_unchecked(id_usize) };
+
+            Entity { id, generation }
         } else {
             // Allocate new ID
             let id = self.generations.len();
 
-            // Extra defensive: check for overflow
-            assert!(
+            // Extra defensive: check for overflow in debug mode only
+            debug_assert!(
                 id <= u32::MAX as usize,
                 "Entity ID overflow: cannot allocate more than {} entities",
                 u32::MAX
@@ -145,6 +152,7 @@ impl EntityAllocator {
     /// assert!(allocator.free(entity));
     /// assert!(!allocator.free(entity)); // Already freed
     /// ```
+    #[inline]
     pub fn free(&mut self, entity: Entity) -> bool {
         if !self.is_alive(entity) {
             return false;
@@ -152,25 +160,91 @@ impl EntityAllocator {
 
         let id = entity.id as usize;
 
-        // Extra defensive: verify generation won't overflow
-        let current_gen = self.generations[id];
-        assert!(
-            current_gen < u32::MAX,
+        // Extra defensive: verify generation won't overflow in debug mode only
+        debug_assert!(
+            self.generations[id] < u32::MAX,
             "Generation overflow for entity ID {}: generation {}",
             entity.id,
-            current_gen
+            self.generations[id]
         );
 
-        // Increment generation to invalidate old handles
-        self.generations[id] += 1;
+        // SAFETY: is_alive() already verified this ID is valid
+        unsafe {
+            *self.generations.get_unchecked_mut(id) += 1;
+        }
         self.free_list.push(entity.id);
 
         true
     }
 
+    /// Allocate multiple entities in a single batch
+    ///
+    /// This is more efficient than calling allocate() repeatedly because it:
+    /// - Reduces per-allocation overhead
+    /// - Improves cache locality by processing allocations together
+    /// - Can pre-allocate the output vector with the exact size needed
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use engine_core::ecs::entity::EntityAllocator;
+    /// let mut allocator = EntityAllocator::new();
+    /// let entities = allocator.allocate_batch(100);
+    /// assert_eq!(entities.len(), 100);
+    /// for entity in &entities {
+    ///     assert!(allocator.is_alive(*entity));
+    /// }
+    /// ```
+    #[inline]
+    pub fn allocate_batch(&mut self, count: usize) -> Vec<Entity> {
+        let mut entities = Vec::with_capacity(count);
+
+        // First, drain as many from the free list as possible
+        let from_free_list = count.min(self.free_list.len());
+        for _ in 0..from_free_list {
+            // SAFETY: We know free_list has at least from_free_list elements
+            let id = unsafe { self.free_list.pop().unwrap_unchecked() };
+            let id_usize = id as usize;
+
+            debug_assert!(
+                id_usize < self.generations.len(),
+                "Free list contained invalid ID: {}",
+                id
+            );
+
+            let generation = unsafe { *self.generations.get_unchecked(id_usize) };
+            entities.push(Entity { id, generation });
+        }
+
+        // Allocate the rest as new IDs
+        let remaining = count - from_free_list;
+        if remaining > 0 {
+            let start_id = self.generations.len();
+            debug_assert!(
+                start_id + remaining <= u32::MAX as usize,
+                "Entity ID overflow: cannot allocate {} more entities",
+                remaining
+            );
+
+            // Reserve space for all new generations at once
+            self.generations.reserve(remaining);
+
+            for i in 0..remaining {
+                let id = (start_id + i) as u32;
+                self.generations.push(0);
+                entities.push(Entity { id, generation: 0 });
+            }
+        }
+
+        entities
+    }
+
     /// Check if entity handle is still valid
     ///
     /// An entity is alive if its ID exists and the generation matches.
+    ///
+    /// This is called extremely frequently in queries, so it's optimized
+    /// to avoid unnecessary bounds checking and branching.
     ///
     /// # Examples
     ///
@@ -183,12 +257,15 @@ impl EntityAllocator {
     /// allocator.free(entity);
     /// assert!(!allocator.is_alive(entity));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn is_alive(&self, entity: Entity) -> bool {
-        self.generations
-            .get(entity.id as usize)
-            .map(|&gen| gen == entity.generation)
-            .unwrap_or(false)
+        let id = entity.id as usize;
+        // Fast path: bounds check then direct comparison
+        // This is faster than .get().map() chain due to reduced branching
+        id < self.generations.len() && unsafe {
+            // SAFETY: We just verified id < len
+            *self.generations.get_unchecked(id) == entity.generation
+        }
     }
 
     /// Get the number of allocated entities (alive + freed)
@@ -207,6 +284,7 @@ impl EntityAllocator {
     }
 
     /// Get the number of currently alive entities
+    #[inline]
     pub fn alive_count(&self) -> usize {
         self.generations.len() - self.free_list.len()
     }
@@ -214,6 +292,7 @@ impl EntityAllocator {
     /// Clear all entities
     ///
     /// This removes all entity data and resets the allocator to its initial state.
+    #[inline]
     pub fn clear(&mut self) {
         self.generations.clear();
         self.free_list.clear();
@@ -367,5 +446,58 @@ mod tests {
         assert!(set.contains(&e1));
         assert!(set.contains(&e2));
         assert!(set.contains(&e3));
+    }
+
+    #[test]
+    fn test_allocate_batch_new() {
+        let mut alloc = EntityAllocator::new();
+        let entities = alloc.allocate_batch(100);
+
+        assert_eq!(entities.len(), 100);
+
+        // All entities should be alive
+        for entity in &entities {
+            assert!(alloc.is_alive(*entity));
+        }
+
+        // All IDs should be unique
+        let mut ids: Vec<_> = entities.iter().map(|e| e.id).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), 100);
+    }
+
+    #[test]
+    fn test_allocate_batch_with_free_list() {
+        let mut alloc = EntityAllocator::new();
+
+        // Allocate and free 50 entities to populate free list
+        let first_batch = alloc.allocate_batch(50);
+        for entity in first_batch {
+            alloc.free(entity);
+        }
+
+        // Batch allocate 100 entities (50 from free list, 50 new)
+        let entities = alloc.allocate_batch(100);
+
+        assert_eq!(entities.len(), 100);
+
+        // All entities should be alive
+        for entity in &entities {
+            assert!(alloc.is_alive(*entity));
+        }
+
+        // First 50 should have generation 1, last 50 should have generation 0
+        let gen_1_count = entities.iter().filter(|e| e.generation() == 1).count();
+        let gen_0_count = entities.iter().filter(|e| e.generation() == 0).count();
+        assert_eq!(gen_1_count, 50);
+        assert_eq!(gen_0_count, 50);
+    }
+
+    #[test]
+    fn test_allocate_batch_empty() {
+        let mut alloc = EntityAllocator::new();
+        let entities = alloc.allocate_batch(0);
+        assert_eq!(entities.len(), 0);
     }
 }

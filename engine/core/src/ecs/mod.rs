@@ -6,15 +6,15 @@
 //! - World container for managing all ECS data
 //! - Type-safe component queries
 
-pub mod entity;
 pub mod component;
+pub mod entity;
+pub mod query;
 pub mod storage;
 pub mod world;
-pub mod query;
 
 // Re-export commonly used types
-pub use entity::{Entity, EntityAllocator};
 pub use component::{Component, ComponentDescriptor};
+pub use entity::{Entity, EntityAllocator};
+pub use query::{Query, QueryIter, QueryIterMut};
 pub use storage::SparseSet;
 pub use world::World;
-pub use query::{Query, QueryIter, QueryIterMut};

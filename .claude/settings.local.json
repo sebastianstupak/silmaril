@@ -13,7 +13,20 @@
       "Bash(timeout 60 cargo build:*)",
       "Bash(git add:*)",
       "Bash(cargo check:*)",
-      "Bash(cargo bench:*)"
+      "Bash(cargo bench:*)",
+      "Bash(tee:*)",
+      "Bash(rustc:*)",
+      "Bash(cargo build:*)",
+      "Bash(git checkout:*)",
+      "Bash(grep:*)",
+      "Bash(cargo run:*)",
+      "Bash(echo:*)",
+      "Bash(cargo:*)",
+      "Bash(timeout 120 bash -c 'while [ ! -f \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\ba32647.output\"\" ] || grep -q \"\"Compiling\\\\|Building\"\" \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\ba32647.output\"\" 2>/dev/null; do sleep 2; done')",
+      "Bash(test -d \"D:\\\\dev\\\\agent-game-engine\\\\engine\\\\core\\\\src\\\\serialization\")",
+      "Bash(git status:*)",
+      "Bash(find:*)",
+      "Bash(timeout 60 bash -c 'while ! grep -q \"\"test result:\"\" \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\ba0ac1b.output\"\" 2>/dev/null; do sleep 2; done':*)"
     ]
   }
 }

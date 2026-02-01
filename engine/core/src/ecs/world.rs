@@ -3,8 +3,9 @@
 //! The World owns all entities and their components, providing the main
 //! interface for creating entities and managing component data.
 
+use super::storage::ComponentStorage;
 use super::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet};
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::collections::HashMap;
 
 /// World container - owns all entities and components
@@ -39,7 +40,7 @@ pub struct World {
     /// Entity allocator
     entities: EntityAllocator,
     /// Component storage (TypeId → type-erased SparseSet)
-    pub(crate) components: HashMap<TypeId, Box<dyn Any>>,
+    pub(crate) components: HashMap<TypeId, Box<dyn ComponentStorage>>,
     /// Component metadata for debugging
     descriptors: HashMap<TypeId, ComponentDescriptor>,
 }
@@ -74,9 +75,8 @@ impl World {
         let type_id = TypeId::of::<T>();
         if !self.components.contains_key(&type_id) {
             self.components
-                .insert(type_id, Box::new(SparseSet::<T>::new()));
-            self.descriptors
-                .insert(type_id, ComponentDescriptor::new::<T>());
+                .insert(type_id, Box::new(SparseSet::<T>::new()) as Box<dyn ComponentStorage>);
+            self.descriptors.insert(type_id, ComponentDescriptor::new::<T>());
         }
     }
 
@@ -92,6 +92,7 @@ impl World {
     /// let entity = world.spawn();
     /// assert!(world.is_alive(entity));
     /// ```
+    #[inline]
     pub fn spawn(&mut self) -> Entity {
         self.entities.allocate()
     }
@@ -111,28 +112,18 @@ impl World {
     /// assert!(world.despawn(entity));
     /// assert!(!world.is_alive(entity));
     /// ```
+    #[inline]
     pub fn despawn(&mut self, entity: Entity) -> bool {
         if !self.entities.is_alive(entity) {
             return false;
         }
 
-        // Remove from all component storages
+        // Remove from all component storages using type-erased method
         for storage in self.components.values_mut() {
-            // Type-erased removal - try to cast and remove
-            // This is safe because we only store SparseSet<T> for registered T
-            Self::remove_component_erased(storage, entity);
+            storage.remove_entity(entity);
         }
 
         self.entities.free(entity)
-    }
-
-    /// Helper to remove a component from type-erased storage
-    fn remove_component_erased(storage: &mut Box<dyn Any>, entity: Entity) {
-        // We don't know the component type here, so we can't call remove directly
-        // This is a limitation of type erasure - we'll handle it with a trait in the future
-        // For now, we'll just skip removal (components will be orphaned)
-        // TODO: Implement ComponentStorage trait for proper type-erased removal
-        let _ = (storage, entity); // Suppress unused warnings
     }
 
     /// Add a component to an entity
@@ -142,7 +133,7 @@ impl World {
     /// # Panics
     ///
     /// Panics if:
-    /// - The entity is not alive
+    /// - The entity is not alive (debug builds only)
     /// - The component type is not registered (call `register::<T>()` first)
     ///
     /// # Examples
@@ -158,8 +149,10 @@ impl World {
     /// let entity = world.spawn();
     /// world.add(entity, Health { current: 100.0, max: 100.0 });
     /// ```
+    #[inline]
     pub fn add<T: Component>(&mut self, entity: Entity, component: T) {
         // Extra defensive: verify entity is alive
+        // Note: This check is always active for safety, even in release builds
         assert!(
             self.entities.is_alive(entity),
             "Cannot add component to dead entity {:?}",
@@ -177,10 +170,23 @@ impl World {
                     std::any::type_name::<T>()
                 )
             })
+            .as_any_mut()
             .downcast_mut::<SparseSet<T>>()
             .expect("Component storage type mismatch (internal error)");
 
         storage.insert(entity, component);
+    }
+
+    /// Get a typed storage reference directly (internal use for queries)
+    ///
+    /// This bypasses the ComponentStorage trait to avoid virtual dispatch overhead.
+    /// Returns None if the component type is not registered.
+    ///
+    /// SAFETY: This is pub(crate) to keep the API clean - only used by query internals.
+    #[inline(always)]
+    pub(crate) fn get_storage<T: Component>(&self) -> Option<&SparseSet<T>> {
+        let type_id = TypeId::of::<T>();
+        self.components.get(&type_id)?.as_any().downcast_ref::<SparseSet<T>>()
     }
 
     /// Get an immutable reference to an entity's component
@@ -206,7 +212,7 @@ impl World {
     pub fn get<T: Component>(&self, entity: Entity) -> Option<&T> {
         let type_id = TypeId::of::<T>();
         let storage = self.components.get(&type_id)?;
-        let storage = storage.downcast_ref::<SparseSet<T>>()?;
+        let storage = storage.as_any().downcast_ref::<SparseSet<T>>()?;
         storage.get(entity)
     }
 
@@ -233,7 +239,7 @@ impl World {
     pub fn get_mut<T: Component>(&mut self, entity: Entity) -> Option<&mut T> {
         let type_id = TypeId::of::<T>();
         let storage = self.components.get_mut(&type_id)?;
-        let storage = storage.downcast_mut::<SparseSet<T>>()?;
+        let storage = storage.as_any_mut().downcast_mut::<SparseSet<T>>()?;
         storage.get_mut(entity)
     }
 
@@ -255,10 +261,11 @@ impl World {
     /// let velocity = world.remove::<Velocity>(entity);
     /// assert!(velocity.is_some());
     /// ```
+    #[inline]
     pub fn remove<T: Component>(&mut self, entity: Entity) -> Option<T> {
         let type_id = TypeId::of::<T>();
         let storage = self.components.get_mut(&type_id)?;
-        let storage = storage.downcast_mut::<SparseSet<T>>()?;
+        let storage = storage.as_any_mut().downcast_mut::<SparseSet<T>>()?;
         storage.remove(entity)
     }
 
@@ -341,29 +348,10 @@ impl World {
     /// checking component existence without knowing the component type at compile time.
     #[allow(dead_code)]
     pub(crate) fn has_component_by_id(&self, entity: Entity, type_id: TypeId) -> bool {
-        // We need to check if the entity is in the sparse set for this type_id
-        // This requires type-erased access to the sparse set's contains() method
-        // For now, we'll use a simple approach: get the descriptor to verify registration,
-        // then try to access the storage and check entity presence
-        if !self.entities.is_alive(entity) {
-            return false;
-        }
-
-        // Check if component type is registered
-        if !self.components.contains_key(&type_id) {
-            return false;
-        }
-
-        // We can't directly call contains() without knowing the type T
-        // So we'll use the descriptor to get the type name and then manually check
-        // This is inefficient but works for filters which are not the hot path
-        //
-        // A better approach would be to have a ComponentStorage trait with
-        // type-erased methods, but that's more complex.
-        //
-        // For now, we return true if the storage exists (component registered)
-        // The actual filtering will happen during iteration when we can access typed storage
-        true
+        self.components
+            .get(&type_id)
+            .map(|storage| storage.contains_entity(entity))
+            .unwrap_or(false)
     }
 }
 
@@ -414,14 +402,7 @@ mod tests {
         world.register::<Transform>();
 
         let entity = world.spawn();
-        world.add(
-            entity,
-            Transform {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-        );
+        world.add(entity, Transform { x: 1.0, y: 2.0, z: 3.0 });
 
         assert!(world.get::<Transform>(entity).is_some());
         let transform = world.get::<Transform>(entity).unwrap();
@@ -437,14 +418,7 @@ mod tests {
         let entity = world.spawn();
         world.despawn(entity);
 
-        world.add(
-            entity,
-            Transform {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        ); // Should panic
+        world.add(entity, Transform { x: 0.0, y: 0.0, z: 0.0 }); // Should panic
     }
 
     #[test]
@@ -453,14 +427,7 @@ mod tests {
         let mut world = World::new();
         let entity = world.spawn();
 
-        world.add(
-            entity,
-            Transform {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        ); // Should panic - not registered
+        world.add(entity, Transform { x: 0.0, y: 0.0, z: 0.0 }); // Should panic - not registered
     }
 
     #[test]
@@ -469,10 +436,7 @@ mod tests {
         world.register::<Health>();
 
         let entity = world.spawn();
-        world.add(entity, Health {
-            current: 100.0,
-            max: 100.0,
-        });
+        world.add(entity, Health { current: 100.0, max: 100.0 });
 
         let removed = world.remove::<Health>(entity);
         assert!(removed.is_some());
@@ -489,14 +453,7 @@ mod tests {
 
         assert!(!world.has::<Transform>(entity));
 
-        world.add(
-            entity,
-            Transform {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add(entity, Transform { x: 0.0, y: 0.0, z: 0.0 });
 
         assert!(world.has::<Transform>(entity));
     }
@@ -507,10 +464,7 @@ mod tests {
         world.register::<Health>();
 
         let entity = world.spawn();
-        world.add(entity, Health {
-            current: 100.0,
-            max: 100.0,
-        });
+        world.add(entity, Health { current: 100.0, max: 100.0 });
 
         if let Some(health) = world.get_mut::<Health>(entity) {
             health.current = 50.0;
@@ -526,18 +480,8 @@ mod tests {
         world.register::<Health>();
 
         let entity = world.spawn();
-        world.add(
-            entity,
-            Transform {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-        );
-        world.add(entity, Health {
-            current: 100.0,
-            max: 100.0,
-        });
+        world.add(entity, Transform { x: 1.0, y: 2.0, z: 3.0 });
+        world.add(entity, Health { current: 100.0, max: 100.0 });
 
         assert!(world.has::<Transform>(entity));
         assert!(world.has::<Health>(entity));
@@ -571,14 +515,7 @@ mod tests {
         world.register::<Transform>(); // Should not panic
 
         let entity = world.spawn();
-        world.add(
-            entity,
-            Transform {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-        );
+        world.add(entity, Transform { x: 1.0, y: 2.0, z: 3.0 });
 
         assert!(world.has::<Transform>(entity));
     }

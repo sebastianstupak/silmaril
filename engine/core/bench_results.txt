@@ -1,0 +1,112 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+    Finished `bench` profile [optimized + debuginfo] target(s) in 0.40s
+     Running benches\query_benches.rs (D:\dev\agent-game-engine\target\release\deps\query_benches-cd48303cad51e6e6.exe)
+Gnuplot not found, using plotters backend
+Benchmarking query_single_component/10000
+Benchmarking query_single_component/10000: Warming up for 2.0000 s
+Benchmarking query_single_component/10000: Collecting 100 samples in estimated 6.8727 s (15k iterations)
+Benchmarking query_single_component/10000: Analyzing
+query_single_component/10000
+                        time:   [419.28 µs 426.96 µs 435.06 µs]
+                        change: [-2.6394% +0.5104% +3.6484%] (p = 0.76 > 0.05)
+                        No change in performance detected.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+
+Benchmarking query_single_component_mut/10000
+Benchmarking query_single_component_mut/10000: Warming up for 2.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.1s, enable flat sampling, or reduce sample count to 50.
+Benchmarking query_single_component_mut/10000: Collecting 100 samples in estimated 7.0615 s (5050 iterations)
+Benchmarking query_single_component_mut/10000: Analyzing
+query_single_component_mut/10000
+                        time:   [410.56 µs 417.20 µs 424.14 µs]
+                        change: [-3.5899% -0.4211% +2.6058%] (p = 0.80 > 0.05)
+                        No change in performance detected.
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking query_two_components/10000
+Benchmarking query_two_components/10000: Warming up for 2.0000 s
+Benchmarking query_two_components/10000: Collecting 100 samples in estimated 9.1731 s (10k iterations)
+Benchmarking query_two_components/10000: Analyzing
+query_two_components/10000
+                        time:   [906.81 µs 975.46 µs 1.0690 ms]
+                        change: [-1.7099% +3.0567% +9.4836%] (p = 0.31 > 0.05)
+                        No change in performance detected.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  5 (5.00%) high severe
+
+Benchmarking query_two_components_mut/10000
+Benchmarking query_two_components_mut/10000: Warming up for 2.0000 s
+Benchmarking query_two_components_mut/10000: Collecting 100 samples in estimated 5.1574 s (2400 iterations)
+Benchmarking query_two_components_mut/10000: Analyzing
+query_two_components_mut/10000
+                        time:   [822.50 µs 841.23 µs 860.98 µs]
+                        change: [-0.9796% +2.3665% +6.1165%] (p = 0.19 > 0.05)
+                        No change in performance detected.
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking query_three_components/10000
+Benchmarking query_three_components/10000: Warming up for 2.0000 s
+Benchmarking query_three_components/10000: Collecting 100 samples in estimated 6.2744 s (20k iterations)
+Benchmarking query_three_components/10000: Analyzing
+query_three_components/10000
+                        time:   [302.50 µs 307.91 µs 313.75 µs]
+                        change: [-1.8596% +1.4511% +4.8053%] (p = 0.40 > 0.05)
+                        No change in performance detected.
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) low mild
+  3 (3.00%) high mild
+
+Benchmarking query_five_components/10000
+Benchmarking query_five_components/10000: Warming up for 2.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.5s, enable flat sampling, or reduce sample count to 60.
+Benchmarking query_five_components/10000: Collecting 100 samples in estimated 5.5283 s (5050 iterations)
+Benchmarking query_five_components/10000: Analyzing
+query_five_components/10000
+                        time:   [1.1030 ms 1.1272 ms 1.1536 ms]
+                        change: [-9.2006% -6.0462% -3.0490%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking query_physics_simulation/10000
+Benchmarking query_physics_simulation/10000: Warming up for 2.0000 s
+Benchmarking query_physics_simulation/10000: Collecting 100 samples in estimated 5.2845 s (1500 iterations)
+Benchmarking query_physics_simulation/10000: Analyzing
+query_physics_simulation/10000
+                        time:   [1.3993 ms 1.4166 ms 1.4359 ms]
+                        change: [-9.8385% -6.7317% -3.8180%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking query_sparse_components/10000
+Benchmarking query_sparse_components/10000: Warming up for 2.0000 s
+Benchmarking query_sparse_components/10000: Collecting 100 samples in estimated 5.4170 s (50k iterations)
+Benchmarking query_sparse_components/10000: Analyzing
+query_sparse_components/10000
+                        time:   [107.11 µs 109.04 µs 111.10 µs]
+                        change: [-2.7851% +0.3236% +3.5320%] (p = 0.85 > 0.05)
+                        No change in performance detected.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+

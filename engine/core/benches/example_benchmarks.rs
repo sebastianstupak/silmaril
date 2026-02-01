@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo bench -p engine-core
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 // =============================================================================
 // Basic Benchmarks
@@ -38,19 +38,15 @@ fn bench_vector_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("vector_creation");
 
     for size in [10, 100, 1_000, 10_000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let mut v = Vec::with_capacity(size);
-                    for i in 0..size {
-                        v.push(black_box(i));
-                    }
-                    black_box(v)
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let mut v = Vec::with_capacity(size);
+                for i in 0..size {
+                    v.push(black_box(i));
+                }
+                black_box(v)
+            });
+        });
     }
 
     group.finish();
@@ -193,15 +189,12 @@ fn bench_position_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("position_operations");
 
     group.bench_function("distance_single", |b| {
-        b.iter(|| {
-            black_box(pos1.distance_to(&pos2))
-        });
+        b.iter(|| black_box(pos1.distance_to(&pos2)));
     });
 
     group.bench_function("distance_batch_1000", |b| {
-        let positions: Vec<_> = (0..1000)
-            .map(|i| MockPosition::new(i as f32, i as f32, i as f32))
-            .collect();
+        let positions: Vec<_> =
+            (0..1000).map(|i| MockPosition::new(i as f32, i as f32, i as f32)).collect();
 
         b.iter(|| {
             let mut total_distance = 0.0;
@@ -219,32 +212,15 @@ fn bench_position_operations(c: &mut Criterion) {
 // Benchmark Groups
 // =============================================================================
 
-criterion_group!(
-    basic_benches,
-    bench_simple_operation,
-    bench_vector_creation,
-);
+criterion_group!(basic_benches, bench_simple_operation, bench_vector_creation,);
 
-criterion_group!(
-    parameterized_benches,
-    bench_vector_sizes,
-    bench_iteration_methods,
-);
+criterion_group!(parameterized_benches, bench_vector_sizes, bench_iteration_methods,);
 
-criterion_group!(
-    allocation_benches,
-    bench_allocations,
-);
+criterion_group!(allocation_benches, bench_allocations,);
 
-criterion_group!(
-    throughput_benches,
-    bench_data_processing,
-);
+criterion_group!(throughput_benches, bench_data_processing,);
 
-criterion_group!(
-    component_benches,
-    bench_position_operations,
-);
+criterion_group!(component_benches, bench_position_operations,);
 
 criterion_main!(
     basic_benches,
