@@ -265,8 +265,6 @@ impl GpuMesh {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_buffer_sizes() {
         // Just test size calculations (no Vulkan required)
