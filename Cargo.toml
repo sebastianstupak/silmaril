@@ -40,7 +40,7 @@ parking_lot = "0.12"
 tracy-client = { version = "0.17", default-features = false }
 
 # Math
-glam = { version = "0.29", features = ["serde"] }
+glam = { version = "0.31", features = ["serde"] }
 
 # Graphics
 ash = "0.38"

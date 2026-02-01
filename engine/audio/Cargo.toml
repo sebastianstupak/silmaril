@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 kira = "0.8"
 engine-core = { path = "../core" }
-glam = "0.25"
+glam = "0.31"
 
 [dev-dependencies]
 criterion = "0.5"

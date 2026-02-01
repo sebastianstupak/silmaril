@@ -15,7 +15,7 @@ backtrace = ["engine-core/backtrace"]
 ash = "0.38"
 ash-window = "0.13"
 gpu-allocator = { version = "0.28", features = ["vulkan"] }
-glam = "0.25"
+glam = "0.31"
 winit = "0.30"
 tracing = "0.1"
 smallvec = "1.13"
