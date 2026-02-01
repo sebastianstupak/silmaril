@@ -59,10 +59,7 @@ impl Aabb {
     /// ```
     #[inline]
     pub fn from_center_half_extents(center: Vec3, half_extents: Vec3) -> Self {
-        Self {
-            min: center - half_extents,
-            max: center + half_extents,
-        }
+        Self { min: center - half_extents, max: center + half_extents }
     }
 
     /// Create an AABB that encompasses a single point.
@@ -139,10 +136,7 @@ impl Aabb {
     /// Merge this AABB with another, returning a new AABB that contains both.
     #[inline]
     pub fn merge(&self, other: &Aabb) -> Aabb {
-        Aabb {
-            min: self.min.min(other.min),
-            max: self.max.max(other.max),
-        }
+        Aabb { min: self.min.min(other.min), max: self.max.max(other.max) }
     }
 
     /// Expand this AABB to include a point.
@@ -156,10 +150,7 @@ impl Aabb {
     #[inline]
     pub fn expand(&self, margin: f32) -> Aabb {
         let margin_vec = Vec3::new(margin, margin, margin);
-        Aabb {
-            min: self.min - margin_vec,
-            max: self.max + margin_vec,
-        }
+        Aabb { min: self.min - margin_vec, max: self.max + margin_vec }
     }
 
     /// Test ray intersection with this AABB.
@@ -179,7 +170,12 @@ impl Aabb {
     /// let hit = aabb.ray_intersection(origin, direction, 10.0);
     /// assert!(hit.is_some());
     /// ```
-    pub fn ray_intersection(&self, origin: Vec3, direction: Vec3, max_distance: f32) -> Option<(f32, f32)> {
+    pub fn ray_intersection(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        max_distance: f32,
+    ) -> Option<(f32, f32)> {
         // Optimized slab method
         let inv_dir = Vec3::new(
             if direction.x != 0.0 { 1.0 / direction.x } else { f32::INFINITY },
@@ -230,10 +226,7 @@ impl Component for Aabb {}
 
 impl Default for Aabb {
     fn default() -> Self {
-        Self {
-            min: Vec3::ZERO,
-            max: Vec3::ZERO,
-        }
+        Self { min: Vec3::ZERO, max: Vec3::ZERO }
     }
 }
 

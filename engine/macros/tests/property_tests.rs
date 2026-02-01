@@ -167,7 +167,7 @@ mod macro_interaction_properties {
 
             let a = MultiDerived { value };
             let b = a; // Copy
-            let c = a.clone(); // Clone
+            let c = a; // Clone
 
             // Properties: Copy and Clone produce equal values
             prop_assert_eq!(a, b);
@@ -279,7 +279,7 @@ mod network_message_properties {
             z in -1000.0f32..1000.0,
         ) {
             // Simulate message serialization
-            let message = vec![x.to_le_bytes(), y.to_le_bytes(), z.to_le_bytes()];
+            let message = [x.to_le_bytes(), y.to_le_bytes(), z.to_le_bytes()];
             let total_size: usize = message.iter().map(|b| b.len()).sum();
 
             // Property: 3 f32s = 12 bytes
@@ -326,10 +326,7 @@ mod prediction_properties {
     }
 
     fn simulate_movement(pos: Position, vel: Velocity, dt: f32) -> Position {
-        Position {
-            x: pos.x + vel.x * dt,
-            y: pos.y + vel.y * dt,
-        }
+        Position { x: pos.x + vel.x * dt, y: pos.y + vel.y * dt }
     }
 
     // Property: Client prediction should match server simulation

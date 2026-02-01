@@ -67,11 +67,7 @@ impl CommandPool {
         queue_family_index: u32,
         flags: vk::CommandPoolCreateFlags,
     ) -> Result<Self, CommandError> {
-        debug!(
-            queue_family = queue_family_index,
-            ?flags,
-            "Creating command pool"
-        );
+        debug!(queue_family = queue_family_index, ?flags, "Creating command pool");
 
         let pool_info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(queue_family_index)
@@ -83,10 +79,7 @@ impl CommandPool {
 
         debug!(pool = ?pool, "Command pool created successfully");
 
-        Ok(Self {
-            pool,
-            device: device.clone(),
-        })
+        Ok(Self { pool, device: device.clone() })
     }
 
     /// Allocate command buffers from this pool
@@ -117,11 +110,7 @@ impl CommandPool {
         level: vk::CommandBufferLevel,
         count: u32,
     ) -> Result<Vec<vk::CommandBuffer>, CommandError> {
-        debug!(
-            count = count,
-            ?level,
-            "Allocating command buffers"
-        );
+        debug!(count = count, ?level, "Allocating command buffers");
 
         let alloc_info = vk::CommandBufferAllocateInfo::default()
             .command_pool(self.pool)
@@ -158,10 +147,8 @@ impl CommandPool {
     pub fn reset(&self, device: &ash::Device) -> Result<(), CommandError> {
         debug!("Resetting command pool");
 
-        unsafe {
-            device.reset_command_pool(self.pool, vk::CommandPoolResetFlags::empty())
-        }
-        .map_err(|e| CommandError::resetfailed(format!("vkResetCommandPool failed: {}", e)))?;
+        unsafe { device.reset_command_pool(self.pool, vk::CommandPoolResetFlags::empty()) }
+            .map_err(|e| CommandError::resetfailed(format!("vkResetCommandPool failed: {}", e)))?;
 
         debug!("Command pool reset successfully");
 
@@ -259,9 +246,8 @@ impl CommandBuffer {
     /// # Ok::<(), engine_renderer::CommandError>(())
     /// ```
     pub fn end(&self, device: &ash::Device) -> Result<(), CommandError> {
-        unsafe { device.end_command_buffer(self.buffer) }.map_err(|e| {
-            CommandError::endfailed(format!("vkEndCommandBuffer failed: {}", e))
-        })?;
+        unsafe { device.end_command_buffer(self.buffer) }
+            .map_err(|e| CommandError::endfailed(format!("vkEndCommandBuffer failed: {}", e)))?;
 
         Ok(())
     }
@@ -302,16 +288,9 @@ impl CommandBuffer {
         extent: vk::Extent2D,
         clear_color: [f32; 4],
     ) {
-        let clear_value = vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: clear_color,
-            },
-        };
+        let clear_value = vk::ClearValue { color: vk::ClearColorValue { float32: clear_color } };
 
-        let render_area = vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent,
-        };
+        let render_area = vk::Rect2D { offset: vk::Offset2D { x: 0, y: 0 }, extent };
 
         let render_pass_info = vk::RenderPassBeginInfo::default()
             .render_pass(render_pass)

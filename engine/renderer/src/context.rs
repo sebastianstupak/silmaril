@@ -142,7 +142,10 @@ impl VulkanContext {
         let entry = unsafe {
             ash::Entry::load().map_err(|e| {
                 error!(error = ?e, "Failed to load Vulkan library");
-                RendererError::instancecreationfailed(format!("Failed to load Vulkan library: {:?}", e))
+                RendererError::instancecreationfailed(format!(
+                    "Failed to load Vulkan library: {:?}",
+                    e
+                ))
             })?
         };
 
@@ -319,7 +322,9 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
     if vk::api_version_major(api_version) < 1
         || (vk::api_version_major(api_version) == 1 && vk::api_version_minor(api_version) < 1)
     {
-        return Err(RendererError::instancecreationfailed("Vulkan 1.1 or higher required".to_string()));
+        return Err(RendererError::instancecreationfailed(
+            "Vulkan 1.1 or higher required".to_string(),
+        ));
     }
 
     // Application info
@@ -363,7 +368,10 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
         // It returns a Vec of layer properties, no pointer manipulation needed.
         let available_layers = unsafe {
             entry.enumerate_instance_layer_properties().map_err(|e| {
-                RendererError::instancecreationfailed(format!("Failed to enumerate layers: {:?}", e))
+                RendererError::instancecreationfailed(format!(
+                    "Failed to enumerate layers: {:?}",
+                    e
+                ))
             })?
         };
 
@@ -782,9 +790,9 @@ fn create_logical_device(
     // SAFETY: physical_device is valid, create_info is properly initialized.
     // All pointers in create_info (queue_create_infos, extensions) remain valid for this call.
     let device = unsafe {
-        instance.create_device(physical_device, &create_info, None).map_err(|e| {
-            RendererError::logicaldevicecreationfailed(format!("{:?}", e))
-        })?
+        instance
+            .create_device(physical_device, &create_info, None)
+            .map_err(|e| RendererError::logicaldevicecreationfailed(format!("{:?}", e)))?
     };
 
     // Get queue handles

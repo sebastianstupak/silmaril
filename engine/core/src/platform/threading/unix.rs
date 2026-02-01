@@ -34,9 +34,7 @@ impl UnixThreading {
     /// Create a new Unix threading backend.
     pub fn new() -> Result<Self, PlatformError> {
         // Cache CPU count for affinity validation
-        let num_cpus = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(1);
+        let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
 
         Ok(Self { num_cpus })
     }
@@ -102,18 +100,16 @@ impl ThreadingBackend for UnixThreading {
         if result != 0 {
             // Provide helpful error message
             let details = match result {
-                libc::EINVAL => format!(
-                    "Invalid priority/policy for {:?} (errno: EINVAL)",
-                    priority
-                ),
+                libc::EINVAL => {
+                    format!("Invalid priority/policy for {:?} (errno: EINVAL)", priority)
+                }
                 libc::EPERM => format!(
                     "Permission denied for {:?} (errno: EPERM) - need CAP_SYS_NICE for realtime",
                     priority
                 ),
-                _ => format!(
-                    "pthread_setschedparam failed with code {} for {:?}",
-                    result, priority
-                ),
+                _ => {
+                    format!("pthread_setschedparam failed with code {} for {:?}", result, priority)
+                }
             };
 
             return Err(PlatformError::ThreadingError {
@@ -138,10 +134,7 @@ impl ThreadingBackend for UnixThreading {
             if core >= self.num_cpus {
                 return Err(PlatformError::ThreadingError {
                     operation: "set_affinity".to_string(),
-                    details: format!(
-                        "Core {} exceeds available CPUs ({})",
-                        core, self.num_cpus
-                    ),
+                    details: format!("Core {} exceeds available CPUs ({})", core, self.num_cpus),
                 });
             }
         }
@@ -299,18 +292,16 @@ impl ThreadingBackend for MacOsThreading {
         if result != 0 {
             // Provide helpful error messages
             let details = match result {
-                libc::EINVAL => format!(
-                    "Invalid priority/policy for {:?} (errno: EINVAL)",
-                    priority
-                ),
+                libc::EINVAL => {
+                    format!("Invalid priority/policy for {:?} (errno: EINVAL)", priority)
+                }
                 libc::EPERM => format!(
                     "Permission denied for {:?} (errno: EPERM) - realtime may require root",
                     priority
                 ),
-                _ => format!(
-                    "pthread_setschedparam failed with code {} for {:?}",
-                    result, priority
-                ),
+                _ => {
+                    format!("pthread_setschedparam failed with code {} for {:?}", result, priority)
+                }
             };
 
             return Err(PlatformError::ThreadingError {

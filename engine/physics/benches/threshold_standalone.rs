@@ -3,9 +3,7 @@
 //! This benchmark is self-contained and doesn't depend on other engine components
 //! that may have compilation issues.
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rayon::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,19 +19,11 @@ impl Vec3 {
     }
 
     fn mul_scalar(self, scalar: f32) -> Self {
-        Self {
-            x: self.x * scalar,
-            y: self.y * scalar,
-            z: self.z * scalar,
-        }
+        Self { x: self.x * scalar, y: self.y * scalar, z: self.z * scalar }
     }
 
     fn add(self, other: Self) -> Self {
-        Self {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-        }
+        Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
     }
 }
 
@@ -44,9 +34,7 @@ struct Transform {
 
 impl Transform {
     fn identity() -> Self {
-        Self {
-            position: Vec3::new(0.0, 0.0, 0.0),
-        }
+        Self { position: Vec3::new(0.0, 0.0, 0.0) }
     }
 }
 
@@ -114,9 +102,8 @@ fn process_with_threshold(
 fn bench_crossover_point(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossover_point");
 
-    let entity_counts = vec![
-        500, 750, 1_000, 1_250, 1_500, 1_750, 2_000, 2_500, 3_000, 4_000, 5_000,
-    ];
+    let entity_counts =
+        vec![500, 750, 1_000, 1_250, 1_500, 1_750, 2_000, 2_500, 3_000, 4_000, 5_000];
 
     for entity_count in entity_counts.iter() {
         let count = *entity_count;
@@ -154,8 +141,8 @@ fn bench_crossover_point(c: &mut Criterion) {
 fn bench_threshold_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("threshold_comparison");
 
-    let thresholds = vec![1_000, 1_500, 2_000, 2_500, 3_000, 4_000, 5_000];
-    let entity_counts = vec![500, 1_000, 2_000, 3_000, 5_000, 7_500, 10_000, 20_000];
+    let thresholds = [1_000, 1_500, 2_000, 2_500, 3_000, 4_000, 5_000];
+    let entity_counts = [500, 1_000, 2_000, 3_000, 5_000, 7_500, 10_000, 20_000];
 
     for entity_count in entity_counts.iter() {
         let count = *entity_count;
@@ -187,7 +174,7 @@ fn bench_threshold_comparison(c: &mut Criterion) {
 fn bench_parallel_overhead(c: &mut Criterion) {
     let mut group = c.benchmark_group("parallel_overhead");
 
-    let entity_counts = vec![100, 250, 500, 750, 1_000, 1_500, 2_000];
+    let entity_counts = [100, 250, 500, 750, 1_000, 1_500, 2_000];
 
     for entity_count in entity_counts.iter() {
         let count = *entity_count;
@@ -225,8 +212,8 @@ fn bench_parallel_overhead(c: &mut Criterion) {
 fn bench_target_range_detailed(c: &mut Criterion) {
     let mut group = c.benchmark_group("target_range_detailed");
 
-    let thresholds = vec![1_500, 2_000, 2_500, 3_000];
-    let entity_counts = vec![1_000, 2_000, 3_000, 5_000, 7_500, 10_000];
+    let thresholds = [1_500, 2_000, 2_500, 3_000];
+    let entity_counts = [1_000, 2_000, 3_000, 5_000, 7_500, 10_000];
 
     for entity_count in entity_counts.iter() {
         let count = *entity_count;

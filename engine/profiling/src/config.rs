@@ -60,11 +60,11 @@ pub enum ConfigError {
 impl std::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigError::FileNotFound(path) => write!(f, "Configuration file not found: {}", path),
-            ConfigError::ParseError(msg) => write!(f, "Failed to parse configuration: {}", msg),
-            ConfigError::InvalidDuration(s) => write!(f, "Invalid duration format: {}", s),
-            ConfigError::IoError(msg) => write!(f, "I/O error: {}", msg),
-            ConfigError::MissingField(field) => write!(f, "Missing required field: {}", field),
+            ConfigError::FileNotFound(path) => write!(f, "Configuration file not found: {path}"),
+            ConfigError::ParseError(msg) => write!(f, "Failed to parse configuration: {msg}"),
+            ConfigError::InvalidDuration(s) => write!(f, "Invalid duration format: {s}"),
+            ConfigError::IoError(msg) => write!(f, "I/O error: {msg}"),
+            ConfigError::MissingField(field) => write!(f, "Missing required field: {field}"),
         }
     }
 }
@@ -75,18 +75,15 @@ impl std::error::Error for ConfigError {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "config", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "config", serde(rename_all = "snake_case"))]
+#[derive(Default)]
 pub enum ProfileFormat {
-    /// Chrome Tracing JSON format (for chrome://tracing)
+    /// Chrome Tracing JSON format (for <chrome://tracing>)
+    #[default]
     ChromeTrace,
     /// Generic JSON format
     Json,
 }
 
-impl Default for ProfileFormat {
-    fn default() -> Self {
-        ProfileFormat::ChromeTrace
-    }
-}
 
 /// Configuration for profiling data retention.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,7 +122,7 @@ impl Default for RetentionConfig {
 /// - `PROFILE_PERSIST`: "true" or "false"
 /// - `PROFILE_DIR`: Output directory path
 /// - `PROFILE_MAX_SIZE_MB`: Maximum file size in MB
-/// - `PROFILE_FORMAT`: "chrome_trace" or "json"
+/// - `PROFILE_FORMAT`: "`chrome_trace`" or "json"
 /// - `PROFILE_BUFFER_FRAMES`: Circular buffer size
 /// - `PROFILE_BUDGET_<name>`: Budget for specific scope (e.g., `PROFILE_BUDGET_GAME_LOOP=16.0ms`)
 ///
@@ -184,6 +181,7 @@ impl ProfilerConfig {
     /// Default configuration for development builds.
     ///
     /// Profiling enabled with reasonable defaults for development workflow.
+    #[must_use] 
     pub fn default_dev() -> Self {
         let mut budgets = HashMap::new();
         budgets.insert("game_loop".to_string(), Duration::from_millis(16)); // 60 FPS
@@ -205,6 +203,7 @@ impl ProfilerConfig {
     /// Default configuration for release builds.
     ///
     /// All profiling disabled to ensure zero overhead.
+    #[must_use] 
     pub fn default_release() -> Self {
         Self {
             enabled: false,
@@ -269,7 +268,7 @@ impl ProfilerConfig {
     /// - `PROFILE_PERSIST`: "true" or "false"
     /// - `PROFILE_DIR`: Output directory path
     /// - `PROFILE_MAX_SIZE_MB`: Maximum file size in MB
-    /// - `PROFILE_FORMAT`: "chrome_trace" or "json"
+    /// - `PROFILE_FORMAT`: "`chrome_trace`" or "json"
     /// - `PROFILE_BUFFER_FRAMES`: Circular buffer size
     /// - `PROFILE_BUDGET_<name>`: Budget for specific scope
     ///
@@ -280,6 +279,7 @@ impl ProfilerConfig {
     ///
     /// let config = ProfilerConfig::from_env();
     /// ```
+    #[must_use] 
     pub fn from_env() -> Self {
         let mut config = Self::default_dev();
 
@@ -564,12 +564,13 @@ pub fn parse_duration(s: &str) -> Result<Duration, ConfigError> {
 /// assert_eq!(format_duration(&Duration::from_millis(16)), "16.0ms");
 /// assert_eq!(format_duration(&Duration::from_secs(1)), "1000.0ms");
 /// ```
+#[must_use] 
 pub fn format_duration(duration: &Duration) -> String {
     let micros = duration.as_micros();
     if micros >= 1000 {
         format!("{:.1}ms", micros as f64 / 1000.0)
     } else {
-        format!("{}us", micros)
+        format!("{micros}us")
     }
 }
 

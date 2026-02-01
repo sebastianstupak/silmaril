@@ -159,6 +159,7 @@ impl AgentFeedbackMetrics {
     /// let metrics = AgentFeedbackMetrics::from_profiler(&profiler);
     /// # }
     /// ```
+    #[must_use] 
     pub fn from_profiler(profiler: &Profiler) -> Self {
         let history = profiler.frame_history();
 
@@ -222,6 +223,7 @@ impl AgentFeedbackMetrics {
     /// assert!(json.contains("frame_time_ms"));
     /// # }
     /// ```
+    #[must_use] 
     pub fn to_json(&self) -> String {
         #[cfg(feature = "serde")]
         {
@@ -248,7 +250,7 @@ impl AgentFeedbackMetrics {
             json.push_str(r#"  "time_by_category": {"#);
             json.push('\n');
             for (i, (k, v)) in self.time_by_category.iter().enumerate() {
-                json.push_str(&format!(r#"    "{}": {}"#, k, v));
+                json.push_str(&format!(r#"    "{k}": {v}"#));
                 if i < self.time_by_category.len() - 1 {
                     json.push(',');
                 }
@@ -332,6 +334,7 @@ impl Profiler {
     /// println!("Frame time p95: {}ms", metrics.frame_time_p95_ms);
     /// # }
     /// ```
+    #[must_use] 
     pub fn get_agent_metrics(&self) -> AgentFeedbackMetrics {
         AgentFeedbackMetrics::from_profiler(self)
     }

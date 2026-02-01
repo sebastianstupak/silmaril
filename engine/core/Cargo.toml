@@ -97,3 +97,15 @@ harness = false
 [[bench]]
 name = "spatial_benches"
 harness = false
+
+[[bench]]
+name = "ecs_comprehensive"
+harness = false
+
+[[bench]]
+name = "ecs_simple"
+harness = false
+
+[[bench]]
+name = "serialization_comprehensive"
+harness = false

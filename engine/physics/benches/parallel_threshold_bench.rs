@@ -36,8 +36,8 @@ fn bench_threshold_comparison(c: &mut Criterion) {
     group
         .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
-    let thresholds = vec![1_000, 2_000, 3_000, 5_000, 10_000];
-    let entity_counts = vec![500, 1_000, 2_000, 5_000, 10_000, 20_000];
+    let thresholds = [1_000, 2_000, 3_000, 5_000, 10_000];
+    let entity_counts = [500, 1_000, 2_000, 5_000, 10_000, 20_000];
 
     for entity_count in entity_counts.iter() {
         group.throughput(Throughput::Elements(*entity_count as u64));
@@ -150,7 +150,7 @@ fn bench_parallel_overhead(c: &mut Criterion) {
     let mut group = c.benchmark_group("parallel_overhead");
 
     // Test very small counts to measure pure overhead
-    let entity_counts = vec![10, 50, 100, 250, 500, 750, 1_000];
+    let entity_counts = [10, 50, 100, 250, 500, 750, 1_000];
 
     for entity_count in entity_counts.iter() {
         let count = *entity_count;
@@ -189,8 +189,8 @@ fn bench_optimal_threshold_candidates(c: &mut Criterion) {
     let mut group = c.benchmark_group("optimal_threshold_candidates");
 
     // Test the most promising threshold values in the target range
-    let thresholds = vec![1_500, 2_000, 2_500, 3_000, 3_500, 4_000];
-    let entity_counts = vec![1_000, 2_000, 3_000, 5_000, 7_500, 10_000];
+    let thresholds = [1_500, 2_000, 2_500, 3_000, 3_500, 4_000];
+    let entity_counts = [1_000, 2_000, 3_000, 5_000, 7_500, 10_000];
 
     for entity_count in entity_counts.iter() {
         let count = *entity_count;

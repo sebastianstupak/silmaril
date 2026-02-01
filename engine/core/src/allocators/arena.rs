@@ -92,11 +92,7 @@ impl Arena {
         assert!(chunk_size >= 1024, "Chunk size must be at least 1KB");
         assert!(chunk_size.is_power_of_two(), "Chunk size must be power of 2");
 
-        Self {
-            current_chunk: Cell::new(None),
-            chunks: Vec::new(),
-            chunk_size,
-        }
+        Self { current_chunk: Cell::new(None), chunks: Vec::new(), chunk_size }
     }
 
     /// Allocate a single value in the arena
@@ -243,11 +239,7 @@ impl Chunk {
             let ptr = alloc(layout);
             assert!(!ptr.is_null(), "Arena chunk allocation failed");
 
-            Self {
-                ptr: NonNull::new_unchecked(ptr),
-                capacity: size,
-                offset: 0,
-            }
+            Self { ptr: NonNull::new_unchecked(ptr), capacity: size, offset: 0 }
         }
     }
 
@@ -267,11 +259,7 @@ impl Chunk {
     }
 
     fn clone(&self) -> Self {
-        Self {
-            ptr: self.ptr,
-            capacity: self.capacity,
-            offset: self.offset,
-        }
+        Self { ptr: self.ptr, capacity: self.capacity, offset: self.offset }
     }
 }
 
@@ -361,21 +349,21 @@ mod tests {
     fn test_arena_reset() {
         let mut arena = Arena::new();
 
-        let before_capacity = arena.capacity();
-
         // Allocate some data
         let _a = arena.alloc(1u64);
         let _b = arena.alloc(2u64);
 
         let used = arena.used();
+        let capacity_after_alloc = arena.capacity();
         assert!(used > 0);
+        assert!(capacity_after_alloc > 0);
 
         // Reset
         arena.reset();
 
-        // Should reuse memory
+        // Should reuse memory (capacity stays the same, used goes to 0)
         assert_eq!(arena.used(), 0);
-        assert_eq!(arena.capacity(), before_capacity);
+        assert_eq!(arena.capacity(), capacity_after_alloc);
     }
 
     #[test]
@@ -412,10 +400,7 @@ mod tests {
     #[test]
     fn test_arena_custom_alignment() {
         let mut arena = Arena::new();
-        let data = arena.alloc(AlignedData {
-            _pad: [0; 63],
-            value: 42,
-        });
+        let data = arena.alloc(AlignedData { _pad: [0; 63], value: 42 });
 
         assert_eq!(data.value, 42);
     }

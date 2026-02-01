@@ -25,8 +25,6 @@
 #[cfg(feature = "admin")]
 use engine_observability::admin::{AdminCommand, AdminConsole};
 
-use std::time::{Duration, Instant};
-use tracing::info;
 
 #[cfg(feature = "admin")]
 #[tokio::main]
@@ -79,10 +77,7 @@ async fn main() {
             tick_count += 1;
 
             if tick_count % 60 == 0 {
-                info!(
-                    "Tick {}: {} entities, paused={}",
-                    tick_count, entity_count, paused
-                );
+                info!("Tick {}: {} entities, paused={}", tick_count, entity_count, paused);
             }
         }
 
@@ -140,26 +135,20 @@ fn process_command(
             *entity_count -= actual;
             format!("Despawned {} entities (total: {})", actual, entity_count)
         }
-        AdminCommand::SetConfig { key, value } => {
-            match key.as_str() {
-                "max_clients" => {
-                    match value.parse::<u32>() {
-                        Ok(val) => {
-                            *max_clients = val;
-                            format!("Set max_clients = {}", val)
-                        }
-                        Err(_) => "Error: max_clients must be a number".to_string(),
-                    }
+        AdminCommand::SetConfig { key, value } => match key.as_str() {
+            "max_clients" => match value.parse::<u32>() {
+                Ok(val) => {
+                    *max_clients = val;
+                    format!("Set max_clients = {}", val)
                 }
-                _ => format!("Error: Unknown config key '{}'", key),
-            }
-        }
-        AdminCommand::GetConfig { key } => {
-            match key.as_str() {
-                "max_clients" => format!("max_clients = {}", max_clients),
-                _ => format!("Error: Unknown config key '{}'", key),
-            }
-        }
+                Err(_) => "Error: max_clients must be a number".to_string(),
+            },
+            _ => format!("Error: Unknown config key '{}'", key),
+        },
+        AdminCommand::GetConfig { key } => match key.as_str() {
+            "max_clients" => format!("max_clients = {}", max_clients),
+            _ => format!("Error: Unknown config key '{}'", key),
+        },
         _ => "Command not implemented".to_string(),
     }
 }

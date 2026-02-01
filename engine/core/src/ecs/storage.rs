@@ -470,11 +470,11 @@ impl<T: Component> ComponentStorage for SparseSet<T> {
 
     fn get_component_data(&self, entity: Entity) -> Option<crate::serialization::ComponentData> {
         // Import ComponentData and all component types
-        use crate::serialization::ComponentData;
         use crate::gameplay::Health;
         use crate::math::Transform;
         use crate::physics_components::Velocity;
         use crate::rendering::MeshRenderer;
+        use crate::serialization::ComponentData;
         use std::any::TypeId;
 
         let type_id = TypeId::of::<T>();

@@ -76,7 +76,9 @@ impl Surface {
                 None, // No custom allocator
             )
         }
-        .map_err(|e| SurfaceError::creationfailed(format!("ash_window::create_surface failed: {}", e)))?;
+        .map_err(|e| {
+            SurfaceError::creationfailed(format!("ash_window::create_surface failed: {}", e))
+        })?;
 
         // Create surface loader for queries
         let surface_loader = ash::khr::surface::Instance::new(entry, instance);

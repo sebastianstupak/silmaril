@@ -63,11 +63,7 @@ impl Framebuffer {
         image_view: vk::ImageView,
         extent: vk::Extent2D,
     ) -> Result<Self, FramebufferError> {
-        debug!(
-            width = extent.width,
-            height = extent.height,
-            "Creating framebuffer"
-        );
+        debug!(width = extent.width, height = extent.height, "Creating framebuffer");
 
         let attachments = [image_view];
 
@@ -78,15 +74,14 @@ impl Framebuffer {
             .height(extent.height)
             .layers(1);
 
-        let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None) }
-            .map_err(|e| FramebufferError::creationfailed(format!("vkCreateFramebuffer failed: {}", e)))?;
+        let framebuffer =
+            unsafe { device.create_framebuffer(&framebuffer_info, None) }.map_err(|e| {
+                FramebufferError::creationfailed(format!("vkCreateFramebuffer failed: {}", e))
+            })?;
 
         debug!(framebuffer = ?framebuffer, "Framebuffer created successfully");
 
-        Ok(Self {
-            framebuffer,
-            device: device.clone(),
-        })
+        Ok(Self { framebuffer, device: device.clone() })
     }
 
     /// Get the raw framebuffer handle

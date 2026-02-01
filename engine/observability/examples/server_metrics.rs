@@ -19,8 +19,6 @@
 #[cfg(feature = "metrics")]
 use engine_observability::metrics::{start_metrics_server, MetricsRegistry};
 
-use std::time::{Duration, Instant};
-use tracing::info;
 
 #[cfg(feature = "metrics")]
 #[tokio::main]

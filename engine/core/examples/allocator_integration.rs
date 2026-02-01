@@ -83,8 +83,16 @@ fn demo_arena_temporary_collections() {
     let arena_time = start.elapsed();
 
     println!("Iterations: {}", iterations);
-    println!("Vec allocation:   {:?} ({:.2} µs/iter)", vec_time, vec_time.as_micros() as f64 / iterations as f64);
-    println!("Arena allocation: {:?} ({:.2} µs/iter)", arena_time, arena_time.as_micros() as f64 / iterations as f64);
+    println!(
+        "Vec allocation:   {:?} ({:.2} µs/iter)",
+        vec_time,
+        vec_time.as_micros() as f64 / iterations as f64
+    );
+    println!(
+        "Arena allocation: {:?} ({:.2} µs/iter)",
+        arena_time,
+        arena_time.as_micros() as f64 / iterations as f64
+    );
     let speedup = vec_time.as_micros() as f64 / arena_time.as_micros() as f64;
     println!("Speedup: {:.2}x faster\n", speedup);
     println!("Arena stats:");
@@ -144,8 +152,16 @@ fn demo_pool_object_reuse() {
 
     println!("Iterations: {}", iterations);
     println!("Objects per iteration: {}", objects_per_iteration);
-    println!("Box allocation:  {:?} ({:.2} µs/iter)", box_time, box_time.as_micros() as f64 / iterations as f64);
-    println!("Pool allocation: {:?} ({:.2} µs/iter)", pool_time, pool_time.as_micros() as f64 / iterations as f64);
+    println!(
+        "Box allocation:  {:?} ({:.2} µs/iter)",
+        box_time,
+        box_time.as_micros() as f64 / iterations as f64
+    );
+    println!(
+        "Pool allocation: {:?} ({:.2} µs/iter)",
+        pool_time,
+        pool_time.as_micros() as f64 / iterations as f64
+    );
     let speedup = box_time.as_micros() as f64 / pool_time.as_micros() as f64;
     println!("Speedup: {:.2}x faster\n", speedup);
     println!("Pool stats:");
@@ -196,8 +212,16 @@ fn demo_frame_per_frame_buffers() {
     let frame_time = start.elapsed();
 
     println!("Frame count: {}", frame_count);
-    println!("Vec allocation:   {:?} ({:.2} µs/frame)", vec_time, vec_time.as_micros() as f64 / frame_count as f64);
-    println!("Frame allocation: {:?} ({:.2} µs/frame)", frame_time, frame_time.as_micros() as f64 / frame_count as f64);
+    println!(
+        "Vec allocation:   {:?} ({:.2} µs/frame)",
+        vec_time,
+        vec_time.as_micros() as f64 / frame_count as f64
+    );
+    println!(
+        "Frame allocation: {:?} ({:.2} µs/frame)",
+        frame_time,
+        frame_time.as_micros() as f64 / frame_count as f64
+    );
     let speedup = vec_time.as_micros() as f64 / frame_time.as_micros() as f64;
     println!("Speedup: {:.2}x faster\n", speedup);
     println!("Frame allocator stats:");
@@ -275,8 +299,16 @@ fn demo_ecs_integration() {
     }
     let optimized_time = start.elapsed();
 
-    println!("Baseline (Vec):         {:?} ({:.2} ms/frame)", baseline_time, baseline_time.as_millis() as f64 / frame_count as f64);
-    println!("Optimized (Arena):      {:?} ({:.2} ms/frame)", optimized_time, optimized_time.as_millis() as f64 / frame_count as f64);
+    println!(
+        "Baseline (Vec):         {:?} ({:.2} ms/frame)",
+        baseline_time,
+        baseline_time.as_millis() as f64 / frame_count as f64
+    );
+    println!(
+        "Optimized (Arena):      {:?} ({:.2} ms/frame)",
+        optimized_time,
+        optimized_time.as_millis() as f64 / frame_count as f64
+    );
     let speedup = baseline_time.as_micros() as f64 / optimized_time.as_micros() as f64;
     println!("Speedup: {:.2}x faster\n", speedup);
 }
@@ -333,7 +365,11 @@ fn demo_combined_allocators() {
     let total_time = start.elapsed();
 
     println!("Frames: {}", frame_count);
-    println!("Total time: {:?} ({:.2} ms/frame)", total_time, total_time.as_millis() as f64 / frame_count as f64);
+    println!(
+        "Total time: {:?} ({:.2} ms/frame)",
+        total_time,
+        total_time.as_millis() as f64 / frame_count as f64
+    );
     println!("\nThis demonstrates:");
     println!("  • Arena: Temporary collections during system processing");
     println!("  • Frame: Per-frame immediate buffers (render, audio, etc.)");

@@ -19,10 +19,7 @@ pub struct SpatialGridConfig {
 
 impl Default for SpatialGridConfig {
     fn default() -> Self {
-        Self {
-            cell_size: 10.0,
-            entities_per_cell: 16,
-        }
+        Self { cell_size: 10.0, entities_per_cell: 16 }
     }
 }
 
@@ -53,11 +50,7 @@ impl GridCell {
         for dx in -1..=1 {
             for dy in -1..=1 {
                 for dz in -1..=1 {
-                    cells[idx] = GridCell {
-                        x: self.x + dx,
-                        y: self.y + dy,
-                        z: self.z + dz,
-                    };
+                    cells[idx] = GridCell { x: self.x + dx, y: self.y + dy, z: self.z + dz };
                     idx += 1;
                 }
             }
@@ -108,27 +101,20 @@ pub struct SpatialGrid {
 impl SpatialGrid {
     /// Create a new empty spatial grid.
     pub fn new(config: SpatialGridConfig) -> Self {
-        Self {
-            cells: HashMap::new(),
-            config,
-            entity_count: 0,
-        }
+        Self { cells: HashMap::new(), config, entity_count: 0 }
     }
 
     /// Build a spatial grid from all entities with Aabb components.
     pub fn build(world: &crate::ecs::World, config: SpatialGridConfig) -> Self {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_grid_build", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_grid_build",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let storage = match world.get_storage::<Aabb>() {
             Some(s) => s,
-            None => {
-                return Self {
-                    cells: HashMap::new(),
-                    config,
-                    entity_count: 0,
-                }
-            }
+            None => return Self { cells: HashMap::new(), config, entity_count: 0 },
         };
 
         let mut grid = Self::new(config);
@@ -203,7 +189,10 @@ impl SpatialGrid {
     /// O(k) where k is the number of cells intersected for larger radii.
     pub fn query_radius(&self, center: Vec3, radius: f32) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_grid_query_radius", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_grid_query_radius",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let mut results = Vec::new();
         let radius_sq = radius * radius;
@@ -239,7 +228,10 @@ impl SpatialGrid {
     /// Find all entities within an AABB.
     pub fn query_aabb(&self, aabb: &Aabb) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_grid_query_aabb", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_grid_query_aabb",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let mut results = Vec::new();
 
@@ -381,10 +373,7 @@ mod tests {
             }
         }
 
-        let config = SpatialGridConfig {
-            cell_size: 5.0,
-            entities_per_cell: 4,
-        };
+        let config = SpatialGridConfig { cell_size: 5.0, entities_per_cell: 4 };
         let grid = SpatialGrid::build(&world, config);
 
         // Query small radius
@@ -414,7 +403,8 @@ mod tests {
 
     #[test]
     fn test_spatial_grid_update_same_cell() {
-        let mut grid = SpatialGrid::new(SpatialGridConfig { cell_size: 10.0, entities_per_cell: 4 });
+        let mut grid =
+            SpatialGrid::new(SpatialGridConfig { cell_size: 10.0, entities_per_cell: 4 });
         let mut world = World::new();
 
         let entity = world.spawn();

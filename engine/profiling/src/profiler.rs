@@ -20,7 +20,7 @@ pub struct FrameMetrics {
     /// Total frame time in milliseconds
     pub frame_time_ms: f32,
 
-    /// Frames per second (calculated from frame_time_ms)
+    /// Frames per second (calculated from `frame_time_ms`)
     pub fps: f32,
 
     /// Memory usage in megabytes (approximate)
@@ -123,6 +123,7 @@ pub struct Profiler {
 
 impl Profiler {
     /// Create a new profiler with the given configuration.
+    #[must_use] 
     pub fn new(config: ProfilerConfig) -> Self {
         Self { state: Arc::new(Mutex::new(ProfilerState::new(config))) }
     }
@@ -257,6 +258,7 @@ impl Profiler {
     /// } // Scope ends here when _guard is dropped
     /// # }
     /// ```
+    #[must_use] 
     pub fn scope(&self, name: &str, category: ProfileCategory) -> ScopeGuard {
         let state = self.state.lock();
 
@@ -309,6 +311,7 @@ impl Profiler {
     /// Get the frame metrics history.
     ///
     /// Returns a vector of metrics for recent frames (limited by circular buffer size).
+    #[must_use] 
     pub fn frame_history(&self) -> Vec<FrameMetrics> {
         let state = self.state.lock();
         state.frame_metrics_history.clone()
@@ -337,6 +340,7 @@ impl Profiler {
     /// println!("Physics p95: {}us", stats.p95_us);
     /// # }
     /// ```
+    #[must_use] 
     pub fn query(&self) -> crate::query::QueryBuilder<'_> {
         crate::query::QueryBuilder::new(self)
     }

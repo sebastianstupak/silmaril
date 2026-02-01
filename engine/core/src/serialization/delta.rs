@@ -142,7 +142,7 @@ impl WorldStateDelta {
 
         // Modify components
         for (entity, components) in &self.modified_components {
-            let entry = base.components.entry(*entity).or_insert_with(Vec::new);
+            let entry = base.components.entry(*entity).or_default();
 
             for new_comp in components {
                 // Remove old version of this component type

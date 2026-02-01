@@ -444,11 +444,9 @@ fn create_image(
         profile_scope!("vkCreateImage");
         unsafe {
             // SAFETY: create_info is valid and device is valid
-            device
-                .create_image(&create_info, None)
-                .map_err(|e| {
-                    RendererError::imagecreationfailed(extent.width, extent.height, format!("{:?}", e))
-                })?
+            device.create_image(&create_info, None).map_err(|e| {
+                RendererError::imagecreationfailed(extent.width, extent.height, format!("{:?}", e))
+            })?
         }
     };
 

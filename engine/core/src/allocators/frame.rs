@@ -216,7 +216,7 @@ impl FrameAllocator {
             return &mut [];
         }
 
-        let size = size_of::<T>() * slice.len();
+        let size = std::mem::size_of_val(slice);
         let align = align_of::<T>();
         let ptr = self.alloc_raw(size, align) as *mut T;
 

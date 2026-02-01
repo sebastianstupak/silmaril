@@ -29,4 +29,6 @@ pub use math::{Quat, Transform, Vec3};
 pub use physics_components::Velocity;
 pub use platform::PlatformError;
 pub use rendering::MeshRenderer;
-pub use spatial::{Aabb, BoundingBox, Bvh, RayCast, RayHit, SpatialGrid, SpatialGridConfig, SpatialQuery};
+pub use spatial::{
+    Aabb, BoundingBox, Bvh, RayCast, RayHit, SpatialGrid, SpatialGridConfig, SpatialQuery,
+};

@@ -95,11 +95,7 @@ impl WorldState {
             }
 
             // Add entity metadata
-            entities.push(EntityMetadata {
-                entity,
-                generation: entity.generation(),
-                alive: true,
-            });
+            entities.push(EntityMetadata { entity, generation: entity.generation(), alive: true });
 
             // Get all components for this entity
             let entity_components = world.get_all_components(entity);

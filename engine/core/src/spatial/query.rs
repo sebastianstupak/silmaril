@@ -18,11 +18,7 @@ pub struct RayCast {
 impl RayCast {
     /// Create a new ray cast query.
     pub fn new(origin: Vec3, direction: Vec3, max_distance: f32) -> Self {
-        Self {
-            origin,
-            direction,
-            max_distance,
-        }
+        Self { origin, direction, max_distance }
     }
 }
 
@@ -40,11 +36,7 @@ pub struct RayHit {
 impl RayHit {
     /// Create a new ray hit.
     pub fn new(entity: Entity, distance: f32, origin: Vec3, direction: Vec3) -> Self {
-        Self {
-            entity,
-            distance,
-            point: origin + direction * distance,
-        }
+        Self { entity, distance, point: origin + direction * distance }
     }
 }
 
@@ -67,10 +59,20 @@ pub trait SpatialQuery {
     /// Find all entities within a radius using spatial grid.
     ///
     /// Builds a spatial grid on-demand and queries it.
-    fn spatial_query_radius_grid(&self, center: Vec3, radius: f32, config: SpatialGridConfig) -> Vec<Entity>;
+    fn spatial_query_radius_grid(
+        &self,
+        center: Vec3,
+        radius: f32,
+        config: SpatialGridConfig,
+    ) -> Vec<Entity>;
 
     /// Perform a ray cast using linear search.
-    fn spatial_raycast_linear(&self, origin: Vec3, direction: Vec3, max_distance: f32) -> Vec<RayHit>;
+    fn spatial_raycast_linear(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        max_distance: f32,
+    ) -> Vec<RayHit>;
 
     /// Perform a ray cast using BVH.
     ///
@@ -90,7 +92,10 @@ pub trait SpatialQuery {
 impl SpatialQuery for World {
     fn spatial_query_radius_linear(&self, center: Vec3, radius: f32) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_query_radius_linear", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_query_radius_linear",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let storage = match self.get_storage::<Aabb>() {
             Some(s) => s,
@@ -111,23 +116,42 @@ impl SpatialQuery for World {
 
     fn spatial_query_radius_bvh(&self, center: Vec3, radius: f32) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_query_radius_bvh", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_query_radius_bvh",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let bvh = Bvh::build(self);
         bvh.query_radius(center, radius)
     }
 
-    fn spatial_query_radius_grid(&self, center: Vec3, radius: f32, config: SpatialGridConfig) -> Vec<Entity> {
+    fn spatial_query_radius_grid(
+        &self,
+        center: Vec3,
+        radius: f32,
+        config: SpatialGridConfig,
+    ) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_query_radius_grid", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_query_radius_grid",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let grid = SpatialGrid::build(self, config);
         grid.query_radius(center, radius)
     }
 
-    fn spatial_raycast_linear(&self, origin: Vec3, direction: Vec3, max_distance: f32) -> Vec<RayHit> {
+    fn spatial_raycast_linear(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        max_distance: f32,
+    ) -> Vec<RayHit> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_raycast_linear", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_raycast_linear",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let storage = match self.get_storage::<Aabb>() {
             Some(s) => s,
@@ -143,14 +167,19 @@ impl SpatialQuery for World {
         }
 
         // Sort by distance
-        hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
+        hits.sort_by(|a, b| {
+            a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         hits
     }
 
     fn spatial_raycast_bvh(&self, origin: Vec3, direction: Vec3, max_distance: f32) -> Vec<RayHit> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_raycast_bvh", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_raycast_bvh",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let bvh = Bvh::build(self);
         let hits = bvh.ray_cast(origin, direction, max_distance);
@@ -162,7 +191,10 @@ impl SpatialQuery for World {
 
     fn spatial_query_aabb_linear(&self, aabb: &Aabb) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_query_aabb_linear", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_query_aabb_linear",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let storage = match self.get_storage::<Aabb>() {
             Some(s) => s,
@@ -182,7 +214,10 @@ impl SpatialQuery for World {
 
     fn spatial_query_aabb_bvh(&self, aabb: &Aabb) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_query_aabb_bvh", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_query_aabb_bvh",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let bvh = Bvh::build(self);
         bvh.query_aabb(aabb)
@@ -190,7 +225,10 @@ impl SpatialQuery for World {
 
     fn spatial_query_aabb_grid(&self, aabb: &Aabb, config: SpatialGridConfig) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("spatial_query_aabb_grid", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "spatial_query_aabb_grid",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         let grid = SpatialGrid::build(self, config);
         grid.query_aabb(aabb)
@@ -239,7 +277,11 @@ mod tests {
             world.add(entity, aabb);
         }
 
-        let hits = world.spatial_raycast_linear(Vec3::new(-1.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0), 100.0);
+        let hits = world.spatial_raycast_linear(
+            Vec3::new(-1.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            100.0,
+        );
         assert_eq!(hits.len(), 10);
 
         // Verify sorted by distance

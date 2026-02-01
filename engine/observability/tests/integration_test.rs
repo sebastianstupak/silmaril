@@ -201,7 +201,7 @@ fn test_multiple_scopes_with_different_budgets() {
 
     let violations = profiler.get_violations();
     assert!(
-        violations.len() >= 1,
+        !violations.is_empty(),
         "Expected at least one violation, got {}",
         violations.len()
     );

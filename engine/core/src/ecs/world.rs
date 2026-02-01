@@ -79,9 +79,8 @@ impl World {
         profile_scope!("component_register", ProfileCategory::ECS);
 
         let type_id = TypeId::of::<T>();
-        if !self.components.contains_key(&type_id) {
-            self.components
-                .insert(type_id, Box::new(SparseSet::<T>::new()) as Box<dyn ComponentStorage>);
+        if let std::collections::hash_map::Entry::Vacant(e) = self.components.entry(type_id) {
+            e.insert(Box::new(SparseSet::<T>::new()) as Box<dyn ComponentStorage>);
             self.descriptors.insert(type_id, ComponentDescriptor::new::<T>());
         }
     }
@@ -453,7 +452,11 @@ impl World {
     /// let component_data = ComponentData::Transform(Transform::default());
     /// world.add_component_data(entity, component_data);
     /// ```
-    pub fn add_component_data(&mut self, entity: Entity, component_data: crate::serialization::ComponentData) {
+    pub fn add_component_data(
+        &mut self,
+        entity: Entity,
+        component_data: crate::serialization::ComponentData,
+    ) {
         #[cfg(feature = "profiling")]
         profile_scope!("world_add_component_data", ProfileCategory::ECS);
 

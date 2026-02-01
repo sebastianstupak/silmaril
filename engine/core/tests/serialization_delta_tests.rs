@@ -122,7 +122,10 @@ fn test_delta_with_component_modifications() {
 
     // Should have modified components
     assert!(delta.modified_components.len() > 0, "Should have modified components");
-    assert!(delta.modified_components.len() <= 10, "Should have at most 10 modified entities");
+    assert!(
+        delta.modified_components.len() <= 10,
+        "Should have at most 10 modified entities"
+    );
 
     // Apply delta
     let mut state1_copy = state1.clone();
@@ -284,13 +287,20 @@ fn test_delta_efficiency_small_changes() {
     let full_size = bincode::serialize(&state2).unwrap().len();
     let delta_size = bincode::serialize(&delta).unwrap().len();
 
-    println!("Full state: {} bytes, Delta: {} bytes, Ratio: {:.1}%",
-        full_size, delta_size, 100.0 * delta_size as f64 / full_size as f64);
+    println!(
+        "Full state: {} bytes, Delta: {} bytes, Ratio: {:.1}%",
+        full_size,
+        delta_size,
+        100.0 * delta_size as f64 / full_size as f64
+    );
 
     // Delta should be < 20% of full state for 1% changes
-    assert!(delta_size < full_size / 5,
+    assert!(
+        delta_size < full_size / 5,
         "Delta ({} bytes) should be < 20% of full state ({} bytes)",
-        delta_size, full_size);
+        delta_size,
+        full_size
+    );
 }
 
 #[test]
@@ -322,8 +332,7 @@ fn test_delta_efficiency_many_changes() {
     let full_size = bincode::serialize(&state2).unwrap().len();
     let delta_size = bincode::serialize(&delta).unwrap().len();
 
-    println!("Full state: {} bytes, Delta: {} bytes (90% changed)",
-        full_size, delta_size);
+    println!("Full state: {} bytes, Delta: {} bytes (90% changed)", full_size, delta_size);
 
     // Delta should still apply correctly even if it's not smaller
     let mut state1_copy = state1.clone();

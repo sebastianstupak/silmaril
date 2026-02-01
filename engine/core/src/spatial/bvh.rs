@@ -96,10 +96,7 @@ pub struct Bvh {
 impl Bvh {
     /// Create a new empty BVH.
     pub fn new() -> Self {
-        Self {
-            root: None,
-            entity_count: 0,
-        }
+        Self { root: None, entity_count: 0 }
     }
 
     /// Build a BVH from all entities with Aabb components.
@@ -107,17 +104,15 @@ impl Bvh {
     /// This performs a full rebuild of the BVH using SAH (Surface Area Heuristic).
     pub fn build(world: &crate::ecs::World) -> Self {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!("bvh_build", agent_game_engine_profiling::ProfileCategory::Physics);
+        agent_game_engine_profiling::profile_scope!(
+            "bvh_build",
+            agent_game_engine_profiling::ProfileCategory::Physics
+        );
 
         // Collect all entities with AABB components
         let storage = match world.get_storage::<Aabb>() {
             Some(s) => s,
-            None => {
-                return Self {
-                    root: None,
-                    entity_count: 0,
-                }
-            }
+            None => return Self { root: None, entity_count: 0 },
         };
 
         let mut primitives: Vec<(Entity, Aabb)> = Vec::new();
@@ -150,10 +145,7 @@ impl Bvh {
 
         // Create leaf if small enough
         if count <= MAX_LEAF_SIZE {
-            return BvhNode::Leaf {
-                bounds,
-                entities: primitives[start..end].to_vec(),
-            };
+            return BvhNode::Leaf { bounds, entities: primitives[start..end].to_vec() };
         }
 
         // Find best split using SAH
@@ -171,22 +163,14 @@ impl Bvh {
             let left = Self::build_recursive(primitives, start, mid);
             let right = Self::build_recursive(primitives, mid, end);
 
-            return BvhNode::Internal {
-                bounds,
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+            return BvhNode::Internal { bounds, left: Box::new(left), right: Box::new(right) };
         }
 
         // Recursively build children
         let left = Self::build_recursive(primitives, start, mid);
         let right = Self::build_recursive(primitives, mid, end);
 
-        BvhNode::Internal {
-            bounds,
-            left: Box::new(left),
-            right: Box::new(right),
-        }
+        BvhNode::Internal { bounds, left: Box::new(left), right: Box::new(right) }
     }
 
     /// Find the best split using Surface Area Heuristic.
@@ -230,7 +214,13 @@ impl Bvh {
     }
 
     /// Evaluate SAH cost for a split.
-    fn evaluate_sah(primitives: &[(Entity, Aabb)], start: usize, end: usize, axis: usize, pos: f32) -> f32 {
+    fn evaluate_sah(
+        primitives: &[(Entity, Aabb)],
+        start: usize,
+        end: usize,
+        axis: usize,
+        pos: f32,
+    ) -> f32 {
         let mut left_box = None;
         let mut right_box = None;
         let mut left_count = 0;
@@ -273,7 +263,13 @@ impl Bvh {
     }
 
     /// Partition primitives around a split position.
-    fn partition(primitives: &mut [(Entity, Aabb)], start: usize, end: usize, axis: usize, pos: f32) -> usize {
+    fn partition(
+        primitives: &mut [(Entity, Aabb)],
+        start: usize,
+        end: usize,
+        axis: usize,
+        pos: f32,
+    ) -> usize {
         let mut i = start;
         let mut j = end - 1;
 
@@ -336,7 +332,8 @@ impl Bvh {
             BvhNode::Leaf { entities, .. } => {
                 // Test all entities in leaf
                 for (entity, aabb) in entities {
-                    if let Some((t_min, _)) = aabb.ray_intersection(origin, direction, max_distance) {
+                    if let Some((t_min, _)) = aabb.ray_intersection(origin, direction, max_distance)
+                    {
                         hits.push((*entity, t_min));
                     }
                 }
@@ -362,7 +359,12 @@ impl Bvh {
     }
 
     /// Recursive radius query traversal.
-    fn query_radius_recursive(node: &BvhNode, center: Vec3, radius_sq: f32, results: &mut Vec<Entity>) {
+    fn query_radius_recursive(
+        node: &BvhNode,
+        center: Vec3,
+        radius_sq: f32,
+        results: &mut Vec<Entity>,
+    ) {
         // Test if sphere intersects node bounds
         if node.bounds().distance_squared_to_point(center) > radius_sq {
             return;

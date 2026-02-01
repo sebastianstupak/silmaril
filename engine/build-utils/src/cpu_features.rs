@@ -58,8 +58,8 @@ impl CpuTier {
     pub const fn performance_multiplier(self) -> f32 {
         match self {
             CpuTier::Baseline => 1.0,
-            CpuTier::Modern => 1.25,   // 15-30% faster avg
-            CpuTier::HighEnd => 1.35,  // 20-50% faster avg
+            CpuTier::Modern => 1.25,  // 15-30% faster avg
+            CpuTier::HighEnd => 1.35, // 20-50% faster avg
         }
     }
 }
@@ -198,12 +198,7 @@ pub fn detect_features() -> CpuFeatures {
     // Get CPU vendor and brand using cpuid
     let (vendor, brand) = get_cpu_info();
 
-    CpuFeatures {
-        tier: detect_tier(),
-        vendor,
-        brand,
-        features,
-    }
+    CpuFeatures { tier: detect_tier(), vendor, brand, features }
 }
 
 /// Get CPU vendor and brand string
@@ -256,12 +251,18 @@ pub fn print_cpu_info() {
 
     println!();
     println!("Recommended binary: {}", features.tier.name());
-    println!("Expected performance: {:.0}% of native",
-        features.tier.performance_multiplier() * 100.0);
+    println!(
+        "Expected performance: {:.0}% of native",
+        features.tier.performance_multiplier() * 100.0
+    );
 }
 
 fn check_mark(supported: bool) -> &'static str {
-    if supported { "✓" } else { "✗" }
+    if supported {
+        "✓"
+    } else {
+        "✗"
+    }
 }
 
 #[cfg(test)]
@@ -304,6 +305,8 @@ mod tests {
     fn test_performance_multipliers() {
         assert_eq!(CpuTier::Baseline.performance_multiplier(), 1.0);
         assert!(CpuTier::Modern.performance_multiplier() > 1.0);
-        assert!(CpuTier::HighEnd.performance_multiplier() > CpuTier::Modern.performance_multiplier());
+        assert!(
+            CpuTier::HighEnd.performance_multiplier() > CpuTier::Modern.performance_multiplier()
+        );
     }
 }

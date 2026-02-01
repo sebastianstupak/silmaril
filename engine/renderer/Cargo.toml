@@ -46,3 +46,7 @@ harness = false
 [[bench]]
 name = "simple_benches"
 harness = false
+
+[[bench]]
+name = "robust_benches"
+harness = false

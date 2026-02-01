@@ -143,6 +143,13 @@ pub fn check_error_types_use_macro(config: &ErrorCheckConfig) {
 
 /// Extract enum name from an enum declaration line
 fn extract_enum_name(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+
+    // Skip comments
+    if trimmed.starts_with("//") || trimmed.starts_with("/*") {
+        return None;
+    }
+
     // Looking for patterns like "pub enum ErrorName {" or "pub(crate) enum ErrorName {"
     let parts: Vec<&str> = line.split_whitespace().collect();
 

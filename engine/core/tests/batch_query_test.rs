@@ -45,7 +45,7 @@ fn test_batch4_iteration() {
         total_entities += entities.len();
 
         // Verify data integrity
-        for (_entity, pos) in entities.iter().zip(positions.iter()) {
+        for pos in positions.iter() {
             assert!(pos.x >= 0.0 && pos.x < 12.0, "Position x should be in range");
         }
     }
@@ -94,7 +94,7 @@ fn test_batch_simd_processing() {
     }
 
     // Simulate SIMD-style batch processing
-    for (_entities, positions) in world.query_batch4::<Position>() {
+    for (_, positions) in world.query_batch4::<Position>() {
         // In real SIMD: convert to Vec3x4, process in parallel
         let sum_x: f32 = positions.iter().map(|p| p.x).sum();
 

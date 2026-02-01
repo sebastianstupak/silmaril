@@ -24,9 +24,7 @@ fn integration_timed_file_write_and_read() {
     // Measure write time
     let write_start = time_backend.monotonic_nanos();
     let test_data = "Integration test data for timed I/O".repeat(100);
-    fs_backend
-        .write_string(&test_file, &test_data)
-        .expect("Failed to write file");
+    fs_backend.write_string(&test_file, &test_data).expect("Failed to write file");
     let write_end = time_backend.monotonic_nanos();
     let write_duration_us = (write_end - write_start) / 1000;
 
@@ -186,7 +184,9 @@ fn integration_cross_platform_path_handling() {
 
         // Test file operations with normalized path
         let test_data = b"cross-platform test";
-        fs_backend.write_file(&normalized, test_data).expect("Failed to write with normalized path");
+        fs_backend
+            .write_file(&normalized, test_data)
+            .expect("Failed to write with normalized path");
 
         assert!(
             fs_backend.file_exists(&normalized),
@@ -194,7 +194,8 @@ fn integration_cross_platform_path_handling() {
             normalized
         );
 
-        let read_data = fs_backend.read_file(&normalized).expect("Failed to read with normalized path");
+        let read_data =
+            fs_backend.read_file(&normalized).expect("Failed to read with normalized path");
         assert_eq!(test_data, &read_data[..]);
 
         // Cleanup
@@ -228,7 +229,10 @@ fn integration_sleep_accuracy_with_priority() {
         let actual_duration_ms = (end - start) / 1_000_000;
         let expected_ms = sleep_duration.as_millis() as u64;
 
-        println!("Priority {:?}: requested {}ms, actual {}ms", priority, expected_ms, actual_duration_ms);
+        println!(
+            "Priority {:?}: requested {}ms, actual {}ms",
+            priority, expected_ms, actual_duration_ms
+        );
 
         // Sleep should be reasonably accurate (within 5ms)
         assert!(
@@ -321,7 +325,9 @@ fn integration_filesystem_error_handling() {
 
     // Write invalid UTF-8 data
     let invalid_utf8 = vec![0xFF, 0xFE, 0xFD];
-    fs_backend.write_file(&test_file, &invalid_utf8).expect("Failed to write binary data");
+    fs_backend
+        .write_file(&test_file, &invalid_utf8)
+        .expect("Failed to write binary data");
 
     // Reading as string should fail
     let result = fs_backend.read_to_string(&test_file);
@@ -413,16 +419,18 @@ fn integration_realistic_profiling_workflow() {
 
     // Verify events
     for event in &events {
-        println!("{}: start={}ns, duration={}µs", event.name, event.start_ns, event.duration_ns / 1000);
+        println!(
+            "{}: start={}ns, duration={}µs",
+            event.name,
+            event.start_ns,
+            event.duration_ns / 1000
+        );
         assert!(event.duration_ns > 0, "Event {} should have positive duration", event.name);
     }
 
     // Events should be in chronological order
     for i in 1..events.len() {
-        assert!(
-            events[i].start_ns >= events[i - 1].start_ns,
-            "Events should be chronological"
-        );
+        assert!(events[i].start_ns >= events[i - 1].start_ns, "Events should be chronological");
     }
 
     // Cleanup
@@ -465,7 +473,11 @@ fn integration_pinned_thread_performance() {
     }
     let single_core_time = time_backend.monotonic_nanos() - start;
 
-    println!("All cores: {}µs, Single core: {}µs", all_cores_time / 1000, single_core_time / 1000);
+    println!(
+        "All cores: {}µs, Single core: {}µs",
+        all_cores_time / 1000,
+        single_core_time / 1000
+    );
 
     // Reset to all cores
     let _ = threading_backend.set_thread_affinity(&all_cores);

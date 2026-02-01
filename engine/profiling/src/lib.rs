@@ -131,6 +131,7 @@ pub enum ProfileCategory {
 
 impl ProfileCategory {
     /// Get the string name of this category.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             ProfileCategory::ECS => "ECS",

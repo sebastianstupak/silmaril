@@ -140,7 +140,8 @@ fn test_crossover_point_validation() {
         let speedup = seq_time.as_nanos() as f64 / par_time.as_nanos() as f64;
         let faster = if speedup > 1.0 { "PARALLEL" } else { "SEQUENTIAL" };
 
-        println!("{:5} entities: seq={:8.2}μs  par={:8.2}μs  speedup={:4.2}x  [{}]",
+        println!(
+            "{:5} entities: seq={:8.2}μs  par={:8.2}μs  speedup={:4.2}x  [{}]",
             count,
             seq_time.as_micros() as f64 / 50.0,
             par_time.as_micros() as f64 / 50.0,
@@ -228,7 +229,8 @@ fn test_performance_regression() {
             "SIMILAR"
         };
 
-        println!("{:<30} seq={:8.2}μs  par={:8.2}μs  speedup={:5.2}x  [{}]",
+        println!(
+            "{:<30} seq={:8.2}μs  par={:8.2}μs  speedup={:5.2}x  [{}]",
             name,
             seq_time as f64 / 100_000.0,
             par_time as f64 / 100_000.0,

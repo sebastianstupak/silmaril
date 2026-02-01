@@ -117,18 +117,13 @@ impl AdminCommand {
                 if parts.len() < 3 {
                     return Self::Unknown("set requires key and value".to_string());
                 }
-                Self::SetConfig {
-                    key: parts[1].to_string(),
-                    value: parts[2..].join(" "),
-                }
+                Self::SetConfig { key: parts[1].to_string(), value: parts[2..].join(" ") }
             }
             "get" => {
                 if parts.len() < 2 {
                     return Self::Unknown("get requires key".to_string());
                 }
-                Self::GetConfig {
-                    key: parts[1].to_string(),
-                }
+                Self::GetConfig { key: parts[1].to_string() }
             }
             "quit" | "exit" => Self::Quit,
             _ => Self::Unknown(input.to_string()),
@@ -152,11 +147,7 @@ impl AdminConsole {
     /// * `addr` - Address to bind to (e.g., "127.0.0.1:8888")
     pub fn new(addr: &str) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
-        Self {
-            addr: addr.to_string(),
-            command_tx,
-            command_rx,
-        }
+        Self { addr: addr.to_string(), command_tx, command_rx }
     }
 
     /// Start the admin console server
@@ -203,12 +194,8 @@ async fn handle_client(
     command_tx: mpsc::UnboundedSender<(AdminCommand, mpsc::UnboundedSender<String>)>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Send welcome message
-    stream
-        .write_all(b"\r\n=== Agent Game Engine Admin Console ===\r\n")
-        .await?;
-    stream
-        .write_all(b"Type 'help' for available commands\r\n\r\n")
-        .await?;
+    stream.write_all(b"\r\n=== Agent Game Engine Admin Console ===\r\n").await?;
+    stream.write_all(b"Type 'help' for available commands\r\n\r\n").await?;
 
     let (reader, mut writer) = stream.into_split();
     let mut reader = BufReader::new(reader);
@@ -252,9 +239,7 @@ async fn handle_client(
                 let (response_tx, mut response_rx) = mpsc::unbounded_channel();
                 if let Err(e) = command_tx.send((command.clone(), response_tx)) {
                     error!("Failed to send command: {}", e);
-                    writer
-                        .write_all(b"Error: Server not responding\r\n")
-                        .await?;
+                    writer.write_all(b"Error: Server not responding\r\n").await?;
                     continue;
                 }
 

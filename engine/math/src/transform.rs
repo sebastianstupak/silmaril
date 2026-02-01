@@ -248,11 +248,7 @@ mod tests {
 
     #[test]
     fn test_transform_point() {
-        let t = Transform::new(
-            Vec3::new(10.0, 0.0, 0.0),
-            Quat::IDENTITY,
-            Vec3::ONE,
-        );
+        let t = Transform::new(Vec3::new(10.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE);
 
         let point = Vec3::new(1.0, 0.0, 0.0);
         let result = t.transform_point(point);
@@ -262,11 +258,7 @@ mod tests {
 
     #[test]
     fn test_transform_point_with_scale() {
-        let t = Transform::new(
-            Vec3::ZERO,
-            Quat::IDENTITY,
-            Vec3::new(2.0, 2.0, 2.0),
-        );
+        let t = Transform::new(Vec3::ZERO, Quat::IDENTITY, Vec3::new(2.0, 2.0, 2.0));
 
         let point = Vec3::new(1.0, 1.0, 1.0);
         let result = t.transform_point(point);
@@ -291,11 +283,7 @@ mod tests {
 
     #[test]
     fn test_inverse_transform_point() {
-        let t = Transform::new(
-            Vec3::new(10.0, 5.0, 0.0),
-            Quat::IDENTITY,
-            Vec3::new(2.0, 2.0, 2.0),
-        );
+        let t = Transform::new(Vec3::new(10.0, 5.0, 0.0), Quat::IDENTITY, Vec3::new(2.0, 2.0, 2.0));
 
         let point = Vec3::new(1.0, 1.0, 1.0);
         let transformed = t.transform_point(point);
@@ -309,17 +297,9 @@ mod tests {
 
     #[test]
     fn test_compose() {
-        let t1 = Transform::new(
-            Vec3::new(1.0, 0.0, 0.0),
-            Quat::IDENTITY,
-            Vec3::ONE,
-        );
+        let t1 = Transform::new(Vec3::new(1.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE);
 
-        let t2 = Transform::new(
-            Vec3::new(0.0, 2.0, 0.0),
-            Quat::IDENTITY,
-            Vec3::ONE,
-        );
+        let t2 = Transform::new(Vec3::new(0.0, 2.0, 0.0), Quat::IDENTITY, Vec3::ONE);
 
         let composed = t1.compose(&t2);
 
@@ -331,11 +311,8 @@ mod tests {
     fn test_lerp() {
         let t1 = Transform::identity();
 
-        let t2 = Transform::new(
-            Vec3::new(10.0, 0.0, 0.0),
-            Quat::IDENTITY,
-            Vec3::new(2.0, 2.0, 2.0),
-        );
+        let t2 =
+            Transform::new(Vec3::new(10.0, 0.0, 0.0), Quat::IDENTITY, Vec3::new(2.0, 2.0, 2.0));
 
         let mid = t1.lerp(&t2, 0.5);
 

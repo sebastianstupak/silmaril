@@ -27,10 +27,7 @@ fn test_spatial_grid_radius_query_integration() {
     }
 
     // Build spatial grid
-    let config = SpatialGridConfig {
-        cell_size: 10.0,
-        entities_per_cell: 4,
-    };
+    let config = SpatialGridConfig { cell_size: 10.0, entities_per_cell: 4 };
     let grid = SpatialGrid::build(&world, config);
 
     // Query entities near origin
@@ -76,10 +73,7 @@ fn test_bvh_raycast_integration() {
 
     // Verify hits are sorted by distance
     for i in 1..hits.len() {
-        assert!(
-            hits[i - 1].1 <= hits[i].1,
-            "Hits should be sorted by distance"
-        );
+        assert!(hits[i - 1].1 <= hits[i].1, "Hits should be sorted by distance");
     }
 
     // Cast ray that misses everything
@@ -117,10 +111,7 @@ fn test_spatial_grid_vs_bvh_consistency() {
     let center = Vec3::ZERO;
     let radius = 20.0;
 
-    let grid_config = SpatialGridConfig {
-        cell_size: 10.0,
-        entities_per_cell: 8,
-    };
+    let grid_config = SpatialGridConfig { cell_size: 10.0, entities_per_cell: 8 };
 
     let grid_results = world.spatial_query_radius_grid(center, radius, grid_config);
     let bvh_results = world.spatial_query_radius_bvh(center, radius);
@@ -133,14 +124,8 @@ fn test_spatial_grid_vs_bvh_consistency() {
     let linear_set: HashSet<_> = linear_results.into_iter().collect();
 
     // All three methods should find the same entities
-    assert_eq!(
-        grid_set, linear_set,
-        "Grid and linear search should find same entities"
-    );
-    assert_eq!(
-        bvh_set, linear_set,
-        "BVH and linear search should find same entities"
-    );
+    assert_eq!(grid_set, linear_set, "Grid and linear search should find same entities");
+    assert_eq!(bvh_set, linear_set, "BVH and linear search should find same entities");
 }
 
 /// Test AABB query with spatial grid.
@@ -165,10 +150,7 @@ fn test_spatial_grid_aabb_query() {
     let grid = SpatialGrid::build(&world, config);
 
     // Query a box in the middle
-    let query_aabb = Aabb::new(
-        Vec3::new(3.0, 3.0, 3.0),
-        Vec3::new(9.0, 9.0, 9.0),
-    );
+    let query_aabb = Aabb::new(Vec3::new(3.0, 3.0, 3.0), Vec3::new(9.0, 9.0, 9.0));
     let results = grid.query_aabb(&query_aabb);
 
     // Should find entities in the queried region
@@ -186,10 +168,7 @@ fn test_spatial_grid_update_operations() {
     let initial_aabb = Aabb::from_center_half_extents(Vec3::ZERO, Vec3::ONE);
     world.add(entity, initial_aabb);
 
-    let mut grid = SpatialGrid::new(SpatialGridConfig {
-        cell_size: 5.0,
-        entities_per_cell: 4,
-    });
+    let mut grid = SpatialGrid::new(SpatialGridConfig { cell_size: 5.0, entities_per_cell: 4 });
 
     // Insert entity
     grid.insert(entity, initial_aabb);
@@ -230,10 +209,7 @@ fn test_bvh_aabb_query() {
     let bvh = Bvh::build(&world);
 
     // Query middle section
-    let query_aabb = Aabb::new(
-        Vec3::new(15.0, -1.0, -1.0),
-        Vec3::new(35.0, 1.0, 1.0),
-    );
+    let query_aabb = Aabb::new(Vec3::new(15.0, -1.0, -1.0), Vec3::new(35.0, 1.0, 1.0));
     let results = bvh.query_aabb(&query_aabb);
 
     // Should find entities in range [15, 35]
@@ -247,11 +223,8 @@ fn test_spatial_queries_empty_world() {
     let world = World::new();
 
     // Grid query on empty world
-    let grid_results = world.spatial_query_radius_grid(
-        Vec3::ZERO,
-        10.0,
-        SpatialGridConfig::default(),
-    );
+    let grid_results =
+        world.spatial_query_radius_grid(Vec3::ZERO, 10.0, SpatialGridConfig::default());
     assert_eq!(grid_results.len(), 0);
 
     // BVH query on empty world
@@ -263,11 +236,7 @@ fn test_spatial_queries_empty_world() {
     assert_eq!(linear_results.len(), 0);
 
     // Raycast on empty world
-    let ray_hits = world.spatial_raycast_bvh(
-        Vec3::ZERO,
-        Vec3::new(1.0, 0.0, 0.0),
-        100.0,
-    );
+    let ray_hits = world.spatial_raycast_bvh(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0), 100.0);
     assert_eq!(ray_hits.len(), 0);
 }
 
@@ -305,11 +274,8 @@ fn test_spatial_query_faster_than_linear() {
     // Create many entities
     for i in 0..1000 {
         let entity = world.spawn();
-        let pos = Vec3::new(
-            (i % 10) as f32 * 5.0,
-            ((i / 10) % 10) as f32 * 5.0,
-            (i / 100) as f32 * 5.0,
-        );
+        let pos =
+            Vec3::new((i % 10) as f32 * 5.0, ((i / 10) % 10) as f32 * 5.0, (i / 100) as f32 * 5.0);
         let aabb = Aabb::from_center_half_extents(pos, Vec3::new(1.0, 1.0, 1.0));
         world.add(entity, aabb);
     }

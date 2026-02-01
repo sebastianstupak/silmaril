@@ -16,8 +16,7 @@ fn main() {
     // Basic tier detection
     let tier = detect_tier();
     println!("Detected Tier: {}", tier);
-    println!("  Performance: {:.0}% of native",
-        tier.performance_multiplier() * 100.0);
+    println!("  Performance: {:.0}% of native", tier.performance_multiplier() * 100.0);
     println!();
 
     // Detailed feature detection
@@ -37,7 +36,10 @@ fn main() {
         println!("  AVX:     {}", check_mark(features.features.avx));
         println!("  AVX2:    {} (required for Modern tier)", check_mark(features.features.avx2));
         println!("  FMA:     {} (required for Modern tier)", check_mark(features.features.fma));
-        println!("  AVX512F: {} (required for High-end tier)", check_mark(features.features.avx512f));
+        println!(
+            "  AVX512F: {} (required for High-end tier)",
+            check_mark(features.features.avx512f)
+        );
         println!("  AVX512DQ: {}", check_mark(features.features.avx512dq));
         println!("  AVX512BW: {}", check_mark(features.features.avx512bw));
         println!();
@@ -144,5 +146,9 @@ fn main() {
 }
 
 fn check_mark(supported: bool) -> &'static str {
-    if supported { "✓" } else { "✗" }
+    if supported {
+        "✓"
+    } else {
+        "✗"
+    }
 }

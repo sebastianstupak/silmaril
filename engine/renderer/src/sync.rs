@@ -81,28 +81,22 @@ impl FrameSyncObjects {
         // Create semaphores (no special flags needed)
         let semaphore_info = vk::SemaphoreCreateInfo::default();
 
-        let image_available_semaphore = unsafe {
-            device.create_semaphore(&semaphore_info, None)
-        }
-        .map_err(|e| SyncError::creationfailed(format!("Failed to create image_available semaphore: {}", e)))?;
+        let image_available_semaphore = unsafe { device.create_semaphore(&semaphore_info, None) }
+            .map_err(|e| {
+            SyncError::creationfailed(format!("Failed to create image_available semaphore: {}", e))
+        })?;
 
-        let render_finished_semaphore = unsafe {
-            device.create_semaphore(&semaphore_info, None)
-        }
-        .map_err(|e| {
+        let render_finished_semaphore = unsafe { device.create_semaphore(&semaphore_info, None) }
+            .map_err(|e| {
             // Clean up first semaphore on error
             unsafe { device.destroy_semaphore(image_available_semaphore, None) };
             SyncError::creationfailed(format!("Failed to create render_finished semaphore: {}", e))
         })?;
 
         // Create fence in signaled state (first frame doesn't wait)
-        let fence_info = vk::FenceCreateInfo::default()
-            .flags(vk::FenceCreateFlags::SIGNALED);
+        let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
 
-        let in_flight_fence = unsafe {
-            device.create_fence(&fence_info, None)
-        }
-        .map_err(|e| {
+        let in_flight_fence = unsafe { device.create_fence(&fence_info, None) }.map_err(|e| {
             // Clean up semaphores on error
             unsafe {
                 device.destroy_semaphore(image_available_semaphore, None);
@@ -146,10 +140,8 @@ impl FrameSyncObjects {
     /// # Ok::<(), engine_renderer::SyncError>(())
     /// ```
     pub fn wait(&self, device: &ash::Device, timeout_ns: u64) -> Result<(), SyncError> {
-        unsafe {
-            device.wait_for_fences(&[self.in_flight_fence], true, timeout_ns)
-        }
-        .map_err(|e| SyncError::waitfailed(format!("vkWaitForFences failed: {}", e)))
+        unsafe { device.wait_for_fences(&[self.in_flight_fence], true, timeout_ns) }
+            .map_err(|e| SyncError::waitfailed(format!("vkWaitForFences failed: {}", e)))
     }
 
     /// Reset the in-flight fence
@@ -171,10 +163,8 @@ impl FrameSyncObjects {
     /// # Ok::<(), engine_renderer::SyncError>(())
     /// ```
     pub fn reset(&self, device: &ash::Device) -> Result<(), SyncError> {
-        unsafe {
-            device.reset_fences(&[self.in_flight_fence])
-        }
-        .map_err(|e| SyncError::resetfailed(format!("vkResetFences failed: {}", e)))
+        unsafe { device.reset_fences(&[self.in_flight_fence]) }
+            .map_err(|e| SyncError::resetfailed(format!("vkResetFences failed: {}", e)))
     }
 
     /// Get the image available semaphore handle
@@ -237,9 +227,7 @@ pub fn create_sync_objects(
         "Creating sync objects for frames in flight"
     );
 
-    (0..frames_in_flight)
-        .map(|_| FrameSyncObjects::new(device))
-        .collect()
+    (0..frames_in_flight).map(|_| FrameSyncObjects::new(device)).collect()
 }
 
 #[cfg(test)]

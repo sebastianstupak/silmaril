@@ -90,13 +90,13 @@ fn main() {
         }
     }
 
-    println!("");
+    println!();
     println!("=== Threshold Validation Complete ===");
-    println!("");
+    println!();
     println!("Expected behavior:");
     println!("  • Below 2,000: Sequential should be similar or faster");
     println!("  • At/above 2,000: Parallel should show increasing speedup");
-    println!("");
+    println!();
     println!("Current PARALLEL_THRESHOLD = 2,000");
     println!("This means:");
     println!("  • < 2,000 entities: Uses sequential SIMD processing");

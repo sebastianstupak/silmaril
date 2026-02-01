@@ -106,9 +106,8 @@ impl<T> PoolAllocator<T> {
 
             // Initialize free list
             for i in 0..capacity {
-                ptr.add(i).write(Slot {
-                    next_free: if i + 1 < capacity { i + 1 } else { usize::MAX },
-                });
+                ptr.add(i)
+                    .write(Slot { next_free: if i + 1 < capacity { i + 1 } else { usize::MAX } });
             }
 
             Self {
@@ -151,11 +150,8 @@ impl<T> PoolAllocator<T> {
             let slot = self.storage.as_ptr().add(index);
 
             // Get next free index before overwriting
-            let next_free = if (*slot).next_free == usize::MAX {
-                None
-            } else {
-                Some((*slot).next_free)
-            };
+            let next_free =
+                if (*slot).next_free == usize::MAX { None } else { Some((*slot).next_free) };
 
             // Write value to slot
             ptr::write(&mut (*slot).data, std::mem::ManuallyDrop::new(value));
@@ -194,10 +190,7 @@ impl<T> PoolAllocator<T> {
             let slot_ptr = ptr as *mut T as *mut Slot<T>;
             let index = slot_ptr.offset_from(self.storage.as_ptr()) as usize;
 
-            assert!(
-                index < self.capacity,
-                "Pointer does not belong to this pool"
-            );
+            assert!(index < self.capacity, "Pointer does not belong to this pool");
 
             // Drop the value
             std::mem::ManuallyDrop::drop(&mut (*slot_ptr).data);
@@ -473,11 +466,7 @@ mod tests {
         let mut pool = PoolAllocator::<ComplexType>::with_capacity(10);
 
         unsafe {
-            let obj = pool.alloc(ComplexType {
-                x: 1.0,
-                y: 2.0,
-                data: [0; 16],
-            }) as *mut ComplexType;
+            let obj = pool.alloc(ComplexType { x: 1.0, y: 2.0, data: [0; 16] }) as *mut ComplexType;
 
             assert_eq!((*obj).x, 1.0);
             assert_eq!((*obj).y, 2.0);

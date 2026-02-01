@@ -136,9 +136,9 @@ impl Swapchain {
         // All references in create_info remain valid for the duration of this call.
         // queue_family_indices array stays in scope.
         let swapchain = unsafe {
-            swapchain_loader.create_swapchain(&create_info, None).map_err(|e| {
-                RendererError::swapchaincreationfailed(format!("{:?}", e))
-            })?
+            swapchain_loader
+                .create_swapchain(&create_info, None)
+                .map_err(|e| RendererError::swapchaincreationfailed(format!("{:?}", e)))?
         };
 
         // Get swapchain images
@@ -146,7 +146,10 @@ impl Swapchain {
         // The returned images are owned by the swapchain and remain valid until swapchain destruction.
         let images = unsafe {
             swapchain_loader.get_swapchain_images(swapchain).map_err(|e| {
-                RendererError::swapchainimageretrievalfailed(format!("Failed to retrieve swapchain images: {:?}", e))
+                RendererError::swapchainimageretrievalfailed(format!(
+                    "Failed to retrieve swapchain images: {:?}",
+                    e
+                ))
             })?
         };
 
@@ -192,7 +195,9 @@ impl Swapchain {
         // Wait for device to be idle before destroying resources
         // SAFETY: context.device is valid. device_wait_idle ensures no operations are in flight.
         unsafe {
-            context.device.device_wait_idle().map_err(|e| RendererError::devicelost(format!("Failed to wait for device idle: {:?}", e)))?;
+            context.device.device_wait_idle().map_err(|e| {
+                RendererError::devicelost(format!("Failed to wait for device idle: {:?}", e))
+            })?;
         }
 
         // Destroy old image views
@@ -271,9 +276,9 @@ impl Swapchain {
         // SAFETY: create_info is properly initialized. queue_family_indices array stays in scope.
         // old_swapchain (if not null) is valid and we're replacing it.
         let new_swapchain = unsafe {
-            self.loader.create_swapchain(&create_info, None).map_err(|e| {
-                RendererError::swapchaincreationfailed(format!("{:?}", e))
-            })?
+            self.loader
+                .create_swapchain(&create_info, None)
+                .map_err(|e| RendererError::swapchaincreationfailed(format!("{:?}", e)))?
         };
 
         // Destroy old swapchain
@@ -287,7 +292,10 @@ impl Swapchain {
         // SAFETY: new_swapchain is valid, just created above.
         let images = unsafe {
             self.loader.get_swapchain_images(new_swapchain).map_err(|e| {
-                RendererError::swapchainimageretrievalfailed(format!("Failed to retrieve swapchain images: {:?}", e))
+                RendererError::swapchainimageretrievalfailed(format!(
+                    "Failed to retrieve swapchain images: {:?}",
+                    e
+                ))
             })?
         };
 
@@ -336,7 +344,10 @@ impl Swapchain {
                 .map_err(|e| match e {
                     vk::Result::ERROR_OUT_OF_DATE_KHR => RendererError::swapchainoutofdate(),
                     vk::Result::SUBOPTIMAL_KHR => RendererError::swapchainsuboptimal(),
-                    _ => RendererError::swapchaincreationfailed(format!("acquire_next_image failed: {:?}", e)),
+                    _ => RendererError::swapchaincreationfailed(format!(
+                        "acquire_next_image failed: {:?}",
+                        e
+                    )),
                 })
         }
     }
@@ -361,8 +372,13 @@ impl Swapchain {
                 .map_err(|e| match e {
                     vk::Result::ERROR_OUT_OF_DATE_KHR => RendererError::swapchainoutofdate(),
                     vk::Result::SUBOPTIMAL_KHR => RendererError::swapchainsuboptimal(),
-                    vk::Result::TIMEOUT => RendererError::swapchaincreationfailed("Timeout waiting for swapchain image".to_string()),
-                    _ => RendererError::swapchaincreationfailed(format!("acquire_next_image failed: {:?}", e)),
+                    vk::Result::TIMEOUT => RendererError::swapchaincreationfailed(
+                        "Timeout waiting for swapchain image".to_string(),
+                    ),
+                    _ => RendererError::swapchaincreationfailed(format!(
+                        "acquire_next_image failed: {:?}",
+                        e
+                    )),
                 })
         }
     }
@@ -511,7 +527,12 @@ fn choose_present_mode(
     let modes = unsafe {
         surface_loader
             .get_physical_device_surface_present_modes(physical_device, surface)
-            .map_err(|e| RendererError::presentmodequeryfailed(format!("Failed to query present modes: {:?}", e)))?
+            .map_err(|e| {
+                RendererError::presentmodequeryfailed(format!(
+                    "Failed to query present modes: {:?}",
+                    e
+                ))
+            })?
     };
 
     // Determine performance profile from environment
@@ -636,7 +657,10 @@ fn create_image_views(
             // SAFETY: device is valid, image is valid (from swapchain), create_info is properly initialized.
             unsafe {
                 device.create_image_view(&create_info, None).map_err(|e| {
-                    RendererError::imageviewcreationfailed(format!("Failed to create image view: {:?}", e))
+                    RendererError::imageviewcreationfailed(format!(
+                        "Failed to create image view: {:?}",
+                        e
+                    ))
                 })
             }
         })

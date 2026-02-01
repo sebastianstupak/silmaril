@@ -20,8 +20,7 @@ fn bench_sync_creation(c: &mut Criterion) {
 
     c.bench_function("sync_creation", |b| {
         b.iter(|| {
-            let sync = FrameSyncObjects::new(&context.device)
-                .expect("Failed to create sync");
+            let sync = FrameSyncObjects::new(&context.device).expect("Failed to create sync");
             black_box(sync);
         });
     });
@@ -48,8 +47,8 @@ fn bench_framebuffer_creation(c: &mut Criterion) {
     )
     .expect("Failed to create render pass");
 
-    let target = OffscreenTarget::new(&context, 1920, 1080, None, false)
-        .expect("Failed to create target");
+    let target =
+        OffscreenTarget::new(&context, 1920, 1080, None, false).expect("Failed to create target");
 
     c.bench_function("framebuffer_creation", |b| {
         b.iter(|| {
@@ -57,10 +56,7 @@ fn bench_framebuffer_creation(c: &mut Criterion) {
                 &context.device,
                 render_pass.handle(),
                 target.color_image_view,
-                ash::vk::Extent2D {
-                    width: 1920,
-                    height: 1080,
-                },
+                ash::vk::Extent2D { width: 1920, height: 1080 },
             )
             .expect("Failed to create framebuffer");
             black_box(fb);

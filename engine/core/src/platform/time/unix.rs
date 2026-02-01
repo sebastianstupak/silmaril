@@ -36,9 +36,7 @@ impl UnixTime {
         // Verify clock is available by making a test call
         let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
 
-        let result = unsafe {
-            libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts as *mut _)
-        };
+        let result = unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts as *mut _) };
 
         if result != 0 {
             return Err(PlatformError::TimeInitFailed {
@@ -46,9 +44,7 @@ impl UnixTime {
             });
         }
 
-        Ok(Self {
-            _clock_id: libc::CLOCK_MONOTONIC,
-        })
+        Ok(Self { _clock_id: libc::CLOCK_MONOTONIC })
     }
 
     /// Get the current time using CLOCK_MONOTONIC_RAW (not vDSO-accelerated).

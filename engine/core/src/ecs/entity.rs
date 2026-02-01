@@ -331,22 +331,16 @@ impl EntityAllocator {
     /// assert_eq!(entities.len(), 2);
     /// ```
     pub fn entities(&self) -> impl Iterator<Item = Entity> + '_ {
-        self.generations
-            .iter()
-            .enumerate()
-            .filter_map(move |(id, &generation)| {
-                let id_u32 = id as u32;
-                // If ID is in free list, the entity is dead
-                if self.free_list.contains(&id_u32) {
-                    None
-                } else {
-                    // Entity is alive, return it
-                    Some(Entity {
-                        id: id_u32,
-                        generation,
-                    })
-                }
-            })
+        self.generations.iter().enumerate().filter_map(move |(id, &generation)| {
+            let id_u32 = id as u32;
+            // If ID is in free list, the entity is dead
+            if self.free_list.contains(&id_u32) {
+                None
+            } else {
+                // Entity is alive, return it
+                Some(Entity { id: id_u32, generation })
+            }
+        })
     }
 
     /// Allocate an entity with a specific ID and generation (for deserialization)
@@ -379,11 +373,7 @@ impl EntityAllocator {
         }
 
         // Verify this entity isn't already alive
-        assert!(
-            !self.is_alive(entity),
-            "Cannot allocate entity {:?} - already alive",
-            entity
-        );
+        assert!(!self.is_alive(entity), "Cannot allocate entity {:?} - already alive", entity);
 
         // Remove from free list if present
         self.free_list.retain(|&free_id| free_id != entity.id);

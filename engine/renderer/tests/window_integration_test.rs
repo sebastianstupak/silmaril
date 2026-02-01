@@ -109,9 +109,9 @@ fn test_window_config_default() {
 fn test_window_error_display() {
     let err = WindowError::InvalidDimensions { width: 0, height: 0 };
     let display = format!("{}", err);
-    assert!(display.contains("Invalid window dimensions") || display.len() > 0);
+    assert!(display.contains("Invalid window dimensions") || !display.is_empty());
 
     let err2 = WindowError::CreationFailed { details: "test error".to_string() };
     let display2 = format!("{}", err2);
-    assert!(display2.contains("Window creation failed") || display2.len() > 0);
+    assert!(display2.contains("Window creation failed") || !display2.is_empty());
 }

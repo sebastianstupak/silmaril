@@ -28,8 +28,8 @@
 
 #[cfg(feature = "metrics")]
 use prometheus::{
-    register_gauge, register_histogram, register_int_counter, register_int_gauge, Encoder,
-    Gauge, Histogram, IntCounter, IntGauge, TextEncoder,
+    register_gauge, register_histogram, register_int_counter, register_int_gauge, Encoder, Gauge,
+    Histogram, IntCounter, IntGauge, TextEncoder,
 };
 
 #[cfg(feature = "metrics")]
@@ -311,9 +311,8 @@ impl Default for MetricsRegistry {
 pub async fn start_metrics_server(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
     let addr: SocketAddr = addr.parse()?;
 
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, hyper::Error>(service_fn(metrics_handler))
-    });
+    let make_svc =
+        make_service_fn(|_conn| async { Ok::<_, hyper::Error>(service_fn(metrics_handler)) });
 
     let server = Server::bind(&addr).serve(make_svc);
 

@@ -96,16 +96,24 @@ pub fn check_no_print_statements(config: &PrintCheckConfig) {
 
 /// Check for println!, eprintln!, dbg! in a single line
 fn check_line_for_prints(line: &str) -> Option<String> {
-    // Look for println! (with potential whitespace/formatting)
-    if line.contains("println!") {
+    let trimmed = line.trim_start();
+
+    // Skip comments
+    if trimmed.starts_with("//") || trimmed.starts_with("/*") {
+        return None;
+    }
+
+    // Simple heuristic: if it contains the macro followed by '(', it's likely a call
+    // This isn't perfect but catches most cases and avoids string literals
+    if line.contains("println!(") {
         return Some("Found println! - use tracing::info! instead".to_string());
     }
 
-    if line.contains("eprintln!") {
+    if line.contains("eprintln!(") {
         return Some("Found eprintln! - use tracing::error!/warn! instead".to_string());
     }
 
-    if line.contains("dbg!") {
+    if line.contains("dbg!(") {
         return Some("Found dbg! - use tracing::debug! instead".to_string());
     }
 

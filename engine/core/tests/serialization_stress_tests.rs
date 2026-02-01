@@ -32,7 +32,11 @@ fn test_serialize_10k_entities_with_single_component() {
     assert_eq!(snapshot.metadata.component_count, 10_000);
 
     // Verify snapshot time is reasonable (< 50ms for debug build)
-    assert!(snapshot_time.as_millis() < 100, "Snapshot took {:?}, expected < 100ms", snapshot_time);
+    assert!(
+        snapshot_time.as_millis() < 100,
+        "Snapshot took {:?}, expected < 100ms",
+        snapshot_time
+    );
 }
 
 #[test]
@@ -81,7 +85,11 @@ fn test_bincode_serialize_10k_entities() {
     let bytes = snapshot.serialize(Format::Bincode).unwrap();
     let serialize_time = start.elapsed();
 
-    println!("Bincode serialize 10k entities: {:?}, size: {} bytes", serialize_time, bytes.len());
+    println!(
+        "Bincode serialize 10k entities: {:?}, size: {} bytes",
+        serialize_time,
+        bytes.len()
+    );
 
     // Verify size is reasonable (should be < 1MB for 10k simple entities)
     assert!(bytes.len() < 1_000_000, "Bincode size: {} bytes (expected < 1MB)", bytes.len());
@@ -211,8 +219,12 @@ fn test_delta_with_10k_entities_small_changes() {
     let full_size = bincode::serialize(&state2).unwrap().len();
     let delta_size = bincode::serialize(&delta).unwrap().len();
 
-    println!("Full state size: {} bytes, Delta size: {} bytes, Reduction: {:.1}%",
-        full_size, delta_size, 100.0 * (1.0 - delta_size as f64 / full_size as f64));
+    println!(
+        "Full state size: {} bytes, Delta size: {} bytes, Reduction: {:.1}%",
+        full_size,
+        delta_size,
+        100.0 * (1.0 - delta_size as f64 / full_size as f64)
+    );
 
     assert!(delta_size < full_size, "Delta should be smaller than full state");
 
@@ -255,12 +267,18 @@ fn test_memory_usage_10k_entities() {
 
     // Test bincode size
     let bincode_bytes = snapshot.serialize(Format::Bincode).unwrap();
-    println!("10k entities (4 components) - Bincode: {} bytes ({:.2} KB)",
-        bincode_bytes.len(), bincode_bytes.len() as f64 / 1024.0);
+    println!(
+        "10k entities (4 components) - Bincode: {} bytes ({:.2} KB)",
+        bincode_bytes.len(),
+        bincode_bytes.len() as f64 / 1024.0
+    );
 
     // Should be under 2MB for 10k entities with 4 components
-    assert!(bincode_bytes.len() < 2_000_000,
-        "Bincode size {} bytes exceeds 2MB limit", bincode_bytes.len());
+    assert!(
+        bincode_bytes.len() < 2_000_000,
+        "Bincode size {} bytes exceeds 2MB limit",
+        bincode_bytes.len()
+    );
 
     // Verify entity and component counts
     assert_eq!(snapshot.metadata.entity_count, 10_000);

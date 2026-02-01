@@ -52,10 +52,7 @@ fn bench_framebuffer_single_creation(c: &mut Criterion) {
                 &context.device,
                 render_pass.handle(),
                 offscreen.image_view(),
-                ash::vk::Extent2D {
-                    width: 1920,
-                    height: 1080,
-                },
+                ash::vk::Extent2D { width: 1920, height: 1080 },
             )
             .expect("Failed to create framebuffer");
             black_box(fb);
@@ -103,10 +100,7 @@ fn bench_framebuffer_batch_creation(c: &mut Criterion) {
                     &context.device,
                     render_pass.handle(),
                     &image_views,
-                    ash::vk::Extent2D {
-                        width: 1920,
-                        height: 1080,
-                    },
+                    ash::vk::Extent2D { width: 1920, height: 1080 },
                 )
                 .expect("Failed to create framebuffers");
                 black_box(framebuffers);
@@ -132,8 +126,8 @@ fn bench_sync_objects_creation(c: &mut Criterion) {
 
     c.bench_function("sync_single_creation", |b| {
         b.iter(|| {
-            let sync = FrameSyncObjects::new(&context.device)
-                .expect("Failed to create sync objects");
+            let sync =
+                FrameSyncObjects::new(&context.device).expect("Failed to create sync objects");
             black_box(sync);
         });
     });
@@ -166,8 +160,7 @@ fn bench_fence_operations(c: &mut Criterion) {
 
     c.bench_function("fence_wait_and_reset", |b| {
         b.iter(|| {
-            sync.wait(&context.device, u64::MAX)
-                .expect("Failed to wait");
+            sync.wait(&context.device, u64::MAX).expect("Failed to wait");
             sync.reset(&context.device).expect("Failed to reset");
             black_box(&sync);
         });
@@ -215,8 +208,7 @@ fn bench_command_buffer_allocation(c: &mut Criterion) {
             b.iter(|| {
                 let buffers: Vec<_> = (0..count)
                     .map(|_| {
-                        pool.allocate(&context.device)
-                            .expect("Failed to allocate command buffer")
+                        pool.allocate(&context.device).expect("Failed to allocate command buffer")
                     })
                     .collect();
                 black_box(buffers);
@@ -239,9 +231,7 @@ fn bench_command_buffer_begin_end(c: &mut Criterion) {
     let pool = CommandPool::new(&context.device, context.queue_families.graphics)
         .expect("Failed to create command pool");
 
-    let cmd = pool
-        .allocate(&context.device)
-        .expect("Failed to allocate command buffer");
+    let cmd = pool.allocate(&context.device).expect("Failed to allocate command buffer");
 
     c.bench_function("command_buffer_begin_end", |b| {
         b.iter(|| {
@@ -406,10 +396,7 @@ fn bench_full_pipeline_setup(c: &mut Criterion) {
                 &context.device,
                 render_pass.handle(),
                 &image_views,
-                ash::vk::Extent2D {
-                    width: 1920,
-                    height: 1080,
-                },
+                ash::vk::Extent2D { width: 1920, height: 1080 },
             )
             .expect("Failed to create framebuffers");
 
@@ -419,15 +406,12 @@ fn bench_full_pipeline_setup(c: &mut Criterion) {
 
             // Allocate command buffers
             let _command_buffers: Vec<_> = (0..3)
-                .map(|_| {
-                    pool.allocate(&context.device)
-                        .expect("Failed to allocate command buffer")
-                })
+                .map(|_| pool.allocate(&context.device).expect("Failed to allocate command buffer"))
                 .collect();
 
             // Create sync objects for 2 frames in flight
-            let _sync_objects = create_sync_objects(&context.device, 2)
-                .expect("Failed to create sync objects");
+            let _sync_objects =
+                create_sync_objects(&context.device, 2).expect("Failed to create sync objects");
 
             black_box(&render_pass);
         });
@@ -440,11 +424,7 @@ criterion_group!(
     bench_framebuffer_batch_creation,
 );
 
-criterion_group!(
-    sync_benches,
-    bench_sync_objects_creation,
-    bench_fence_operations,
-);
+criterion_group!(sync_benches, bench_sync_objects_creation, bench_fence_operations,);
 
 criterion_group!(
     command_benches,
@@ -453,11 +433,7 @@ criterion_group!(
     bench_command_buffer_begin_end,
 );
 
-criterion_group!(
-    render_pass_benches,
-    bench_render_pass_creation,
-    bench_render_pass_with_depth,
-);
+criterion_group!(render_pass_benches, bench_render_pass_creation, bench_render_pass_with_depth,);
 
 criterion_group!(
     offscreen_benches,
