@@ -129,15 +129,51 @@ watch-test:
 check-compile:
     cargo check --all-targets --all-features
 
-# === Docker (Phase 2.1 Part C - coming soon) ===
+# === Docker ===
 
-# Start development environment
-# dev:
-#     docker-compose -f docker-compose.dev.yml up
+# Start development environment (with hot-reload)
+dev:
+    docker-compose -f docker-compose.dev.yml up
+
+# Start development environment (detached)
+dev-detached:
+    docker-compose -f docker-compose.dev.yml up -d
 
 # Stop development environment
-# dev-stop:
-#     docker-compose -f docker-compose.dev.yml down
+dev-stop:
+    docker-compose -f docker-compose.dev.yml down
+
+# Start production environment
+prod:
+    docker-compose up -d
+
+# Stop production environment
+prod-stop:
+    docker-compose down
+
+# View server logs (dev)
+dev-logs:
+    docker-compose -f docker-compose.dev.yml logs -f server
+
+# View server logs (production)
+prod-logs:
+    docker-compose logs -f server
+
+# Rebuild Docker images
+docker-rebuild:
+    docker-compose build --no-cache
+
+# Show Docker image sizes
+docker-sizes:
+    @echo "Development images:"
+    @docker images | grep agent-game.*dev || echo "  No dev images"
+    @echo "\nProduction images:"
+    @docker images | grep agent-game-engine || echo "  No prod images"
+
+# Clean Docker artifacts
+docker-clean:
+    docker-compose down -v
+    docker-compose -f docker-compose.dev.yml down -v
 
 # === Platform-Specific ===
 

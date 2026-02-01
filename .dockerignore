@@ -1,0 +1,78 @@
+# Docker ignore file - exclude unnecessary files from build context
+
+# Build artifacts
+target/
+*.exe
+*.dll
+*.so
+*.dylib
+*.rlib
+*.a
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Development files
+.env
+.env.*
+*.log
+
+# Test data
+test-data/
+tests/fixtures/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude/AI
+.claude/
+
+# Scripts (not needed in container)
+scripts/
+
+# Examples (not needed in container)
+examples/
+engine/*/examples/
+
+# Benchmarks (not needed in container)
+engine/*/benches/
+
+# Tests (not needed in container builds)
+engine/*/tests/
+
+# Development Docker files (don't need in production builds)
+docker-compose.dev.yml
+*.dev
+
+# Profiling data
+*.prof
+trace.json
+flamegraph.svg
+
+# Cache
+.cargo/
+Cargo.lock

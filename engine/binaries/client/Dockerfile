@@ -1,11 +1,11 @@
 # Multi-stage build for client binary
-FROM rust:1.75 as builder
+FROM rust:1.75-slim as builder
 
-# Install dependencies
+# Install only essential build dependencies
 RUN apt-get update && apt-get install -y \
     cmake \
+    pkg-config \
     libvulkan-dev \
-    vulkan-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -15,8 +15,8 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY engine ./engine
 
-# Build client in release mode
-RUN cargo build --bin agent_game_engine_client --features client --release
+# Build with release profile
+RUN cargo build --bin client --features client --release
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/agent_game_engine_client /usr/local/bin/client
+COPY --from=builder /app/target/release/client /usr/local/bin/client
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/client"]

@@ -1,0 +1,69 @@
+# Development docker-compose
+# Start with: docker-compose -f docker-compose.dev.yml up
+# Or use: just dev
+
+version: '3.8'
+
+services:
+  # Game Server (with hot-reload)
+  server:
+    build:
+      context: .
+      dockerfile: engine/binaries/server/Dockerfile.dev
+    container_name: agent-game-server-dev
+    volumes:
+      # Mount source code for hot-reload
+      - .:/workspace:cached
+      # Cache cargo registry and git
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      # Cache build artifacts
+      - target-dev:/workspace/target
+    ports:
+      - "7777:7777/tcp"  # Game traffic (TCP)
+      - "7778:7778/udp"  # Game traffic (UDP)
+    environment:
+      - RUST_LOG=info,agent_game_engine=debug
+      - RUST_BACKTRACE=1
+    networks:
+      - game-network
+    restart: unless-stopped
+
+  # Optional: Metrics/Observability (Phase 2.1 Part D)
+  # Uncomment when Prometheus integration is complete
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: agent-game-prometheus
+  #   volumes:
+  #     - ./engine/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+  #     - prometheus-data:/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   networks:
+  #     - game-network
+  #   restart: unless-stopped
+
+  # Optional: Grafana Dashboard
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: agent-game-grafana
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   networks:
+  #     - game-network
+  #   restart: unless-stopped
+
+networks:
+  game-network:
+    driver: bridge
+
+volumes:
+  cargo-registry:
+  cargo-git:
+  target-dev:
+  # prometheus-data:
+  # grafana-data:

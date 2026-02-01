@@ -1,0 +1,55 @@
+# Development Dockerfile for Server
+# Hot-reload enabled with cargo-watch
+FROM rust:1.75-bookworm
+
+# Install development tools
+RUN cargo install cargo-watch
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy workspace manifest first (for better caching)
+COPY Cargo.toml Cargo.lock ./
+
+# Copy all crate manifests
+COPY engine/core/Cargo.toml engine/core/Cargo.toml
+COPY engine/math/Cargo.toml engine/math/Cargo.toml
+COPY engine/build-utils/Cargo.toml engine/build-utils/Cargo.toml
+COPY engine/renderer/Cargo.toml engine/renderer/Cargo.toml
+COPY engine/networking/Cargo.toml engine/networking/Cargo.toml
+COPY engine/physics/Cargo.toml engine/physics/Cargo.toml
+COPY engine/audio/Cargo.toml engine/audio/Cargo.toml
+COPY engine/lod/Cargo.toml engine/lod/Cargo.toml
+COPY engine/interest/Cargo.toml engine/interest/Cargo.toml
+COPY engine/auto-update/Cargo.toml engine/auto-update/Cargo.toml
+COPY engine/observability/Cargo.toml engine/observability/Cargo.toml
+COPY engine/profiling/Cargo.toml engine/profiling/Cargo.toml
+COPY engine/macros/Cargo.toml engine/macros/Cargo.toml
+COPY engine/binaries/client/Cargo.toml engine/binaries/client/Cargo.toml
+COPY engine/binaries/server/Cargo.toml engine/binaries/server/Cargo.toml
+
+# Create dummy source files to cache dependencies
+RUN mkdir -p engine/core/src engine/math/src engine/build-utils/src \
+    engine/renderer/src engine/networking/src engine/physics/src \
+    engine/audio/src engine/lod/src engine/interest/src \
+    engine/auto-update/src engine/observability/src engine/profiling/src \
+    engine/macros/src engine/binaries/client/src engine/binaries/server/src \
+    && echo "fn main() {}" > engine/binaries/client/src/main.rs \
+    && echo "fn main() {}" > engine/binaries/server/src/main.rs \
+    && touch engine/core/src/lib.rs engine/math/src/lib.rs engine/build-utils/src/lib.rs \
+    engine/renderer/src/lib.rs engine/networking/src/lib.rs engine/physics/src/lib.rs \
+    engine/audio/src/lib.rs engine/lod/src/lib.rs engine/interest/src/lib.rs \
+    engine/auto-update/src/lib.rs engine/observability/src/lib.rs engine/profiling/src/lib.rs \
+    engine/macros/src/lib.rs
+
+# Build dependencies (will be cached)
+RUN cargo build --bin server --features server
+
+# Remove dummy files
+RUN rm -rf engine/*/src engine/binaries/*/src
+
+# Expose server ports
+EXPOSE 7777/tcp 7778/udp
+
+# Default command: watch and rebuild on changes
+CMD ["cargo", "watch", "-x", "run --bin server --features server"]

@@ -1,9 +1,11 @@
 # Multi-stage build for server binary
-FROM rust:1.75 as builder
+# Target: <50MB image size
+FROM rust:1.75-slim as builder
 
-# Install dependencies
+# Install only essential build dependencies
 RUN apt-get update && apt-get install -y \
     cmake \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -13,8 +15,9 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY engine ./engine
 
-# Build server in release mode
-RUN cargo build --bin agent_game_engine_server --features server --release
+# Build with size-optimized profile
+# release-server profile: strip = true, opt-level = "z", lto = true
+RUN cargo build --bin server --profile release-server --features server
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -27,8 +30,8 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -m -u 1000 gameserver
 
-# Copy binary from builder
-COPY --from=builder /app/target/release/agent_game_engine_server /usr/local/bin/server
+# Copy binary from builder (release-server profile output)
+COPY --from=builder /app/target/release-server/server /usr/local/bin/server
 
 # Set ownership
 RUN chown gameserver:gameserver /usr/local/bin/server

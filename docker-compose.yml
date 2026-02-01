@@ -1,0 +1,79 @@
+# Production docker-compose
+# Start with: docker-compose up -d
+# Or use: just prod
+
+version: '3.8'
+
+services:
+  # Game Server (production)
+  server:
+    build:
+      context: .
+      dockerfile: engine/binaries/server/Dockerfile
+    image: agent-game-engine-server:latest
+    container_name: agent-game-server
+    ports:
+      - "7777:7777/tcp"  # Game traffic (TCP)
+      - "7778:7778/udp"  # Game traffic (UDP)
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=0
+    networks:
+      - game-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/server", "--health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+  # Optional: Prometheus (metrics collection)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: agent-game-prometheus
+  #   volumes:
+  #     - ./engine/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus-data:/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   networks:
+  #     - game-network
+  #   restart: always
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #     - '--storage.tsdb.retention.time=30d'
+
+  # Optional: Grafana (metrics dashboard)
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: agent-game-grafana
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #     - ./engine/observability/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_USER=admin
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
+  #     - GF_SERVER_ROOT_URL=http://localhost:3000
+  #   networks:
+  #     - game-network
+  #   restart: always
+
+networks:
+  game-network:
+    driver: bridge
+
+volumes:
+  # prometheus-data:
+  # grafana-data:
