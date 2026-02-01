@@ -18,7 +18,7 @@ engine-core = { path = "../core" }
 engine-macros = { path = "../macros" }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 
 [[bench]]
 name = "mesh_benches"

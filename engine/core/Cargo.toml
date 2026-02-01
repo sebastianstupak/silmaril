@@ -46,7 +46,7 @@ metrics = ["agent-game-engine-profiling/metrics"]
 engine-build-utils = { path = "../build-utils" }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 proptest = "1.4"
 iai-callgrind = "0.16"
 

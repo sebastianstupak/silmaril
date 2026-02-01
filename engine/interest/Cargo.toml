@@ -11,4 +11,4 @@ engine-core = { path = "../core" }
 glam = "0.25"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"

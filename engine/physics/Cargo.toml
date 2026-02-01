@@ -25,7 +25,7 @@ profiling = ["dep:agent-game-engine-profiling", "agent-game-engine-profiling/pro
 engine-build-utils = { path = "../build-utils" }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 serde_yaml = "0.9"
 
 [[bench]]
