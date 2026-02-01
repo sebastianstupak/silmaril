@@ -9,8 +9,22 @@ repository.workspace = true
 [dependencies]
 tracy-client = { version = "0.17", optional = true }
 puffin = { version = "0.19", optional = true }
+tracing = "0.1"
+
+# Prometheus metrics
+prometheus = { version = "0.13", optional = true }
+lazy_static = { version = "1.4", optional = true }
+
+# HTTP server for metrics endpoint
+hyper = { version = "0.14", features = ["server", "tcp", "http1"], optional = true }
+tokio = { version = "1.35", features = ["rt", "macros"], optional = true }
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
+tokio = { version = "1.35", features = ["rt", "macros"] }
 
 [features]
 default = []
 tracy = ["tracy-client"]
 puffin = ["dep:puffin"]
+metrics = ["prometheus", "lazy_static", "hyper", "tokio"]

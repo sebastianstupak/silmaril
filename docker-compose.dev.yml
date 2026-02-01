@@ -29,33 +29,36 @@ services:
       - game-network
     restart: unless-stopped
 
-  # Optional: Metrics/Observability (Phase 2.1 Part D)
-  # Uncomment when Prometheus integration is complete
-  # prometheus:
-  #   image: prom/prometheus:latest
-  #   container_name: agent-game-prometheus
-  #   volumes:
-  #     - ./engine/observability/prometheus.yml:/etc/prometheus/prometheus.yml
-  #     - prometheus-data:/prometheus
-  #   ports:
-  #     - "9090:9090"
-  #   networks:
-  #     - game-network
-  #   restart: unless-stopped
+  # Prometheus (metrics collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agent-game-prometheus-dev
+    volumes:
+      - ./engine/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - game-network
+    restart: unless-stopped
 
-  # Optional: Grafana Dashboard
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   container_name: agent-game-grafana
-  #   volumes:
-  #     - grafana-data:/var/lib/grafana
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #   networks:
-  #     - game-network
-  #   restart: unless-stopped
+  # Grafana (metrics dashboard)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: agent-game-grafana-dev
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./engine/observability/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - game-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
 
 networks:
   game-network:
@@ -65,5 +68,5 @@ volumes:
   cargo-registry:
   cargo-git:
   target-dev:
-  # prometheus-data:
-  # grafana-data:
+  prometheus-data:
+  grafana-data:

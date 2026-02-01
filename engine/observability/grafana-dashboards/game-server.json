@@ -1,0 +1,189 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "game-server",
+    "title": "Agent Game Engine - Server Metrics",
+    "tags": ["game", "server", "performance"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Server Tick Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "engine_tick_rate_tps",
+            "legendFormat": "Tick Rate (TPS)",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "TPS", "format": "short"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Server Tick Duration",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(engine_tick_duration_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(engine_tick_duration_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(engine_tick_duration_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"label": "Seconds", "format": "s"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Entity Count",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "engine_entity_count",
+            "legendFormat": "Entities",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "Count", "format": "short"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Connected Clients",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "engine_connected_clients",
+            "legendFormat": "Clients",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "Count", "format": "short"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Network Bandwidth",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(engine_network_bytes_sent_total[1m])",
+            "legendFormat": "Sent (bytes/sec)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(engine_network_bytes_received_total[1m])",
+            "legendFormat": "Received (bytes/sec)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bytes/sec", "format": "Bps"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Network Latency",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(engine_network_latency_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(engine_network_latency_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(engine_network_latency_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"label": "Seconds", "format": "s"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "engine_memory_allocated_bytes",
+            "legendFormat": "Total Allocated",
+            "refId": "A"
+          },
+          {
+            "expr": "engine_ecs_memory_bytes",
+            "legendFormat": "ECS Storage",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bytes", "format": "bytes"},
+          {"label": "", "format": "short"}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "ECS Query Performance",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(engine_query_time_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(engine_query_time_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p95",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"label": "Seconds", "format": "s"},
+          {"label": "", "format": "short"}
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    }
+  }
+}

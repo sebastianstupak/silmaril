@@ -36,44 +36,46 @@ services:
           cpus: '1.0'
           memory: 512M
 
-  # Optional: Prometheus (metrics collection)
-  # prometheus:
-  #   image: prom/prometheus:latest
-  #   container_name: agent-game-prometheus
-  #   volumes:
-  #     - ./engine/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  #     - prometheus-data:/prometheus
-  #   ports:
-  #     - "9090:9090"
-  #   networks:
-  #     - game-network
-  #   restart: always
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--storage.tsdb.retention.time=30d'
+  # Prometheus (metrics collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agent-game-prometheus
+    volumes:
+      - ./engine/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - game-network
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
 
-  # Optional: Grafana (metrics dashboard)
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   container_name: agent-game-grafana
-  #   volumes:
-  #     - grafana-data:/var/lib/grafana
-  #     - ./engine/observability/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_USER=admin
-  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
-  #     - GF_SERVER_ROOT_URL=http://localhost:3000
-  #   networks:
-  #     - game-network
-  #   restart: always
+  # Grafana (metrics dashboard)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: agent-game-grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./engine/observability/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    networks:
+      - game-network
+    restart: always
+    depends_on:
+      - prometheus
 
 networks:
   game-network:
     driver: bridge
 
 volumes:
-  # prometheus-data:
-  # grafana-data:
+  prometheus-data:
+  grafana-data:

@@ -1,0 +1,57 @@
+# Prometheus configuration for Agent Game Engine
+
+global:
+  scrape_interval: 15s     # Scrape metrics every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'game-cluster'
+    env: 'production'
+
+# Alerting configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Load rules from files
+# rule_files:
+#   - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Server metrics
+  - job_name: 'game-server'
+    static_configs:
+      - targets: ['server:9090']
+        labels:
+          service: 'game-server'
+
+    # Collect metrics every 5 seconds for low-latency monitoring
+    scrape_interval: 5s
+    scrape_timeout: 4s
+
+    # Relabel metrics
+    metric_relabel_configs:
+      # Add instance label from target
+      - source_labels: [__address__]
+        target_label: instance
+
+      # Drop high-cardinality metrics if needed
+      # - source_labels: [__name__]
+      #   regex: 'engine_.*_bucket'
+      #   action: drop
+
+  # Optional: Client metrics (if clients expose metrics)
+  # - job_name: 'game-client'
+  #   static_configs:
+  #     - targets: ['client:9091']
+  #       labels:
+  #         service: 'game-client'
+  #   scrape_interval: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
