@@ -47,11 +47,13 @@
 mod aabb;
 mod arrows;
 mod collisions;
+mod joints;
 mod lines;
 mod renderer;
 
 pub use aabb::*;
 pub use arrows::*;
 pub use collisions::*;
+pub use joints::*;
 pub use lines::*;
 pub use renderer::*;
