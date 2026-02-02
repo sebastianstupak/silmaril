@@ -1,6 +1,9 @@
 //! Integration test for Vec3x8 SIMD operations
 
+#[cfg(feature = "simd")]
 use engine_math::simd::{vec3_aos_to_soa_8, Vec3x8};
+
+#[cfg(feature = "simd")]
 use engine_math::Vec3;
 
 #[cfg(feature = "simd")]
