@@ -198,7 +198,10 @@ fn test_world_snapshot_restore_yaml() {
     // Snapshot the world
     let snapshot = WorldState::snapshot(&world);
     assert_eq!(snapshot.metadata.entity_count, 10, "Snapshot should have 10 entities");
-    assert!(snapshot.metadata.component_count >= 20, "Should have at least 20 components (Transform + Health for all)");
+    assert!(
+        snapshot.metadata.component_count >= 20,
+        "Should have at least 20 components (Transform + Health for all)"
+    );
 
     // Serialize to YAML
     let yaml_bytes = Serializable::serialize(&snapshot, Format::Yaml)
@@ -259,11 +262,16 @@ fn test_world_snapshot_restore_bincode() {
 
     // Bincode should be compact (rough estimate: < 50 bytes per entity on average)
     let bytes_per_entity = bincode_bytes.len() / 100;
-    assert!(bytes_per_entity < 200, "Bincode should be compact: {} bytes/entity", bytes_per_entity);
+    assert!(
+        bytes_per_entity < 200,
+        "Bincode should be compact: {} bytes/entity",
+        bytes_per_entity
+    );
 
     // Deserialize
-    let restored_snapshot = <WorldState as Serializable>::deserialize(&bincode_bytes, Format::Bincode)
-        .expect("Bincode deserialization should succeed");
+    let restored_snapshot =
+        <WorldState as Serializable>::deserialize(&bincode_bytes, Format::Bincode)
+            .expect("Bincode deserialization should succeed");
 
     assert_eq!(restored_snapshot.metadata.entity_count, 100);
     assert_eq!(restored_snapshot.entities.len(), 100);
@@ -385,13 +393,19 @@ fn test_delta_with_world_changes() {
     let delta = WorldStateDelta::compute(&snapshot1, &snapshot2);
 
     // Delta should only contain modified components
-    assert!(delta.modified_components.len() <= 5, "Should have at most 5 modified components");
+    assert!(
+        delta.modified_components.len() <= 5,
+        "Should have at most 5 modified components"
+    );
 
     // Delta should be smaller than full state for small changes
     let delta_bytes = bincode::serialize(&delta).unwrap();
     let full_bytes = bincode::serialize(&snapshot2).unwrap();
 
-    assert!(delta_bytes.len() < full_bytes.len(),
+    assert!(
+        delta_bytes.len() < full_bytes.len(),
         "Delta ({} bytes) should be smaller than full state ({} bytes) for 25% change",
-        delta_bytes.len(), full_bytes.len());
+        delta_bytes.len(),
+        full_bytes.len()
+    );
 }

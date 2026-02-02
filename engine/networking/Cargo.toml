@@ -9,10 +9,29 @@ repository.workspace = true
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
 engine-core = { path = "../core" }
+engine-interest = { path = "../interest" }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 bincode = "1.3"
 tracing = "0.1"
 agent-game-engine-profiling = { path = "../profiling", optional = true }
+# TLS/DTLS dependencies
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0"
+tokio-rustls = "0.24"
+webpki = "0.22"
+webpki-roots = "0.25"
+rcgen = "0.11"
+# ACME protocol for Let's Encrypt
+instant-acme = "0.3"
+thiserror = "1.0"
+# Hardware crypto acceleration detection
+aes = { version = "0.8", features = ["hazmat"] }
+# Utilities
+bytes = "1.5"
+futures = "0.3"
+parking_lot = "0.12"
+chrono = "0.4"
 
 [features]
 profiling = ["agent-game-engine-profiling", "engine-core/profiling"]
@@ -39,4 +58,60 @@ harness = false
 
 [[bench]]
 name = "integration_benches"
+harness = false
+
+[[bench]]
+name = "concurrent_connections_bench"
+harness = false
+
+[[bench]]
+name = "large_message_bench"
+harness = false
+
+[[bench]]
+name = "resilience_bench"
+harness = false
+
+[[bench]]
+name = "interpolation_bench"
+harness = false
+
+[[bench]]
+name = "channel_bench"
+harness = false
+
+[[bench]]
+name = "auth_encryption_bench"
+harness = false
+
+[[bench]]
+name = "zone_transition_bench"
+harness = false
+
+[[bench]]
+name = "world_streaming_bench"
+harness = false
+
+[[bench]]
+name = "interest_management_bench"
+harness = false
+
+[[bench]]
+name = "interest_extreme_scale_bench"
+harness = false
+
+[[bench]]
+name = "interest_management_comparison_bench"
+harness = false
+
+[[bench]]
+name = "interest_stress_bench"
+harness = false
+
+[[bench]]
+name = "interest_aaa_bench"
+harness = false
+
+[[bench]]
+name = "tls_bench"
 harness = false

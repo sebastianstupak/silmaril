@@ -9,8 +9,8 @@
 //!
 //! Supports multiple network profiles (LAN, Cable, DSL, 4G, 3G, etc.)
 
-use std::collections::{BinaryHeap, VecDeque};
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, VecDeque};
 use std::time::{Duration, Instant};
 
 /// Network simulation profile
@@ -247,7 +247,8 @@ impl NetworkSimulator {
     fn calculate_latency(&mut self) -> Duration {
         let base_latency = self.conditions.latency_ms;
         let jitter = if self.conditions.jitter_ms > 0 {
-            (self.next_random() % self.conditions.jitter_ms) as i32 - (self.conditions.jitter_ms as i32 / 2)
+            (self.next_random() % self.conditions.jitter_ms) as i32
+                - (self.conditions.jitter_ms as i32 / 2)
         } else {
             0
         };
@@ -276,10 +277,7 @@ struct BandwidthTracker {
 
 impl BandwidthTracker {
     fn new() -> Self {
-        Self {
-            bytes_sent: VecDeque::new(),
-            window_duration: Duration::from_secs(1),
-        }
+        Self { bytes_sent: VecDeque::new(), window_duration: Duration::from_secs(1) }
     }
 
     fn calculate_delay(&mut self, packet_size: usize, conditions: &NetworkConditions) -> Duration {

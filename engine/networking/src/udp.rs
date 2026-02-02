@@ -61,10 +61,7 @@ impl UdpSocket {
     pub async fn bind(addr: &str) -> UdpResult<Self> {
         let socket = TokioUdpSocket::bind(addr).await?;
         let local_addr = socket.local_addr()?;
-        Ok(Self {
-            socket: Arc::new(socket),
-            local_addr,
-        })
+        Ok(Self { socket: Arc::new(socket), local_addr })
     }
 
     /// Get the local address
@@ -143,10 +140,7 @@ impl UdpClient {
             ))
         })?;
 
-        Ok(Self {
-            socket,
-            server_addr,
-        })
+        Ok(Self { socket, server_addr })
     }
 
     /// Send a packet to the server
@@ -182,10 +176,7 @@ impl UdpServer {
     /// Bind to an address
     pub async fn bind(addr: &str) -> UdpResult<Self> {
         let socket = UdpSocket::bind(addr).await?;
-        Ok(Self {
-            socket,
-            clients: Arc::new(Mutex::new(HashMap::new())),
-        })
+        Ok(Self { socket, clients: Arc::new(Mutex::new(HashMap::new())) })
     }
 
     /// Get the local address
@@ -309,9 +300,7 @@ mod tests {
 
         // Try to send packet larger than MAX_PACKET_SIZE
         let message = vec![0u8; MAX_PACKET_SIZE + 1];
-        let result = socket
-            .send_to(&message, "127.0.0.1:9999".parse().unwrap())
-            .await;
+        let result = socket.send_to(&message, "127.0.0.1:9999".parse().unwrap()).await;
         assert!(matches!(result, Err(UdpError::PacketTooLarge(_))));
     }
 

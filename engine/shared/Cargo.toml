@@ -1,0 +1,49 @@
+[package]
+name = "engine-shared-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+# This crate only exists for tests and benchmarks
+path = "src/lib.rs"
+
+[[test]]
+name = "integration_simd_test"
+path = "tests/integration_simd_test.rs"
+harness = true
+
+[[test]]
+name = "prediction_tests"
+path = "tests/prediction_tests.rs"
+harness = true
+
+[[test]]
+name = "aaa_plus_stress_tests"
+path = "tests/aaa_plus_stress_tests.rs"
+harness = true
+
+[[bench]]
+name = "integration_bench"
+path = "benches/integration_bench.rs"
+harness = false
+
+[[bench]]
+name = "physics_integration_comparison"
+path = "benches/physics_integration_comparison.rs"
+harness = false
+
+[[bench]]
+name = "prediction_benches"
+path = "benches/prediction_benches.rs"
+harness = false
+
+[dependencies]
+engine-core = { path = "../core" }
+engine-math = { path = "../math" }
+engine-physics = { path = "../physics" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+bincode = "1.3"

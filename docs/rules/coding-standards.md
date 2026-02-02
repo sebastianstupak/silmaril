@@ -235,25 +235,73 @@ mod tests {
 
 ---
 
-### **Test Organization**
+### **Test Organization - 3-Tier Hierarchy** ⚠️ **MANDATORY**
+
+The engine enforces a **3-tier test hierarchy** to maintain clean architecture:
+
+#### **Tier 1: Unit Tests** (Single-Crate Only)
+
+**Location:** `engine/{crate}/tests/` or inline `#[cfg(test)]` modules
+
+**Rule:** MUST NOT import from other engine crates
 
 ```rust
-// Unit tests: same file
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_foo() { }
-}
-
-// Integration tests: tests/ directory
-// tests/integration_test.rs
-use agent_game_engine::*;
+// ✅ CORRECT - Unit test for physics crate
+// File: engine/physics/tests/raycast_tests.rs
+use engine_math::Vec3;         // ← Helper crate OK
+use engine_physics::PhysicsWorld;  // ← Same crate OK
 
 #[test]
-fn test_full_pipeline() { }
+fn test_raycast() {
+    let mut world = PhysicsWorld::new();
+    // Test physics in isolation
+}
 ```
+
+#### **Tier 2: Cross-Crate Integration Tests** ⚠️ **ENFORCED**
+
+**Location:** `engine/shared/tests/` ONLY
+
+**Rule:** Tests importing from 2+ engine crates MUST go here
+
+```rust
+// ✅ CORRECT - Cross-crate test in shared location
+// File: engine/shared/tests/physics_ecs_integration.rs
+use engine_core::ecs::World;        // ← Multiple engine crates
+use engine_physics::PhysicsWorld;   // ← MUST be in engine/shared/tests/
+
+#[test]
+fn test_physics_syncs_to_ecs() {
+    // Test integration between systems
+}
+```
+
+```rust
+// ❌ FORBIDDEN - Cross-crate test in wrong location
+// File: engine/physics/tests/bad_test.rs
+use engine_core::ecs::World;        // ❌ Violates architecture!
+use engine_physics::PhysicsWorld;
+
+#[test]
+fn test_physics_syncs_to_ecs() {
+    // This MUST be in engine/shared/tests/
+}
+```
+
+#### **Tier 3: End-to-End Tests**
+
+**Location:** `examples/` or `scripts/e2e-tests/`
+
+**Rule:** Test complete user workflows with actual binaries
+
+```bash
+# scripts/e2e-tests/test-multiplayer.sh
+cargo run --bin server &
+cargo run --bin client &
+# Verify match completed
+```
+
+**See:** [TESTING_ARCHITECTURE.md](../TESTING_ARCHITECTURE.md) for complete details
 
 ---
 

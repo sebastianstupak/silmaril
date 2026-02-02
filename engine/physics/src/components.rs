@@ -147,6 +147,24 @@ impl RigidBody {
         self
     }
 
+    /// Set linear damping (air resistance for linear velocity)
+    pub fn with_linear_damping(mut self, damping: f32) -> Self {
+        self.linear_damping = damping;
+        self
+    }
+
+    /// Set angular damping (air resistance for angular velocity)
+    pub fn with_angular_damping(mut self, damping: f32) -> Self {
+        self.angular_damping = damping;
+        self
+    }
+
+    /// Set gravity scale (1.0 = normal, 0.0 = no gravity, 2.0 = double)
+    pub fn with_gravity_scale(mut self, scale: f32) -> Self {
+        self.gravity_scale = scale;
+        self
+    }
+
     /// Apply impulse (immediate velocity change)
     pub fn apply_impulse(&mut self, impulse: Vec3) {
         if self.body_type == RigidBodyType::Dynamic {
@@ -391,6 +409,12 @@ impl Collider {
     /// Set collision mask (what do I collide with?)
     pub fn with_mask(mut self, mask: u32) -> Self {
         self.collision_mask = mask;
+        self
+    }
+
+    /// Set physics material (friction, restitution, etc.)
+    pub fn with_material(mut self, material: PhysicsMaterial) -> Self {
+        self.material = material;
         self
     }
 

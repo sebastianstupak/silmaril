@@ -3,6 +3,11 @@
 //! This module is **standalone** - works without ECS integration.
 //! ECS sync will be added later via a separate system.
 
+use crate::agentic_debug::{
+    ColliderState, ConstraintState, ConstraintType, EntityState, EventRecorder, IslandState,
+    MaterialState, PhysicsConfigSnapshot, PhysicsDebugSnapshot, ShapeParams,
+    ShapeType as DebugShapeType, AABB,
+};
 use crate::components::{Collider, ColliderShape, RigidBody, RigidBodyType};
 use crate::config::{PhysicsConfig, PhysicsMode};
 use engine_math::{Quat, Vec3};
@@ -115,6 +120,9 @@ pub struct PhysicsWorld {
 
     /// Frame counter for debugging
     frame_count: u64,
+
+    /// Event recorder for agentic debugging
+    event_recorder: EventRecorder,
 }
 
 impl PhysicsWorld {
@@ -166,6 +174,7 @@ impl PhysicsWorld {
             active_trigger_pairs: HashSet::new(),
             accumulator: 0.0,
             frame_count: 0,
+            event_recorder: EventRecorder::new(),
             config,
         }
     }
@@ -203,6 +212,10 @@ impl PhysicsWorld {
                 "Physics spiral of death - too many substeps"
             );
         }
+
+        // Always update query pipeline for raycasts/spatial queries
+        // This ensures raycasts work even if no physics step was performed (dt=0)
+        self.query_pipeline.update(&self.rigid_body_set, &self.collider_set);
     }
 
     /// Internal step (one fixed timestep)
@@ -541,12 +554,7 @@ impl PhysicsWorld {
     /// Raycast (find first hit)
     ///
     /// Returns: (entity_id, distance, hit_point, normal)
-    pub fn raycast(
-        &self,
-        origin: Vec3,
-        direction: Vec3,
-        max_distance: f32,
-    ) -> Option<RaycastHit> {
+    pub fn raycast(&self, origin: Vec3, direction: Vec3, max_distance: f32) -> Option<RaycastHit> {
         #[cfg(feature = "profiling")]
         profile_scope!("raycast_single", ProfileCategory::Physics);
 
@@ -555,42 +563,44 @@ impl PhysicsWorld {
             vector![direction.x, direction.y, direction.z],
         );
 
-        self.query_pipeline
-            .cast_ray_and_get_normal(
-                &self.rigid_body_set,
-                &self.collider_set,
-                &ray,
-                max_distance,
-                true,
-                QueryFilter::default(),
-            )
-            .and_then(|(handle, intersection)| {
-                let collider = self.collider_set.get(handle)?;
-                let rb_handle = collider.parent()?;
-                let entity_id = self.body_to_entity.get(&rb_handle)?;
+        // First cast ray to find closest hit
+        let (handle, toi) = self.query_pipeline.cast_ray(
+            &self.rigid_body_set,
+            &self.collider_set,
+            &ray,
+            max_distance,
+            true, // solid (ignore back-faces)
+            QueryFilter::new().exclude_sensors(),
+        )?;
 
-                let hit_point = origin + direction * intersection.toi;
-                let normal =
-                    Vec3::new(intersection.normal.x, intersection.normal.y, intersection.normal.z);
+        let collider = self.collider_set.get(handle)?;
+        let rb_handle = collider.parent()?;
+        let entity_id = self.body_to_entity.get(&rb_handle)?;
 
-                Some(RaycastHit {
-                    entity: *entity_id,
-                    distance: intersection.toi,
-                    point: hit_point,
-                    normal,
-                })
-            })
+        let hit_point = origin + direction * toi;
+
+        // Now compute the normal at the hit point
+        let normal = if let Some(intersection) = self.query_pipeline.cast_ray_and_get_normal(
+            &self.rigid_body_set,
+            &self.collider_set,
+            &ray,
+            max_distance,
+            true,
+            QueryFilter::new().exclude_sensors(),
+        ) {
+            Vec3::new(intersection.1.normal.x, intersection.1.normal.y, intersection.1.normal.z)
+        } else {
+            // Fallback: use ray direction reversed as normal
+            -direction
+        };
+
+        Some(RaycastHit { entity: *entity_id, distance: toi, point: hit_point, normal })
     }
 
     /// Raycast all (find all hits along ray, sorted by distance)
     ///
     /// Returns all hits sorted from nearest to farthest.
-    pub fn raycast_all(
-        &self,
-        origin: Vec3,
-        direction: Vec3,
-        max_distance: f32,
-    ) -> Vec<RaycastHit> {
+    pub fn raycast_all(&self, origin: Vec3, direction: Vec3, max_distance: f32) -> Vec<RaycastHit> {
         #[cfg(feature = "profiling")]
         profile_scope!("raycast_all", ProfileCategory::Physics);
 
@@ -606,7 +616,8 @@ impl PhysicsWorld {
             &self.collider_set,
             &ray,
             max_distance,
-            QueryFilter::default(),
+            true, // solid (ignore back-faces)
+            QueryFilter::new().exclude_sensors(),
             |handle, intersection| {
                 if let Some(collider) = self.collider_set.get(handle) {
                     if let Some(rb_handle) = collider.parent() {
@@ -687,6 +698,201 @@ impl PhysicsWorld {
         &self.trigger_exit_events
     }
 
+    /// Enable agentic debugging (event recording)
+    ///
+    /// When enabled, physics events will be recorded to the event recorder.
+    /// Use `event_recorder_mut()` to drain events and export them.
+    pub fn enable_agentic_debug(&mut self) {
+        self.event_recorder.enable();
+        tracing::info!("Agentic debugging enabled for PhysicsWorld");
+    }
+
+    /// Disable agentic debugging
+    pub fn disable_agentic_debug(&mut self) {
+        self.event_recorder.disable();
+        tracing::info!("Agentic debugging disabled for PhysicsWorld");
+    }
+
+    /// Create debug snapshot of current physics state
+    ///
+    /// Captures complete state from Rapier for AI agent analysis.
+    /// This extracts all entity positions, velocities, forces, colliders, and constraints.
+    pub fn create_debug_snapshot(&self, frame: u64) -> PhysicsDebugSnapshot {
+        #[cfg(feature = "profiling")]
+        profile_scope!("create_debug_snapshot", ProfileCategory::Physics);
+
+        let timestamp = frame as f64 * self.config.timestep() as f64;
+        let mut snapshot = PhysicsDebugSnapshot::new(frame, timestamp);
+
+        // Extract all entity states from rigid bodies
+        for (entity_id, &body_handle) in &self.entity_to_body {
+            if let Some(body) = self.rigid_body_set.get(body_handle) {
+                let pos = body.translation();
+                let rot = body.rotation();
+                let linvel = body.linvel();
+                let angvel = body.angvel();
+
+                // Get mass properties
+                let mass_props = body.mass_properties();
+
+                snapshot.entities.push(EntityState {
+                    id: *entity_id,
+                    position: Vec3::new(pos.x, pos.y, pos.z),
+                    rotation: Quat::from_xyzw(rot.i, rot.j, rot.k, rot.w),
+                    linear_velocity: Vec3::new(linvel.x, linvel.y, linvel.z),
+                    angular_velocity: Vec3::new(angvel.x, angvel.y, angvel.z),
+                    forces: Vec3::ZERO, // Rapier doesn't expose accumulated forces directly
+                    torques: Vec3::ZERO,
+                    mass: mass_props.mass(),
+                    linear_damping: body.linear_damping(),
+                    angular_damping: body.angular_damping(),
+                    gravity_scale: body.gravity_scale(),
+                    sleeping: body.is_sleeping(),
+                    is_static: body.is_fixed(),
+                    is_kinematic: body.is_kinematic(),
+                    can_sleep: !body.is_fixed(), // Static bodies cannot sleep
+                    ccd_enabled: body.is_ccd_enabled(),
+                });
+            }
+        }
+
+        // Extract collider states
+        for (collider_handle, collider) in self.collider_set.iter() {
+            // Find entity for this collider
+            if let Some(&entity_id) = self.collider_to_entity.get(&collider_handle) {
+                // Extract shape information
+                let shape = collider.shape();
+                let (shape_type, shape_params) = Self::extract_shape_info(shape);
+
+                // Get AABB
+                let aabb = collider.compute_aabb();
+                let aabb_state = AABB {
+                    min: Vec3::new(aabb.mins.x, aabb.mins.y, aabb.mins.z),
+                    max: Vec3::new(aabb.maxs.x, aabb.maxs.y, aabb.maxs.z),
+                };
+
+                // Get material properties
+                let material = MaterialState {
+                    friction: collider.friction(),
+                    restitution: collider.restitution(),
+                    density: collider.density(),
+                };
+
+                // Get collision groups
+                let groups = collider.collision_groups();
+
+                snapshot.colliders.push(ColliderState {
+                    entity_id,
+                    shape_type,
+                    shape_params,
+                    aabb: aabb_state,
+                    material,
+                    is_sensor: collider.is_sensor(),
+                    collision_groups: groups.memberships.bits(),
+                    collision_mask: groups.filter.bits(),
+                });
+            }
+        }
+
+        // Extract constraint states
+        // Note: Rapier 0.18 doesn't expose joint body handles publicly
+        // This will be improved in A.0.5 (Solver Internals Export)
+        // For now, we'll export basic joint data without entity mapping
+        for (joint_handle, impulse_joint) in self.impulse_joint_set.iter() {
+            // Determine constraint type from joint data
+            let constraint_type = Self::classify_joint(impulse_joint);
+
+            // Get current impulse (magnitude of all impulses)
+            // Note: impulses is a field, not a method, and it's a nalgebra vector
+            let applied_impulse = impulse_joint.impulses.norm();
+
+            snapshot.constraints.push(ConstraintState {
+                id: joint_handle.into_raw_parts().0 as u64,
+                entity_a: 0, // Will be extracted properly in A.0.5
+                entity_b: 0, // Will be extracted properly in A.0.5
+                constraint_type,
+                current_error: 0.0, // Will be extracted in A.0.5
+                applied_impulse,
+                broken: false, // Will need separate tracking
+                break_force: None,
+                enabled: true,
+            });
+        }
+
+        // Extract island states
+        // Note: Rapier doesn't expose island manager internals publicly
+        // For now, we'll create a single pseudo-island with all active bodies
+        // This will be improved in A.0.5 (Solver Internals Export)
+        let active_bodies: Vec<u64> = self
+            .rigid_body_set
+            .iter()
+            .filter(|(_, body)| !body.is_sleeping())
+            .filter_map(|(handle, _)| self.body_to_entity.get(&handle).copied())
+            .collect();
+
+        if !active_bodies.is_empty() {
+            snapshot.islands.push(IslandState {
+                id: 0,
+                entities: active_bodies,
+                sleeping: false,
+                iterations: self.config.solver_iterations,
+                residual: 0.0, // Will be extracted in A.0.5
+                converged: true,
+            });
+        }
+
+        // Add sleeping island
+        let sleeping_bodies: Vec<u64> = self
+            .rigid_body_set
+            .iter()
+            .filter(|(_, body)| body.is_sleeping())
+            .filter_map(|(handle, _)| self.body_to_entity.get(&handle).copied())
+            .collect();
+
+        if !sleeping_bodies.is_empty() {
+            snapshot.islands.push(IslandState {
+                id: 1,
+                entities: sleeping_bodies,
+                sleeping: true,
+                iterations: 0,
+                residual: 0.0,
+                converged: true,
+            });
+        }
+
+        // Set global config
+        snapshot.config = PhysicsConfigSnapshot {
+            gravity: Vec3::new(self.gravity.x, self.gravity.y, self.gravity.z),
+            timestep: self.integration_params.dt,
+            solver_iterations: self.config.solver_iterations,
+            sleep_threshold: 0.01, // Default value
+            ccd_enabled: self.config.enable_ccd,
+        };
+
+        tracing::trace!(
+            frame = frame,
+            entities = snapshot.entities.len(),
+            colliders = snapshot.colliders.len(),
+            constraints = snapshot.constraints.len(),
+            islands = snapshot.islands.len(),
+            "Created debug snapshot"
+        );
+
+        snapshot
+    }
+
+    /// Get mutable reference to event recorder
+    ///
+    /// Use this to drain events and export them to JSONL/SQLite/CSV.
+    pub fn event_recorder_mut(&mut self) -> &mut EventRecorder {
+        &mut self.event_recorder
+    }
+
+    /// Get immutable reference to event recorder
+    pub fn event_recorder(&self) -> &EventRecorder {
+        &self.event_recorder
+    }
+
     /// Process trigger events from collision events
     ///
     /// Detects when entities enter/exit sensor colliders and generates
@@ -715,10 +921,9 @@ impl PhysicsWorld {
                         // Only process if at least one is a sensor
                         if is_sensor_1 || is_sensor_2 {
                             // Get entity IDs
-                            if let (Some(&e1), Some(&e2)) = (
-                                self.collider_to_entity.get(h1),
-                                self.collider_to_entity.get(h2),
-                            ) {
+                            if let (Some(&e1), Some(&e2)) =
+                                (self.collider_to_entity.get(h1), self.collider_to_entity.get(h2))
+                            {
                                 // Determine which is the trigger (sensor) and which is the other
                                 let (trigger, other) = if is_sensor_1 && !is_sensor_2 {
                                     (e1, e2)
@@ -758,6 +963,105 @@ impl PhysicsWorld {
 
         // Update active pairs
         self.active_trigger_pairs = current_pairs;
+    }
+
+    /// Extract shape type and parameters from Rapier shape
+    fn extract_shape_info(shape: &dyn Shape) -> (DebugShapeType, ShapeParams) {
+        use rapier3d::geometry::ShapeType as RapierShapeType;
+
+        match shape.shape_type() {
+            RapierShapeType::Cuboid => {
+                if let Some(cuboid) = shape.as_cuboid() {
+                    (
+                        DebugShapeType::Box,
+                        ShapeParams::Box {
+                            half_extents: Vec3::new(
+                                cuboid.half_extents.x,
+                                cuboid.half_extents.y,
+                                cuboid.half_extents.z,
+                            ),
+                        },
+                    )
+                } else {
+                    (DebugShapeType::Box, ShapeParams::Box { half_extents: Vec3::ZERO })
+                }
+            }
+            RapierShapeType::Ball => {
+                if let Some(ball) = shape.as_ball() {
+                    (DebugShapeType::Sphere, ShapeParams::Sphere { radius: ball.radius })
+                } else {
+                    (DebugShapeType::Sphere, ShapeParams::Sphere { radius: 0.0 })
+                }
+            }
+            RapierShapeType::Capsule => {
+                if let Some(capsule) = shape.as_capsule() {
+                    (
+                        DebugShapeType::Capsule,
+                        ShapeParams::Capsule {
+                            half_height: capsule.half_height(),
+                            radius: capsule.radius,
+                        },
+                    )
+                } else {
+                    (
+                        DebugShapeType::Capsule,
+                        ShapeParams::Capsule { half_height: 0.0, radius: 0.0 },
+                    )
+                }
+            }
+            RapierShapeType::Cylinder => {
+                if let Some(cylinder) = shape.as_cylinder() {
+                    (
+                        DebugShapeType::Cylinder,
+                        ShapeParams::Cylinder {
+                            half_height: cylinder.half_height,
+                            radius: cylinder.radius,
+                        },
+                    )
+                } else {
+                    (
+                        DebugShapeType::Cylinder,
+                        ShapeParams::Cylinder { half_height: 0.0, radius: 0.0 },
+                    )
+                }
+            }
+            RapierShapeType::ConvexPolyhedron => {
+                let vertex_count = 0; // Would need access to internal data
+                (DebugShapeType::ConvexHull, ShapeParams::ConvexHull { vertex_count })
+            }
+            RapierShapeType::TriMesh => {
+                let triangle_count = 0; // Would need access to internal data
+                (DebugShapeType::TriMesh, ShapeParams::TriMesh { triangle_count })
+            }
+            _ => {
+                // Fallback for unknown shapes
+                (DebugShapeType::Box, ShapeParams::Box { half_extents: Vec3::ZERO })
+            }
+        }
+    }
+
+    /// Classify joint type from Rapier impulse joint
+    fn classify_joint(impulse_joint: &ImpulseJoint) -> ConstraintType {
+        // Rapier joint classification based on locked axes
+        let data = impulse_joint.data;
+
+        // Check which axes are locked to determine joint type
+        let locked_axes = data.locked_axes.bits();
+
+        // Count locked translation and rotation axes
+        let locked_trans = (locked_axes & 0b111).count_ones();
+        let locked_rot = ((locked_axes >> 3) & 0b111).count_ones();
+
+        match (locked_trans, locked_rot) {
+            (3, 3) => ConstraintType::Fixed, // All axes locked = fixed joint
+            (3, 2) => ConstraintType::Revolute {
+                angle: 0, // Would need to extract actual angle
+                has_limits: false,
+            },
+            (2, 3) => ConstraintType::Prismatic { translation: 0, has_limits: false },
+            (3, 0) => ConstraintType::Spherical, // Translation locked, rotation free
+            _ => ConstraintType::Generic { locked_axes: locked_axes as u8 },
+        }
     }
 
     /// Convert collider shape component to Rapier shape

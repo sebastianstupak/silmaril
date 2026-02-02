@@ -7,7 +7,7 @@
 //! - Concurrent connections
 //! - Packet rate
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use engine_networking::{TcpClient, TcpServer, UdpClient, UdpServer};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -215,50 +215,46 @@ fn bench_concurrent_connections(c: &mut Criterion) {
     group.sample_size(10); // Reduce sample size for high connection counts
 
     for count in connection_counts {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            &count,
-            |b, &count| {
-                b.iter(|| {
-                    rt.block_on(async move {
-                        // Start echo server
-                        let server = TcpServer::bind("127.0.0.1:0").await.unwrap();
-                        let addr = server.local_addr().unwrap();
-                        let addr_str = addr.to_string();
+        group.bench_with_input(BenchmarkId::from_parameter(count), &count, |b, &count| {
+            b.iter(|| {
+                rt.block_on(async move {
+                    // Start echo server
+                    let server = TcpServer::bind("127.0.0.1:0").await.unwrap();
+                    let addr = server.local_addr().unwrap();
+                    let addr_str = addr.to_string();
 
-                        tokio::spawn(async move {
-                            server.run_echo_server().await.ok();
+                    tokio::spawn(async move {
+                        server.run_echo_server().await.ok();
+                    });
+
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+
+                    // Create multiple clients concurrently
+                    let start = std::time::Instant::now();
+
+                    let mut handles = Vec::new();
+                    for i in 0..count {
+                        let addr_clone = addr_str.clone();
+                        let handle = tokio::spawn(async move {
+                            let client = TcpClient::connect(&addr_clone).await.unwrap();
+                            let message = format!("Message from client {}", i);
+                            client.send(message.as_bytes()).await.unwrap();
+                            let response = client.recv().await.unwrap();
+                            black_box(response);
+                            client.close().await.ok();
                         });
+                        handles.push(handle);
+                    }
 
-                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    // Wait for all clients to complete
+                    for handle in handles {
+                        handle.await.unwrap();
+                    }
 
-                        // Create multiple clients concurrently
-                        let start = std::time::Instant::now();
-
-                        let mut handles = Vec::new();
-                        for i in 0..count {
-                            let addr_clone = addr_str.clone();
-                            let handle = tokio::spawn(async move {
-                                let client = TcpClient::connect(&addr_clone).await.unwrap();
-                                let message = format!("Message from client {}", i);
-                                client.send(message.as_bytes()).await.unwrap();
-                                let response = client.recv().await.unwrap();
-                                black_box(response);
-                                client.close().await.ok();
-                            });
-                            handles.push(handle);
-                        }
-
-                        // Wait for all clients to complete
-                        for handle in handles {
-                            handle.await.unwrap();
-                        }
-
-                        start.elapsed()
-                    })
-                });
-            },
-        );
+                    start.elapsed()
+                })
+            });
+        });
     }
 
     group.finish();

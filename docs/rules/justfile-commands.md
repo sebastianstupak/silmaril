@@ -175,6 +175,34 @@ benchmark\:myfeature:
     cargo bench --package engine-myfeature
 ```
 
+### Benchmark Comparison
+
+| Command | Description |
+|---------|-------------|
+| `just benchmark-compare` | Generate comparison report (agent-game-engine vs industry) |
+| `just benchmark-thresholds` | Quick reference of all industry thresholds |
+
+**Example:**
+```bash
+# View industry thresholds
+just benchmark-thresholds
+
+# Generate full comparison report
+just benchmark-compare
+
+# Custom output location
+just benchmark-compare output=docs/MY_REPORT.md
+```
+
+**Industry Standards Included:**
+- Unity DOTS/ECS performance
+- Unreal Engine 5 (Nanite, Mass Entity)
+- Bevy Engine (Rust ECS)
+- AAA game industry standards
+- Rapier physics benchmarks
+- Competitive FPS networking (Valorant, CS2)
+- MMO networking (WoW, FFXIV)
+
 ## Command Discovery
 
 ```bash

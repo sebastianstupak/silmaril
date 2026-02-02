@@ -26,6 +26,7 @@
 //! ```
 
 use engine_math::Vec3;
+use rapier3d::na::Unit;
 use rapier3d::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -124,12 +125,7 @@ pub struct JointMotor {
 
 impl Default for JointMotor {
     fn default() -> Self {
-        Self {
-            target_velocity: 0.0,
-            max_force: f32::INFINITY,
-            stiffness: 0.0,
-            damping: 1.0,
-        }
+        Self { target_velocity: 0.0, max_force: f32::INFINITY, stiffness: 0.0, damping: 1.0 }
     }
 }
 
@@ -257,10 +253,9 @@ impl JointBuilder {
     /// Build the joint configuration
     pub fn build(self) -> Joint {
         match self.joint_type {
-            JointType::Fixed => Joint::Fixed(FixedJointConfig {
-                anchor1: self.anchor1,
-                anchor2: self.anchor2,
-            }),
+            JointType::Fixed => {
+                Joint::Fixed(FixedJointConfig { anchor1: self.anchor1, anchor2: self.anchor2 })
+            }
             JointType::Revolute => Joint::Revolute(RevoluteJointConfig {
                 anchor1: self.anchor1,
                 anchor2: self.anchor2,
@@ -285,12 +280,21 @@ impl JointBuilder {
 
 impl Joint {
     /// Convert engine joint to Rapier impulse joint
-    pub(crate) fn to_rapier(&self) -> GenericJoint {
+    pub fn to_rapier(&self) -> GenericJoint {
         match self {
             Joint::Fixed(config) => {
-                GenericJoint::new(JointAxesMask::LOCKED_FIXED_AXES)
-                    .local_anchor1(point![config.anchor1.x, config.anchor1.y, config.anchor1.z])
-                    .local_anchor2(point![config.anchor2.x, config.anchor2.y, config.anchor2.z])
+                let mut joint = GenericJoint::new(JointAxesMask::LOCKED_FIXED_AXES);
+                joint.set_local_anchor1(point![
+                    config.anchor1.x,
+                    config.anchor1.y,
+                    config.anchor1.z
+                ]);
+                joint.set_local_anchor2(point![
+                    config.anchor2.x,
+                    config.anchor2.y,
+                    config.anchor2.z
+                ]);
+                joint
             }
             Joint::Revolute(config) => {
                 let mut joint = RevoluteJointBuilder::new(Unit::new_normalize(vector![
@@ -299,7 +303,11 @@ impl Joint {
                     config.axis.z
                 ]))
                 .local_anchor1(point![config.anchor1.x, config.anchor1.y, config.anchor1.z])
-                .local_anchor2(point![config.anchor2.x, config.anchor2.y, config.anchor2.z]);
+                .local_anchor2(point![
+                    config.anchor2.x,
+                    config.anchor2.y,
+                    config.anchor2.z
+                ]);
 
                 if let Some((min, max)) = config.limits {
                     joint = joint.limits([min, max]);
@@ -311,7 +319,7 @@ impl Joint {
                         .motor_model(MotorModel::ForceBased);
                 }
 
-                joint.build()
+                joint.build().into()
             }
             Joint::Prismatic(config) => {
                 let mut joint = PrismaticJointBuilder::new(Unit::new_normalize(vector![
@@ -320,7 +328,11 @@ impl Joint {
                     config.axis.z
                 ]))
                 .local_anchor1(point![config.anchor1.x, config.anchor1.y, config.anchor1.z])
-                .local_anchor2(point![config.anchor2.x, config.anchor2.y, config.anchor2.z]);
+                .local_anchor2(point![
+                    config.anchor2.x,
+                    config.anchor2.y,
+                    config.anchor2.z
+                ]);
 
                 if let Some((min, max)) = config.limits {
                     joint = joint.limits([min, max]);
@@ -332,15 +344,19 @@ impl Joint {
                         .motor_model(MotorModel::ForceBased);
                 }
 
-                joint.build()
+                joint.build().into()
             }
-            Joint::Spherical(config) => {
-                SphericalJointBuilder::new()
-                    .local_anchor1(point![config.anchor1.x, config.anchor1.y, config.anchor1.z])
-                    .local_anchor2(point![config.anchor2.x, config.anchor2.y, config.anchor2.z])
-                    .build()
-            }
+            Joint::Spherical(config) => SphericalJointBuilder::new()
+                .local_anchor1(point![config.anchor1.x, config.anchor1.y, config.anchor1.z])
+                .local_anchor2(point![config.anchor2.x, config.anchor2.y, config.anchor2.z])
+                .build()
+                .into(),
         }
+    }
+
+    /// Alias for to_rapier() - converts engine joint to Rapier impulse joint
+    pub fn to_rapier_joint(&self) -> GenericJoint {
+        self.to_rapier()
     }
 }
 
@@ -438,10 +454,7 @@ mod tests {
     fn test_revolute_with_motor() {
         let motor = JointMotor::new(5.0).with_max_force(50.0);
 
-        let joint = JointBuilder::revolute()
-            .axis(Vec3::Y)
-            .motor(motor)
-            .build();
+        let joint = JointBuilder::revolute().axis(Vec3::Y).motor(motor).build();
 
         match joint {
             Joint::Revolute(config) => {

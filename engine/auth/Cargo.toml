@@ -1,0 +1,71 @@
+[package]
+name = "engine-auth"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Core dependencies
+engine-core = { path = "../core" }
+engine-macros = { path = "../macros" }
+
+# Cryptography
+argon2 = { version = "0.5", features = ["std"] }
+jsonwebtoken = "9"
+totp-rs = { version = "5", features = ["gen_secret", "qr"] }
+sha2 = "0.10"
+rand = "0.8"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Rate limiting
+governor = "0.6"
+nonzero_ext = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for OAuth
+reqwest = { version = "0.11", features = ["json"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# URL encoding
+url = "2.5"
+
+# Base32 encoding for TOTP
+base32 = "0.4"
+
+# QR code generation
+qrcode = "0.14"
+image = "0.24"
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+rsa = { version = "0.9", features = ["sha2"] }
+base64 = "0.21"
+tracing-subscriber = "0.3"
+criterion = "0.5"
+proptest = "1.4"
+tokio-test = "0.4"
+mockito = "1.2"
+
+[features]
+default = []
+backtrace = ["engine-core/backtrace"]
+profiling = ["engine-core/profiling"]
+
+[[bench]]
+name = "auth_bench"
+harness = false

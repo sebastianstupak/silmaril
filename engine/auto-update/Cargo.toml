@@ -7,9 +7,36 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-reqwest = { version = "0.11", features = ["blocking"] }
-tokio = { version = "1.35", features = ["full"] }
 engine-core = { path = "../core" }
+engine-macros = { path = "../macros" }
+reqwest = { version = "0.11", features = ["stream", "json", "rustls-tls"], default-features = false }
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+zstd = "0.13"
+tracing = "0.1"
+thiserror = "1.0"
+futures-util = "0.3"
+chrono = { version = "0.4", features = ["serde"] }
+tempfile = "3.8"
+parking_lot = "0.12"
+hex = "0.4"
+# For differential patching - using qbsdiff which is a pure Rust implementation
+qbsdiff = "1.4"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = { version = "0.5", features = ["html_reports"] }
+mockito = "1.2"
+tokio-test = "0.4"
+clap = { version = "4.4", features = ["derive"] }
+tracing-subscriber = "0.3"
+
+[[bin]]
+name = "generate_patch"
+path = "tools/generate_patch.rs"
+
+[[bench]]
+name = "update_bench"
+harness = false

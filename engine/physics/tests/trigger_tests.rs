@@ -19,7 +19,8 @@ fn test_trigger_enter_event() {
     let rb_trigger = RigidBody::static_body();
     world.add_rigidbody(trigger, &rb_trigger, Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY);
 
-    let trigger_collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
+    let trigger_collider =
+        Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
     world.add_collider(trigger, &trigger_collider);
 
     // Create dynamic object outside trigger
@@ -60,7 +61,8 @@ fn test_trigger_exit_event() {
     let rb_trigger = RigidBody::static_body();
     world.add_rigidbody(trigger, &rb_trigger, Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY);
 
-    let trigger_collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
+    let trigger_collider =
+        Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
     world.add_collider(trigger, &trigger_collider);
 
     // Create object inside trigger
@@ -109,7 +111,8 @@ fn test_trigger_enter_exit_cycle() {
     let rb_trigger = RigidBody::static_body();
     world.add_rigidbody(trigger, &rb_trigger, Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY);
 
-    let trigger_collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
+    let trigger_collider =
+        Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
     world.add_collider(trigger, &trigger_collider);
 
     // Create object
@@ -161,7 +164,8 @@ fn test_sensor_no_collision_response() {
     let rb_sensor = RigidBody::static_body();
     world.add_rigidbody(sensor, &rb_sensor, Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY);
 
-    let sensor_collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
+    let sensor_collider =
+        Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
     world.add_collider(sensor, &sensor_collider);
 
     // Create dynamic object with velocity toward sensor
@@ -182,11 +186,7 @@ fn test_sensor_no_collision_response() {
 
     // Object should have passed through sensor (not stopped by it)
     let (pos, _) = world.get_transform(object).unwrap();
-    assert!(
-        pos.x > 2.0,
-        "Object should pass through sensor (pos.x={})",
-        pos.x
-    );
+    assert!(pos.x > 2.0, "Object should pass through sensor (pos.x={})", pos.x);
 }
 
 #[test]
@@ -198,14 +198,10 @@ fn test_multiple_triggers() {
     for i in 0..2 {
         let trigger = (i + 1) as u64;
         let rb = RigidBody::static_body();
-        world.add_rigidbody(
-            trigger,
-            &rb,
-            Vec3::new(i as f32 * 5.0, 0.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(trigger, &rb, Vec3::new(i as f32 * 5.0, 0.0, 0.0), Quat::IDENTITY);
 
-        let collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
+        let collider =
+            Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
         world.add_collider(trigger, &collider);
     }
 
@@ -249,7 +245,8 @@ fn test_overlapping_triggers() {
         let rb = RigidBody::static_body();
         world.add_rigidbody(trigger, &rb, Vec3::ZERO, Quat::IDENTITY);
 
-        let collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
+        let collider =
+            Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(2.0, 2.0, 2.0) });
         world.add_collider(trigger, &collider);
     }
 
@@ -293,7 +290,8 @@ fn test_trigger_with_dynamic_object() {
     let rb_trigger = RigidBody::static_body();
     world.add_rigidbody(trigger, &rb_trigger, Vec3::new(0.0, -5.0, 0.0), Quat::IDENTITY);
 
-    let trigger_collider = Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(5.0, 1.0, 5.0) });
+    let trigger_collider =
+        Collider::sensor(ColliderShape::Box { half_extents: Vec3::new(5.0, 1.0, 5.0) });
     world.add_collider(trigger, &trigger_collider);
 
     // Create falling object
@@ -355,11 +353,7 @@ fn test_non_sensor_collider() {
 
     // Object should be stopped by wall (not pass through)
     let (pos, _) = world.get_transform(object).unwrap();
-    assert!(
-        pos.x > 2.0,
-        "Object should be stopped by non-sensor collider (pos.x={})",
-        pos.x
-    );
+    assert!(pos.x > 2.0, "Object should be stopped by non-sensor collider (pos.x={})", pos.x);
 
     // Should NOT generate trigger events
     assert_eq!(

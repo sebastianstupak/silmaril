@@ -86,7 +86,21 @@
       "Bash(just:*)",
       "Bash(timeout 30 type:*)",
       "Bash(wmic process where \"name=''serialization_benches-0d2f62414ef4c06b.exe''\" get commandline,processid)",
-      "Bash(timeout /t 30)"
+      "Bash(timeout /t 30)",
+      "Bash(ping:*)",
+      "Bash(Select-Object -Last 30)",
+      "Bash(wmic process where \"name=''serialization_comprehensive-36f28c7764bfa2d0.exe''\" get commandline,processid)",
+      "Bash(just benchmark:physics:*)",
+      "Bash(just benchmark:networking:*)",
+      "WebFetch(domain:thegrimsey.net)",
+      "WebFetch(domain:docs.unity3d.com)",
+      "WebFetch(domain:www.unrealengine.com)",
+      "WebFetch(domain:cedric-neukirchen.net)",
+      "WebFetch(domain:dev.epicgames.com)",
+      "Bash(./test_shader_standalone.exe:*)",
+      "Bash(Select-String -Pattern \"test result|running\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(timeout 15 tail:*)"
     ]
   }
 }

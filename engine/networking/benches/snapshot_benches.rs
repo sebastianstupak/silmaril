@@ -6,7 +6,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use engine_core::ecs::World;
 use engine_core::gameplay::Health;
-use engine_core::math::{Transform, Vec3, Quat};
+use engine_core::math::{Quat, Transform, Vec3};
 use engine_core::physics_components::Velocity;
 use engine_core::serialization::Format;
 use engine_networking::snapshot::WorldSnapshot;
@@ -29,11 +29,7 @@ fn create_test_world(entity_count: usize) -> World {
 
         world.add(
             entity,
-            Transform::new(
-                Vec3::new(pos_x, pos_y, pos_z),
-                Quat::IDENTITY,
-                Vec3::ONE,
-            ),
+            Transform::new(Vec3::new(pos_x, pos_y, pos_z), Quat::IDENTITY, Vec3::ONE),
         );
 
         world.add(entity, Velocity { x: 1.0, y: 0.0, z: 0.0 });
@@ -52,16 +48,12 @@ fn bench_snapshot_generation(c: &mut Criterion) {
         let world = create_test_world(*entity_count);
 
         group.throughput(Throughput::Elements(*entity_count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let snapshot = WorldSnapshot::from_world(black_box(&world));
-                    black_box(snapshot);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let snapshot = WorldSnapshot::from_world(black_box(&world));
+                black_box(snapshot);
+            });
+        });
     }
 
     group.finish();
@@ -76,16 +68,12 @@ fn bench_snapshot_serialization_bincode(c: &mut Criterion) {
         let snapshot = WorldSnapshot::from_world(&world);
 
         group.throughput(Throughput::Elements(*entity_count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let bytes = snapshot.to_bytes(black_box(Format::Bincode)).unwrap();
-                    black_box(bytes);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let bytes = snapshot.to_bytes(black_box(Format::Bincode)).unwrap();
+                black_box(bytes);
+            });
+        });
     }
 
     group.finish();
@@ -101,17 +89,13 @@ fn bench_snapshot_deserialization_bincode(c: &mut Criterion) {
         let bytes = snapshot.to_bytes(Format::Bincode).unwrap();
 
         group.throughput(Throughput::Elements(*entity_count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let snapshot = WorldSnapshot::from_bytes(black_box(&bytes), Format::Bincode)
-                        .unwrap();
-                    black_box(snapshot);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let snapshot =
+                    WorldSnapshot::from_bytes(black_box(&bytes), Format::Bincode).unwrap();
+                black_box(snapshot);
+            });
+        });
     }
 
     group.finish();
@@ -126,21 +110,17 @@ fn bench_snapshot_application(c: &mut Criterion) {
         let snapshot = WorldSnapshot::from_world(&world);
 
         group.throughput(Throughput::Elements(*entity_count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let mut target_world = World::new();
-                    target_world.register::<Transform>();
-                    target_world.register::<Velocity>();
-                    target_world.register::<Health>();
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let mut target_world = World::new();
+                target_world.register::<Transform>();
+                target_world.register::<Velocity>();
+                target_world.register::<Health>();
 
-                    snapshot.apply_to_world(black_box(&mut target_world));
-                    black_box(target_world);
-                });
-            },
-        );
+                snapshot.apply_to_world(black_box(&mut target_world));
+                black_box(target_world);
+            });
+        });
     }
 
     group.finish();
@@ -192,31 +172,27 @@ fn bench_snapshot_full_roundtrip(c: &mut Criterion) {
         let world = create_test_world(*entity_count);
 
         group.throughput(Throughput::Elements(*entity_count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    // World -> Snapshot
-                    let snapshot1 = WorldSnapshot::from_world(black_box(&world));
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                // World -> Snapshot
+                let snapshot1 = WorldSnapshot::from_world(black_box(&world));
 
-                    // Snapshot -> Bytes
-                    let bytes = snapshot1.to_bytes(Format::Bincode).unwrap();
+                // Snapshot -> Bytes
+                let bytes = snapshot1.to_bytes(Format::Bincode).unwrap();
 
-                    // Bytes -> Snapshot
-                    let snapshot2 = WorldSnapshot::from_bytes(&bytes, Format::Bincode).unwrap();
+                // Bytes -> Snapshot
+                let snapshot2 = WorldSnapshot::from_bytes(&bytes, Format::Bincode).unwrap();
 
-                    // Snapshot -> World
-                    let mut target_world = World::new();
-                    target_world.register::<Transform>();
-                    target_world.register::<Velocity>();
-                    target_world.register::<Health>();
-                    snapshot2.apply_to_world(&mut target_world);
+                // Snapshot -> World
+                let mut target_world = World::new();
+                target_world.register::<Transform>();
+                target_world.register::<Velocity>();
+                target_world.register::<Health>();
+                snapshot2.apply_to_world(&mut target_world);
 
-                    black_box(target_world);
-                });
-            },
-        );
+                black_box(target_world);
+            });
+        });
     }
 
     group.finish();
@@ -235,16 +211,12 @@ fn bench_snapshot_serialization_throughput(c: &mut Criterion) {
         let size_bytes = bytes.len();
 
         group.throughput(Throughput::Bytes(size_bytes as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let bytes = snapshot.to_bytes(black_box(Format::Bincode)).unwrap();
-                    black_box(bytes);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let bytes = snapshot.to_bytes(black_box(Format::Bincode)).unwrap();
+                black_box(bytes);
+            });
+        });
     }
 
     group.finish();
@@ -261,17 +233,13 @@ fn bench_snapshot_deserialization_throughput(c: &mut Criterion) {
         let size_bytes = bytes.len();
 
         group.throughput(Throughput::Bytes(size_bytes as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(entity_count),
-            entity_count,
-            |b, _| {
-                b.iter(|| {
-                    let snapshot = WorldSnapshot::from_bytes(black_box(&bytes), Format::Bincode)
-                        .unwrap();
-                    black_box(snapshot);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(entity_count), entity_count, |b, _| {
+            b.iter(|| {
+                let snapshot =
+                    WorldSnapshot::from_bytes(black_box(&bytes), Format::Bincode).unwrap();
+                black_box(snapshot);
+            });
+        });
     }
 
     group.finish();

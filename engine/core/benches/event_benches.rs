@@ -1,6 +1,6 @@
 //! Event system performance benchmarks
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use engine_core::ecs::{Event, World};
 
 #[derive(Debug, Clone)]
@@ -34,19 +34,15 @@ fn bench_send_events_batch(c: &mut Criterion) {
     let mut group = c.benchmark_group("event_send_batch");
 
     for batch_size in [10, 100, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(batch_size),
-            batch_size,
-            |b, &size| {
-                let mut world = World::new();
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), batch_size, |b, &size| {
+            let mut world = World::new();
 
-                b.iter(|| {
-                    for i in 0..size {
-                        world.send_event(TestEvent { value: black_box(i) });
-                    }
-                });
-            },
-        );
+            b.iter(|| {
+                for i in 0..size {
+                    world.send_event(TestEvent { value: black_box(i) });
+                }
+            });
+        });
     }
 
     group.finish();

@@ -35,12 +35,16 @@ define_error! {
         CommandBufferAllocationFailed { count: u32, reason: String } = ErrorCode::CommandBufferAllocationFailed, ErrorSeverity::Error,
         PipelineCreationFailed { reason: String } = ErrorCode::PipelineCreationFailed, ErrorSeverity::Error,
         ShaderCompileFailed { path: String, reason: String } = ErrorCode::ShaderCompileFailed, ErrorSeverity::Error,
+        ShaderCompilationFailed { reason: String } = ErrorCode::ShaderCompileFailed, ErrorSeverity::Error,
+        ShaderNotFound { path: String, reason: String } = ErrorCode::ShaderCompileFailed, ErrorSeverity::Error,
+        InvalidShaderFormat { reason: String } = ErrorCode::ShaderCompileFailed, ErrorSeverity::Error,
         ShaderModuleCreationFailed { reason: String } = ErrorCode::ShaderModuleCreationFailed, ErrorSeverity::Error,
         QueueSubmissionFailed { reason: String } = ErrorCode::QueueSubmissionFailed, ErrorSeverity::Error,
         PresentFailed { reason: String } = ErrorCode::PresentFailed, ErrorSeverity::Warning,
         SwapchainOutOfDate {} = ErrorCode::SwapchainOutOfDate, ErrorSeverity::Warning,
         SwapchainSuboptimal {} = ErrorCode::SwapchainSuboptimal, ErrorSeverity::Warning,
         DeviceLost { reason: String } = ErrorCode::DeviceLost, ErrorSeverity::Critical,
+        InvalidMeshData { reason: String } = ErrorCode::InvalidMeshData, ErrorSeverity::Error,
     }
 }
 

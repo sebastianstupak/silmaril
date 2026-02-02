@@ -37,8 +37,16 @@ fn test_raycast_hits_ground() {
 
     let hit = hit.unwrap();
     assert_eq!(hit.entity, ground);
-    assert!((hit.distance - 10.0).abs() < 0.1, "Distance should be ~10 (hit.distance={})", hit.distance);
-    assert!((hit.point.y - 0.0).abs() < 0.1, "Hit point Y should be near 0 (hit.point.y={})", hit.point.y);
+    assert!(
+        (hit.distance - 10.0).abs() < 0.1,
+        "Distance should be ~10 (hit.distance={})",
+        hit.distance
+    );
+    assert!(
+        (hit.point.y - 0.0).abs() < 0.1,
+        "Hit point Y should be near 0 (hit.point.y={})",
+        hit.point.y
+    );
 
     // Normal should point upward
     assert!(hit.normal.y > 0.9, "Normal should point up (hit.normal.y={})", hit.normal.y);
@@ -253,10 +261,7 @@ fn test_raycast_ignores_sensor_colliders() {
 
     // Sensors should NOT block raycasts by default
     // (Rapier's default QueryFilter excludes sensors)
-    assert!(
-        hit.is_none(),
-        "Raycast should pass through sensor colliders by default"
-    );
+    assert!(hit.is_none(), "Raycast should pass through sensor colliders by default");
 }
 
 #[test]

@@ -205,20 +205,19 @@ impl FramedMessage {
             });
         }
 
-        Ok(Self {
-            length: payload.len() as u32,
-            payload,
-        })
+        Ok(Self { length: payload.len() as u32, payload })
     }
 
     /// Write framed message to writer (length prefix + payload)
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<usize, ProtocolError> {
         // Write length prefix (big-endian)
-        writer.write_all(&self.length.to_be_bytes())
+        writer
+            .write_all(&self.length.to_be_bytes())
             .map_err(|e| ProtocolError::IoError(e.to_string()))?;
 
         // Write payload
-        writer.write_all(&self.payload)
+        writer
+            .write_all(&self.payload)
             .map_err(|e| ProtocolError::IoError(e.to_string()))?;
 
         Ok(4 + self.payload.len())
@@ -228,7 +227,8 @@ impl FramedMessage {
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Self, ProtocolError> {
         // Read length prefix
         let mut len_bytes = [0u8; 4];
-        reader.read_exact(&mut len_bytes)
+        reader
+            .read_exact(&mut len_bytes)
             .map_err(|e| ProtocolError::IoError(e.to_string()))?;
 
         let length = u32::from_be_bytes(len_bytes);
@@ -242,7 +242,8 @@ impl FramedMessage {
 
         // Read payload
         let mut payload = vec![0u8; length as usize];
-        reader.read_exact(&mut payload)
+        reader
+            .read_exact(&mut payload)
             .map_err(|e| ProtocolError::IoError(e.to_string()))?;
 
         Ok(Self { length, payload })
@@ -261,14 +262,12 @@ pub fn serialize_client_message(
 ) -> Result<FramedMessage, ProtocolError> {
     let payload = match format {
         SerializationFormat::Bincode => {
-            bincode::serialize(msg)
-                .map_err(|e| ProtocolError::SerializationError(e.to_string()))?
+            bincode::serialize(msg).map_err(|e| ProtocolError::SerializationError(e.to_string()))?
         }
         SerializationFormat::FlatBuffers => {
             // TODO: Implement FlatBuffers serialization
             // For now, use bincode as placeholder
-            bincode::serialize(msg)
-                .map_err(|e| ProtocolError::SerializationError(e.to_string()))?
+            bincode::serialize(msg).map_err(|e| ProtocolError::SerializationError(e.to_string()))?
         }
     };
 
@@ -281,10 +280,8 @@ pub fn deserialize_client_message(
     format: SerializationFormat,
 ) -> Result<ClientMessage, ProtocolError> {
     match format {
-        SerializationFormat::Bincode => {
-            bincode::deserialize(&framed.payload)
-                .map_err(|e| ProtocolError::DeserializationError(e.to_string()))
-        }
+        SerializationFormat::Bincode => bincode::deserialize(&framed.payload)
+            .map_err(|e| ProtocolError::DeserializationError(e.to_string())),
         SerializationFormat::FlatBuffers => {
             // TODO: Implement FlatBuffers deserialization
             // For now, use bincode as placeholder
@@ -301,13 +298,11 @@ pub fn serialize_server_message(
 ) -> Result<FramedMessage, ProtocolError> {
     let payload = match format {
         SerializationFormat::Bincode => {
-            bincode::serialize(msg)
-                .map_err(|e| ProtocolError::SerializationError(e.to_string()))?
+            bincode::serialize(msg).map_err(|e| ProtocolError::SerializationError(e.to_string()))?
         }
         SerializationFormat::FlatBuffers => {
             // TODO: Implement FlatBuffers serialization
-            bincode::serialize(msg)
-                .map_err(|e| ProtocolError::SerializationError(e.to_string()))?
+            bincode::serialize(msg).map_err(|e| ProtocolError::SerializationError(e.to_string()))?
         }
     };
 
@@ -320,10 +315,8 @@ pub fn deserialize_server_message(
     format: SerializationFormat,
 ) -> Result<ServerMessage, ProtocolError> {
     match format {
-        SerializationFormat::Bincode => {
-            bincode::deserialize(&framed.payload)
-                .map_err(|e| ProtocolError::DeserializationError(e.to_string()))
-        }
+        SerializationFormat::Bincode => bincode::deserialize(&framed.payload)
+            .map_err(|e| ProtocolError::DeserializationError(e.to_string())),
         SerializationFormat::FlatBuffers => {
             // TODO: Implement FlatBuffers deserialization
             bincode::deserialize(&framed.payload)
@@ -385,15 +378,11 @@ mod tests {
 
     #[test]
     fn test_client_message_serialization_bincode() {
-        let msg = ClientMessage::PlayerMove {
-            x: 1.0,
-            y: 2.0,
-            z: 3.0,
-            timestamp: 12345,
-        };
+        let msg = ClientMessage::PlayerMove { x: 1.0, y: 2.0, z: 3.0, timestamp: 12345 };
 
         let framed = serialize_client_message(&msg, SerializationFormat::Bincode).unwrap();
-        let deserialized = deserialize_client_message(&framed, SerializationFormat::Bincode).unwrap();
+        let deserialized =
+            deserialize_client_message(&framed, SerializationFormat::Bincode).unwrap();
 
         assert_eq!(msg, deserialized);
     }
@@ -409,7 +398,8 @@ mod tests {
         };
 
         let framed = serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
-        let deserialized = deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap();
+        let deserialized =
+            deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap();
 
         assert_eq!(msg, deserialized);
     }
@@ -434,40 +424,37 @@ mod tests {
         let large_payload = vec![0u8; MAX_MESSAGE_SIZE + 1];
         let result = FramedMessage::new(large_payload);
 
-        assert!(matches!(
-            result,
-            Err(ProtocolError::MessageTooLarge { .. })
-        ));
+        assert!(matches!(result, Err(ProtocolError::MessageTooLarge { .. })));
     }
 
     #[test]
     fn test_chat_message_overhead() {
-        let msg = ClientMessage::ChatMessage {
-            message: "Hello".to_string(),
-            channel: 0,
-        };
+        let msg = ClientMessage::ChatMessage { message: "Hello".to_string(), channel: 0 };
 
         let framed = serialize_client_message(&msg, SerializationFormat::Bincode).unwrap();
 
         // Overhead should be minimal (enum discriminant + string length + framing)
         // With "Hello" (5 bytes), total should be < 50 bytes
-        assert!(framed.total_size() < 50, "Message overhead too large: {} bytes", framed.total_size());
+        assert!(
+            framed.total_size() < 50,
+            "Message overhead too large: {} bytes",
+            framed.total_size()
+        );
     }
 
     #[test]
     fn test_player_move_overhead() {
-        let msg = ClientMessage::PlayerMove {
-            x: 1.0,
-            y: 2.0,
-            z: 3.0,
-            timestamp: 12345,
-        };
+        let msg = ClientMessage::PlayerMove { x: 1.0, y: 2.0, z: 3.0, timestamp: 12345 };
 
         let framed = serialize_client_message(&msg, SerializationFormat::Bincode).unwrap();
 
         // PlayerMove should be very compact (3 f32s + 1 u64 + overhead)
         // Expected: ~30 bytes total
-        assert!(framed.total_size() < 50, "PlayerMove overhead too large: {} bytes", framed.total_size());
+        assert!(
+            framed.total_size() < 50,
+            "PlayerMove overhead too large: {} bytes",
+            framed.total_size()
+        );
     }
 
     #[test]
@@ -487,7 +474,11 @@ mod tests {
 
         // Transform update should be compact (entity + 7 f32s + overhead)
         // Expected: ~40 bytes total
-        assert!(framed.total_size() < 60, "EntityTransform overhead too large: {} bytes", framed.total_size());
+        assert!(
+            framed.total_size() < 60,
+            "EntityTransform overhead too large: {} bytes",
+            framed.total_size()
+        );
     }
 
     #[test]
@@ -498,7 +489,8 @@ mod tests {
         };
 
         let framed = serialize_client_message(&msg, SerializationFormat::Bincode).unwrap();
-        let deserialized = deserialize_client_message(&framed, SerializationFormat::Bincode).unwrap();
+        let deserialized =
+            deserialize_client_message(&framed, SerializationFormat::Bincode).unwrap();
 
         assert_eq!(msg, deserialized);
     }
@@ -510,10 +502,7 @@ mod tests {
         let ping = ClientMessage::Ping { client_time };
         let ping_framed = serialize_client_message(&ping, SerializationFormat::Bincode).unwrap();
 
-        let pong = ServerMessage::Pong {
-            client_time,
-            server_time: 123456800,
-        };
+        let pong = ServerMessage::Pong { client_time, server_time: 123456800 };
         let pong_framed = serialize_server_message(&pong, SerializationFormat::Bincode).unwrap();
 
         // Ping/pong should be very small for low latency measurement
@@ -526,27 +515,35 @@ mod tests {
         let entities = vec![
             EntityState {
                 entity: Entity::new(1, 0),
-                x: 1.0, y: 2.0, z: 3.0,
-                qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0,
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+                qx: 0.0,
+                qy: 0.0,
+                qz: 0.0,
+                qw: 1.0,
                 health: Some(100.0),
                 max_health: Some(100.0),
             },
             EntityState {
                 entity: Entity::new(2, 0),
-                x: 4.0, y: 5.0, z: 6.0,
-                qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0,
+                x: 4.0,
+                y: 5.0,
+                z: 6.0,
+                qx: 0.0,
+                qy: 0.0,
+                qz: 0.0,
+                qw: 1.0,
                 health: None,
                 max_health: None,
             },
         ];
 
-        let msg = ServerMessage::StateUpdate {
-            timestamp: 12345,
-            entities,
-        };
+        let msg = ServerMessage::StateUpdate { timestamp: 12345, entities };
 
         let framed = serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
-        let deserialized = deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap();
+        let deserialized =
+            deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap();
 
         assert_eq!(msg, deserialized);
     }

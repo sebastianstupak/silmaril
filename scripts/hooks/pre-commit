@@ -110,6 +110,70 @@ if [ $ISSUES -eq 0 ]; then
 fi
 echo ""
 
+# 6. Check for forbidden documentation files (CLAUDE.md Rule #9)
+echo "6. Checking for forbidden summary/implementation documents..."
+FORBIDDEN_DOCS=0
+
+# Define forbidden patterns
+FORBIDDEN_PATTERNS=(
+    "*_COMPLETE.md"
+    "*_SUMMARY.md"
+    "*_IMPLEMENTATION*.md"
+    "*_STATUS.md"
+    "*_REPORT.md"
+    "*_RESULTS.md"
+    "*_PLAN.md"
+    "*_VALIDATION.md"
+    "*_COMPARISON.md"
+    "PHASE_*.md"
+    "TASK_*.md"
+    "AAA_*.md"
+)
+
+# Check staged files for forbidden patterns
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=A)
+for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+    # Convert glob pattern to regex
+    regex="^${pattern//\*/.*}$"
+    if echo "$STAGED_FILES" | grep -qE "$regex"; then
+        FORBIDDEN_DOCS=1
+        print_status 1 "Forbidden documentation file detected: $pattern"
+    fi
+done
+
+if [ $FORBIDDEN_DOCS -eq 0 ]; then
+    print_status 0 "No forbidden documentation files"
+else
+    print_fix "Remove summary/implementation/status documents (see CLAUDE.md Rule #9)"
+    echo "    For progress → Use git commit messages"
+    echo "    For architecture → Update docs/ (permanent docs)"
+    echo "    For status → Update ROADMAP.md checkboxes"
+    FAILED=1
+fi
+echo ""
+
+# 7. Check for examples/ directories in engine crates (CLAUDE.md Rule #10)
+echo "7. Checking for forbidden examples/ directories in engine crates..."
+FORBIDDEN_EXAMPLES=0
+
+# Check for files in engine/*/examples/ (but not engine/shared/examples/)
+if echo "$STAGED_FILES" | grep -qE "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/"; then
+    FORBIDDEN_EXAMPLES=1
+    print_status 1 "Forbidden examples/ directory in engine crate"
+    echo "$STAGED_FILES" | grep -E "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/" | sed 's/^/    /'
+else
+    print_status 0 "No forbidden examples/ directories"
+fi
+
+if [ $FORBIDDEN_EXAMPLES -ne 0 ]; then
+    print_fix "Move examples to tests/ or benches/ (see CLAUDE.md Rule #10)"
+    echo "    For API demos → Add rustdoc examples in src/"
+    echo "    For functionality → Write integration tests in tests/"
+    echo "    For performance → Write benchmarks in benches/"
+    FAILED=1
+fi
+echo ""
+
 # Final result
 echo "========================================="
 if [ $FAILED -eq 0 ]; then

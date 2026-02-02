@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 #[test]
 fn test_lan_profile() {
-    let mut sim = NetworkSimulator::new(NetworkProfile::Lan);
+    let sim = NetworkSimulator::new(NetworkProfile::Lan);
     let conditions = sim.conditions();
 
     assert_eq!(conditions.latency_ms, 1);

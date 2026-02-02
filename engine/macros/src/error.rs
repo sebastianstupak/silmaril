@@ -245,6 +245,28 @@ pub fn define_error_impl(input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // Generate Clone implementation (backtrace field doesn't implement Clone)
+    let clone_arms: Vec<_> = error_def
+        .variants
+        .iter()
+        .map(|v| {
+            let variant_name = &v.name;
+            let field_names: Vec<_> = v.fields.iter().map(|f| &f.name).collect();
+
+            quote! {
+                #name::#variant_name {
+                    #(#field_names,)*
+                    #[cfg(feature = "backtrace")]
+                    backtrace: _,
+                } => #name::#variant_name {
+                    #(#field_names: #field_names.clone(),)*
+                    #[cfg(feature = "backtrace")]
+                    backtrace: ::std::backtrace::Backtrace::disabled(),
+                }
+            }
+        })
+        .collect();
+
     // Generate the full implementation
     // Types (EngineError, ErrorCode, ErrorSeverity) must be in scope
     quote! {
@@ -252,6 +274,14 @@ pub fn define_error_impl(input: TokenStream) -> TokenStream {
         #[allow(missing_docs)]
         #vis enum #name {
             #(#variants),*
+        }
+
+        impl Clone for #name {
+            fn clone(&self) -> Self {
+                match self {
+                    #(#clone_arms),*
+                }
+            }
         }
 
         impl #name {

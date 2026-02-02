@@ -105,36 +105,32 @@ fn bench_raycast_batch(c: &mut Criterion) {
     group.sample_size(50);
 
     for ray_count in [10, 50, 100, 200].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(ray_count),
-            ray_count,
-            |b, &count| {
-                let config = PhysicsConfig::default();
-                let mut world = PhysicsWorld::new(config);
-                create_test_scene(&mut world, 100);
+        group.bench_with_input(BenchmarkId::from_parameter(ray_count), ray_count, |b, &count| {
+            let config = PhysicsConfig::default();
+            let mut world = PhysicsWorld::new(config);
+            create_test_scene(&mut world, 100);
 
-                // Generate random ray directions
-                let rays: Vec<(Vec3, Vec3)> = (0..count)
-                    .map(|i| {
-                        let angle = (i as f32) * std::f32::consts::TAU / (count as f32);
-                        let dir = Vec3::new(angle.cos(), -1.0, angle.sin()).normalize();
-                        (Vec3::new(0.0, 10.0, 0.0), dir)
-                    })
-                    .collect();
+            // Generate random ray directions
+            let rays: Vec<(Vec3, Vec3)> = (0..count)
+                .map(|i| {
+                    let angle = (i as f32) * std::f32::consts::TAU / (count as f32);
+                    let dir = Vec3::new(angle.cos(), -1.0, angle.sin()).normalize();
+                    (Vec3::new(0.0, 10.0, 0.0), dir)
+                })
+                .collect();
 
-                let max_distance = 20.0;
+            let max_distance = 20.0;
 
-                b.iter(|| {
-                    for (origin, direction) in &rays {
-                        black_box(world.raycast(
-                            black_box(*origin),
-                            black_box(*direction),
-                            black_box(max_distance),
-                        ));
-                    }
-                });
-            },
-        );
+            b.iter(|| {
+                for (origin, direction) in &rays {
+                    black_box(world.raycast(
+                        black_box(*origin),
+                        black_box(*direction),
+                        black_box(max_distance),
+                    ));
+                }
+            });
+        });
     }
 
     group.finish();
@@ -162,8 +158,9 @@ fn bench_trigger_detection(c: &mut Criterion) {
                         Quat::IDENTITY,
                     );
 
-                    let collider =
-                        Collider::sensor(engine_physics::ColliderShape::Box { half_extents: Vec3::new(1.0, 1.0, 1.0) });
+                    let collider = Collider::sensor(engine_physics::ColliderShape::Box {
+                        half_extents: Vec3::new(1.0, 1.0, 1.0),
+                    });
                     world.add_collider(trigger, &collider);
                 }
 

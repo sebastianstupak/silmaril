@@ -10,16 +10,22 @@ repository.workspace = true
 rapier3d = { version = "0.18", features = ["parallel", "simd-stable"] }
 engine-core = { path = "../core" }
 engine-math = { path = "../math", features = ["serde", "simd"] }
+engine-macros = { path = "../macros" }
 agent-game-engine-profiling = { path = "../profiling", optional = true }
 puffin = { version = "0.19", optional = true }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 glam = "0.25"
 rayon = "1.10"
 crossbeam-channel = "0.5"
 tracing = "0.1"
+rusqlite = { version = "0.30", features = ["bundled"] }
+csv = "1.3"
+sha2 = "0.10"
 
 [features]
 profiling = ["dep:agent-game-engine-profiling", "agent-game-engine-profiling/profiling-puffin", "puffin"]
+backtrace = []
 
 [build-dependencies]
 engine-build-utils = { path = "../build-utils" }
@@ -27,14 +33,11 @@ engine-build-utils = { path = "../build-utils" }
 [dev-dependencies]
 criterion = "0.5"
 serde_yaml = "0.9"
-
-[[bench]]
-name = "integration_bench"
-harness = false
-
-[[bench]]
-name = "physics_integration_comparison"
-harness = false
+bincode = "1.3"
+engine-macros = { path = "../macros" }
+tracing-subscriber = "0.3"
+tempfile = "3.8"
+proptest = "1.4"
 
 [[bench]]
 name = "parallel_threshold_bench"
@@ -50,4 +53,16 @@ harness = false
 
 [[bench]]
 name = "character_benches"
+harness = false
+
+[[bench]]
+name = "deterministic_benches"
+harness = false
+
+[[bench]]
+name = "joint_benches"
+harness = false
+
+[[bench]]
+name = "advanced_benches"
 harness = false

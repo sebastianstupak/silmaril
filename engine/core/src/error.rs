@@ -142,10 +142,14 @@ pub enum ErrorCode {
     TextureLoadFailed = 1329,
     /// Mesh loading failed
     MeshLoadFailed = 1330,
+    /// Material loading failed
+    MaterialLoadFailed = 1331,
+    /// Asset loading failed (general)
+    AssetLoadFailed = 1339,
     /// Synchronization object creation failed
-    SyncObjectCreationFailed = 1331,
+    SyncObjectCreationFailed = 1340,
     /// GPU memory mapping failed
-    MemoryMappingFailed = 1332,
+    MemoryMappingFailed = 1341,
     /// Command buffer recording failed
     CommandBufferRecordingFailed = 1333,
     /// Queue submission failed
@@ -158,6 +162,20 @@ pub enum ErrorCode {
     SwapchainSuboptimal = 1337,
     /// Device lost
     DeviceLost = 1338,
+    /// Invalid mesh data (empty or malformed)
+    InvalidMeshData = 1342,
+    /// Debug snapshot validation failed
+    DebugSnapshotValidationFailed = 1343,
+    /// Invalid timestamp in debug snapshot
+    InvalidTimestamp = 1344,
+    /// Invalid viewport dimensions
+    InvalidViewport = 1345,
+    /// Invalid draw call data
+    InvalidDrawCall = 1346,
+    /// Invalid transform matrix (NaN or Inf)
+    InvalidTransform = 1347,
+    /// Draw call has zero vertices
+    ZeroVertices = 1348,
 
     // Networking (1400-1499)
     /// Network connection failed
@@ -170,6 +188,36 @@ pub enum ErrorCode {
     ReceiveFailed = 1403,
     /// Network protocol error
     ProtocolError = 1404,
+    /// TLS handshake failed
+    TlsHandshakeFailed = 1405,
+    /// TLS certificate error
+    TlsCertificateError = 1406,
+    /// TLS configuration error
+    TlsConfigError = 1407,
+    /// TLS connection error
+    TlsConnectionError = 1408,
+    /// TLS encryption error
+    TlsEncryptionError = 1409,
+    /// TLS decryption error
+    TlsDecryptionError = 1410,
+    /// Certificate validation failed
+    CertificateValidationFailed = 1411,
+    /// Certificate expired
+    CertificateExpired = 1412,
+    /// Certificate not yet valid
+    CertificateNotYetValid = 1413,
+    /// Invalid certificate
+    InvalidCertificate = 1414,
+    /// Certificate chain error
+    CertificateChainError = 1415,
+    /// ACME protocol error
+    AcmeError = 1416,
+    /// Certificate renewal failed
+    CertificateRenewalFailed = 1417,
+    /// DTLS handshake failed
+    DtlsHandshakeFailed = 1418,
+    /// DTLS packet error
+    DtlsPacketError = 1419,
 
     // Physics (1500-1599)
     /// Physics system initialization failed

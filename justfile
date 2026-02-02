@@ -2,6 +2,9 @@
 # Install `just`: cargo install just
 # Run `just` to see all commands
 
+# Set shell for Windows
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+
 # Configuration variables
 profile_dir := if os() == "windows" { env_var_or_default("TEMP", "C:\\temp") + "\\pgo-data" } else { "/tmp/pgo-data" }
 baseline_dir := if os() == "windows" { env_var_or_default("TEMP", "C:\\temp") + "\\pgo-baseline" } else { "/tmp/pgo-baseline" }
@@ -74,6 +77,36 @@ test-macros:
 test-verbose:
     cargo test --all-features -- --nocapture
 
+# Test ECS (Entity Component System)
+test-ecs:
+    cargo test --package engine-core --lib ecs
+    cargo test --package engine-core --test ecs_integration
+
+# Test serialization
+test-serialization:
+    cargo test --package engine-core --lib serialization
+    cargo test --package engine-core --test serialization_integration
+
+# Test physics
+test-physics:
+    cargo test --package engine-physics
+
+# Test renderer
+test-renderer:
+    cargo test --package engine-renderer
+
+# Test math
+test-math:
+    cargo test --package engine-math
+
+# Test networking
+test-networking:
+    cargo test --package engine-networking
+
+# Test profiling
+test-profiling:
+    cargo test --package engine-profiling
+
 # === Code Quality ===
 
 # Format all code
@@ -102,59 +135,59 @@ bench:
     cargo bench --all-features
 
 # Run all benchmarks and save baseline
-bench-all:
+benchmark-all:
     cargo bench --all-features -- --save-baseline current
 
 # Run platform-specific benchmarks only
-bench-platform:
+benchmark-platform:
     cargo bench --package engine-core --bench platform_benches
     cargo bench --package engine-renderer --bench vulkan_context_bench
 
 # Run ECS benchmarks only
-bench-ecs:
+benchmark-ecs:
     cargo bench --package engine-core --bench ecs_simple
     cargo bench --package engine-core --bench ecs_comprehensive
     cargo bench --package engine-core --bench query_benches
     cargo bench --package engine-core --bench world_benches
 
 # Run physics benchmarks
-bench-physics:
+benchmark-physics:
     cargo bench --package engine-physics
 
 # Run renderer benchmarks
-bench-renderer:
+benchmark-renderer:
     cargo bench --package engine-renderer
 
 # Run math benchmarks
-bench-math:
+benchmark-math:
     cargo bench --package engine-math
 
 # Run profiling overhead benchmarks
-bench-profiling:
+benchmark-profiling:
     cargo bench --package engine-profiling
 
 # Run industry comparison benchmarks
-bench-compare:
+benchmark-compare:
     cargo bench --package engine-core --bench game_engine_comparison
 
 # Compare current benchmarks with saved baseline
-bench-baseline:
+benchmark-baseline:
     cargo bench --all-features -- --baseline current
 
 # Save current benchmarks as main baseline
-bench-save-baseline:
+benchmark-save-baseline:
     cargo bench --all-features -- --save-baseline main
 
 # Run quick benchmark smoke test (fast, for CI)
-bench-smoke:
+benchmark-smoke:
     cargo bench --package engine-core --bench ecs_simple -- --sample-size 10
 
 # Run benchmarks with profiling enabled
-bench-profile:
+benchmark-profile:
     cargo bench --all-features --features profiling-puffin
 
 # Open benchmark report in browser
-bench-report:
+benchmark-view:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -f "target/criterion/report/index.html" ]; then
@@ -170,34 +203,34 @@ bench-report:
     fi
 
 # Network benchmarks (when implemented)
-bench-network:
+benchmark-network:
     cargo bench --package engine-networking
 
 # Run serialization benchmarks (Phase 1.3)
-bench-serialization:
+benchmark-serialization:
     @echo "Running serialization benchmarks..."
     cargo bench --package engine-core --bench serialization_benches
     cargo bench --package engine-core --bench serialization_comprehensive
 
 # Run asset loading benchmarks
-bench-assets:
+benchmark-assets:
     @echo "Running asset benchmarks..."
     cargo bench --package engine-assets
 
 # Run spatial data structure benchmarks
-bench-spatial:
+benchmark-spatial:
     @echo "Running spatial benchmarks..."
     cargo bench --package engine-core --bench spatial_benches
 
 # Run allocator benchmarks
-bench-allocators:
+benchmark-allocators:
     @echo "Running allocator benchmarks..."
     cargo bench --package engine-core --bench allocator_benches
 
 # === Benchmark Management ===
 
 # Run comprehensive benchmark suite with report generation
-bench-all-platforms baseline_name="" compare_name="" output_dir="benchmarks/results" quick="false" skip_platform="false" skip_ecs="false":
+benchmark-all-platforms baseline_name="" compare_name="" output_dir="benchmarks/results" quick="false" skip_platform="false" skip_ecs="false":
     #!/usr/bin/env python3
     import subprocess
     import sys
@@ -278,7 +311,7 @@ bench-all-platforms baseline_name="" compare_name="" output_dir="benchmarks/resu
     print(f"HTML report: target/criterion/report/index.html")
 
 # Update benchmark baseline for regression testing
-bench-update-baseline baseline_name="main":
+benchmark-update-baseline baseline_name="main":
     #!/usr/bin/env python3
     import subprocess
     import os
@@ -324,7 +357,7 @@ bench-update-baseline baseline_name="main":
     print(f"Location: {baseline_dir}")
 
 # Compare current benchmarks with saved baseline
-bench-compare-baseline baseline_name="main" threshold="20":
+benchmark-compare-baseline baseline_name="main" threshold="20":
     #!/usr/bin/env python3
     import subprocess
     import os
@@ -343,7 +376,7 @@ bench-compare-baseline baseline_name="main" threshold="20":
     if not os.path.exists(f"{baseline_dir}/criterion"):
         print(f"❌ Error: Baseline not found at {baseline_dir}")
         print(f"\nCreate baseline with:")
-        print(f"  just bench-update-baseline {{baseline_name}}")
+        print(f"  just benchmark-update-baseline {{baseline_name}}")
         sys.exit(1)
 
     # Copy baseline to target
@@ -954,7 +987,7 @@ setup-hooks:
     if sys.platform != 'win32':
         os.chmod(dest_hook, 0o755)
 
-    print("✓ Pre-commit hook installed\n")
+    print("[OK] Pre-commit hook installed\n")
 
     # Check for optional tools
     print("Checking for optional development tools...\n")
@@ -967,9 +1000,9 @@ setup-hooks:
 
     for tool, install_cmd in tools:
         if shutil.which(tool):
-            print(f"✓ {tool} installed")
+            print(f"[OK] {tool} installed")
         else:
-            print(f"○ {tool} not installed (optional)")
+            print(f"[ ] {tool} not installed (optional)")
             print(f"  Install with: {install_cmd}")
 
     print("\n=========================================")
@@ -977,10 +1010,10 @@ setup-hooks:
     print("=========================================\n")
     print("Pre-commit hooks will now run automatically.\n")
     print("The following checks will run:")
-    print("  • Code formatting (cargo fmt)")
-    print("  • Linting (cargo clippy)")
-    print("  • Unit tests (cargo test --lib)")
-    print("  • Common issue detection\n")
+    print("  - Code formatting (cargo fmt)")
+    print("  - Linting (cargo clippy)")
+    print("  - Unit tests (cargo test --lib)")
+    print("  - Common issue detection\n")
 
 # === Documentation ===
 
@@ -1460,6 +1493,27 @@ dev-headless:
 
 # === Docker ===
 
+# Start development environment with Docker Compose (server + Prometheus + Grafana)
+dev-docker:
+    docker-compose -f docker-compose.dev.yml up
+
+# Start development environment with Docker Compose (detached)
+dev-docker-detached:
+    docker-compose -f docker-compose.dev.yml up -d
+
+# Stop development Docker environment
+dev-docker-stop:
+    docker-compose -f docker-compose.dev.yml down
+
+# View development Docker logs
+dev-docker-logs:
+    docker-compose -f docker-compose.dev.yml logs -f
+
+# Rebuild development Docker images
+dev-docker-rebuild:
+    docker-compose -f docker-compose.dev.yml build --no-cache
+    docker-compose -f docker-compose.dev.yml up
+
 # Start production environment
 prod:
     docker-compose up -d
@@ -1529,3 +1583,13 @@ update:
 # Show outdated dependencies
 outdated:
     cargo outdated
+
+# === Benchmark Comparison ===
+
+# Generate benchmark comparison report (agent-game-engine vs industry standards)
+benchmark-report output="BENCHMARK_COMPARISON.md":
+    powershell -File scripts/parse_benchmark_results.ps1 -OutputFile {{output}}
+
+# Show benchmark thresholds (quick reference)
+benchmark-thresholds:
+    powershell -File scripts/show_benchmark_thresholds.ps1

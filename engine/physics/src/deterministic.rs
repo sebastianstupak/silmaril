@@ -3,7 +3,7 @@
 //! Provides state hashing, replay recording, and deterministic simulation guarantees.
 
 use crate::world::PhysicsWorld;
-use engine_core::{ErrorCode, ErrorSeverity};
+use engine_core::{EngineError, ErrorCode, ErrorSeverity};
 use engine_macros::define_error;
 use engine_math::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
@@ -25,13 +25,37 @@ define_error! {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PhysicsInput {
     /// Apply force to entity
-    ApplyForce { entity_id: u64, force: Vec3 },
+    ApplyForce {
+        /// Entity ID to apply force to
+        entity_id: u64,
+        /// Force vector to apply
+        force: Vec3,
+    },
     /// Apply impulse to entity
-    ApplyImpulse { entity_id: u64, impulse: Vec3 },
+    ApplyImpulse {
+        /// Entity ID to apply impulse to
+        entity_id: u64,
+        /// Impulse vector to apply
+        impulse: Vec3,
+    },
     /// Set velocity of entity
-    SetVelocity { entity_id: u64, linear: Vec3, angular: Vec3 },
+    SetVelocity {
+        /// Entity ID to set velocity for
+        entity_id: u64,
+        /// Linear velocity
+        linear: Vec3,
+        /// Angular velocity
+        angular: Vec3,
+    },
     /// Set transform of entity
-    SetTransform { entity_id: u64, position: Vec3, rotation: Quat },
+    SetTransform {
+        /// Entity ID to set transform for
+        entity_id: u64,
+        /// Position vector
+        position: Vec3,
+        /// Rotation quaternion
+        rotation: Quat,
+    },
 }
 
 /// Recorded frame with inputs
@@ -221,7 +245,10 @@ impl ReplayPlayer {
                 "State hash mismatch during replay"
             );
 
-            return Err(DeterministicError::HashMismatch { expected: expected_hash, actual: actual_hash });
+            return Err(DeterministicError::HashMismatch {
+                expected: expected_hash,
+                actual: actual_hash,
+            });
         }
 
         Ok(())
@@ -349,7 +376,7 @@ fn hash_quat(q: &Quat, hasher: &mut impl Hasher) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{Collider, RigidBody};
+    use crate::components::RigidBody;
     use crate::config::PhysicsConfig;
 
     #[test]
@@ -464,16 +491,14 @@ mod tests {
             state_hash: 0,
         };
 
-        let frames = vec![
-            RecordedFrame {
-                frame: 0,
-                inputs: vec![PhysicsInput::ApplyForce {
-                    entity_id: 1,
-                    force: Vec3::new(0.0, 10.0, 0.0),
-                }],
-                state_hash: 12345,
-            },
-        ];
+        let frames = vec![RecordedFrame {
+            frame: 0,
+            inputs: vec![PhysicsInput::ApplyForce {
+                entity_id: 1,
+                force: Vec3::new(0.0, 10.0, 0.0),
+            }],
+            state_hash: 12345,
+        }];
 
         let mut player = ReplayPlayer::new(snapshot, frames, false);
 

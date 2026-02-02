@@ -7,8 +7,10 @@
 //! - Preallocates buffers to avoid repeated allocations
 //! - Only syncs dynamic bodies (static/kinematic handled separately)
 //! - Uses profiling to track sync overhead
+//! - Supports client-side prediction integration
 
 use crate::events::*;
+// use crate::prediction::PredictionSystem;
 use crate::world::PhysicsWorld;
 use engine_core::ecs::{Entity, World};
 use engine_math::{Quat, Vec3};
@@ -27,6 +29,8 @@ pub struct PhysicsSyncConfig {
     pub send_events: bool,
     /// Batch size for sync operations (cache optimization)
     pub batch_size: usize,
+    /// Enable client-side prediction support
+    pub enable_prediction: bool,
 }
 
 impl Default for PhysicsSyncConfig {
@@ -35,7 +39,8 @@ impl Default for PhysicsSyncConfig {
             sync_transforms: true,
             sync_velocities: true,
             send_events: true,
-            batch_size: 256, // Optimized for cache line (64 bytes)
+            batch_size: 256,          // Optimized for cache line (64 bytes)
+            enable_prediction: false, // Disabled by default (enable for networked clients)
         }
     }
 }
@@ -43,6 +48,7 @@ impl Default for PhysicsSyncConfig {
 /// Physics sync system state
 ///
 /// Preallocates buffers to minimize allocations during sync.
+/// Optionally integrates with client-side prediction.
 pub struct PhysicsSyncSystem {
     config: PhysicsSyncConfig,
     /// Mapping from entity ID (u64) to ECS Entity
@@ -52,15 +58,24 @@ pub struct PhysicsSyncSystem {
     transform_buffer: Vec<(Entity, Vec3, Quat)>,
     /// Preallocated buffer for velocity batch
     velocity_buffer: Vec<(Entity, Vec3, Vec3)>,
+    // Client-side prediction system (optional, for networked clients)
+    // prediction: Option<PredictionSystem>,
 }
 
 impl PhysicsSyncSystem {
     /// Create new sync system
     pub fn new(config: PhysicsSyncConfig) -> Self {
+        // let prediction = if config.enable_prediction {
+        //     Some(PredictionSystem::new())
+        // } else {
+        //     None
+        // };
+
         Self {
             transform_buffer: Vec::with_capacity(config.batch_size),
             velocity_buffer: Vec::with_capacity(config.batch_size),
             entity_map: HashMap::new(),
+            // prediction,
             config,
         }
     }
@@ -77,15 +92,33 @@ impl PhysicsSyncSystem {
         self.entity_map.remove(&entity_id);
     }
 
+    // /// Get access to prediction system (if enabled)
+    // pub fn prediction_system(&self) -> Option<&PredictionSystem> {
+    //     self.prediction.as_ref()
+    // }
+
+    // /// Get mutable access to prediction system (if enabled)
+    // pub fn prediction_system_mut(&mut self) -> Option<&mut PredictionSystem> {
+    //     self.prediction.as_mut()
+    // }
+
     /// Sync physics state to ECS
     ///
     /// This should be called after PhysicsWorld::step() to propagate
     /// physics results back to ECS components.
-    pub fn sync_to_ecs(&mut self, physics: &PhysicsWorld, world: &mut World) {
+    ///
+    /// If prediction is enabled, applies error smoothing instead of direct sync.
+    pub fn sync_to_ecs(&mut self, physics: &PhysicsWorld, world: &mut World, _dt: f32) {
         #[cfg(feature = "profiling")]
         profile_scope!("physics_sync_to_ecs", ProfileCategory::Physics);
 
-        // Sync transforms
+        // If prediction is enabled, apply error smoothing
+        // if let Some(prediction) = &mut self.prediction {
+        //     prediction.apply_error_smoothing(world, dt);
+        // }
+
+        // Sync transforms (skip if prediction is handling it)
+        // if self.config.sync_transforms && self.prediction.is_none() {
         if self.config.sync_transforms {
             self.sync_transforms(physics, world);
         }

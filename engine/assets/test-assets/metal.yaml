@@ -1,0 +1,9 @@
+name: "metal"
+base_color_texture: "metal_albedo.png"
+metallic_roughness_texture: "metal_rough.png"
+normal_texture: "metal_normal.png"
+emissive_texture: null
+base_color_factor: [0.9, 0.9, 0.9, 1.0]
+metallic_factor: 1.0
+roughness_factor: 0.2
+emissive_factor: [0.0, 0.0, 0.0]

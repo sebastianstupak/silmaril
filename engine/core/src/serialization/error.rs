@@ -16,6 +16,8 @@ define_error! {
         FlatBuffersDeserialize { details: String } = ErrorCode::FlatbuffersDeserializeFailed, ErrorSeverity::Error,
         IoError { details: String } = ErrorCode::FileSystemError, ErrorSeverity::Error,
         Utf8Error { details: String } = ErrorCode::InvalidFormat, ErrorSeverity::Error,
+        CompressionError { details: String } = ErrorCode::SerializationFailed, ErrorSeverity::Error,
+        DecompressionError { details: String } = ErrorCode::DeserializationFailed, ErrorSeverity::Error,
     }
 }
 

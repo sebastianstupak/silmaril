@@ -12,13 +12,15 @@ use engine_networking::delta::{AdaptiveDeltaStrategy, NetworkDelta};
 fn create_world(entity_count: usize) -> World {
     let mut world = World::new();
 
+    // Register component types
+    world.register::<Transform>();
+    world.register::<Velocity>();
+    world.register::<Health>();
+
     for i in 0..entity_count {
         let entity = world.spawn();
         let position = Vec3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0);
-        world.add(
-            entity,
-            Transform::new(position, Quat::IDENTITY, Vec3::ONE),
-        );
+        world.add(entity, Transform::new(position, Quat::IDENTITY, Vec3::ONE));
         world.add(entity, Velocity::new(0.1, 0.2, 0.3));
         world.add(entity, Health::new(100.0, 100.0));
     }
@@ -32,7 +34,7 @@ fn modify_positions(world: &mut World, change_percent: f32) {
     let change_count = (entities.len() as f32 * change_percent) as usize;
 
     for entity in entities.iter().take(change_count) {
-        if let Some(mut transform) = world.get_mut::<Transform>(*entity) {
+        if let Some(transform) = world.get_mut::<Transform>(*entity) {
             transform.position.x += 1.0;
             transform.position.y += 2.0;
             transform.position.z += 3.0;
@@ -48,17 +50,17 @@ fn modify_mixed(world: &mut World, change_percent: f32) {
     for (idx, entity) in entities.iter().take(change_count).enumerate() {
         // Vary the changes
         if idx % 3 == 0 {
-            if let Some(mut transform) = world.get_mut::<Transform>(*entity) {
-                transform.translation[0] += 1.0;
+            if let Some(transform) = world.get_mut::<Transform>(*entity) {
+                transform.position.x += 1.0;
             }
         }
         if idx % 3 == 1 {
-            if let Some(mut velocity) = world.get_mut::<Velocity>(*entity) {
+            if let Some(velocity) = world.get_mut::<Velocity>(*entity) {
                 velocity.x += 0.1;
             }
         }
         if idx % 3 == 2 {
-            if let Some(mut health) = world.get_mut::<Health>(*entity) {
+            if let Some(health) = world.get_mut::<Health>(*entity) {
                 health.current = (health.current - 10.0).max(0.0);
             }
         }
@@ -93,7 +95,11 @@ fn bench_delta_diff(c: &mut Criterion) {
         for change_percent in [0.01, 0.05, 0.10, 0.50] {
             group.throughput(Throughput::Elements(entity_count as u64));
 
-            let id = BenchmarkId::from_parameter(format!("{}ent_{}%", entity_count, (change_percent * 100.0) as u32));
+            let id = BenchmarkId::from_parameter(format!(
+                "{}ent_{}%",
+                entity_count,
+                (change_percent * 100.0) as u32
+            ));
 
             group.bench_with_input(id, &(entity_count, change_percent), |b, &(count, percent)| {
                 let mut world1 = create_world(count);
@@ -119,7 +125,11 @@ fn bench_delta_serialization(c: &mut Criterion) {
 
     for entity_count in [100, 1_000, 10_000] {
         for change_percent in [0.01, 0.05, 0.10, 0.50] {
-            let id = BenchmarkId::from_parameter(format!("{}ent_{}%", entity_count, (change_percent * 100.0) as u32));
+            let id = BenchmarkId::from_parameter(format!(
+                "{}ent_{}%",
+                entity_count,
+                (change_percent * 100.0) as u32
+            ));
 
             group.bench_with_input(id, &(entity_count, change_percent), |b, &(count, percent)| {
                 let mut world1 = create_world(count);
@@ -149,7 +159,11 @@ fn bench_delta_application(c: &mut Criterion) {
         for change_percent in [0.01, 0.05, 0.10, 0.50] {
             group.throughput(Throughput::Elements(entity_count as u64));
 
-            let id = BenchmarkId::from_parameter(format!("{}ent_{}%", entity_count, (change_percent * 100.0) as u32));
+            let id = BenchmarkId::from_parameter(format!(
+                "{}ent_{}%",
+                entity_count,
+                (change_percent * 100.0) as u32
+            ));
 
             group.bench_with_input(id, &(entity_count, change_percent), |b, &(count, percent)| {
                 let mut world1 = create_world(count);
@@ -178,7 +192,11 @@ fn bench_compression_ratio(c: &mut Criterion) {
 
     for entity_count in [100, 1_000, 10_000] {
         for change_percent in [0.01, 0.05, 0.10, 0.50] {
-            let id = BenchmarkId::from_parameter(format!("{}ent_{}%", entity_count, (change_percent * 100.0) as u32));
+            let id = BenchmarkId::from_parameter(format!(
+                "{}ent_{}%",
+                entity_count,
+                (change_percent * 100.0) as u32
+            ));
 
             group.bench_with_input(id, &(entity_count, change_percent), |b, &(count, percent)| {
                 let mut world1 = create_world(count);
@@ -188,7 +206,8 @@ fn bench_compression_ratio(c: &mut Criterion) {
                 let state2 = WorldState::snapshot(&world1);
 
                 b.iter(|| {
-                    let net_delta = NetworkDelta::from_states(black_box(&state1), black_box(&state2));
+                    let net_delta =
+                        NetworkDelta::from_states(black_box(&state1), black_box(&state2));
                     black_box(net_delta);
                 });
             });
@@ -326,7 +345,11 @@ fn bench_size_comparison(c: &mut Criterion) {
 
     for entity_count in [100, 1_000, 10_000] {
         for change_percent in [0.01, 0.05, 0.10, 0.50] {
-            let id = BenchmarkId::from_parameter(format!("{}ent_{}%", entity_count, (change_percent * 100.0) as u32));
+            let id = BenchmarkId::from_parameter(format!(
+                "{}ent_{}%",
+                entity_count,
+                (change_percent * 100.0) as u32
+            ));
 
             group.bench_with_input(id, &(entity_count, change_percent), |b, &(count, percent)| {
                 let mut world1 = create_world(count);

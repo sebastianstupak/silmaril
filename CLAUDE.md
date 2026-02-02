@@ -24,7 +24,7 @@ Build a **fully automatable game engine** optimized for AI agent workflows with:
 - **Any Code** → [docs/rules/coding-standards.md](docs/rules/coding-standards.md) ⚠️ MANDATORY
 - **Error Handling** → [docs/error-handling.md](docs/error-handling.md) ⚠️ MANDATORY
 - **Platform-Specific Code** → [docs/platform-abstraction.md](docs/platform-abstraction.md) ⚠️ MANDATORY
-- **Testing** → [docs/testing-strategy.md](docs/testing-strategy.md) ⚠️ MANDATORY
+- **Testing** → [docs/TESTING_ARCHITECTURE.md](docs/TESTING_ARCHITECTURE.md) ⚠️ MANDATORY
 - **Profiling & Performance** → [docs/profiling.md](docs/profiling.md) ⚠️ MANDATORY
 
 - **ECS System** → [docs/ecs.md](docs/ecs.md)
@@ -188,48 +188,87 @@ fn expensive_physics_loop() {
 
 ---
 
-### **6. Testing - All Types Required**
+### **6. Testing - 3-Tier Hierarchy (MANDATORY)**
 
-Every feature MUST include:
-- **Unit tests** (in same file or `tests/` module)
-- **Integration tests** (in crate's `tests/` directory)
-- **E2E tests** (for user-facing features)
-- **Property-based tests** (for serialization, math, etc.)
+The engine uses a **3-tier test hierarchy** to enforce clean architecture:
+
+#### **Tier 1: Unit Tests** (Single-Crate Only)
+
+**Location:** `engine/{crate}/tests/` or inline `#[cfg(test)]`
+
+**Rule:** MUST NOT import from other engine crates (except helpers like `engine-math`)
 
 ```rust
-// Unit test
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ✅ CORRECT - Physics-only test
+// File: engine/physics/tests/raycast_tests.rs
+use engine_math::{Vec3, Quat};
+use engine_physics::{PhysicsWorld, Collider};
 
-    #[test]
-    fn test_entity_spawn() {
-        let mut world = World::new();
-        let entity = world.spawn();
-        assert!(world.is_alive(entity));
-    }
-}
-
-// Property-based test
-#[cfg(test)]
-mod proptests {
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn test_transform_serialization_roundtrip(
-            pos in prop::array::uniform3(-1000.0f32..1000.0)
-        ) {
-            let transform = Transform::from_translation(pos.into());
-            let bytes = transform.to_bytes();
-            let decoded = Transform::from_bytes(&bytes).unwrap();
-            assert_eq!(transform, decoded);
-        }
-    }
+#[test]
+fn test_raycast_hits_ground() {
+    let mut world = PhysicsWorld::new();
+    // Test physics in isolation
 }
 ```
 
-**See:** [docs/testing-strategy.md](docs/testing-strategy.md)
+#### **Tier 2: Cross-Crate Integration Tests** ⚠️ **ENFORCED**
+
+**Location:** `engine/shared/tests/` ONLY
+
+**Rule:** ANY test importing from 2+ engine crates MUST go here
+
+```rust
+// ✅ CORRECT - Cross-crate test in shared location
+// File: engine/shared/tests/physics_ecs_integration.rs
+use engine_core::ecs::World;           // ← Multiple crates
+use engine_physics::PhysicsWorld;      // ← Must be in shared/
+
+#[test]
+fn test_physics_syncs_to_ecs() {
+    // Test integration between physics and ECS
+}
+```
+
+```rust
+// ❌ FORBIDDEN - Cross-crate test in wrong location
+// File: engine/physics/tests/bad_test.rs
+use engine_core::ecs::World;           // ❌ Imports engine-core
+use engine_physics::PhysicsWorld;      // ❌ This violates architecture!
+
+#[test]
+fn test_physics_syncs_to_ecs() {
+    // This MUST be in engine/shared/tests/
+}
+```
+
+**Enforcement:** Build will fail if dependencies are wrong. Code review MUST check test location.
+
+#### **Tier 3: End-to-End System Tests**
+
+**Location:** `examples/` or `scripts/e2e-tests/`
+
+**Rule:** Test complete user workflows with actual binaries
+
+```bash
+#!/bin/bash
+# File: scripts/e2e-tests/test-multiplayer-match.sh
+cargo run --bin server &
+cargo run --bin client &
+# Verify match completed successfully
+```
+
+#### **Benchmark Organization (Same Rules)**
+
+**Single-crate benchmarks:** `engine/{crate}/benches/`
+**Cross-crate benchmarks:** `engine/shared/benches/` ⚠️ **MANDATORY**
+
+```rust
+// ❌ FORBIDDEN - Cross-crate benchmark in wrong location
+// File: engine/physics/benches/bad_bench.rs
+use engine_core::ecs::World;  // ❌ Must be in engine/shared/benches/
+```
+
+**See:** [docs/TESTING_ARCHITECTURE.md](docs/TESTING_ARCHITECTURE.md) for complete architecture
 
 ---
 
@@ -274,6 +313,155 @@ engine/physics/
 engine/game-logic/
 └── src/
     └── lib.rs          (5000 lines - everything mixed)
+```
+
+---
+
+### **9. NO Summary/Implementation Documents - STRICTLY FORBIDDEN** ⚠️ **CRITICAL**
+
+**NEVER create temporary summary, implementation, status, or completion documents.**
+
+```
+❌ FORBIDDEN - DO NOT CREATE THESE FILES:
+- *_COMPLETE.md
+- *_SUMMARY.md
+- *_IMPLEMENTATION*.md
+- *_STATUS.md
+- *_REPORT.md
+- *_RESULTS.md
+- *_PLAN.md
+- *_VALIDATION.md
+- *_COMPARISON.md
+- PHASE_*.md (in root)
+- TASK_*.md (in root)
+- AAA_*.md
+
+❌ Examples of FORBIDDEN files:
+- SERIALIZATION_COMPLETE.md
+- PHYSICS_IMPLEMENTATION_SUMMARY.md
+- NETWORKING_VALIDATION_RESULTS.md
+- PHASE_1_6_4_5_COMPLETE.md
+- TASK_8_PROCEDURAL_GENERATION_COMPLETE.md
+- AAA_AUTHENTICATION_AUTO_UPDATE_TLS_IMPLEMENTATION_PLAN.md
+```
+
+**Why this is forbidden:**
+- These files clutter the repository
+- They become stale immediately
+- Information belongs in git commits, PR descriptions, or permanent docs
+- They provide no long-term value
+
+**✅ What to do instead:**
+
+1. **For implementation progress** → Use git commits with clear messages
+2. **For architecture decisions** → Update permanent docs in `docs/`
+3. **For completion status** → Update checkboxes in ROADMAP.md
+4. **For validation results** → Include in PR description or code comments
+5. **For benchmark results** → Save to `docs/benchmarks/` with meaningful names
+
+**Permanent documentation locations:**
+```
+✅ ALLOWED documentation:
+docs/
+├── architecture/           ← Architectural decisions
+│   ├── ecs-design.md
+│   └── networking-architecture.md
+├── benchmarks/             ← Benchmark results (permanent)
+│   ├── physics-baseline-2025-01.md
+│   └── serialization-comparison.md
+├── ecs.md                  ← Subsystem docs
+├── networking.md
+├── physics.md
+└── ...
+
+ROADMAP.md                  ← Implementation progress (checkboxes only)
+```
+
+**Enforcement:** Pre-commit hook blocks these files (see rule #10)
+
+---
+
+### **10. NO examples/ Directories in Engine Crates - STRICTLY FORBIDDEN** ⚠️ **CRITICAL**
+
+**Engine crates MUST NOT have `examples/` directories. Use tests or benchmarks instead.**
+
+```
+❌ FORBIDDEN:
+engine/physics/examples/      ← NO!
+engine/renderer/examples/     ← NO!
+engine/networking/examples/   ← NO!
+engine/interest/examples/     ← NO!
+
+✅ CORRECT - Use tests or benchmarks:
+engine/physics/tests/         ← Integration tests
+engine/physics/benches/       ← Performance benchmarks
+```
+
+**Why this is forbidden:**
+- Examples are not tested in CI
+- Examples can go stale and break
+- Examples duplicate test coverage
+- No clear ownership or maintenance
+
+**✅ What to do instead:**
+
+| Use Case | Replace With | Location |
+|----------|-------------|----------|
+| Demonstrate API usage | Documentation examples in rustdoc | `src/lib.rs` or `src/module.rs` |
+| Test functionality | Integration test | `engine/{crate}/tests/` |
+| Verify performance | Benchmark | `engine/{crate}/benches/` |
+| E2E demonstration | Top-level example game | `examples/` (root only) |
+| Interactive demo | Test with `#[ignore]` flag | `engine/{crate}/tests/` |
+
+**Examples:**
+
+```rust
+// ❌ FORBIDDEN - engine/physics/examples/character_demo.rs
+pub fn main() {
+    let mut world = PhysicsWorld::new();
+    // Demo code that isn't tested
+}
+
+// ✅ CORRECT - engine/physics/tests/character_controller_tests.rs
+#[test]
+fn test_character_controller_movement() {
+    let mut world = PhysicsWorld::new();
+    // Same logic, but tested in CI
+    assert!(world.character_count() > 0);
+}
+
+// ✅ CORRECT - engine/physics/benches/character_benches.rs
+fn bench_character_movement(b: &mut Bencher) {
+    let mut world = PhysicsWorld::new();
+    b.iter(|| {
+        // Same logic, but performance is tracked
+        world.step(0.016);
+    });
+}
+
+// ✅ CORRECT - src/character_controller.rs (rustdoc example)
+/// Character controller for player movement.
+///
+/// # Example
+/// ```
+/// use engine_physics::{PhysicsWorld, CharacterController};
+///
+/// let mut world = PhysicsWorld::new();
+/// let controller = CharacterController::new();
+/// world.add_character(controller);
+/// ```
+pub struct CharacterController { }
+```
+
+**Enforcement:** Pre-commit hook blocks `engine/*/examples/` directories
+
+**Allowed examples locations:**
+```
+✅ ONLY allowed examples directory:
+examples/                   ← Root level ONLY (full game demos)
+├── singleplayer/
+├── mmorpg/
+└── moba/
 ```
 
 ---
@@ -473,6 +661,8 @@ The engine is production-ready when it supports:
 4. **Write tests FIRST** (TDD)
 5. **Run all checks** before committing
 6. **Update docs** if changing public APIs
+7. **NEVER create summary/implementation/status documents** ⚠️ **CRITICAL**
+8. **NEVER create examples/ directories in engine crates** ⚠️ **CRITICAL**
 
 ### **Code Review Checklist**
 
@@ -484,6 +674,8 @@ Before marking work as complete:
 - [ ] Documented (rustdoc with examples)
 - [ ] Benchmarked (if performance-sensitive)
 - [ ] Cross-platform CI passes
+- [ ] **NO summary/implementation/status documents created** ⚠️ **CRITICAL**
+- [ ] **NO engine/*/examples/ directories** ⚠️ **CRITICAL**
 
 ---
 

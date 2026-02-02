@@ -104,12 +104,12 @@ fn test_raycast() {
 
     assert!(hit.is_some(), "Raycast should hit box");
 
-    let (entity_id, distance, _hit_point) = hit.unwrap();
-    assert_eq!(entity_id, box_id);
+    let hit = hit.unwrap();
+    assert_eq!(hit.entity, box_id);
     assert!(
-        distance > 3.0 && distance < 5.0,
+        hit.distance > 3.0 && hit.distance < 5.0,
         "Distance should be ~4 units (5 - 1 for box half-extent), got {}",
-        distance
+        hit.distance
     );
 }
 

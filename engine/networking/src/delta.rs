@@ -131,7 +131,8 @@ impl AdaptiveDeltaStrategy {
         }
 
         // Use average of recent ratios to smooth out decisions
-        let avg_ratio: f32 = self.recent_ratios.iter().sum::<f32>() / self.recent_ratios.len() as f32;
+        let avg_ratio: f32 =
+            self.recent_ratios.iter().sum::<f32>() / self.recent_ratios.len() as f32;
 
         // Use delta if both current and average are below threshold
         current_ratio < self.threshold && avg_ratio < self.threshold

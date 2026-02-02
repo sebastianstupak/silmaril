@@ -2,12 +2,12 @@
 //!
 //! Measures serialization performance, message overhead, and throughput.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use engine_core::ecs::Entity;
 use engine_networking::{
-    ClientMessage, ServerMessage, EntityState, FramedMessage,
-    SerializationFormat, serialize_client_message, deserialize_client_message,
-    serialize_server_message, deserialize_server_message,
+    deserialize_client_message, deserialize_server_message, serialize_client_message,
+    serialize_server_message, ClientMessage, EntityState, FramedMessage, SerializationFormat,
+    ServerMessage,
 };
 use std::io::Cursor;
 
@@ -25,31 +25,19 @@ fn create_player_move(timestamp: u64) -> ClientMessage {
 }
 
 fn create_player_action(timestamp: u64) -> ClientMessage {
-    ClientMessage::PlayerAction {
-        action_id: 1,
-        target: Some(Entity::new(42, 0)),
-        timestamp,
-    }
+    ClientMessage::PlayerAction { action_id: 1, target: Some(Entity::new(42, 0)), timestamp }
 }
 
 fn create_chat_message(msg: &str) -> ClientMessage {
-    ClientMessage::ChatMessage {
-        message: msg.to_string(),
-        channel: 0,
-    }
+    ClientMessage::ChatMessage { message: msg.to_string(), channel: 0 }
 }
 
 fn create_ping(timestamp: u64) -> ClientMessage {
-    ClientMessage::Ping {
-        client_time: timestamp,
-    }
+    ClientMessage::Ping { client_time: timestamp }
 }
 
 fn create_handshake() -> ClientMessage {
-    ClientMessage::Handshake {
-        version: 1,
-        client_name: "BenchClient".to_string(),
-    }
+    ClientMessage::Handshake { version: 1, client_name: "BenchClient".to_string() }
 }
 
 fn create_entity_spawned(entity_id: u32) -> ServerMessage {
@@ -63,9 +51,7 @@ fn create_entity_spawned(entity_id: u32) -> ServerMessage {
 }
 
 fn create_entity_despawned(entity_id: u32) -> ServerMessage {
-    ServerMessage::EntityDespawned {
-        entity: Entity::new(entity_id, 0),
-    }
+    ServerMessage::EntityDespawned { entity: Entity::new(entity_id, 0) }
 }
 
 fn create_entity_transform(entity_id: u32) -> ServerMessage {
@@ -97,10 +83,7 @@ fn create_state_update(entity_count: usize) -> ServerMessage {
         })
         .collect();
 
-    ServerMessage::StateUpdate {
-        timestamp: 12345,
-        entities,
-    }
+    ServerMessage::StateUpdate { timestamp: 12345, entities }
 }
 
 // ============================================================================
@@ -113,50 +96,39 @@ fn bench_client_message_serialization(c: &mut Criterion) {
     // PlayerMove serialization
     group.bench_function("player_move_bincode", |b| {
         let msg = create_player_move(12345);
-        b.iter(|| {
-            black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // PlayerAction serialization
     group.bench_function("player_action_bincode", |b| {
         let msg = create_player_action(12345);
-        b.iter(|| {
-            black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // ChatMessage serialization (short message)
     group.bench_function("chat_short_bincode", |b| {
         let msg = create_chat_message("Hello");
-        b.iter(|| {
-            black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // ChatMessage serialization (long message)
     group.bench_function("chat_long_bincode", |b| {
-        let long_msg = "This is a much longer chat message that might be sent by players during gameplay.";
+        let long_msg =
+            "This is a much longer chat message that might be sent by players during gameplay.";
         let msg = create_chat_message(long_msg);
-        b.iter(|| {
-            black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // Ping serialization
     group.bench_function("ping_bincode", |b| {
         let msg = create_ping(12345);
-        b.iter(|| {
-            black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // Handshake serialization
     group.bench_function("handshake_bincode", |b| {
         let msg = create_handshake();
-        b.iter(|| {
-            black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_client_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     group.finish();
@@ -168,25 +140,19 @@ fn bench_server_message_serialization(c: &mut Criterion) {
     // EntitySpawned serialization
     group.bench_function("entity_spawned_bincode", |b| {
         let msg = create_entity_spawned(42);
-        b.iter(|| {
-            black_box(serialize_server_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_server_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // EntityDespawned serialization
     group.bench_function("entity_despawned_bincode", |b| {
         let msg = create_entity_despawned(42);
-        b.iter(|| {
-            black_box(serialize_server_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_server_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     // EntityTransform serialization
     group.bench_function("entity_transform_bincode", |b| {
         let msg = create_entity_transform(42);
-        b.iter(|| {
-            black_box(serialize_server_message(&msg, SerializationFormat::Bincode).unwrap())
-        });
+        b.iter(|| black_box(serialize_server_message(&msg, SerializationFormat::Bincode).unwrap()));
     });
 
     group.finish();
@@ -325,36 +291,26 @@ fn bench_batch_serialization(c: &mut Criterion) {
         group.throughput(Throughput::Elements(size as u64));
 
         // Batch PlayerMove messages
-        group.bench_with_input(
-            BenchmarkId::new("player_moves", size),
-            &size,
-            |b, &size| {
-                let messages: Vec<ClientMessage> = (0..size)
-                    .map(|i| create_player_move(i as u64))
-                    .collect();
-                b.iter(|| {
-                    for msg in &messages {
-                        black_box(serialize_client_message(msg, SerializationFormat::Bincode).unwrap());
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("player_moves", size), &size, |b, &size| {
+            let messages: Vec<ClientMessage> =
+                (0..size).map(|i| create_player_move(i as u64)).collect();
+            b.iter(|| {
+                for msg in &messages {
+                    black_box(serialize_client_message(msg, SerializationFormat::Bincode).unwrap());
+                }
+            });
+        });
 
         // Batch EntityTransform messages
-        group.bench_with_input(
-            BenchmarkId::new("entity_transforms", size),
-            &size,
-            |b, &size| {
-                let messages: Vec<ServerMessage> = (0..size)
-                    .map(|i| create_entity_transform(i as u32))
-                    .collect();
-                b.iter(|| {
-                    for msg in &messages {
-                        black_box(serialize_server_message(msg, SerializationFormat::Bincode).unwrap());
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("entity_transforms", size), &size, |b, &size| {
+            let messages: Vec<ServerMessage> =
+                (0..size).map(|i| create_entity_transform(i as u32)).collect();
+            b.iter(|| {
+                for msg in &messages {
+                    black_box(serialize_server_message(msg, SerializationFormat::Bincode).unwrap());
+                }
+            });
+        });
     }
 
     group.finish();
@@ -388,7 +344,9 @@ fn bench_state_update(c: &mut Criterion) {
                 let msg = create_state_update(count);
                 let framed = serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
                 b.iter(|| {
-                    black_box(deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap())
+                    black_box(
+                        deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap(),
+                    )
                 });
             },
         );
@@ -399,8 +357,11 @@ fn bench_state_update(c: &mut Criterion) {
             |b, &count| {
                 let msg = create_state_update(count);
                 b.iter(|| {
-                    let framed = serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
-                    black_box(deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap())
+                    let framed =
+                        serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
+                    black_box(
+                        deserialize_server_message(&framed, SerializationFormat::Bincode).unwrap(),
+                    )
                 });
             },
         );
@@ -499,12 +460,17 @@ fn bench_protocol_negotiation(c: &mut Criterion) {
 
         b.iter(|| {
             // Client -> Server
-            let client_framed = serialize_client_message(&client_msg, SerializationFormat::Bincode).unwrap();
-            let _client_decoded = deserialize_client_message(&client_framed, SerializationFormat::Bincode).unwrap();
+            let client_framed =
+                serialize_client_message(&client_msg, SerializationFormat::Bincode).unwrap();
+            let _client_decoded =
+                deserialize_client_message(&client_framed, SerializationFormat::Bincode).unwrap();
 
             // Server -> Client
-            let server_framed = serialize_server_message(&server_msg, SerializationFormat::Bincode).unwrap();
-            black_box(deserialize_server_message(&server_framed, SerializationFormat::Bincode).unwrap())
+            let server_framed =
+                serialize_server_message(&server_msg, SerializationFormat::Bincode).unwrap();
+            black_box(
+                deserialize_server_message(&server_framed, SerializationFormat::Bincode).unwrap(),
+            )
         });
     });
 

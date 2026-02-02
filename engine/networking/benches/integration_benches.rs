@@ -109,10 +109,7 @@ impl SimulatedClient {
 
     fn send_input(&mut self, input: Vec3) -> MockClientMessage {
         self.input_sequence += 1;
-        MockClientMessage::Input {
-            sequence: self.input_sequence,
-            movement: input,
-        }
+        MockClientMessage::Input { sequence: self.input_sequence, movement: input }
     }
 
     fn record_latency(&mut self, sent_at: Instant) {
@@ -148,31 +145,21 @@ impl SimulatedServer {
         // Spawn entities for the scenario
         for i in 0..scenario.entity_count {
             let entity = world.spawn();
-            let position = Vec3::new(
-                (i as f32 % 100.0) * 10.0,
-                0.0,
-                (i as f32 / 100.0) * 10.0,
-            );
+            let position = Vec3::new((i as f32 % 100.0) * 10.0, 0.0, (i as f32 / 100.0) * 10.0);
             world.add(entity, Transform::new(position, engine_core::Quat::IDENTITY, Vec3::ONE));
             world.add(entity, Velocity::new(0.0, 0.0, 0.0));
         }
 
-        Self {
-            world,
-            clients: Vec::new(),
-            tick: 0,
-        }
+        Self { world, clients: Vec::new(), tick: 0 }
     }
 
     fn add_client(&mut self, client_id: usize) -> Entity {
         self.clients.push(client_id);
         let entity = self.world.spawn();
-        let position = Vec3::new(
-            (client_id as f32 % 10.0) * 20.0,
-            0.0,
-            (client_id as f32 / 10.0) * 20.0,
-        );
-        self.world.add(entity, Transform::new(position, engine_core::Quat::IDENTITY, Vec3::ONE));
+        let position =
+            Vec3::new((client_id as f32 % 10.0) * 20.0, 0.0, (client_id as f32 / 10.0) * 20.0);
+        self.world
+            .add(entity, Transform::new(position, engine_core::Quat::IDENTITY, Vec3::ONE));
         self.world.add(entity, Velocity::new(0.0, 0.0, 0.0));
         entity
     }
@@ -217,10 +204,7 @@ impl SimulatedServer {
             .map(|(e, _)| e)
             .collect();
 
-        MockServerMessage::StateUpdate {
-            tick: self.tick,
-            entity_count: nearby_entities.len(),
-        }
+        MockServerMessage::StateUpdate { tick: self.tick, entity_count: nearby_entities.len() }
     }
 }
 
@@ -236,11 +220,8 @@ fn simulate_game_loop(
     // Create clients
     for i in 0..scenario.player_count {
         let entity = server.add_client(i);
-        let position = server
-            .world
-            .get::<Transform>(entity)
-            .map(|t| t.position)
-            .unwrap_or(Vec3::ZERO);
+        let position =
+            server.world.get::<Transform>(entity).map(|t| t.position).unwrap_or(Vec3::ZERO);
         clients.push(SimulatedClient::new(i, entity, position, profile));
     }
 
@@ -308,11 +289,7 @@ fn simulate_game_loop(
         let _elapsed = tick_start.elapsed();
     }
 
-    SimulationResults {
-        total_ticks: ticks,
-        clients,
-        duration: start.elapsed(),
-    }
+    SimulationResults { total_ticks: ticks, clients, duration: start.elapsed() }
 }
 
 /// Results from a game simulation
@@ -334,30 +311,20 @@ impl SimulationResults {
 
     #[allow(dead_code)]
     fn max_latency(&self) -> Duration {
-        self.clients
-            .iter()
-            .map(|c| c.average_latency())
-            .max()
-            .unwrap_or(Duration::ZERO)
+        self.clients.iter().map(|c| c.average_latency()).max().unwrap_or(Duration::ZERO)
     }
 
     fn average_bandwidth(&self) -> f64 {
         if self.clients.is_empty() {
             return 0.0;
         }
-        self.clients
-            .iter()
-            .map(|c| c.bandwidth_usage(self.duration))
-            .sum::<f64>()
+        self.clients.iter().map(|c| c.bandwidth_usage(self.duration)).sum::<f64>()
             / self.clients.len() as f64
     }
 
     #[allow(dead_code)]
     fn total_bandwidth(&self) -> f64 {
-        self.clients
-            .iter()
-            .map(|c| c.bandwidth_usage(self.duration))
-            .sum()
+        self.clients.iter().map(|c| c.bandwidth_usage(self.duration)).sum()
     }
 }
 
@@ -365,26 +332,19 @@ impl SimulationResults {
 fn bench_game_scenarios(c: &mut Criterion) {
     let mut group = c.benchmark_group("game_scenarios");
 
-    let scenarios = vec![
-        GameScenario::mmorpg(),
-        GameScenario::fps(),
-        GameScenario::battle_royale(),
-    ];
+    let scenarios =
+        vec![GameScenario::mmorpg(), GameScenario::fps(), GameScenario::battle_royale()];
 
     for scenario in scenarios {
-        group.bench_with_input(
-            BenchmarkId::new(scenario.name, "LAN"),
-            &scenario,
-            |b, scenario| {
-                b.iter(|| {
-                    simulate_game_loop(
-                        black_box(scenario),
-                        NetworkProfile::Lan,
-                        Duration::from_millis(100),
-                    )
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new(scenario.name, "LAN"), &scenario, |b, scenario| {
+            b.iter(|| {
+                simulate_game_loop(
+                    black_box(scenario),
+                    NetworkProfile::Lan,
+                    Duration::from_millis(100),
+                )
+            });
+        });
     }
 
     group.finish();
@@ -454,19 +414,15 @@ fn bench_concurrent_clients(c: &mut Criterion) {
         scenario.player_count = count;
 
         group.throughput(Throughput::Elements(count as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            &scenario,
-            |b, scenario| {
-                b.iter(|| {
-                    simulate_game_loop(
-                        black_box(scenario),
-                        NetworkProfile::Cable,
-                        Duration::from_millis(100),
-                    )
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(count), &scenario, |b, scenario| {
+            b.iter(|| {
+                simulate_game_loop(
+                    black_box(scenario),
+                    NetworkProfile::Cable,
+                    Duration::from_millis(100),
+                )
+            });
+        });
     }
 
     group.finish();
@@ -510,20 +466,16 @@ fn bench_scalability(c: &mut Criterion) {
         let mut scenario = GameScenario::mmorpg();
         scenario.player_count = count;
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(count),
-            &scenario,
-            |b, scenario| {
-                b.iter(|| {
-                    let results = simulate_game_loop(
-                        black_box(scenario),
-                        NetworkProfile::Cable,
-                        Duration::from_millis(100),
-                    );
-                    black_box(results.average_latency())
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(count), &scenario, |b, scenario| {
+            b.iter(|| {
+                let results = simulate_game_loop(
+                    black_box(scenario),
+                    NetworkProfile::Cable,
+                    Duration::from_millis(100),
+                );
+                black_box(results.average_latency())
+            });
+        });
     }
 
     group.finish();

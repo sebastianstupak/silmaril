@@ -91,6 +91,7 @@ impl RenderPass {
     pub fn new(device: &ash::Device, config: RenderPassConfig) -> Result<Self, RenderPassError> {
         info!(
             format = ?config.color_format,
+            depth_format = ?config.depth_format,
             samples = ?config.samples,
             "Creating render pass"
         );
@@ -111,31 +112,66 @@ impl RenderPass {
             .attachment(0) // Index in attachment descriptions array
             .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
-        // Define subpass
+        // Optional depth attachment
+        let mut attachments_vec = vec![color_attachment];
+        let depth_attachment_ref;
+        let has_depth = config.depth_format.is_some();
+
+        if let Some(depth_format) = config.depth_format {
+            let depth_attachment = vk::AttachmentDescription::default()
+                .format(depth_format)
+                .samples(config.samples)
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::DONT_CARE)
+                .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                .initial_layout(vk::ImageLayout::UNDEFINED)
+                .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+            depth_attachment_ref = vk::AttachmentReference::default()
+                .attachment(1) // Second attachment
+                .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+            attachments_vec.push(depth_attachment);
+        } else {
+            depth_attachment_ref = vk::AttachmentReference::default();
+        }
+
+        // Define subpass with optional depth
         let color_attachments = [color_attachment_ref];
-        let subpass = vk::SubpassDescription::default()
+        let mut subpass = vk::SubpassDescription::default()
             .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
             .color_attachments(&color_attachments);
 
+        if has_depth {
+            subpass = subpass.depth_stencil_attachment(&depth_attachment_ref);
+        }
+
         // Subpass dependency for layout transitions
-        // This ensures proper synchronization between:
-        // - External operations (previous frame) and this subpass
-        // - Color attachment output stage
+        let mut src_stage = vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT;
+        let mut dst_stage = vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT;
+        let mut dst_access = vk::AccessFlags::COLOR_ATTACHMENT_WRITE;
+
+        if has_depth {
+            src_stage |= vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS;
+            dst_stage |= vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS;
+            dst_access |= vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE;
+        }
+
         let dependency = vk::SubpassDependency::default()
             .src_subpass(vk::SUBPASS_EXTERNAL)
             .dst_subpass(0)
-            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .src_stage_mask(src_stage)
+            .dst_stage_mask(dst_stage)
             .src_access_mask(vk::AccessFlags::empty())
-            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE);
+            .dst_access_mask(dst_access);
 
         // Create render pass
-        let attachments = [color_attachment];
         let subpasses = [subpass];
         let dependencies = [dependency];
 
         let render_pass_info = vk::RenderPassCreateInfo::default()
-            .attachments(&attachments)
+            .attachments(&attachments_vec)
             .subpasses(&subpasses)
             .dependencies(&dependencies);
 

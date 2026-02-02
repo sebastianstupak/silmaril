@@ -21,7 +21,6 @@
 //! - Input replay: < 1ms for 60 inputs
 //! - Prediction overhead: < 5% of normal physics step
 
-use crate::components::{RigidBody, Velocity};
 use crate::world::PhysicsWorld;
 use engine_core::ecs::{Entity, World};
 use engine_math::{Quat, Vec3};
@@ -158,8 +157,7 @@ impl InputBuffer {
         #[cfg(feature = "profiling")]
         profile_scope!("input_buffer_add", ProfileCategory::Physics);
 
-        let input =
-            PlayerInput::new(self.next_sequence, timestamp, movement, jump, delta_time);
+        let input = PlayerInput::new(self.next_sequence, timestamp, movement, jump, delta_time);
         self.next_sequence += 1;
 
         self.inputs.push_back(input);
@@ -301,15 +299,15 @@ impl PredictionSystem {
         self.input_buffer.add_input(timestamp, movement, jump, delta_time);
 
         // Apply input to physics simulation
-        if let (Some(state), Some(physics_id)) =
-            (&mut self.predicted_state, self.physics_entity_id)
-        {
+        if let Some(physics_id) = self.physics_entity_id {
             self.apply_input_to_physics(physics_id, movement, jump, physics);
 
             // Update predicted state with new position after physics step
-            if let Some((pos, rot)) = physics.get_transform(physics_id) {
-                state.predicted_position = pos;
-                state.predicted_rotation = rot;
+            if let Some(state) = &mut self.predicted_state {
+                if let Some((pos, rot)) = physics.get_transform(physics_id) {
+                    state.predicted_position = pos;
+                    state.predicted_rotation = rot;
+                }
             }
         }
     }
@@ -343,7 +341,12 @@ impl PredictionSystem {
         };
 
         // Update server-confirmed state
-        state.update_server_state(server_sequence, server_position, server_rotation, server_velocity);
+        state.update_server_state(
+            server_sequence,
+            server_position,
+            server_rotation,
+            server_velocity,
+        );
 
         // Calculate position error
         let error = (state.predicted_position - server_position).length();
@@ -376,7 +379,13 @@ impl PredictionSystem {
                 }
             } else {
                 // Replay inputs from confirmed sequence
-                self.replay_inputs(server_sequence, server_position, server_rotation, server_velocity, physics);
+                self.replay_inputs(
+                    server_sequence,
+                    server_position,
+                    server_rotation,
+                    server_velocity,
+                    physics,
+                );
             }
 
             // Remove old inputs
@@ -581,12 +590,8 @@ mod tests {
         let mut allocator = EntityAllocator::new();
         let entity = allocator.allocate();
 
-        let state = PredictedState::new(
-            entity,
-            Vec3::new(1.0, 2.0, 3.0),
-            Quat::IDENTITY,
-            Vec3::ZERO,
-        );
+        let state =
+            PredictedState::new(entity, Vec3::new(1.0, 2.0, 3.0), Quat::IDENTITY, Vec3::ZERO);
 
         assert_eq!(state.entity, entity);
         assert_eq!(state.server_position, Vec3::new(1.0, 2.0, 3.0));

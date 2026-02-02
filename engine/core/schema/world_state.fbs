@@ -1,74 +1,79 @@
 // FlatBuffers schema for WorldState serialization
-// For zero-copy network serialization in Phase 2
+// Zero-copy deserialization for network protocols
 
-namespace agent_game_engine.serialization;
+namespace agent_game_engine.serialization.fb;
 
 // Entity metadata
 table EntityMetadata {
-    id: uint64;
-    generation: uint32;
-    alive: bool = true;
+  id: uint64;
+  generation: uint32;
+  alive: bool;
 }
 
-// Component types enumeration
-union ComponentData {
-    Transform,
-    Health,
-    Velocity,
-    MeshRenderer,
+// Component types (discriminated union)
+union ComponentType {
+  TransformComponent,
+  VelocityComponent,
+  HealthComponent,
+  GenericComponent,
 }
 
 // Transform component
-table Transform {
-    position_x: float;
-    position_y: float;
-    position_z: float;
-    rotation_x: float;
-    rotation_y: float;
-    rotation_z: float;
-    rotation_w: float;
-    scale_x: float = 1.0;
-    scale_y: float = 1.0;
-    scale_z: float = 1.0;
-}
-
-// Health component
-table Health {
-    current: float;
-    max: float;
+table TransformComponent {
+  pos_x: float;
+  pos_y: float;
+  pos_z: float;
+  rot_x: float;
+  rot_y: float;
+  rot_z: float;
+  rot_w: float;
+  scale_x: float;
+  scale_y: float;
+  scale_z: float;
 }
 
 // Velocity component
-table Velocity {
-    x: float;
-    y: float;
-    z: float;
+table VelocityComponent {
+  x: float;
+  y: float;
+  z: float;
 }
 
-// MeshRenderer component
-table MeshRenderer {
-    mesh_id: uint64;
-    material_id: uint64;
+// Health component
+table HealthComponent {
+  current: float;
+  max: float;
+}
+
+// Generic component fallback
+table GenericComponent {
+  type_name: string;
+  data: [ubyte];
+}
+
+// Component wrapper
+table Component {
+  component_type: ComponentType;
 }
 
 // Entity with components
-table Entity {
-    metadata: EntityMetadata (required);
-    components: [ComponentData];
+table EntityData {
+  metadata: EntityMetadata;
+  components: [Component];
 }
 
 // World metadata
 table WorldMetadata {
-    version: uint32;
-    timestamp: uint64;
-    entity_count: uint64;
-    component_count: uint64;
+  version: uint32;
+  timestamp: uint64;
+  entity_count: uint32;
+  component_count: uint32;
 }
 
 // Complete world state
 table WorldState {
-    metadata: WorldMetadata (required);
-    entities: [Entity];
+  metadata: WorldMetadata;
+  entities: [EntityData];
 }
 
 root_type WorldState;

@@ -12,7 +12,9 @@ use engine_math::{Quat, Vec3};
 use engine_physics::{CharacterController, Collider, PhysicsConfig, PhysicsWorld, RigidBody};
 
 /// Create a physics world with ground and N characters
-fn create_world_with_characters(num_characters: usize) -> (PhysicsWorld, Vec<u64>, Vec<CharacterController>) {
+fn create_world_with_characters(
+    num_characters: usize,
+) -> (PhysicsWorld, Vec<u64>, Vec<CharacterController>) {
     let mut world = PhysicsWorld::new(PhysicsConfig::default());
 
     // Create ground plane
@@ -64,7 +66,11 @@ fn bench_single_character_update(c: &mut Criterion) {
 
     c.bench_function("character_update_single", |b| {
         b.iter(|| {
-            controllers[0].update(black_box(&mut world), black_box(entity_ids[0]), black_box(1.0 / 60.0));
+            controllers[0].update(
+                black_box(&mut world),
+                black_box(entity_ids[0]),
+                black_box(1.0 / 60.0),
+            );
         });
     });
 }
@@ -75,7 +81,11 @@ fn bench_ground_detection(c: &mut Criterion) {
     c.bench_function("character_ground_check", |b| {
         b.iter(|| {
             // Just update to trigger ground check
-            controllers[0].update(black_box(&mut world), black_box(entity_ids[0]), black_box(1.0 / 60.0));
+            controllers[0].update(
+                black_box(&mut world),
+                black_box(entity_ids[0]),
+                black_box(1.0 / 60.0),
+            );
         });
     });
 }
@@ -87,7 +97,11 @@ fn bench_character_movement_only(c: &mut Criterion) {
         b.iter(|| {
             // Set movement input and update
             controllers[0].set_movement_input(black_box(Vec3::new(1.0, 0.0, 1.0)));
-            controllers[0].update(black_box(&mut world), black_box(entity_ids[0]), black_box(1.0 / 60.0));
+            controllers[0].update(
+                black_box(&mut world),
+                black_box(entity_ids[0]),
+                black_box(1.0 / 60.0),
+            );
         });
     });
 }

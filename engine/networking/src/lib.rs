@@ -26,15 +26,27 @@ pub mod snapshot;
 /// Network simulator for testing
 pub mod simulator;
 
+/// Interest management integration
+pub mod interest_filtering;
+
+/// TLS/DTLS encryption
+pub mod tls;
+
 // Re-export commonly used types
 pub use delta::{AdaptiveDeltaStrategy, NetworkDelta};
+pub use interest_filtering::{InterestFilter, InterestFilterStats};
 pub use protocol::{
-    ClientMessage, ServerMessage, EntityState, FramedMessage,
-    SerializationFormat, ProtocolError, PROTOCOL_VERSION,
-    serialize_client_message, deserialize_client_message,
-    serialize_server_message, deserialize_server_message,
+    deserialize_client_message, deserialize_server_message, serialize_client_message,
+    serialize_server_message, ClientMessage, EntityState, FramedMessage, ProtocolError,
+    SerializationFormat, ServerMessage, PROTOCOL_VERSION,
 };
-pub use snapshot::WorldSnapshot;
 pub use simulator::{NetworkConditions, NetworkProfile, NetworkSimulator};
-pub use tcp::{TcpClient, TcpServer, TcpConnection, TcpError, TcpResult};
-pub use udp::{UdpClient, UdpServer, UdpSocket, UdpError, UdpResult};
+pub use snapshot::WorldSnapshot;
+pub use tcp::{TcpClient, TcpConnection, TcpError, TcpResult, TcpServer};
+pub use tls::{
+    generate_self_signed_cert, AcmeClient, AcmeConfig, CertificateInfo, CertificateManager,
+    CertificateStatus, CertificateVerification, CipherSuiteSelection, SelfSignedConfig,
+    SessionCache, SessionCacheStats, TlsClientConfigBuilder, TlsClientConnection, TlsError,
+    TlsResult, TlsServer, TlsServerConfigBuilder, TlsServerConnection, TlsVersion,
+};
+pub use udp::{UdpClient, UdpError, UdpResult, UdpServer, UdpSocket};

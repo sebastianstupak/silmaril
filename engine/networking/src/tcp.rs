@@ -59,10 +59,7 @@ impl TcpConnection {
     /// Create a new TCP connection from a stream
     pub fn new(stream: TcpStream) -> TcpResult<Self> {
         let peer_addr = stream.peer_addr()?;
-        Ok(Self {
-            stream: Arc::new(Mutex::new(stream)),
-            peer_addr,
-        })
+        Ok(Self { stream: Arc::new(Mutex::new(stream)), peer_addr })
     }
 
     /// Get peer address

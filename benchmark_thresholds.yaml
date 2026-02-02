@@ -1,0 +1,487 @@
+# Industry Performance Thresholds
+#
+# Comprehensive benchmarking standards from Unity, Unreal Engine, Bevy, and AAA games.
+# All data sourced from official documentation, community benchmarks, and industry research.
+#
+# Last Updated: 2026-02-01
+# Sources: See individual entries below
+
+version: 1
+timestamp: "2026-02-01"
+
+# ================================================
+# FRAME TIME BUDGETS
+# ================================================
+frame_time:
+  target_60fps:
+    value: 16.67
+    unit: "ms"
+    source: "Unreal Engine / AAA Industry Standard"
+    source_url: "https://dev.epicgames.com/documentation/en-us/unreal-engine/nanite-virtualized-geometry-in-unreal-engine"
+    description: "Total frame budget for 60 FPS gameplay (1000ms / 60fps)"
+    notes: "60-70% typically allocated to GPU for visually rich scenes"
+
+  target_30fps:
+    value: 33.33
+    unit: "ms"
+    source: "Unreal Engine / Console AAA Standard"
+    description: "Total frame budget for 30 FPS (console games)"
+    notes: "Common for AAA console titles, narrative games"
+
+  target_120fps:
+    value: 8.33
+    unit: "ms"
+    source: "Unreal Engine / High-end PC Standard"
+    description: "Total frame budget for 120 FPS (competitive/VR)"
+    notes: "Required for competitive FPS and VR applications"
+
+  mobile_30fps:
+    value: 22.0
+    unit: "ms"
+    source: "Unity Mobile Optimization Guide"
+    description: "Mobile frame budget with 35% thermal headroom"
+    notes: "Target 22ms for 30fps to prevent device thermal throttling"
+
+# ================================================
+# ECS PERFORMANCE
+# ================================================
+ecs:
+  # Entity Iteration Throughput
+  entity_iteration:
+    bevy_v016:
+      improvement: "3x faster than previous version"
+      source: "Bevy Engine v0.16 (2024)"
+      source_url: "https://bevyengine.org/"
+      description: "Bevy v0.16 delivered 3x performance improvement, fastest Rust ECS"
+      notes: "Considered fastest Rust ECS per ecs_bench_suite"
+
+    unity_dots:
+      value: 100000
+      unit: "entities"
+      time: 44.4
+      time_unit: "ms"
+      throughput: 2252
+      throughput_unit: "entities/ms"
+      source: "Unity DOTS/ECS 2024 Benchmark"
+      source_url: "https://medium.com/superstringtheory/unity-dots-ecs-performance-amazing-5a62fece23d4"
+      description: "100K boid entities with full ECS simulation (Ryzen 7 5800H + RTX 3060)"
+      cpu_improvement: "5-50x over traditional Unity depending on parallelization"
+
+    unreal_mass:
+      capability: "Orders of magnitude more triangles and instances than traditional rendering"
+      source: "Unreal Engine 5 Mass Entity System"
+      source_url: "https://dev.epicgames.com/documentation/en-us/unreal-engine/mass-entity-in-unreal-engine"
+      description: "Mass Entity used in Matrix Awakens demo for massive crowd simulations"
+      notes: "Community reports 75K-100K+ entities feasible with proper optimization"
+
+    agent_game_engine_target:
+      value: 10000000
+      unit: "entities/sec"
+      source: "agent-game-engine Phase 1.1-1.2 target"
+      description: "Target: 10M entities/sec query iteration"
+      notes: "4.4x faster than Unity DOTS throughput target"
+
+  # Rust ECS Benchmarks (from ecs_bench_suite)
+  rust_ecs_benchmarks:
+    legion_single_component:
+      value: 1
+      unit: "μs/iter"
+      operation: "update"
+      source: "ecs_bench_suite (archived)"
+      source_url: "https://github.com/rust-gamedev/ecs_bench_suite"
+      notes: "3x faster than specs for single component updates"
+
+    hecs:
+      build_time: 375
+      update_time: 4
+      unit: "μs/iter"
+      source: "ecs_bench Position/Velocity test"
+      description: "Lightweight ECS focusing on archetype-based storage"
+
+    specs:
+      build_time: 319
+      update_time: 3
+      unit: "μs/iter"
+      source: "ecs_bench Position/Velocity test"
+      description: "Mature ECS with flat performance across component counts"
+
+  # Component Operations
+  component_operations:
+    agent_game_engine_target:
+      value: 1
+      unit: "μs"
+      source: "agent-game-engine performance target"
+      description: "Component add/remove operations target"
+
+    rust_ecs_insert:
+      value: "319-538"
+      unit: "μs"
+      entity_count: 10000
+      component_count: 4
+      source: "ecs_bench insert test"
+      description: "Insert 10K entities with 4 components (Transform, Position, Rotation, Velocity)"
+
+# ================================================
+# SERIALIZATION PERFORMANCE
+# ================================================
+serialization:
+  bincode:
+    rust_benchmark:
+      serialize: 2962
+      deserialize: 285
+      unit: "MB/s"
+      source: "rust-serialization-benchmarks"
+      source_url: "https://github.com/erickt/rust-serialization-benchmarks"
+      description: "Fastest Rust serialization library for structured data"
+
+    mesh_dataset:
+      serialize_time: 2.88
+      deserialize_time: 0.98
+      unit: "ms"
+      source: "djkoloski rust_serialization_benchmark"
+      source_url: "https://github.com/djkoloski/rust_serialization_benchmark"
+      description: "Mesh dataset with triangle arrays, vertices, normals"
+
+    agent_game_engine_target:
+      value: 5
+      unit: "ms"
+      entity_count: 1000
+      source: "agent-game-engine Phase 1.3 target"
+      description: "Serialize 1000 entities with multiple components"
+
+    agent_game_engine_actual:
+      value: 0.0993
+      unit: "ms"
+      entity_count: 1000
+      source: "agent-game-engine Phase 1.3 benchmark (2026-02-01)"
+      description: "✅ ACTUAL: 99.3µs (50x faster than target!)"
+      throughput: 10000000
+      throughput_unit: "entities/sec"
+
+  flatbuffers:
+    cap_n_proto_similar:
+      marshal: 4039.83
+      unmarshal_zerocopy: 1445.07
+      unit: "MB/s"
+      source: "buffer-benchmarks"
+      source_url: "https://github.com/kcchu/buffer-benchmarks"
+      description: "Cap'n Proto (similar to FlatBuffers) zero-copy performance"
+
+    weakness:
+      issue: "Major performance issues on highly-structured data"
+      source: "djkoloski benchmark (minecraft_savedata test)"
+      description: "FlatBuffers had worst serialization performance on structured data"
+      notes: "Use for network protocols, not local save files"
+
+  comparison:
+    bincode_vs_flatbuffers:
+      winner: "bincode"
+      reason: "Bincode faster for typical game serialization (structured data)"
+      flatbuffers_advantage: "Zero-copy deserialization for network messages"
+
+# ================================================
+# RENDERING PERFORMANCE
+# ================================================
+rendering:
+  # Triangle Throughput
+  triangles_per_frame:
+    unity_dots:
+      value: 31000000
+      unit: "triangles/frame"
+      source: "Unity DOTS 2024 Benchmark (RTX 3060)"
+      source_url: "https://medium.com/superstringtheory/unity-dots-ecs-performance-amazing-5a62fece23d4"
+      description: "31M triangles/frame with ECS renderer on RTX 3060"
+
+    unreal_nanite:
+      approach: "Pixel-scale detail, ~2x pixel count in triangles"
+      source: "Unreal Engine 5 Nanite"
+      source_url: "https://dev.epicgames.com/documentation/en-us/unreal-engine/nanite-virtualized-geometry-in-unreal-engine"
+      description: "Ideally draw 2x pixels worth of triangles (hardware raster for >1px triangles)"
+      compression: "14.4 bytes per input triangle average"
+      notes: "1M triangle mesh = ~13.8 MB on disk"
+
+    nanite_performance:
+      benchmark: "8192 mesh instances"
+      nanite_fps: 60
+      traditional_lod_fps: 24
+      source: "Medium Nanite Performance Article"
+      source_url: "https://medium.com/@GroundZer0/nanite-optimizations-in-unreal-engine-5-diving-into-nanite-performance-a5e6cd19920c"
+      description: "Nanite holds 60 FPS, traditional LODs drop to 24 FPS at extreme range"
+
+  # Draw Calls
+  draw_calls:
+    traditional_limit:
+      value: 1000
+      unit: "draw calls/frame"
+      source: "AAA Industry Standard (without GPU instancing)"
+      description: "Traditional rendering pipeline limit"
+
+    modern_instancing:
+      value: 10000
+      unit: "draw calls/frame"
+      source: "Modern engines with GPU instancing"
+      description: "With instancing and indirect draw calls"
+
+  # LOD Management
+  lod:
+    unreal_nanite:
+      automatic: true
+      description: "Automatic LOD, no manual setup required"
+      cluster_size: 128
+      cluster_unit: "triangles"
+      notes: "Clusters adjust based on screen size, distance, resolution"
+
+# ================================================
+# PHYSICS PERFORMANCE
+# ================================================
+physics:
+  rigid_bodies:
+    standard_target:
+      value: 1000
+      unit: "bodies"
+      time: 16.67
+      time_unit: "ms"
+      source: "Physics engines (PhysX, Havok, Rapier)"
+      description: "1000 active rigid bodies at 60 FPS"
+
+    rapier_benchmark:
+      falling_balls: 12500
+      falling_cubes: 3380
+      box_pyramid: 5050
+      timestep: 16
+      timestep_unit: "ms"
+      velocity_iterations: 4
+      position_iterations: 1
+      source: "Rapier physics engine announcement (2020)"
+      source_url: "https://dimforge.com/blog/2020/08/25/announcing-the-rapier-physics-engine/"
+      description: "Rapier benchmarks: 12.5K balls, 3.4K cubes, 5K box pyramid"
+
+    rapier_vs_nphysics:
+      improvement: "4-8x faster than nphysics"
+      multithreaded_improvement: "5-10x faster with multithreading"
+      source: "Rapier announcement"
+      notes: "PhysX and Rapier have close single-threaded performance"
+
+  integration_simd:
+    agent_game_engine_target:
+      value: 8
+      unit: "bodies/iteration (AVX2)"
+      source: "agent-game-engine SIMD physics"
+      description: "8-wide SIMD integration for position/velocity"
+
+# ================================================
+# NETWORKING PERFORMANCE
+# ================================================
+networking:
+  server_tick_rate:
+    competitive_fps_standard:
+      valorant: 128
+      cs2_official: 64
+      cs2_subtick: "Sub-tick processing between 64Hz ticks"
+      source: "Competitive FPS Standards (2024-2025)"
+      source_url: "https://whatisesports.xyz/server-tick-rates/"
+      description: "Valorant: 128Hz everywhere. CS2: 64Hz + subtick system"
+      notes: "CS2 subtick records inputs at exact timestamps for better hit registration"
+
+    competitive_requirements:
+      minimum: 60
+      professional: "120-128"
+      unit: "ticks/sec"
+      source: "Competitive FPS Requirements"
+      description: "60+ Hz for fair play, 120-128 Hz for pro tournaments"
+
+    other_fps_games:
+      apex_legends: 20
+      cod_warzone: 30
+      cod_standard: 60
+      overwatch: 64
+      battlefield: "30-60"
+      unit: "Hz"
+      source: "Server Tick Rates Article"
+
+    mmo_standards:
+      world_of_warcraft: 4
+      world_of_warcraft_modern: "4+ Hz (varies by content)"
+      final_fantasy_xiv: 3
+      unit: "Hz"
+      source: "MMO Server Performance Discussions"
+      source_url: "https://www.resetera.com/threads/nearly-20-years-later-its-impressive-how-not-a-single-mmo-managed-to-surpass-world-of-warcrafts-movement-and-combat-fluidity.708395/"
+      description: "MMOs use lower tick rates: WoW 4Hz, FFXIV 3Hz"
+      notes: "FFXIV slidecasting and animation delays due to low tick rate"
+
+  agent_game_engine_targets:
+    competitive_fps_target:
+      value: 60
+      unit: "ticks/sec"
+      tick_budget: 16.67
+      tick_budget_unit: "ms"
+      description: "Competitive FPS server tick rate target"
+
+    mmo_target:
+      value: 20
+      unit: "ticks/sec"
+      tick_budget: 50
+      tick_budget_unit: "ms"
+      description: "MMO server tick rate target"
+
+    latency_overhead:
+      value: 5
+      unit: "ms"
+      description: "Network processing overhead per tick target"
+
+# ================================================
+# MEMORY BUDGETS
+# ================================================
+memory:
+  system_ram:
+    minimum_2024:
+      value: 8192
+      unit: "MB"
+      source: "AAA Games 2024 Minimum Requirements"
+      source_url: "https://www.wepc.com/how-much-ram-you-need-for-gaming/"
+      description: "8GB RAM minimum for AAA titles (but not recommended)"
+
+    recommended_2024:
+      value: 16384
+      unit: "MB"
+      source: "AAA Games 2024 Standard"
+      description: "16GB RAM standard for most AAA games in 2024-2025"
+      notes: "16GB is plenty for smooth performance in modern games"
+
+    enthusiast_2024:
+      value: 32768
+      unit: "MB"
+      source: "High-end Gaming 2024"
+      description: "32GB for heavy multitasking + future-proofing"
+
+  vram_texture_streaming:
+    unreal_default_pool:
+      value: 1000
+      unit: "MB"
+      source: "Unreal Engine Default Texture Streaming Pool"
+      source_url: "https://techarthub.com/fixing-texture-streaming-pool-over-budget-in-unreal/"
+      description: "Default texture streaming pool size"
+
+    heroes_of_the_storm_4k:
+      texture_budget: 570
+      total_vram: 3072
+      unit: "MB"
+      source: "HotS 4K High Performance Settings"
+      description: "3840x2160, high performance mode"
+
+  agent_game_engine_targets:
+    client_baseline:
+      value: 2048
+      unit: "MB"
+      source: "agent-game-engine target"
+      description: "Client memory budget (baseline)"
+
+    client_critical:
+      value: 4096
+      unit: "MB"
+      source: "agent-game-engine target"
+      description: "Critical threshold (must not exceed)"
+
+    server_per_1000_players:
+      value: 8192
+      unit: "MB"
+      source: "agent-game-engine MMO target"
+      description: "Server memory for 1000 concurrent players"
+
+    server_critical:
+      value: 16384
+      unit: "MB"
+      description: "Critical threshold per 1000 players"
+
+# ================================================
+# ASSET LOADING
+# ================================================
+assets:
+  texture_compression:
+    dxt1_4k:
+      size: 10.6
+      unit: "MB"
+      format: "DXT1"
+      resolution: "4K"
+      source: "Unity/Unreal Texture Compression"
+
+    dxt5_4k:
+      size: 21.2
+      unit: "MB"
+      format: "DXT5"
+      resolution: "4K"
+      notes: "2x size of DXT1"
+
+  streaming_performance:
+    fixed_load_time:
+      value: 16
+      unit: "ms"
+      source: "Texture Streaming Research"
+      source_url: "https://link.springer.com/article/10.1007/s00371-021-02152-z"
+      description: "Fixed load time to limit streaming rate and reduce stuttering"
+
+  agent_game_engine_targets:
+    texture_loading:
+      value: 100
+      unit: "MB/sec"
+      description: "Texture streaming throughput target"
+
+    mesh_loading:
+      value: 50
+      unit: "MB/sec"
+      description: "Mesh loading and parsing target"
+
+# ================================================
+# PROFILING OVERHEAD
+# ================================================
+profiling:
+  runtime_overhead:
+    agent_game_engine_target:
+      value: 1
+      unit: "%"
+      source: "agent-game-engine profiling infrastructure"
+      description: "Profiling overhead in instrumented builds"
+
+    tracy_reference:
+      value: 1
+      unit: "%"
+      source: "Tracy Profiler documentation"
+      description: "Industry-standard profiler overhead"
+
+# ================================================
+# COMPARISON SUMMARY
+# ================================================
+comparison_summary:
+  agent_game_engine_wins:
+    - feature: "Serialization"
+      target: "5ms for 1000 entities"
+      actual: "0.0993ms (99.3µs)"
+      improvement: "50x faster than target"
+      status: "✅ EXCEEDS"
+
+    - feature: "ECS Target"
+      target: "10M entities/sec"
+      unity_comparison: "2.25M entities/sec (Unity DOTS)"
+      ratio: "4.4x faster than Unity"
+      status: "🎯 AMBITIOUS TARGET"
+
+  industry_standards_to_meet:
+    - feature: "Frame Time (60 FPS)"
+      target: "16.67ms"
+      source: "Unreal Engine / AAA Standard"
+      status: "📊 BENCHMARK REQUIRED"
+
+    - feature: "Server Tick Rate (Competitive FPS)"
+      target: "60 Hz"
+      source: "Competitive FPS Standard"
+      status: "📊 BENCHMARK REQUIRED"
+
+    - feature: "Physics (1000 bodies)"
+      target: "< 16.67ms"
+      source: "PhysX/Rapier Standard"
+      status: "📊 BENCHMARK REQUIRED"
+
+    - feature: "Rendering Triangles"
+      reference: "31M triangles/frame (Unity on RTX 3060)"
+      source: "Unity DOTS 2024"
+      status: "📊 BENCHMARK REQUIRED"

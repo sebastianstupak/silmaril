@@ -43,9 +43,13 @@
 pub mod buffer;
 pub mod command;
 pub mod context;
+pub mod debug;
+pub mod depth;
 pub mod error;
 pub mod framebuffer;
+pub mod gpu_cache;
 pub mod offscreen;
+pub mod pipeline;
 pub mod render_pass;
 pub mod renderer;
 pub mod shader;
@@ -58,15 +62,18 @@ pub mod window;
 pub use buffer::{GpuBuffer, GpuMesh, IndexBuffer, VertexBuffer};
 pub use command::{CommandBuffer, CommandError, CommandPool};
 pub use context::{QueueFamilies, VulkanContext};
+pub use depth::DepthBuffer;
 pub use error::RendererError;
 pub use framebuffer::{create_framebuffers, Framebuffer, FramebufferError};
+pub use gpu_cache::{GpuCache, GpuCachedMesh, MeshInfo};
 pub use offscreen::OffscreenTarget;
+pub use pipeline::GraphicsPipeline;
 pub use render_pass::{RenderPass, RenderPassConfig, RenderPassError};
 pub use renderer::Renderer;
-pub use shader::ShaderModule;
+pub use shader::{stage_from_extension, ShaderModule};
 pub use surface::{Surface, SurfaceError};
 pub use swapchain::Swapchain;
-pub use sync::{create_sync_objects, FrameSyncObjects, SyncError};
+pub use sync::{create_sync_objects, FrameResources, FrameSync, FrameSyncObjects, SyncError};
 pub use window::{Window, WindowConfig, WindowError, WindowEventType};
 
 // Re-export from engine-assets for convenience

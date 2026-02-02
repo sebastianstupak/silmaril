@@ -37,9 +37,7 @@ impl WorldSnapshot {
         #[cfg(feature = "profiling")]
         profile_scope!("snapshot_from_world");
 
-        Self {
-            state: WorldState::snapshot(world),
-        }
+        Self { state: WorldState::snapshot(world) }
     }
 
     /// Apply snapshot to a World
@@ -122,12 +120,7 @@ impl WorldSnapshot {
 
     /// Get list of entities in snapshot
     pub fn entities(&self) -> Vec<Entity> {
-        self.state
-            .entities
-            .iter()
-            .filter(|e| e.alive)
-            .map(|e| e.entity)
-            .collect()
+        self.state.entities.iter().filter(|e| e.alive).map(|e| e.entity).collect()
     }
 
     /// Get the underlying WorldState (for advanced use cases)

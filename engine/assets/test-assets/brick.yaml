@@ -1,0 +1,9 @@
+name: "brick"
+base_color_texture: "brick_albedo.png"
+metallic_roughness_texture: null
+normal_texture: "brick_normal.png"
+emissive_texture: null
+base_color_factor: [0.8, 0.6, 0.4, 1.0]
+metallic_factor: 0.0
+roughness_factor: 0.8
+emissive_factor: [0.0, 0.0, 0.0]

@@ -19,6 +19,15 @@ pub struct GpuBuffer {
     device: ash::Device,
 }
 
+impl std::fmt::Debug for GpuBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GpuBuffer")
+            .field("buffer", &self.buffer)
+            .field("size", &self.size)
+            .finish_non_exhaustive()
+    }
+}
+
 impl GpuBuffer {
     /// Create a new GPU buffer
     ///
@@ -35,9 +44,10 @@ impl GpuBuffer {
         location: MemoryLocation,
     ) -> Result<Self, RendererError> {
         // Create buffer
-        let buffer_info = vk::BufferCreateInfo::default().size(size).usage(usage).sharing_mode(
-            vk::SharingMode::EXCLUSIVE,
-        );
+        let buffer_info = vk::BufferCreateInfo::default()
+            .size(size)
+            .usage(usage)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
         let buffer = unsafe {
             context.device.create_buffer(&buffer_info, None).map_err(|e| {
@@ -87,12 +97,7 @@ impl GpuBuffer {
 
         info!(size = size, usage = ?usage, "GPU buffer created");
 
-        Ok(Self {
-            buffer,
-            allocation: Some(allocation),
-            size,
-            device: context.device.clone(),
-        })
+        Ok(Self { buffer, allocation: Some(allocation), size, device: context.device.clone() })
     }
 
     /// Upload data to buffer (for CPU-visible buffers)
@@ -148,6 +153,7 @@ impl Drop for GpuBuffer {
 }
 
 /// Vertex buffer (convenience wrapper)
+#[derive(Debug)]
 pub struct VertexBuffer {
     buffer: GpuBuffer,
     vertex_count: u32,
@@ -162,15 +168,11 @@ impl VertexBuffer {
         let size = (std::mem::size_of::<T>() * vertices.len()) as u64;
         let usage = vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST;
 
-        let mut buffer =
-            GpuBuffer::new(context, size, usage, MemoryLocation::CpuToGpu)?;
+        let mut buffer = GpuBuffer::new(context, size, usage, MemoryLocation::CpuToGpu)?;
 
         buffer.upload(vertices)?;
 
-        Ok(Self {
-            buffer,
-            vertex_count: vertices.len() as u32,
-        })
+        Ok(Self { buffer, vertex_count: vertices.len() as u32 })
     }
 
     /// Get buffer handle
@@ -185,6 +187,7 @@ impl VertexBuffer {
 }
 
 /// Index buffer (convenience wrapper)
+#[derive(Debug)]
 pub struct IndexBuffer {
     buffer: GpuBuffer,
     index_count: u32,
@@ -196,15 +199,11 @@ impl IndexBuffer {
         let size = (std::mem::size_of::<u32>() * indices.len()) as u64;
         let usage = vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST;
 
-        let mut buffer =
-            GpuBuffer::new(context, size, usage, MemoryLocation::CpuToGpu)?;
+        let mut buffer = GpuBuffer::new(context, size, usage, MemoryLocation::CpuToGpu)?;
 
         buffer.upload(indices)?;
 
-        Ok(Self {
-            buffer,
-            index_count: indices.len() as u32,
-        })
+        Ok(Self { buffer, index_count: indices.len() as u32 })
     }
 
     /// Get buffer handle
@@ -241,10 +240,7 @@ impl GpuMesh {
             "GPU mesh created"
         );
 
-        Ok(Self {
-            vertex_buffer,
-            index_buffer,
-        })
+        Ok(Self { vertex_buffer, index_buffer })
     }
 
     /// Get vertex count
