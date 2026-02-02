@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Maximum number of inputs to buffer (2 seconds at 60 FPS = 120 inputs)
 const MAX_INPUT_BUFFER_SIZE: usize = 120;

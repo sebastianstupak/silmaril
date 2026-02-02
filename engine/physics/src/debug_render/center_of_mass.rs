@@ -29,11 +29,11 @@ pub struct CenterOfMassRenderOptions {
 impl Default for CenterOfMassRenderOptions {
     fn default() -> Self {
         Self {
-            dynamic_color: [1.0, 0.0, 0.0],     // Red for dynamic
-            kinematic_color: [0.0, 0.0, 1.0],   // Blue for kinematic
-            show_static: false,                  // Hide static by default
-            static_color: [0.5, 0.5, 0.5],      // Gray for static
-            marker_size: 0.2,                    // 20cm cross
+            dynamic_color: [1.0, 0.0, 0.0],   // Red for dynamic
+            kinematic_color: [0.0, 0.0, 1.0], // Blue for kinematic
+            show_static: false,               // Hide static by default
+            static_color: [0.5, 0.5, 0.5],    // Gray for static
+            marker_size: 0.2,                 // 20cm cross
         }
     }
 }
@@ -111,12 +111,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add a dynamic body
-        world.add_rigidbody(
-            0,
-            &RigidBody::dynamic(1.0),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
         let options = CenterOfMassRenderOptions::default();
@@ -140,18 +135,10 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add static body
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
-        let options = CenterOfMassRenderOptions {
-            show_static: false,
-            ..Default::default()
-        };
+        let options = CenterOfMassRenderOptions { show_static: false, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_center_of_mass(&world, &options);
@@ -167,18 +154,10 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add static body
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
-        let options = CenterOfMassRenderOptions {
-            show_static: true,
-            ..Default::default()
-        };
+        let options = CenterOfMassRenderOptions { show_static: true, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_center_of_mass(&world, &options);
@@ -199,21 +178,11 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add dynamic body
-        world.add_rigidbody(
-            0,
-            &RigidBody::dynamic(1.0),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
         // Add kinematic body
-        world.add_rigidbody(
-            1,
-            &RigidBody::kinematic(),
-            Vec3::new(5.0, 0.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::kinematic(), Vec3::new(5.0, 0.0, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::ONE));
 
         let options = CenterOfMassRenderOptions::default();

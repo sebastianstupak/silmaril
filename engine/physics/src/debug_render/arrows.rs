@@ -334,11 +334,8 @@ mod tests {
         // Set angular velocity (spinning around Y axis)
         world.set_velocity(1, Vec3::ZERO, Vec3::new(0.0, 3.0, 0.0));
 
-        let options = VelocityRenderOptions {
-            show_linear: false,
-            show_angular: true,
-            ..Default::default()
-        };
+        let options =
+            VelocityRenderOptions { show_linear: false, show_angular: true, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_velocities(&world, &options);
@@ -363,11 +360,8 @@ mod tests {
         // Set both velocities
         world.set_velocity(1, Vec3::new(5.0, 0.0, 0.0), Vec3::new(0.0, 2.0, 0.0));
 
-        let options = VelocityRenderOptions {
-            show_linear: true,
-            show_angular: true,
-            ..Default::default()
-        };
+        let options =
+            VelocityRenderOptions { show_linear: true, show_angular: true, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_velocities(&world, &options);
@@ -412,15 +406,9 @@ mod tests {
         world.set_velocity(1, Vec3::new(10.0, 0.0, 0.0), Vec3::ZERO);
 
         // Test with different scale factors
-        let options_small = VelocityRenderOptions {
-            scale: 0.1,
-            ..Default::default()
-        };
+        let options_small = VelocityRenderOptions { scale: 0.1, ..Default::default() };
 
-        let options_large = VelocityRenderOptions {
-            scale: 0.5,
-            ..Default::default()
-        };
+        let options_large = VelocityRenderOptions { scale: 0.5, ..Default::default() };
 
         // Render with small scale
         debug_renderer.begin_frame();
@@ -477,10 +465,7 @@ mod tests {
         // Apply tiny force (below threshold)
         world.apply_force(1, Vec3::new(0.05, 0.0, 0.0));
 
-        let options = ForceRenderOptions {
-            min_magnitude: 0.1,
-            ..Default::default()
-        };
+        let options = ForceRenderOptions { min_magnitude: 0.1, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_forces(&world, &options);

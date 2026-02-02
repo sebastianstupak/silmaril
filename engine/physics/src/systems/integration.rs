@@ -8,7 +8,7 @@ use engine_core::ecs::World;
 use engine_core::math::Transform;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::profile_scope;
+use silmaril_profiling::profile_scope;
 
 /// Standard physics integration system (scalar).
 ///

@@ -39,11 +39,11 @@ pub struct JointRenderOptions {
 impl Default for JointRenderOptions {
     fn default() -> Self {
         Self {
-            fixed_color: [0.5, 0.5, 0.5],      // Gray for fixed
-            revolute_color: [0.0, 1.0, 0.0],   // Green for revolute
-            prismatic_color: [0.0, 0.0, 1.0],  // Blue for prismatic
-            spherical_color: [1.0, 1.0, 0.0],  // Yellow for spherical
-            generic_color: [1.0, 0.0, 1.0],    // Magenta for generic
+            fixed_color: [0.5, 0.5, 0.5],     // Gray for fixed
+            revolute_color: [0.0, 1.0, 0.0],  // Green for revolute
+            prismatic_color: [0.0, 0.0, 1.0], // Blue for prismatic
+            spherical_color: [1.0, 1.0, 0.0], // Yellow for spherical
+            generic_color: [1.0, 0.0, 1.0],   // Magenta for generic
             thickness: 1.0,
             show_anchors: true,
             anchor_size: 0.1,
@@ -120,38 +120,14 @@ impl DebugRenderer {
                 let size = options.anchor_size;
 
                 // Anchor on body 1
-                self.add_line(
-                    point1 - Vec3::X * size,
-                    point1 + Vec3::X * size,
-                    color,
-                );
-                self.add_line(
-                    point1 - Vec3::Y * size,
-                    point1 + Vec3::Y * size,
-                    color,
-                );
-                self.add_line(
-                    point1 - Vec3::Z * size,
-                    point1 + Vec3::Z * size,
-                    color,
-                );
+                self.add_line(point1 - Vec3::X * size, point1 + Vec3::X * size, color);
+                self.add_line(point1 - Vec3::Y * size, point1 + Vec3::Y * size, color);
+                self.add_line(point1 - Vec3::Z * size, point1 + Vec3::Z * size, color);
 
                 // Anchor on body 2
-                self.add_line(
-                    point2 - Vec3::X * size,
-                    point2 + Vec3::X * size,
-                    color,
-                );
-                self.add_line(
-                    point2 - Vec3::Y * size,
-                    point2 + Vec3::Y * size,
-                    color,
-                );
-                self.add_line(
-                    point2 - Vec3::Z * size,
-                    point2 + Vec3::Z * size,
-                    color,
-                );
+                self.add_line(point2 - Vec3::X * size, point2 + Vec3::X * size, color);
+                self.add_line(point2 - Vec3::Y * size, point2 + Vec3::Y * size, color);
+                self.add_line(point2 - Vec3::Z * size, point2 + Vec3::Z * size, color);
             }
         }
     }
@@ -171,20 +147,10 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Create two bodies
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::new(2.0, 0.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(2.0, 0.0, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::ONE));
 
         // Add a fixed joint between them
@@ -240,57 +206,33 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Create two bodies with a joint
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::new(2.0, 0.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(2.0, 0.0, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::ONE));
 
         world.add_joint(0, 1, &JointBuilder::fixed().build());
 
         // Test with anchors disabled
-        let options_no_anchors = JointRenderOptions {
-            show_anchors: false,
-            ..Default::default()
-        };
+        let options_no_anchors = JointRenderOptions { show_anchors: false, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_joints(&world, &options_no_anchors);
         let lines_no_anchors = debug_renderer.end_frame();
 
         // Should only have connection line
-        assert_eq!(
-            lines_no_anchors.len(),
-            1,
-            "Should only render connection line without anchors"
-        );
+        assert_eq!(lines_no_anchors.len(), 1, "Should only render connection line without anchors");
 
         // Test with anchors enabled
-        let options_with_anchors = JointRenderOptions {
-            show_anchors: true,
-            ..Default::default()
-        };
+        let options_with_anchors = JointRenderOptions { show_anchors: true, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_joints(&world, &options_with_anchors);
         let lines_with_anchors = debug_renderer.end_frame();
 
         // Should have connection + anchors
-        assert_eq!(
-            lines_with_anchors.len(),
-            7,
-            "Should render connection and anchor markers"
-        );
+        assert_eq!(lines_with_anchors.len(), 7, "Should render connection and anchor markers");
     }
 
     #[test]
@@ -299,12 +241,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Create bodies but no joints
-        world.add_rigidbody(
-            0,
-            &RigidBody::dynamic(1.0),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
         let options = JointRenderOptions::default();

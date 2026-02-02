@@ -10,6 +10,8 @@ use crate::agentic_debug::{
 };
 use crate::components::{Collider, ColliderShape, RigidBody, RigidBodyType};
 use crate::config::{PhysicsConfig, PhysicsMode};
+#[allow(unused_imports)] // FrameMetrics used in public API return type
+use crate::metrics::{FrameMetrics, MetricsCollector};
 use engine_math::{Quat, Vec3};
 use rapier3d::na::{Quaternion, UnitQuaternion};
 use rapier3d::prelude::*;
@@ -124,6 +126,10 @@ pub struct PhysicsWorld {
     /// Event recorder for agentic debugging
     event_recorder: EventRecorder,
 
+    /// Metrics collector for performance profiling (Phase A.2)
+    #[allow(dead_code)] // Work in progress - public API methods being added
+    metrics_collector: MetricsCollector,
+
     /// Applied forces for debug rendering (Phase A.1.7)
     /// Maps entity ID to accumulated force for current frame
     #[cfg(feature = "debug-render")]
@@ -185,6 +191,7 @@ impl PhysicsWorld {
             accumulator: 0.0,
             frame_count: 0,
             event_recorder: EventRecorder::new(),
+            metrics_collector: MetricsCollector::new(),
             #[cfg(feature = "debug-render")]
             applied_forces: HashMap::new(),
             #[cfg(feature = "debug-render")]
@@ -1174,7 +1181,7 @@ impl PhysicsWorld {
             },
             (2, 3) => ConstraintType::Prismatic { translation: 0, has_limits: false },
             (3, 0) => ConstraintType::Spherical, // Translation locked, rotation free
-            _ => ConstraintType::Generic { locked_axes: locked_axes as u8 },
+            _ => ConstraintType::Generic { locked_axes: locked_axes },
         }
     }
 

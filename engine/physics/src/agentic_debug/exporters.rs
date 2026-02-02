@@ -458,7 +458,7 @@ impl SqliteExporter {
     /// Write an event to the database
     pub fn write_event(&mut self, event: &PhysicsEvent) -> Result<(), ExportError> {
         let entities = event.involved_entities();
-        let entity_a = entities.get(0).copied();
+        let entity_a = entities.first().copied();
         let entity_b = entities.get(1).copied();
 
         let data_json = serde_json::to_string(event)
@@ -503,7 +503,7 @@ impl SqliteExporter {
 
             for event in events {
                 let entities = event.involved_entities();
-                let entity_a = entities.get(0).copied();
+                let entity_a = entities.first().copied();
                 let entity_b = entities.get(1).copied();
 
                 let data_json = serde_json::to_string(event)
@@ -569,7 +569,7 @@ impl CsvExporter {
 
         // Write header
         writer
-            .write_record(&[
+            .write_record([
                 "frame",
                 "entity_id",
                 "pos_x",

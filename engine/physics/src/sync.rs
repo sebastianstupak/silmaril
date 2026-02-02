@@ -17,7 +17,7 @@ use engine_math::{Quat, Vec3};
 use std::collections::HashMap;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Sync configuration
 pub struct PhysicsSyncConfig {

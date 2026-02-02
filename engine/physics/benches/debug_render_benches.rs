@@ -30,26 +30,18 @@ fn bench_velocity_rendering(c: &mut Criterion) {
                 Quat::IDENTITY,
             );
             world.add_collider(i, &Collider::box_collider(Vec3::ONE));
-            world.set_velocity(
-                i,
-                Vec3::new((i % 5) as f32, 0.0, 0.0),
-                Vec3::ZERO,
-            );
+            world.set_velocity(i, Vec3::new((i % 5) as f32, 0.0, 0.0), Vec3::ZERO);
         }
 
         let options = VelocityRenderOptions::default();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(body_count),
-            body_count,
-            |b, _| {
-                b.iter(|| {
-                    debug_renderer.begin_frame();
-                    debug_renderer.render_velocities(black_box(&world), black_box(&options));
-                    let _ = debug_renderer.end_frame();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(body_count), body_count, |b, _| {
+            b.iter(|| {
+                debug_renderer.begin_frame();
+                debug_renderer.render_velocities(black_box(&world), black_box(&options));
+                let _ = debug_renderer.end_frame();
+            });
+        });
     }
 
     group.finish();
@@ -76,17 +68,13 @@ fn bench_aabb_rendering(c: &mut Criterion) {
 
         let options = AabbRenderOptions::default();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(body_count),
-            body_count,
-            |b, _| {
-                b.iter(|| {
-                    debug_renderer.begin_frame();
-                    debug_renderer.render_aabbs(black_box(&world), black_box(&options));
-                    let _ = debug_renderer.end_frame();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(body_count), body_count, |b, _| {
+            b.iter(|| {
+                debug_renderer.begin_frame();
+                debug_renderer.render_aabbs(black_box(&world), black_box(&options));
+                let _ = debug_renderer.end_frame();
+            });
+        });
     }
 
     group.finish();
@@ -154,17 +142,13 @@ fn bench_center_of_mass_rendering(c: &mut Criterion) {
 
         let options = CenterOfMassRenderOptions::default();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(body_count),
-            body_count,
-            |b, _| {
-                b.iter(|| {
-                    debug_renderer.begin_frame();
-                    debug_renderer.render_center_of_mass(black_box(&world), black_box(&options));
-                    let _ = debug_renderer.end_frame();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(body_count), body_count, |b, _| {
+            b.iter(|| {
+                debug_renderer.begin_frame();
+                debug_renderer.render_center_of_mass(black_box(&world), black_box(&options));
+                let _ = debug_renderer.end_frame();
+            });
+        });
     }
 
     group.finish();
@@ -177,24 +161,20 @@ fn bench_line_batching(c: &mut Criterion) {
     let mut debug_renderer = DebugRenderer::new(Some(100_000));
 
     for line_count in [100, 1000, 10_000, 50_000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(line_count),
-            line_count,
-            |b, &count| {
-                b.iter(|| {
-                    debug_renderer.begin_frame();
-                    for i in 0..count {
-                        let offset = (i as f32) * 0.1;
-                        debug_renderer.add_line(
-                            Vec3::new(offset, 0.0, 0.0),
-                            Vec3::new(offset, 1.0, 0.0),
-                            [1.0, 0.0, 0.0],
-                        );
-                    }
-                    let _ = debug_renderer.end_frame();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(line_count), line_count, |b, &count| {
+            b.iter(|| {
+                debug_renderer.begin_frame();
+                for i in 0..count {
+                    let offset = (i as f32) * 0.1;
+                    debug_renderer.add_line(
+                        Vec3::new(offset, 0.0, 0.0),
+                        Vec3::new(offset, 1.0, 0.0),
+                        [1.0, 0.0, 0.0],
+                    );
+                }
+                let _ = debug_renderer.end_frame();
+            });
+        });
     }
 
     group.finish();
@@ -223,17 +203,13 @@ fn bench_force_rendering(c: &mut Criterion) {
 
         let options = ForceRenderOptions::default();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(body_count),
-            body_count,
-            |b, _| {
-                b.iter(|| {
-                    debug_renderer.begin_frame();
-                    debug_renderer.render_forces(black_box(&world), black_box(&options));
-                    let _ = debug_renderer.end_frame();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(body_count), body_count, |b, _| {
+            b.iter(|| {
+                debug_renderer.begin_frame();
+                debug_renderer.render_forces(black_box(&world), black_box(&options));
+                let _ = debug_renderer.end_frame();
+            });
+        });
     }
 
     group.finish();

@@ -36,11 +36,11 @@ pub struct CollisionRenderOptions {
 impl Default for CollisionRenderOptions {
     fn default() -> Self {
         Self {
-            point_color: [1.0, 0.0, 1.0],    // Magenta for contact points
-            normal_color: [0.0, 1.0, 1.0],   // Cyan for normals
-            normal_scale: 2.0,                // Normal length = 2x penetration
-            min_penetration: 0.001,           // 1mm threshold
-            max_contacts: 1000,               // Limit for performance
+            point_color: [1.0, 0.0, 1.0],  // Magenta for contact points
+            normal_color: [0.0, 1.0, 1.0], // Cyan for normals
+            normal_scale: 2.0,             // Normal length = 2x penetration
+            min_penetration: 0.001,        // 1mm threshold
+            max_contacts: 1000,            // Limit for performance
             show_points: true,
             show_normals: true,
         }
@@ -160,12 +160,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add ground plane
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::new(100.0, 0.1, 100.0)));
 
         // Add box slightly penetrating ground
@@ -188,10 +183,7 @@ mod tests {
 
         // Should have some contact visualization lines
         // (3 cross lines + 4 arrow lines per contact, possibly multiple contacts)
-        assert!(
-            !lines.is_empty(),
-            "Should render collision visualization"
-        );
+        assert!(!lines.is_empty(), "Should render collision visualization");
     }
 
     #[test]
@@ -200,12 +192,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add two boxes far apart (no contact)
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::ONE));
 
         world.add_rigidbody(
@@ -219,10 +206,7 @@ mod tests {
         // Step once (no contacts expected)
         world.step(1.0 / 60.0);
 
-        let options = CollisionRenderOptions {
-            min_penetration: 0.001,
-            ..Default::default()
-        };
+        let options = CollisionRenderOptions { min_penetration: 0.001, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_collisions(&world, &options);
@@ -238,41 +222,25 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Setup collision scenario
-        world.add_rigidbody(
-            0,
-            &RigidBody::static_body(),
-            Vec3::ZERO,
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
         world.add_collider(0, &Collider::box_collider(Vec3::new(100.0, 0.1, 100.0)));
 
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::new(0.0, 0.4, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 0.4, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::new(0.5, 0.5, 0.5)));
 
         world.step(1.0 / 60.0);
 
         // Test with only points
-        let options_points_only = CollisionRenderOptions {
-            show_points: true,
-            show_normals: false,
-            ..Default::default()
-        };
+        let options_points_only =
+            CollisionRenderOptions { show_points: true, show_normals: false, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_collisions(&world, &options_points_only);
         let lines_points = debug_renderer.end_frame().len();
 
         // Test with only normals
-        let options_normals_only = CollisionRenderOptions {
-            show_points: false,
-            show_normals: true,
-            ..Default::default()
-        };
+        let options_normals_only =
+            CollisionRenderOptions { show_points: false, show_normals: true, ..Default::default() };
 
         debug_renderer.begin_frame();
         debug_renderer.render_collisions(&world, &options_normals_only);

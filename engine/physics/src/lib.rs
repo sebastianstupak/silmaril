@@ -1,4 +1,4 @@
-//! Physics module for the agent game engine.
+//! Physics module for the Silmaril.
 //!
 //! Integrates Rapier physics engine with ECS and provides SIMD-optimized systems.
 //!
@@ -16,6 +16,7 @@ pub mod config;
 pub mod deterministic;
 pub mod events;
 pub mod joints;
+pub mod metrics;
 pub mod prediction;
 pub mod sync;
 pub mod systems;
@@ -48,6 +49,7 @@ pub use joints::{
     FixedJointConfig, Joint, JointBuilder, JointHandle, JointMotor, PrismaticJointConfig,
     RevoluteJointConfig, SphericalJointConfig,
 };
+pub use metrics::{FrameMetrics, MetricsCollector};
 pub use prediction::{InputBuffer, PlayerInput, PredictedState, PredictionSystem};
 pub use sync::{build_entity_mapping, PhysicsSyncConfig, PhysicsSyncSystem};
 pub use systems::{physics_integration_system, physics_integration_system_simd};

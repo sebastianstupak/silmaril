@@ -20,7 +20,7 @@ use engine_math::{
 use rayon::prelude::*;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Threshold for enabling parallel processing (entities count).
 ///
