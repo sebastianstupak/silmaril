@@ -61,17 +61,8 @@ impl Vec3x4 {
         Self { x: f32x4::splat(v.x), y: f32x4::splat(v.y), z: f32x4::splat(v.z) }
     }
 
-    /// Add two Vec3x4 (SIMD).
-    #[inline]
-    pub fn add(self, rhs: Self) -> Self {
-        Self { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
-    }
-
-    /// Subtract two Vec3x4 (SIMD).
-    #[inline]
-    pub fn sub(self, rhs: Self) -> Self {
-        Self { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z }
-    }
+    // Note: Add and Sub operations are implemented via std::ops traits below
+    // This avoids method name confusion with std::ops::Add::add and std::ops::Sub::sub
 
     /// Multiply Vec3x4 by scalar (SIMD).
     #[inline]
@@ -192,7 +183,7 @@ impl Add for Vec3x4 {
     type Output = Self;
     #[inline]
     fn add(self, rhs: Self) -> Self {
-        self.add(rhs)
+        Self { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
     }
 }
 
@@ -200,7 +191,7 @@ impl Sub for Vec3x4 {
     type Output = Self;
     #[inline]
     fn sub(self, rhs: Self) -> Self {
-        self.sub(rhs)
+        Self { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z }
     }
 }
 
