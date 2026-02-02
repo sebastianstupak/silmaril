@@ -127,13 +127,9 @@ fn test_metrics_joint_tracking() {
     world.add_collider(2, &Collider::box_collider(Vec3::ONE));
 
     // Add fixed joint between them
-    let joint = FixedJointConfig {
-        anchor1: Vec3::new(0.5, 0.0, 0.0),
-        anchor2: Vec3::new(-0.5, 0.0, 0.0),
-        rotation1: Quat::IDENTITY,
-        rotation2: Quat::IDENTITY,
-    };
-    world.add_joint(1, 2, Joint::Fixed(joint));
+    let joint =
+        FixedJointConfig { anchor1: Vec3::new(0.5, 0.0, 0.0), anchor2: Vec3::new(-0.5, 0.0, 0.0) };
+    world.add_joint(1, 2, &Joint::Fixed(joint));
 
     world.enable_metrics();
     world.step(1.0 / 60.0);
