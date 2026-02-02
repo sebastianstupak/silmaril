@@ -102,7 +102,7 @@ impl DependencyGraph {
                 if self.systems_conflict(&node_i.access, &node_j.access) {
                     // Systems conflict - add edge to enforce ordering
                     // By convention, lower index runs first
-                    self.edges.entry(i).or_insert_with(Vec::new).push(j);
+                    self.edges.entry(i).or_default().push(j);
                     debug!(
                         from = %node_i.name,
                         to = %node_j.name,

@@ -377,8 +377,10 @@ pub struct EventStatistics {
 impl EventStatistics {
     /// Compute statistics from event list
     pub fn from_events(events: &[PhysicsEvent]) -> Self {
-        let mut stats = Self::default();
-        stats.total = events.len();
+        let mut stats = Self {
+            total: events.len(),
+            ..Default::default()
+        };
 
         for event in events {
             match event {

@@ -14,6 +14,7 @@ pub mod character_controller;
 pub mod components;
 pub mod config;
 pub mod deterministic;
+pub mod divergence_logger;
 pub mod events;
 pub mod joints;
 pub mod metrics;
@@ -41,6 +42,9 @@ pub use deterministic::{
     create_snapshot, hash_physics_state, restore_snapshot, DeterministicError, PhysicsInput,
     PhysicsSnapshot, RecordedFrame, ReplayPlayer, ReplayRecorder,
 };
+pub use divergence_logger::{
+    DivergenceLogger, DivergenceStatistics, DivergenceThresholds, EntityDivergenceRecord,
+};
 pub use events::{
     BodySleepEvent, BodyWakeEvent, CollisionEndEvent, CollisionStartEvent, ContactForceEvent,
     TriggerEnterEvent, TriggerExitEvent,
@@ -49,7 +53,7 @@ pub use joints::{
     FixedJointConfig, Joint, JointBuilder, JointHandle, JointMotor, PrismaticJointConfig,
     RevoluteJointConfig, SphericalJointConfig,
 };
-pub use metrics::{FrameMetrics, MetricsCollector};
+pub use metrics::{FrameMetrics, FrameStats, MetricsCollector};
 pub use prediction::{InputBuffer, PlayerInput, PredictedState, PredictionSystem};
 pub use sync::{build_entity_mapping, PhysicsSyncConfig, PhysicsSyncSystem};
 pub use systems::{physics_integration_system, physics_integration_system_simd};

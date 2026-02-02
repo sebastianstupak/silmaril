@@ -51,7 +51,7 @@ use rayon::prelude::*;
 use std::any::TypeId;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Send-safe wrapper for mutable raw pointers used in parallel iteration
 ///
@@ -90,7 +90,7 @@ impl<T> SendPtr<T> {
 
 impl<T> Clone for SendPtr<T> {
     fn clone(&self) -> Self {
-        SendPtr(self.0)
+        *self
     }
 }
 
@@ -132,7 +132,7 @@ impl<T> SendConstPtr<T> {
 
 impl<T> Clone for SendConstPtr<T> {
     fn clone(&self) -> Self {
-        SendConstPtr(self.0)
+        *self
     }
 }
 

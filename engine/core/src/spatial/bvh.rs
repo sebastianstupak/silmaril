@@ -104,9 +104,9 @@ impl Bvh {
     /// This performs a full rebuild of the BVH using SAH (Surface Area Heuristic).
     pub fn build(world: &crate::ecs::World) -> Self {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "bvh_build",
-            agent_game_engine_profiling::ProfileCategory::Physics
+            silmaril_profiling::ProfileCategory::Physics
         );
 
         // Collect all entities with AABB components
@@ -139,8 +139,8 @@ impl Bvh {
 
         // Compute bounds for this node
         let mut bounds = primitives[start].1;
-        for i in (start + 1)..end {
-            bounds = bounds.merge(&primitives[i].1);
+        for (_, prim_bounds) in primitives.iter().take(end).skip(start + 1) {
+            bounds = bounds.merge(prim_bounds);
         }
 
         // Create leaf if small enough
@@ -226,19 +226,19 @@ impl Bvh {
         let mut left_count = 0;
         let mut right_count = 0;
 
-        for i in start..end {
-            let center = primitives[i].1.center();
+        for (_, prim_bounds) in primitives.iter().take(end).skip(start) {
+            let center = prim_bounds.center();
             if center[axis] < pos {
                 left_count += 1;
                 left_box = Some(match left_box {
-                    Some(b) => primitives[i].1.merge(&b),
-                    None => primitives[i].1,
+                    Some(b) => prim_bounds.merge(&b),
+                    None => *prim_bounds,
                 });
             } else {
                 right_count += 1;
                 right_box = Some(match right_box {
-                    Some(b) => primitives[i].1.merge(&b),
-                    None => primitives[i].1,
+                    Some(b) => prim_bounds.merge(&b),
+                    None => *prim_bounds,
                 });
             }
         }

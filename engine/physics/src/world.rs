@@ -144,8 +144,10 @@ pub struct PhysicsWorld {
 impl PhysicsWorld {
     /// Create a new physics world with configuration
     pub fn new(config: PhysicsConfig) -> Self {
-        let mut integration_params = IntegrationParameters::default();
-        integration_params.dt = config.timestep();
+        let mut integration_params = IntegrationParameters {
+            dt: config.timestep(),
+            ..Default::default()
+        };
 
         // Configure based on mode
         if let PhysicsMode::Deterministic { .. } = config.mode {
@@ -1405,19 +1407,20 @@ impl PhysicsWorld {
         let total_joint_count = self.impulse_joint_set.len();
 
         // End frame and generate metrics
-        let metrics = self.metrics_collector.end_frame(
+        let stats = crate::metrics::FrameStats {
             active_bodies,
             sleeping_bodies,
             island_count,
             avg_bodies_per_island,
             max_bodies_in_island,
-            collision_pair_count,
-            active_contact_count,
+            collision_pairs: collision_pair_count,
+            active_contacts: active_contact_count,
             solver_iterations,
-            constraint_count,
-            total_collider_count,
-            total_joint_count,
-        );
+            constraints: constraint_count,
+            colliders: total_collider_count,
+            joints: total_joint_count,
+        };
+        let metrics = self.metrics_collector.end_frame(stats);
 
         Some(metrics)
     }

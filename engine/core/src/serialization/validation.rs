@@ -258,14 +258,12 @@ impl WorldStateValidator {
         }
 
         // Check metadata consistency
-        if state.metadata.entity_count != state.entities.len() {
-            if self.options.log_recovery {
-                warn!(
-                    expected = state.metadata.entity_count,
-                    actual = state.entities.len(),
-                    "Metadata entity count mismatch"
-                );
-            }
+        if state.metadata.entity_count != state.entities.len() && self.options.log_recovery {
+            warn!(
+                expected = state.metadata.entity_count,
+                actual = state.entities.len(),
+                "Metadata entity count mismatch"
+            );
         }
 
         if corrupt_count == 0 {

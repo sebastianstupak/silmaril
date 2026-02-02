@@ -20,6 +20,33 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+/// Frame statistics to pass to MetricsCollector::end_frame
+#[derive(Debug, Clone, Copy)]
+pub struct FrameStats {
+    /// Number of active (non-sleeping) rigid bodies
+    pub active_bodies: usize,
+    /// Number of sleeping rigid bodies
+    pub sleeping_bodies: usize,
+    /// Number of simulation islands
+    pub island_count: usize,
+    /// Average number of bodies per island
+    pub avg_bodies_per_island: f32,
+    /// Maximum number of bodies in any single island
+    pub max_bodies_in_island: usize,
+    /// Number of collision pairs detected
+    pub collision_pairs: usize,
+    /// Number of active contact points
+    pub active_contacts: usize,
+    /// Number of solver iterations performed
+    pub solver_iterations: usize,
+    /// Number of constraints (joints + contacts)
+    pub constraints: usize,
+    /// Total number of colliders in the world
+    pub colliders: usize,
+    /// Total number of joints in the world
+    pub joints: usize,
+}
+
 /// Frame-level physics metrics
 ///
 /// Captures performance and simulation statistics for a single physics step.
@@ -261,20 +288,7 @@ impl MetricsCollector {
     }
 
     /// Finish frame and generate metrics
-    pub fn end_frame(
-        &mut self,
-        active_bodies: usize,
-        sleeping_bodies: usize,
-        island_count: usize,
-        avg_bodies_per_island: f32,
-        max_bodies_in_island: usize,
-        collision_pairs: usize,
-        active_contacts: usize,
-        solver_iterations: usize,
-        constraints: usize,
-        colliders: usize,
-        joints: usize,
-    ) -> FrameMetrics {
+    pub fn end_frame(&mut self, stats: FrameStats) -> FrameMetrics {
         let frame_time = if let Some(start) = self.frame_start {
             start.elapsed()
         } else {
@@ -289,18 +303,18 @@ impl MetricsCollector {
             solver_time_us: self.solver_time.as_micros() as u64,
             island_build_time_us: self.island_build_time.as_micros() as u64,
             ccd_time_us: self.ccd_time.as_micros() as u64,
-            island_count,
-            avg_bodies_per_island,
-            max_bodies_in_island,
-            active_body_count: active_bodies,
-            sleeping_body_count: sleeping_bodies,
-            collision_pair_count: collision_pairs,
-            active_contact_count: active_contacts,
-            solver_iterations,
+            island_count: stats.island_count,
+            avg_bodies_per_island: stats.avg_bodies_per_island,
+            max_bodies_in_island: stats.max_bodies_in_island,
+            active_body_count: stats.active_bodies,
+            sleeping_body_count: stats.sleeping_bodies,
+            collision_pair_count: stats.collision_pairs,
+            active_contact_count: stats.active_contacts,
+            solver_iterations: stats.solver_iterations,
             solver_residual: 0.0, // Not exposed by Rapier 0.18
-            constraint_count: constraints,
-            total_collider_count: colliders,
-            total_joint_count: joints,
+            constraint_count: stats.constraints,
+            total_collider_count: stats.colliders,
+            total_joint_count: stats.joints,
         }
     }
 }
@@ -353,7 +367,20 @@ mod tests {
 
         collector.begin_frame(1);
         collector.record_broadphase(Duration::from_millis(5));
-        let metrics = collector.end_frame(10, 5, 2, 7.5, 10, 20, 15, 4, 5, 30, 8);
+        let stats = FrameStats {
+            active_bodies: 10,
+            sleeping_bodies: 5,
+            island_count: 2,
+            avg_bodies_per_island: 7.5,
+            max_bodies_in_island: 10,
+            collision_pairs: 20,
+            active_contacts: 15,
+            solver_iterations: 4,
+            constraints: 5,
+            colliders: 30,
+            joints: 8,
+        };
+        let metrics = collector.end_frame(stats);
 
         // Should have zero timings when disabled
         assert_eq!(metrics.broadphase_time_us, 0);
@@ -370,7 +397,20 @@ mod tests {
         collector.record_narrowphase(Duration::from_micros(200));
         collector.record_solver(Duration::from_micros(300));
 
-        let metrics = collector.end_frame(10, 5, 2, 7.5, 10, 20, 15, 4, 5, 30, 8);
+        let stats = FrameStats {
+            active_bodies: 10,
+            sleeping_bodies: 5,
+            island_count: 2,
+            avg_bodies_per_island: 7.5,
+            max_bodies_in_island: 10,
+            collision_pairs: 20,
+            active_contacts: 15,
+            solver_iterations: 4,
+            constraints: 5,
+            colliders: 30,
+            joints: 8,
+        };
+        let metrics = collector.end_frame(stats);
 
         assert_eq!(metrics.frame, 1);
         assert_eq!(metrics.broadphase_time_us, 100);

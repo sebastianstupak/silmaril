@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Optimized delta with field-level granularity
 ///
@@ -70,14 +70,14 @@ impl<T: Copy + Eq + Ord> RunLengthEncoded<T> {
         let mut start = values[0];
         let mut count = 1;
 
-        for i in 1..values.len() {
+        for &value in values.iter().skip(1) {
             // Check if consecutive (for Entity, we check ID continuity)
             let expected_next = start + T::from(count as u8);
-            if values[i] == expected_next {
+            if value == expected_next {
                 count += 1;
             } else {
                 runs.push((start, count));
-                start = values[i];
+                start = value;
                 count = 1;
             }
         }

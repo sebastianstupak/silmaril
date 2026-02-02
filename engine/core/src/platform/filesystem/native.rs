@@ -9,6 +9,12 @@ use std::path::{Path, PathBuf};
 /// This provides basic file I/O operations with path normalization.
 pub struct NativeFileSystem;
 
+impl Default for NativeFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NativeFileSystem {
     /// Create a new native filesystem backend.
     pub fn new() -> Self {

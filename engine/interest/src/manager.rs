@@ -124,9 +124,9 @@ impl InterestManager {
     /// - Uses profiling when enabled
     pub fn update_from_world(&mut self, world: &World) {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "interest_update_from_world",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         // Clear and rebuild spatial grid
@@ -151,9 +151,7 @@ impl InterestManager {
         self.client_interests.insert(client_id, aoi);
 
         // Initialize visibility cache if needed
-        if !self.visibility_cache.contains_key(&client_id) {
-            self.visibility_cache.insert(client_id, HashSet::new());
-        }
+        self.visibility_cache.entry(client_id).or_default();
     }
 
     /// Remove a client from interest management
@@ -187,9 +185,9 @@ impl InterestManager {
     /// - Uses spatial grid for efficient querying
     pub fn calculate_visibility(&self, client_id: u64) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "interest_calculate_visibility",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         let aoi = match self.client_interests.get(&client_id) {
@@ -227,9 +225,9 @@ impl InterestManager {
     /// Updates the visibility cache for this client
     pub fn get_visibility_changes(&mut self, client_id: u64) -> (Vec<Entity>, Vec<Entity>) {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "interest_get_visibility_changes",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         // Calculate current visibility
@@ -237,7 +235,7 @@ impl InterestManager {
             self.calculate_visibility(client_id).into_iter().collect();
 
         // Get cached visibility
-        let cached_visible = self.visibility_cache.entry(client_id).or_insert_with(HashSet::new);
+        let cached_visible = self.visibility_cache.entry(client_id).or_default();
 
         // Calculate differences
         let entered: Vec<Entity> = current_visible.difference(cached_visible).copied().collect();
