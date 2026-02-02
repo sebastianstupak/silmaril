@@ -201,12 +201,52 @@ fn bench_line_batching(c: &mut Criterion) {
 }
 
 #[cfg(feature = "debug-render")]
+fn bench_force_rendering(c: &mut Criterion) {
+    let mut group = c.benchmark_group("debug_render/force");
+
+    for body_count in [10, 50, 100, 500].iter() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        // Create bodies with applied forces
+        for i in 0..*body_count {
+            world.add_rigidbody(
+                i,
+                &RigidBody::dynamic(1.0),
+                Vec3::new((i % 10) as f32 * 2.0, (i / 10) as f32 * 2.0, 0.0),
+                Quat::IDENTITY,
+            );
+            world.add_collider(i, &Collider::box_collider(Vec3::ONE));
+            // Apply force to each body
+            world.apply_force(i, Vec3::new((i % 5) as f32 * 10.0, 50.0, 0.0));
+        }
+
+        let options = ForceRenderOptions::default();
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(body_count),
+            body_count,
+            |b, _| {
+                b.iter(|| {
+                    debug_renderer.begin_frame();
+                    debug_renderer.render_forces(black_box(&world), black_box(&options));
+                    let _ = debug_renderer.end_frame();
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+#[cfg(feature = "debug-render")]
 criterion_group!(
     benches,
     bench_velocity_rendering,
     bench_aabb_rendering,
     bench_collision_rendering,
     bench_center_of_mass_rendering,
+    bench_force_rendering,
     bench_line_batching,
 );
 

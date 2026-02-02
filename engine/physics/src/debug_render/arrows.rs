@@ -144,8 +144,8 @@ impl DebugRenderer {
 
     /// Render force and torque arrows for all bodies
     ///
-    /// Phase A.1.7 implementation. Note: Rapier doesn't expose per-body forces
-    /// directly, so this renders user-applied forces that are tracked separately.
+    /// Phase A.1.7 implementation. Renders user-applied forces and torques that
+    /// are tracked by PhysicsWorld via apply_force() and apply_impulse() calls.
     ///
     /// # Arguments
     ///
@@ -154,16 +154,69 @@ impl DebugRenderer {
     ///
     /// # Note
     ///
-    /// This requires tracking forces applied via `apply_force`. Internal solver
-    /// forces (constraints, contacts) are not directly accessible from Rapier's
-    /// public API.
-    pub fn render_forces(&mut self, _world: &PhysicsWorld, _options: &ForceRenderOptions) {
-        // TODO: Implement force tracking in PhysicsWorld
-        // Rapier doesn't expose per-body accumulated forces in public API
-        // We would need to track forces applied via apply_force/apply_impulse
-        // and render those separately.
-        //
-        // For now, this is a placeholder for Phase A.1.7
+    /// Only renders forces explicitly applied via PhysicsWorld::apply_force() and
+    /// apply_impulse(). Internal solver forces (constraints, contacts) are not
+    /// accessible from Rapier's public API.
+    pub fn render_forces(&mut self, world: &PhysicsWorld, options: &ForceRenderOptions) {
+        if !self.is_enabled() {
+            return;
+        }
+
+        let rigid_bodies = world.rigid_body_set();
+        let applied_forces = world.applied_forces();
+        let applied_torques = world.applied_torques();
+
+        // Render forces
+        if options.show_forces {
+            for (entity_id, force) in applied_forces.iter() {
+                let magnitude = force.length();
+
+                // Filter small forces
+                if magnitude < options.min_magnitude {
+                    continue;
+                }
+
+                // Get body position
+                if let Some(body_handle) = world.entity_to_body().get(entity_id) {
+                    if let Some(body) = rigid_bodies.get(*body_handle) {
+                        let position = body.translation();
+                        let start = Vec3::new(position.x, position.y, position.z);
+
+                        // Scale force for visualization
+                        let visual_force = *force * options.scale;
+                        let end = start + visual_force;
+
+                        self.draw_arrow(start, end, options.force_color);
+                    }
+                }
+            }
+        }
+
+        // Render torques
+        if options.show_torques {
+            for (entity_id, torque) in applied_torques.iter() {
+                let magnitude = torque.length();
+
+                // Filter small torques
+                if magnitude < options.min_magnitude {
+                    continue;
+                }
+
+                // Get body position
+                if let Some(body_handle) = world.entity_to_body().get(entity_id) {
+                    if let Some(body) = rigid_bodies.get(*body_handle) {
+                        let position = body.translation();
+                        let start = Vec3::new(position.x, position.y, position.z);
+
+                        // Scale torque for visualization (torque is axis * magnitude)
+                        let visual_torque = torque.normalize() * magnitude * options.scale;
+                        let end = start + visual_torque;
+
+                        self.draw_arrow(start, end, options.torque_color);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -386,5 +439,151 @@ mod tests {
         let length_small = (lines_small[0].end - lines_small[0].start).length();
         let length_large = (lines_large[0].end - lines_large[0].start).length();
         assert!(length_large > length_small, "Larger scale should produce longer arrows");
+    }
+
+    #[test]
+    fn test_render_forces_basic() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        // Add dynamic body
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Apply force
+        world.apply_force(1, Vec3::new(100.0, 0.0, 0.0));
+
+        let options = ForceRenderOptions::default();
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &options);
+        let lines = debug_renderer.end_frame();
+
+        // Should render force arrow (4 lines: shaft + head)
+        assert_eq!(lines.len(), 4, "Should render force arrow");
+
+        // Should be yellow (force color)
+        assert_eq!(lines[0].color, options.force_color);
+    }
+
+    #[test]
+    fn test_render_forces_filters_small() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Apply tiny force (below threshold)
+        world.apply_force(1, Vec3::new(0.05, 0.0, 0.0));
+
+        let options = ForceRenderOptions {
+            min_magnitude: 0.1,
+            ..Default::default()
+        };
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &options);
+        let lines = debug_renderer.end_frame();
+
+        // Should filter out small forces
+        assert_eq!(lines.len(), 0, "Should filter forces below threshold");
+    }
+
+    #[test]
+    fn test_render_forces_accumulates() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Apply multiple forces to same body
+        world.apply_force(1, Vec3::new(50.0, 0.0, 0.0));
+        world.apply_force(1, Vec3::new(50.0, 0.0, 0.0));
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &ForceRenderOptions::default());
+        let lines = debug_renderer.end_frame();
+
+        // Should accumulate and render as single arrow
+        assert_eq!(lines.len(), 4, "Should render accumulated force");
+    }
+
+    #[test]
+    fn test_render_forces_clears_after_step() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 10.0, 0.0), Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Add ground to prevent falling forever
+        world.add_rigidbody(0, &RigidBody::static_body(), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(0, &Collider::box_collider(Vec3::new(100.0, 0.1, 100.0)));
+
+        // Apply force
+        world.apply_force(1, Vec3::new(100.0, 0.0, 0.0));
+
+        // Render before step
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &ForceRenderOptions::default());
+        let lines_before = debug_renderer.end_frame().len();
+
+        assert_eq!(lines_before, 4, "Should render force before step");
+
+        // Step physics (should clear forces)
+        world.step(1.0 / 60.0);
+
+        // Render after step (no new forces applied)
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &ForceRenderOptions::default());
+        let lines_after = debug_renderer.end_frame().len();
+
+        assert_eq!(lines_after, 0, "Forces should be cleared after step");
+    }
+
+    #[test]
+    fn test_render_forces_multiple_bodies() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        // Add multiple bodies with forces
+        for i in 0..3 {
+            world.add_rigidbody(
+                i,
+                &RigidBody::dynamic(1.0),
+                Vec3::new(i as f32 * 2.0, 0.0, 0.0),
+                Quat::IDENTITY,
+            );
+            world.add_collider(i, &Collider::box_collider(Vec3::ONE));
+            world.apply_force(i, Vec3::new((i + 1) as f32 * 50.0, 0.0, 0.0));
+        }
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &ForceRenderOptions::default());
+        let lines = debug_renderer.end_frame();
+
+        // 3 bodies × 4 lines per arrow = 12 lines
+        assert_eq!(lines.len(), 12, "Should render forces for all bodies");
+    }
+
+    #[test]
+    fn test_render_impulse_as_force() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Apply impulse (should be visualized as force)
+        world.apply_impulse(1, Vec3::new(10.0, 0.0, 0.0));
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_forces(&world, &ForceRenderOptions::default());
+        let lines = debug_renderer.end_frame();
+
+        // Impulse should be rendered as force
+        assert_eq!(lines.len(), 4, "Should render impulse as force arrow");
     }
 }

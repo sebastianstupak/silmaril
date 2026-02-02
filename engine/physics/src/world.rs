@@ -123,6 +123,16 @@ pub struct PhysicsWorld {
 
     /// Event recorder for agentic debugging
     event_recorder: EventRecorder,
+
+    /// Applied forces for debug rendering (Phase A.1.7)
+    /// Maps entity ID to accumulated force for current frame
+    #[cfg(feature = "debug-render")]
+    applied_forces: HashMap<u64, Vec3>,
+
+    /// Applied torques for debug rendering (Phase A.1.7)
+    /// Maps entity ID to accumulated torque for current frame
+    #[cfg(feature = "debug-render")]
+    applied_torques: HashMap<u64, Vec3>,
 }
 
 impl PhysicsWorld {
@@ -175,6 +185,10 @@ impl PhysicsWorld {
             accumulator: 0.0,
             frame_count: 0,
             event_recorder: EventRecorder::new(),
+            #[cfg(feature = "debug-render")]
+            applied_forces: HashMap::new(),
+            #[cfg(feature = "debug-render")]
+            applied_torques: HashMap::new(),
             config,
         }
     }
@@ -222,6 +236,13 @@ impl PhysicsWorld {
     fn step_internal(&mut self, _dt: f32) {
         #[cfg(feature = "profiling")]
         profile_scope!("physics_step_internal", ProfileCategory::Physics);
+
+        // Clear tracked forces from previous frame (Phase A.1.7)
+        #[cfg(feature = "debug-render")]
+        {
+            self.applied_forces.clear();
+            self.applied_torques.clear();
+        }
 
         self.frame_count += 1;
 
@@ -490,6 +511,12 @@ impl PhysicsWorld {
         if let Some(handle) = self.entity_to_body.get(&entity_id) {
             if let Some(body) = self.rigid_body_set.get_mut(*handle) {
                 body.add_force(vector![force.x, force.y, force.z], true);
+
+                // Track for debug rendering (Phase A.1.7)
+                #[cfg(feature = "debug-render")]
+                {
+                    *self.applied_forces.entry(entity_id).or_insert(Vec3::ZERO) += force;
+                }
             }
         }
     }
@@ -499,6 +526,15 @@ impl PhysicsWorld {
         if let Some(handle) = self.entity_to_body.get(&entity_id) {
             if let Some(body) = self.rigid_body_set.get_mut(*handle) {
                 body.apply_impulse(vector![impulse.x, impulse.y, impulse.z], true);
+
+                // Track impulse as instantaneous force for debug rendering (Phase A.1.7)
+                // Note: Impulse is force*dt, so we approximate by showing it at scale
+                #[cfg(feature = "debug-render")]
+                {
+                    // Scale impulse for visualization (impulse / dt ≈ average force)
+                    let force_approx = impulse / self.config.timestep();
+                    *self.applied_forces.entry(entity_id).or_insert(Vec3::ZERO) += force_approx;
+                }
             }
         }
     }
@@ -1230,6 +1266,44 @@ impl PhysicsWorld {
     #[cfg(feature = "debug-render")]
     pub fn narrow_phase(&self) -> &NarrowPhase {
         &self.narrow_phase
+    }
+
+    /// Get applied forces for debug rendering (Phase A.1.7)
+    ///
+    /// Returns a map of entity ID to accumulated force applied this frame.
+    /// Forces are cleared at the start of each physics step.
+    ///
+    /// # Note
+    ///
+    /// Only tracks forces applied via `apply_force()` and `apply_impulse()`.
+    /// Internal constraint/contact forces from Rapier are not included as they're
+    /// not exposed in Rapier's public API.
+    #[cfg(feature = "debug-render")]
+    pub fn applied_forces(&self) -> &HashMap<u64, Vec3> {
+        &self.applied_forces
+    }
+
+    /// Get applied torques for debug rendering (Phase A.1.7)
+    ///
+    /// Returns a map of entity ID to accumulated torque applied this frame.
+    /// Torques are cleared at the start of each physics step.
+    ///
+    /// # Note
+    ///
+    /// Currently a placeholder - torque application API not yet implemented.
+    #[cfg(feature = "debug-render")]
+    pub fn applied_torques(&self) -> &HashMap<u64, Vec3> {
+        &self.applied_torques
+    }
+
+    /// Get entity to body handle mapping (for debug rendering)
+    ///
+    /// # Note
+    ///
+    /// Used by debug rendering to look up body handles from entity IDs.
+    #[cfg(feature = "debug-render")]
+    pub fn entity_to_body(&self) -> &HashMap<u64, rapier3d::prelude::RigidBodyHandle> {
+        &self.entity_to_body
     }
 }
 
