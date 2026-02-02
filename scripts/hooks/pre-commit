@@ -157,10 +157,11 @@ echo "7. Checking for forbidden examples/ directories in engine crates..."
 FORBIDDEN_EXAMPLES=0
 
 # Check for files in engine/*/examples/ (but not engine/shared/examples/)
-if echo "$STAGED_FILES" | grep -qE "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/"; then
+FORBIDDEN_EXAMPLE_FILES=$(echo "$STAGED_FILES" | grep -E "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/" || true)
+if [ -n "$FORBIDDEN_EXAMPLE_FILES" ]; then
     FORBIDDEN_EXAMPLES=1
     print_status 1 "Forbidden examples/ directory in engine crate"
-    echo "$STAGED_FILES" | grep -E "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/" | sed 's/^/    /'
+    echo "$FORBIDDEN_EXAMPLE_FILES" | sed 's/^/    /'
 else
     print_status 0 "No forbidden examples/ directories"
 fi
