@@ -32,40 +32,10 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use engine_core::{EngineError, ErrorCode, ErrorSeverity};
-use engine_macros::define_error;
+use engine_core::ErrorCode;
 use serde::{Deserialize, Serialize};
 
-// Validation errors using define_error! macro
-define_error! {
-    /// Validation errors for rendering debug snapshots
-    pub enum ValidationError {
-        /// Invalid timestamp in debug snapshot
-        InvalidTimestamp { timestamp: f64 } =
-            ErrorCode::InvalidTimestamp,
-            ErrorSeverity::Error,
-
-        /// Invalid viewport dimensions
-        InvalidViewport {} =
-            ErrorCode::InvalidViewport,
-            ErrorSeverity::Error,
-
-        /// Invalid draw call data
-        InvalidDrawCall { index: usize, message: String } =
-            ErrorCode::InvalidDrawCall,
-            ErrorSeverity::Error,
-
-        /// Invalid transform matrix (contains NaN or Inf)
-        InvalidTransform {} =
-            ErrorCode::InvalidTransform,
-            ErrorSeverity::Error,
-
-        /// Draw call has zero vertices
-        ZeroVertices {} =
-            ErrorCode::ZeroVertices,
-            ErrorSeverity::Error,
-    }
-}
+use super::error::ValidationError;
 
 /// Complete render state snapshot for a single frame
 #[derive(Debug, Clone, Serialize, Deserialize)]

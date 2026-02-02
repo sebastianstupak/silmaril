@@ -41,6 +41,7 @@
 //! - Export: Async, non-blocking
 //! - Query latency: < 10ms per query
 
+pub mod error;
 pub mod snapshot;
 // pub mod events;
 // pub mod exporters;
@@ -48,6 +49,7 @@ pub mod snapshot;
 // pub mod capture;
 
 // Re-export main types
+pub use error::ValidationError;
 pub use snapshot::{
     DrawCallInfo, FramebufferInfo, GpuMemoryStats, QueueStateInfo, RenderDebugSnapshot,
     RenderTargetInfo, ShaderStageInfo, TextureInfo, BufferInfo,
