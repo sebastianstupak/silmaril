@@ -46,6 +46,7 @@
 
 mod aabb;
 mod arrows;
+mod center_of_mass;
 mod collisions;
 mod joints;
 mod lines;
@@ -53,6 +54,7 @@ mod renderer;
 
 pub use aabb::*;
 pub use arrows::*;
+pub use center_of_mass::*;
 pub use collisions::*;
 pub use joints::*;
 pub use lines::*;
