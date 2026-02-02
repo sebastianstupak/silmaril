@@ -21,6 +21,36 @@ define_error! {
     }
 }
 
+/// Replay file format version (Phase A.3.3)
+const REPLAY_FILE_VERSION: u32 = 1;
+
+/// Replay file metadata (Phase A.3.3)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplayMetadata {
+    /// Number of recorded frames
+    pub frame_count: u64,
+    /// Duration in frames
+    pub duration_frames: u64,
+    /// Unix timestamp when replay was created
+    pub created_timestamp: u64,
+}
+
+/// Complete replay file format (Phase A.3.3)
+///
+/// Binary format containing initial snapshot + all recorded frames.
+/// Serialized using bincode for compact size and fast I/O.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplayFile {
+    /// File format version
+    pub version: u32,
+    /// Replay metadata
+    pub metadata: ReplayMetadata,
+    /// Initial world snapshot (frame 0)
+    pub initial_snapshot: PhysicsSnapshot,
+    /// All recorded frames
+    pub frames: Vec<RecordedFrame>,
+}
+
 /// Input action for a single frame
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PhysicsInput {
@@ -176,6 +206,110 @@ impl ReplayRecorder {
         let inputs_size = self.pending_inputs.len() * std::mem::size_of::<PhysicsInput>();
         let snapshot_size = std::mem::size_of::<PhysicsSnapshot>();
         frames_size + inputs_size + snapshot_size
+    }
+
+    /// Save replay to file (Phase A.3.3 - Replay export/import)
+    ///
+    /// Saves the complete replay (initial snapshot + all frames) to a binary .replay file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - File path to save to (typically with .replay extension)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DeterministicError::InvalidSnapshot`] if no initial snapshot recorded
+    /// or if file I/O fails.
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), DeterministicError> {
+        let replay_file = ReplayFile {
+            version: REPLAY_FILE_VERSION,
+            metadata: ReplayMetadata {
+                frame_count: self.frames.len() as u64,
+                duration_frames: self.current_frame,
+                created_timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+            },
+            initial_snapshot: self.initial_snapshot.clone().ok_or_else(|| {
+                DeterministicError::InvalidSnapshot {
+                    reason: "No initial snapshot recorded".to_string(),
+                }
+            })?,
+            frames: self.frames.clone(),
+        };
+
+        // Serialize to bincode (compact binary format)
+        let bytes = bincode::serialize(&replay_file).map_err(|e| {
+            DeterministicError::ReplayFailed {
+                reason: format!("Serialization failed: {}", e),
+            }
+        })?;
+
+        let size_bytes = bytes.len();
+
+        // Write to file
+        std::fs::write(path, bytes).map_err(|e| DeterministicError::ReplayFailed {
+            reason: format!("File write failed: {}", e),
+        })?;
+
+        tracing::info!(
+            path = %path.display(),
+            frame_count = self.frames.len(),
+            size_bytes = size_bytes,
+            "Replay saved to file"
+        );
+
+        Ok(())
+    }
+
+    /// Load replay from file (Phase A.3.3 - Replay export/import)
+    ///
+    /// Loads a complete replay from a .replay file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - File path to load from
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DeterministicError::ReplayFailed`] if file doesn't exist,
+    /// is corrupted, or has an incompatible version.
+    pub fn load_from_file(path: &std::path::Path) -> Result<Self, DeterministicError> {
+        // Read file
+        let bytes = std::fs::read(path).map_err(|e| DeterministicError::ReplayFailed {
+            reason: format!("File read failed: {}", e),
+        })?;
+
+        // Deserialize
+        let replay_file: ReplayFile =
+            bincode::deserialize(&bytes).map_err(|e| DeterministicError::ReplayFailed {
+                reason: format!("Deserialization failed: {}", e),
+            })?;
+
+        // Version check
+        if replay_file.version != REPLAY_FILE_VERSION {
+            return Err(DeterministicError::ReplayFailed {
+                reason: format!(
+                    "Incompatible replay version (file: {}, expected: {})",
+                    replay_file.version, REPLAY_FILE_VERSION
+                ),
+            });
+        }
+
+        tracing::info!(
+            path = %path.display(),
+            frame_count = replay_file.frames.len(),
+            duration_frames = replay_file.metadata.duration_frames,
+            "Replay loaded from file"
+        );
+
+        Ok(Self {
+            frames: replay_file.frames,
+            current_frame: replay_file.metadata.duration_frames,
+            pending_inputs: Vec::new(),
+            initial_snapshot: Some(replay_file.initial_snapshot),
+        })
     }
 }
 
@@ -521,5 +655,150 @@ mod tests {
 
         let after_usage = recorder.memory_usage();
         assert!(after_usage > initial_usage);
+    }
+
+    // Phase A.3.3 - Replay file I/O tests
+
+    #[test]
+    fn test_replay_save_load_roundtrip() {
+        use std::path::PathBuf;
+
+        let mut recorder = ReplayRecorder::new();
+
+        // Create test world with some entities
+        let config = crate::config::PhysicsConfig::default().with_deterministic(true);
+        let mut world = crate::world::PhysicsWorld::new(config);
+
+        let rb = crate::components::RigidBody::dynamic(1.0);
+        world.add_rigidbody(1, &rb, Vec3::new(0.0, 10.0, 0.0), Quat::IDENTITY);
+        world.add_collider(1, &crate::components::Collider::sphere(0.5));
+
+        // Record initial snapshot
+        recorder.record_initial_snapshot(&world);
+
+        // Simulate and record frames
+        for _ in 0..10 {
+            recorder.record_input(PhysicsInput::ApplyForce {
+                entity_id: 1,
+                force: Vec3::new(0.0, 5.0, 0.0),
+            });
+            world.step(1.0 / 60.0);
+            recorder.commit_frame(&world);
+        }
+
+        // Save to file
+        let temp_path = PathBuf::from("test_replay_roundtrip.replay");
+        recorder.save_to_file(&temp_path).expect("Failed to save replay");
+
+        // Load from file
+        let loaded =
+            ReplayRecorder::load_from_file(&temp_path).expect("Failed to load replay");
+
+        // Verify loaded data matches original
+        assert_eq!(loaded.frames().len(), recorder.frames().len());
+        assert_eq!(loaded.current_frame(), recorder.current_frame());
+        assert!(loaded.initial_snapshot().is_some());
+        assert_eq!(
+            loaded.initial_snapshot().unwrap().state_hash,
+            recorder.initial_snapshot().unwrap().state_hash
+        );
+
+        // Cleanup
+        std::fs::remove_file(&temp_path).ok();
+    }
+
+    #[test]
+    fn test_replay_save_without_initial_snapshot_fails() {
+        use std::path::PathBuf;
+
+        let recorder = ReplayRecorder::new();
+        let temp_path = PathBuf::from("test_no_snapshot.replay");
+
+        // Should fail because no initial snapshot was recorded
+        let result = recorder.save_to_file(&temp_path);
+        assert!(result.is_err());
+
+        // Cleanup (in case it was created)
+        std::fs::remove_file(&temp_path).ok();
+    }
+
+    #[test]
+    fn test_replay_load_nonexistent_file_fails() {
+        use std::path::PathBuf;
+
+        let path = PathBuf::from("nonexistent_replay_file.replay");
+        let result = ReplayRecorder::load_from_file(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_replay_file_metadata() {
+        use std::path::PathBuf;
+
+        let mut recorder = ReplayRecorder::new();
+
+        let config = crate::config::PhysicsConfig::default();
+        let world = crate::world::PhysicsWorld::new(config);
+
+        recorder.record_initial_snapshot(&world);
+
+        // Record some frames
+        for _ in 0..5 {
+            recorder.commit_frame(&world);
+        }
+
+        let temp_path = PathBuf::from("test_metadata.replay");
+        recorder.save_to_file(&temp_path).expect("Failed to save");
+
+        // Load and verify metadata
+        let loaded = ReplayRecorder::load_from_file(&temp_path).expect("Failed to load");
+        assert_eq!(loaded.frames().len(), 5);
+        assert_eq!(loaded.current_frame(), 5);
+
+        // Cleanup
+        std::fs::remove_file(&temp_path).ok();
+    }
+
+    #[test]
+    fn test_replay_file_size_reasonable() {
+        use std::path::PathBuf;
+
+        let mut recorder = ReplayRecorder::new();
+
+        let config = crate::config::PhysicsConfig::default();
+        let mut world = crate::world::PhysicsWorld::new(config);
+
+        // Add multiple entities
+        for i in 0..10 {
+            let rb = crate::components::RigidBody::dynamic(1.0);
+            world.add_rigidbody(
+                i,
+                &rb,
+                Vec3::new(i as f32, 10.0, 0.0),
+                Quat::IDENTITY,
+            );
+        }
+
+        recorder.record_initial_snapshot(&world);
+
+        // Record 100 frames
+        for _ in 0..100 {
+            world.step(1.0 / 60.0);
+            recorder.commit_frame(&world);
+        }
+
+        let temp_path = PathBuf::from("test_file_size.replay");
+        recorder.save_to_file(&temp_path).expect("Failed to save");
+
+        // Check file size is reasonable (< 1MB for this test)
+        let metadata = std::fs::metadata(&temp_path).expect("Failed to get metadata");
+        assert!(
+            metadata.len() < 1024 * 1024,
+            "File size {} exceeds 1MB",
+            metadata.len()
+        );
+
+        // Cleanup
+        std::fs::remove_file(&temp_path).ok();
     }
 }

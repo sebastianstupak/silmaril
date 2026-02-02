@@ -40,7 +40,7 @@ pub use components::{
 pub use config::{PhysicsConfig, PhysicsMode};
 pub use deterministic::{
     create_snapshot, hash_physics_state, restore_snapshot, DeterministicError, PhysicsInput,
-    PhysicsSnapshot, RecordedFrame, ReplayPlayer, ReplayRecorder,
+    PhysicsSnapshot, RecordedFrame, ReplayFile, ReplayMetadata, ReplayPlayer, ReplayRecorder,
 };
 pub use divergence_logger::{
     DivergenceLogger, DivergenceStatistics, DivergenceThresholds, EntityDivergenceRecord,
