@@ -11,7 +11,7 @@ rapier3d = { version = "0.18", features = ["parallel", "simd-stable"] }
 engine-core = { path = "../core" }
 engine-math = { path = "../math", features = ["serde", "simd"] }
 engine-macros = { path = "../macros" }
-agent-game-engine-profiling = { path = "../profiling", optional = true }
+silmaril-profiling = { path = "../profiling", optional = true }
 puffin = { version = "0.19", optional = true }
 engine-renderer = { path = "../renderer", optional = true }
 serde = { version = "1.0", features = ["derive"] }
@@ -25,7 +25,7 @@ csv = "1.3"
 sha2 = "0.10"
 
 [features]
-profiling = ["dep:agent-game-engine-profiling", "agent-game-engine-profiling/profiling-puffin", "puffin"]
+profiling = ["dep:silmaril-profiling", "silmaril-profiling/profiling-puffin", "puffin"]
 backtrace = []
 debug-render = ["dep:engine-renderer"]
 
@@ -72,3 +72,8 @@ harness = false
 [[bench]]
 name = "agentic_debug_benches"
 harness = false
+
+[[bench]]
+name = "debug_render_benches"
+harness = false
+required-features = ["debug-render"]

@@ -268,4 +268,123 @@ mod tests {
         // High velocity should be closer to red
         assert!(lines[0].color[0] > 0.8, "High velocity should be mostly red");
     }
+
+    #[test]
+    fn test_render_angular_velocity() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        // Add dynamic body
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Set angular velocity (spinning around Y axis)
+        world.set_velocity(1, Vec3::ZERO, Vec3::new(0.0, 3.0, 0.0));
+
+        let options = VelocityRenderOptions {
+            show_linear: false,
+            show_angular: true,
+            ..Default::default()
+        };
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_velocities(&world, &options);
+        let lines = debug_renderer.end_frame();
+
+        // Should render angular velocity arrow (4 lines)
+        assert_eq!(lines.len(), 4, "Should render angular velocity arrow");
+
+        // Angular velocity should be cyan
+        assert_eq!(lines[0].color, [0.0, 1.0, 1.0], "Angular velocity should be cyan");
+    }
+
+    #[test]
+    fn test_render_both_linear_and_angular() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        // Add dynamic body with both linear and angular velocity
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+
+        // Set both velocities
+        world.set_velocity(1, Vec3::new(5.0, 0.0, 0.0), Vec3::new(0.0, 2.0, 0.0));
+
+        let options = VelocityRenderOptions {
+            show_linear: true,
+            show_angular: true,
+            ..Default::default()
+        };
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_velocities(&world, &options);
+        let lines = debug_renderer.end_frame();
+
+        // Should render both arrows: 4 lines each = 8 total
+        assert_eq!(lines.len(), 8, "Should render both linear and angular velocity arrows");
+    }
+
+    #[test]
+    fn test_render_velocities_multiple_bodies() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        // Add multiple bodies with different velocities
+        for i in 0..3 {
+            world.add_rigidbody(
+                i,
+                &RigidBody::dynamic(1.0),
+                Vec3::new(i as f32 * 2.0, 0.0, 0.0),
+                Quat::IDENTITY,
+            );
+            world.add_collider(i, &Collider::box_collider(Vec3::ONE));
+            world.set_velocity(i, Vec3::new((i + 1) as f32 * 2.0, 0.0, 0.0), Vec3::ZERO);
+        }
+
+        debug_renderer.begin_frame();
+        debug_renderer.render_velocities(&world, &VelocityRenderOptions::default());
+        let lines = debug_renderer.end_frame();
+
+        // 3 bodies × 4 lines per arrow = 12 lines
+        assert_eq!(lines.len(), 12, "Should render velocities for all bodies");
+    }
+
+    #[test]
+    fn test_velocity_scaling() {
+        let mut world = PhysicsWorld::new(PhysicsConfig::default());
+        let mut debug_renderer = DebugRenderer::new(None);
+
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::ZERO, Quat::IDENTITY);
+        world.add_collider(1, &Collider::box_collider(Vec3::ONE));
+        world.set_velocity(1, Vec3::new(10.0, 0.0, 0.0), Vec3::ZERO);
+
+        // Test with different scale factors
+        let options_small = VelocityRenderOptions {
+            scale: 0.1,
+            ..Default::default()
+        };
+
+        let options_large = VelocityRenderOptions {
+            scale: 0.5,
+            ..Default::default()
+        };
+
+        // Render with small scale
+        debug_renderer.begin_frame();
+        debug_renderer.render_velocities(&world, &options_small);
+        let lines_small = debug_renderer.end_frame().to_vec();
+
+        // Render with large scale
+        debug_renderer.begin_frame();
+        debug_renderer.render_velocities(&world, &options_large);
+        let lines_large = debug_renderer.end_frame().to_vec();
+
+        // Both should render same number of lines
+        assert_eq!(lines_small.len(), lines_large.len());
+
+        // Large scale arrows should be longer
+        let length_small = (lines_small[0].end - lines_small[0].start).length();
+        let length_large = (lines_large[0].end - lines_large[0].start).length();
+        assert!(length_large > length_small, "Larger scale should produce longer arrows");
+    }
 }
