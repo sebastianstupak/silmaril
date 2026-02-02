@@ -3,9 +3,9 @@
 //! Provides utilities for generating self-signed certificates for development and testing.
 
 use crate::tls::error::{TlsError, TlsResult};
-use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, KeyPair, SanType};
+use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, SanType};
 use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Self-signed certificate configuration
 #[derive(Debug, Clone)]
@@ -122,8 +122,9 @@ pub fn generate_self_signed_cert(config: &SelfSignedConfig) -> TlsResult<(String
         .collect();
 
     // Set validity period
-    params.not_before = chrono::Utc::now() - chrono::Duration::days(1);
-    params.not_after = chrono::Utc::now() + chrono::Duration::days(config.validity_days as i64);
+    let now = time::OffsetDateTime::now_utc();
+    params.not_before = now - time::Duration::days(1);
+    params.not_after = now + time::Duration::days(config.validity_days as i64);
 
     // Generate certificate
     let cert = Certificate::from_params(params).map_err(|e| TlsError::InvalidCertificate {

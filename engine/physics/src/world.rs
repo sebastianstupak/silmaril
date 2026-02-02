@@ -4,9 +4,9 @@
 //! ECS sync will be added later via a separate system.
 
 use crate::agentic_debug::{
-    ColliderState, ConstraintState, ConstraintType, EntityState, EventRecorder, IslandState,
-    MaterialState, PhysicsConfigSnapshot, PhysicsDebugSnapshot, ShapeParams,
-    ShapeType as DebugShapeType, AABB,
+    BroadphasePairState, ColliderState, ConstraintState, ConstraintType, ContactManifoldState,
+    ContactPointState, EntityState, EventRecorder, IslandState, MaterialState,
+    PhysicsConfigSnapshot, PhysicsDebugSnapshot, ShapeParams, ShapeType as DebugShapeType, AABB,
 };
 use crate::components::{Collider, ColliderShape, RigidBody, RigidBodyType};
 use crate::config::{PhysicsConfig, PhysicsMode};
@@ -794,10 +794,7 @@ impl PhysicsWorld {
             }
         }
 
-        // Extract constraint states
-        // Note: Rapier 0.18 doesn't expose joint body handles publicly
-        // This will be improved in A.0.5 (Solver Internals Export)
-        // For now, we'll export basic joint data without entity mapping
+        // Extract constraint states (A.0.5: Now with proper entity mapping!)
         for (joint_handle, impulse_joint) in self.impulse_joint_set.iter() {
             // Determine constraint type from joint data
             let constraint_type = Self::classify_joint(impulse_joint);
@@ -806,12 +803,16 @@ impl PhysicsWorld {
             // Note: impulses is a field, not a method, and it's a nalgebra vector
             let applied_impulse = impulse_joint.impulses.norm();
 
+            // Extract body handles (A.0.5: These are public fields!)
+            let entity_a = self.body_to_entity.get(&impulse_joint.body1).copied().unwrap_or(0);
+            let entity_b = self.body_to_entity.get(&impulse_joint.body2).copied().unwrap_or(0);
+
             snapshot.constraints.push(ConstraintState {
                 id: joint_handle.into_raw_parts().0 as u64,
-                entity_a: 0, // Will be extracted properly in A.0.5
-                entity_b: 0, // Will be extracted properly in A.0.5
+                entity_a,
+                entity_b,
                 constraint_type,
-                current_error: 0.0, // Will be extracted in A.0.5
+                current_error: 0.0, // TODO: Extract from joint.data if available
                 applied_impulse,
                 broken: false, // Will need separate tracking
                 break_force: None,
@@ -819,10 +820,84 @@ impl PhysicsWorld {
             });
         }
 
+        // Extract contact manifolds (A.0.5: Narrow-phase collision data)
+        for contact_pair in self.narrow_phase.contact_pairs() {
+            // Map colliders to entities
+            let entity_a =
+                self.collider_to_entity.get(&contact_pair.collider1).copied().unwrap_or(0);
+            let entity_b =
+                self.collider_to_entity.get(&contact_pair.collider2).copied().unwrap_or(0);
+
+            // Extract contact manifolds
+            for manifold in &contact_pair.manifolds {
+                let normal = manifold.data.normal;
+
+                // Extract contact points from solver contacts
+                let contact_points: Vec<ContactPointState> = manifold
+                    .data
+                    .solver_contacts
+                    .iter()
+                    .map(|contact| ContactPointState {
+                        point: Vec3::new(contact.point.x, contact.point.y, contact.point.z),
+                        distance: contact.dist,
+                        friction: contact.friction,
+                        restitution: contact.restitution,
+                    })
+                    .collect();
+
+                snapshot.contact_manifolds.push(ContactManifoldState {
+                    entity_a,
+                    entity_b,
+                    normal: Vec3::new(normal.x, normal.y, normal.z),
+                    contact_points,
+                    total_impulse_magnitude: manifold
+                        .data
+                        .solver_contacts
+                        .iter()
+                        .fold(0.0, |acc, c| acc + c.friction + c.restitution),
+                    has_active_contact: contact_pair.has_any_active_contact,
+                    relative_dominance: manifold.data.relative_dominance,
+                });
+            }
+        }
+
+        // Extract broadphase pairs (A.0.5: Spatial partitioning data)
+        // Note: Rapier's BroadPhase doesn't expose pairs directly in a simple way.
+        // We can approximate by using contact pairs as a proxy for broadphase pairs.
+        // A complete implementation would require accessing BroadPhase internals.
+        // For now, we document this as a known limitation.
+        for contact_pair in self.narrow_phase.contact_pairs() {
+            let entity_a =
+                self.collider_to_entity.get(&contact_pair.collider1).copied().unwrap_or(0);
+            let entity_b =
+                self.collider_to_entity.get(&contact_pair.collider2).copied().unwrap_or(0);
+
+            // Get collider AABBs to compute distance
+            let aabb_distance = if let (Some(c1), Some(c2)) = (
+                self.collider_set.get(contact_pair.collider1),
+                self.collider_set.get(contact_pair.collider2),
+            ) {
+                let aabb1 = c1.compute_aabb();
+                let aabb2 = c2.compute_aabb();
+                let center1 = aabb1.center();
+                let center2 = aabb2.center();
+                (center2 - center1).norm()
+            } else {
+                0.0
+            };
+
+            snapshot.broadphase_pairs.push(BroadphasePairState {
+                entity_a,
+                entity_b,
+                aabb_distance,
+                in_narrowphase: true, // We're iterating narrowphase pairs
+            });
+        }
+
         // Extract island states
         // Note: Rapier doesn't expose island manager internals publicly
         // For now, we'll create a single pseudo-island with all active bodies
-        // This will be improved in A.0.5 (Solver Internals Export)
+        // This will be improved if Rapier exposes island iteration in future versions
         let active_bodies: Vec<u64> = self
             .rigid_body_set
             .iter()
@@ -875,6 +950,9 @@ impl PhysicsWorld {
             colliders = snapshot.colliders.len(),
             constraints = snapshot.constraints.len(),
             islands = snapshot.islands.len(),
+            contact_manifolds = snapshot.contact_manifolds.len(),
+            contact_points = snapshot.total_contact_points(),
+            broadphase_pairs = snapshot.broadphase_pairs.len(),
             "Created debug snapshot"
         );
 

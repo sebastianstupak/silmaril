@@ -2,17 +2,15 @@
 //!
 //! Provides TLS-encrypted TCP connections with transparent integration.
 
-use super::config::{TlsClientConfigBuilder, TlsServerConfigBuilder};
 use super::error::{TlsError, TlsResult};
-use crate::tcp::{TcpError, TcpResult};
-use rustls::{ClientConfig, ServerConfig, ServerConnection};
+use rustls::{ClientConfig, ServerConfig};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{client::TlsStream as ClientTlsStream, server::TlsStream as ServerTlsStream};
 use tokio_rustls::{TlsAcceptor, TlsConnector};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Maximum message size (10MB) - same as non-TLS TCP
 const MAX_MESSAGE_SIZE: u32 = 10 * 1024 * 1024;

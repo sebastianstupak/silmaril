@@ -3,11 +3,9 @@
 //! Provides configuration structures for TLS/DTLS with strong security defaults.
 
 use super::error::{TlsError, TlsResult};
-use rustls::client::{ServerCertVerified, ServerCertVerifier};
 use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
 use tracing::{debug, info, warn};
 
 /// TLS protocol version
@@ -168,7 +166,7 @@ impl TlsClientConfigBuilder {
         }
 
         // Build configuration
-        let mut config = ClientConfig::builder()
+        let config = ClientConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
             .with_protocol_versions(&[&rustls::version::TLS13])
@@ -309,7 +307,7 @@ impl TlsServerConfigBuilder {
         let key = load_private_key(&key_path)?;
 
         // Build base configuration
-        let mut config = ServerConfig::builder()
+        let config = ServerConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
             .with_protocol_versions(&[&rustls::version::TLS13])
@@ -320,7 +318,7 @@ impl TlsServerConfigBuilder {
             })?;
 
         // Configure client authentication if required
-        let mut config = if self.require_client_auth {
+        let config = if self.require_client_auth {
             let ca_path = self.client_ca_path.ok_or_else(|| TlsError::ConfigError {
                 reason: "Client CA path not set but client auth is required".to_string(),
                 #[cfg(feature = "backtrace")]
@@ -343,11 +341,12 @@ impl TlsServerConfigBuilder {
             config.with_no_client_auth()
         };
 
-        config.with_single_cert(certs, key).map_err(|e| TlsError::InvalidCertificate {
-            reason: format!("Failed to set server certificate: {}", e),
-            #[cfg(feature = "backtrace")]
-            backtrace: std::backtrace::Backtrace::capture(),
-        })?;
+        let config =
+            config.with_single_cert(certs, key).map_err(|e| TlsError::InvalidCertificate {
+                reason: format!("Failed to set server certificate: {}", e),
+                #[cfg(feature = "backtrace")]
+                backtrace: std::backtrace::Backtrace::capture(),
+            })?;
 
         // Configure session resumption and 0-RTT
         if self.enable_session_resumption {

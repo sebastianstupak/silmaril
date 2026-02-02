@@ -152,25 +152,82 @@ else
 fi
 echo ""
 
-# 7. Check for examples/ directories in engine crates (CLAUDE.md Rule #10)
-echo "7. Checking for forbidden examples/ directories in engine crates..."
+# 7. Check for examples/ directories in engine crates (CLAUDE.md Rule #11)
+echo "7. Checking for forbidden examples/ directories..."
 FORBIDDEN_EXAMPLES=0
 
 # Check for files in engine/*/examples/ (but not engine/shared/examples/)
-FORBIDDEN_EXAMPLE_FILES=$(echo "$STAGED_FILES" | grep -E "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/" || true)
-if [ -n "$FORBIDDEN_EXAMPLE_FILES" ]; then
+FORBIDDEN_ENGINE_EXAMPLES=$(echo "$STAGED_FILES" | grep -E "^engine/[^/]+/examples/" | grep -vE "^engine/shared/examples/" || true)
+if [ -n "$FORBIDDEN_ENGINE_EXAMPLES" ]; then
     FORBIDDEN_EXAMPLES=1
     print_status 1 "Forbidden examples/ directory in engine crate"
-    echo "$FORBIDDEN_EXAMPLE_FILES" | sed 's/^/    /'
-else
-    print_status 0 "No forbidden examples/ directories"
+    echo "$FORBIDDEN_ENGINE_EXAMPLES" | sed 's/^/    /'
+fi
+
+# Check for non-game examples in top-level examples/ (CLAUDE.md Rule #11)
+# Allowed: examples/{singleplayer,mmorpg,moba,turn-based}/
+# Forbidden: examples/simple_demo, examples/ai_agent_debugger, etc.
+ALLOWED_EXAMPLES_PATTERN="^examples/(singleplayer|mmorpg|moba|turn-based)/"
+FORBIDDEN_ROOT_EXAMPLES=$(echo "$STAGED_FILES" | grep -E "^examples/" | grep -vE "$ALLOWED_EXAMPLES_PATTERN" || true)
+if [ -n "$FORBIDDEN_ROOT_EXAMPLES" ]; then
+    FORBIDDEN_EXAMPLES=1
+    print_status 1 "Forbidden non-game example in examples/"
+    echo "$FORBIDDEN_ROOT_EXAMPLES" | sed 's/^/    /'
+fi
+
+if [ $FORBIDDEN_EXAMPLES -eq 0 ]; then
+    print_status 0 "No forbidden examples/ files"
 fi
 
 if [ $FORBIDDEN_EXAMPLES -ne 0 ]; then
-    print_fix "Move examples to tests/ or benches/ (see CLAUDE.md Rule #10)"
+    print_fix "Move examples to tests/ or benches/ (see CLAUDE.md Rule #11)"
     echo "    For API demos → Add rustdoc examples in src/"
     echo "    For functionality → Write integration tests in tests/"
     echo "    For performance → Write benchmarks in benches/"
+    echo "    For full games only → Use examples/{singleplayer,mmorpg,moba,turn-based}/"
+    FAILED=1
+fi
+echo ""
+
+# 8. Check for performance tests in tests/ directory (CLAUDE.md Rule #10)
+echo "8. Checking for performance tests in wrong location..."
+MISPLACED_PERF=0
+
+# Check for performance-related filenames in tests/
+PERF_TEST_FILES=$(echo "$STAGED_FILES" | grep -E "^engine/.*/tests/.*performance.*\.rs$" || true)
+if [ -n "$PERF_TEST_FILES" ]; then
+    MISPLACED_PERF=1
+    print_status 1 "Performance test in tests/ directory (should be in benches/)"
+    echo "$PERF_TEST_FILES" | sed 's/^/    /'
+fi
+
+# Check for benchmark-related filenames in tests/
+BENCH_TEST_FILES=$(echo "$STAGED_FILES" | grep -E "^engine/.*/tests/.*(bench|benchmark).*\.rs$" || true)
+if [ -n "$BENCH_TEST_FILES" ]; then
+    MISPLACED_PERF=1
+    print_status 1 "Benchmark test in tests/ directory (should be in benches/)"
+    echo "$BENCH_TEST_FILES" | sed 's/^/    /'
+fi
+
+# Check staged .rs files in tests/ for Instant::now() (performance measurement)
+STAGED_TEST_FILES=$(echo "$STAGED_FILES" | grep -E "^engine/.*/tests/.*\.rs$" || true)
+if [ -n "$STAGED_TEST_FILES" ]; then
+    for file in $STAGED_TEST_FILES; do
+        if git diff --cached "$file" | grep -qE '\+.*Instant::now\(\)'; then
+            MISPLACED_PERF=1
+            print_status 1 "Performance measurement (Instant::now) in tests/: $file"
+            echo "    Line: $(git diff --cached "$file" | grep -E '\+.*Instant::now\(\)' | head -1)"
+        fi
+    done
+fi
+
+if [ $MISPLACED_PERF -eq 0 ]; then
+    print_status 0 "No performance tests in wrong location"
+else
+    print_fix "Move performance tests to benches/ (see CLAUDE.md Rule #10)"
+    echo "    Tests verify correctness → tests/"
+    echo "    Benchmarks measure performance → benches/"
+    echo "    If both needed → Split into 2 files"
     FAILED=1
 fi
 echo ""

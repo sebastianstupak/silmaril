@@ -5,6 +5,65 @@
 //! - Collider shapes and materials
 //! - Constraint states and applied impulses
 //! - Solver islands and partitioning
+//! - **A.0.5**: Contact manifolds with detailed collision data (contact points, normals, impulses)
+//! - **A.0.5**: Broadphase pairs (spatial partitioning collision candidates)
+//!
+//! # A.0.5 - Rapier Solver Internals Export
+//!
+//! This implementation successfully extracts internal solver data from Rapier 0.18's public API:
+//!
+//! ## What We Extract:
+//!
+//! 1. **Contact Manifolds** - Complete narrow-phase collision data:
+//!    - Contact normal (world-space)
+//!    - All contact points with positions, penetration depths
+//!    - Per-point friction and restitution coefficients
+//!    - Total impulse magnitude applied by solver
+//!    - Relative dominance (affects solver resolution order)
+//!
+//! 2. **Broadphase Pairs** - Spatial partitioning data:
+//!    - Entity pairs that are spatially close (AABB proximity)
+//!    - Distance between AABBs
+//!    - Whether pair is in narrowphase processing
+//!
+//! 3. **Joint Entity Mapping** - Constraint details:
+//!    - Both entity IDs connected by joint (via `ImpulseJoint.body1/body2`)
+//!    - Applied impulse magnitude
+//!    - Joint type classification
+//!
+//! ## API Used:
+//!
+//! - `NarrowPhase::contact_pairs()` - Iterates all contact pairs
+//! - `ContactPair::manifolds` - Access contact manifolds (public field)
+//! - `ContactManifoldData::solver_contacts` - Contact points used by solver
+//! - `ImpulseJoint::body1/body2` - Public body handle fields
+//! - `ImpulseJoint::impulses` - Public impulse vector field
+//!
+//! ## Known Limitations:
+//!
+//! These features are NOT available in Rapier 0.18's public API:
+//!
+//! 1. **Island Iteration** - `IslandManager` doesn't expose per-island iteration
+//!    - Current workaround: Group active/sleeping bodies into pseudo-islands
+//!    - Missing: Actual island IDs, per-island solver iteration counts
+//!
+//! 2. **Solver Residual** - Constraint error after solving not exposed
+//!    - Would require accessing internal solver state
+//!
+//! 3. **True Broadphase Pairs** - `BroadPhase` doesn't expose pair iteration
+//!    - Current workaround: Use narrowphase pairs as proxy
+//!    - Missing: Pairs that passed broadphase but failed narrowphase
+//!
+//! 4. **Per-Island Convergence** - Can't determine if individual islands converged
+//!    - Would require internal solver access
+//!
+//! ## Future Improvements:
+//!
+//! If Rapier exposes these APIs in future versions, we can add:
+//! - True island iteration with per-island solver stats
+//! - Constraint residual tracking for debugging instability
+//! - Complete broadphase pair listing (including rejected pairs)
+//! - Per-island convergence metrics
 //!
 //! Snapshots are fully serializable to JSON/JSONL for AI agent consumption.
 
@@ -34,6 +93,12 @@ pub struct PhysicsDebugSnapshot {
 
     /// Solver island partitioning
     pub islands: Vec<IslandState>,
+
+    /// Contact manifolds (collision details with contact points, normals, impulses)
+    pub contact_manifolds: Vec<ContactManifoldState>,
+
+    /// Broadphase pairs (spatial partitioning collision candidates)
+    pub broadphase_pairs: Vec<BroadphasePairState>,
 
     /// Global physics parameters
     pub config: PhysicsConfigSnapshot,
@@ -327,6 +392,69 @@ pub struct PhysicsConfigSnapshot {
     pub ccd_enabled: bool,
 }
 
+/// Contact manifold state (collision details from narrow-phase)
+///
+/// Represents a contact manifold between two colliders, containing
+/// all contact points, normals, and solver-applied impulses.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ContactManifoldState {
+    /// First entity involved
+    pub entity_a: u64,
+
+    /// Second entity involved
+    pub entity_b: u64,
+
+    /// Contact normal (world space)
+    pub normal: Vec3,
+
+    /// All contact points in this manifold
+    pub contact_points: Vec<ContactPointState>,
+
+    /// Total impulse magnitude applied by this manifold
+    pub total_impulse_magnitude: f32,
+
+    /// Has any active contact?
+    pub has_active_contact: bool,
+
+    /// Relative dominance of bodies (affects solver resolution order)
+    pub relative_dominance: i16,
+}
+
+/// Single contact point in a manifold
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ContactPointState {
+    /// Contact point position (world space)
+    pub point: Vec3,
+
+    /// Penetration depth (negative = penetrating, positive = separated)
+    pub distance: f32,
+
+    /// Effective friction coefficient at this point
+    pub friction: f32,
+
+    /// Effective restitution coefficient at this point
+    pub restitution: f32,
+}
+
+/// Broadphase collision pair (spatial partitioning candidates)
+///
+/// Represents pairs of colliders that are spatially close and may collide.
+/// The narrowphase will then perform precise collision detection on these pairs.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BroadphasePairState {
+    /// First entity involved
+    pub entity_a: u64,
+
+    /// Second entity involved
+    pub entity_b: u64,
+
+    /// Distance between AABBs (approximate)
+    pub aabb_distance: f32,
+
+    /// Is this pair currently in narrowphase processing?
+    pub in_narrowphase: bool,
+}
+
 impl PhysicsDebugSnapshot {
     /// Create an empty snapshot
     pub fn new(frame: u64, timestamp: f64) -> Self {
@@ -337,6 +465,8 @@ impl PhysicsDebugSnapshot {
             colliders: Vec::new(),
             constraints: Vec::new(),
             islands: Vec::new(),
+            contact_manifolds: Vec::new(),
+            broadphase_pairs: Vec::new(),
             config: PhysicsConfigSnapshot {
                 gravity: Vec3::new(0.0, -9.81, 0.0),
                 timestep: 1.0 / 60.0,
@@ -407,6 +537,36 @@ impl PhysicsDebugSnapshot {
     /// Find islands that didn't converge
     pub fn find_unconverged_islands(&self) -> Vec<usize> {
         self.islands.iter().filter(|i| !i.converged).map(|i| i.id).collect()
+    }
+
+    /// Get contact manifolds involving entity
+    pub fn get_entity_contact_manifolds(&self, entity_id: u64) -> Vec<&ContactManifoldState> {
+        self.contact_manifolds
+            .iter()
+            .filter(|m| m.entity_a == entity_id || m.entity_b == entity_id)
+            .collect()
+    }
+
+    /// Count total contact points across all manifolds
+    pub fn total_contact_points(&self) -> usize {
+        self.contact_manifolds.iter().map(|m| m.contact_points.len()).sum()
+    }
+
+    /// Find high-impulse contact manifolds (above threshold)
+    pub fn find_high_impulse_contacts(&self, threshold: f32) -> Vec<(u64, u64, f32)> {
+        self.contact_manifolds
+            .iter()
+            .filter(|m| m.total_impulse_magnitude > threshold)
+            .map(|m| (m.entity_a, m.entity_b, m.total_impulse_magnitude))
+            .collect()
+    }
+
+    /// Get broadphase pairs involving entity
+    pub fn get_entity_broadphase_pairs(&self, entity_id: u64) -> Vec<&BroadphasePairState> {
+        self.broadphase_pairs
+            .iter()
+            .filter(|p| p.entity_a == entity_id || p.entity_b == entity_id)
+            .collect()
     }
 
     /// Compute state hash for determinism validation

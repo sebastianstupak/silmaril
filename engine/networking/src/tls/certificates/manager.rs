@@ -4,12 +4,11 @@
 
 use crate::tls::error::{TlsError, TlsResult};
 use parking_lot::RwLock;
-use rustls::Certificate;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Certificate status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,7 +137,7 @@ impl CertificateManager {
     }
 
     /// Parse certificate PEM to extract information
-    fn parse_certificate_info(&self, domain: &str, cert_pem: &str) -> TlsResult<CertificateInfo> {
+    fn parse_certificate_info(&self, domain: &str, _cert_pem: &str) -> TlsResult<CertificateInfo> {
         // For now, we'll use x509-parser to extract certificate details
         // This is a simplified implementation - a production version would use a full X.509 parser
 

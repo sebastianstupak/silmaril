@@ -89,7 +89,7 @@ impl AcmeClient {
                     backtrace: std::backtrace::Backtrace::capture(),
                 })?;
 
-            Account::from_credentials(credentials).await.map_err(|e| TlsError::Acme {
+            Account::from_credentials(credentials).map_err(|e| TlsError::Acme {
                 reason: format!("Failed to restore account from credentials: {}", e),
                 #[cfg(feature = "backtrace")]
                 backtrace: std::backtrace::Backtrace::capture(),
@@ -104,7 +104,7 @@ impl AcmeClient {
                 LetsEncrypt::Production.url()
             };
 
-            let (account, credentials) = Account::create(
+            let new_account = Account::create(
                 &NewAccount {
                     contact: &[&format!("mailto:{}", self.config.email)],
                     terms_of_service_agreed: true,
@@ -120,7 +120,8 @@ impl AcmeClient {
                 backtrace: std::backtrace::Backtrace::capture(),
             })?;
 
-            // Save account credentials
+            // Save account credentials (get from account)
+            let credentials = new_account.credentials();
             let credentials_json =
                 serde_json::to_string_pretty(&credentials).map_err(|e| TlsError::Acme {
                     reason: format!("Failed to serialize account credentials: {}", e),
@@ -136,7 +137,7 @@ impl AcmeClient {
 
             info!(path = ?account_path, "ACME account credentials saved");
 
-            account
+            new_account
         };
 
         self.account = Some(account);
@@ -198,7 +199,7 @@ impl AcmeClient {
 
                     // Get challenge token and key authorization
                     let token = &challenge.token;
-                    let key_auth = order.key_authorization(challenge);
+                    let _key_auth = order.key_authorization(challenge);
 
                     info!(
                         domain = %domain,
@@ -242,21 +243,17 @@ impl AcmeClient {
                             });
                         }
 
-                        let authz = order
-                            .refresh()
-                            .await
-                            .map_err(|e| TlsError::Acme {
-                                reason: format!("Failed to refresh order: {}", e),
-                                #[cfg(feature = "backtrace")]
-                                backtrace: std::backtrace::Backtrace::capture(),
-                            })?
-                            .authorizations()
-                            .await
-                            .map_err(|e| TlsError::Acme {
-                                reason: format!("Failed to get authorizations: {}", e),
-                                #[cfg(feature = "backtrace")]
-                                backtrace: std::backtrace::Backtrace::capture(),
-                            })?;
+                        let _state = order.refresh().await.map_err(|e| TlsError::Acme {
+                            reason: format!("Failed to refresh order: {}", e),
+                            #[cfg(feature = "backtrace")]
+                            backtrace: std::backtrace::Backtrace::capture(),
+                        })?;
+
+                        let authz = order.authorizations().await.map_err(|e| TlsError::Acme {
+                            reason: format!("Failed to get authorizations: {}", e),
+                            #[cfg(feature = "backtrace")]
+                            backtrace: std::backtrace::Backtrace::capture(),
+                        })?;
 
                         if let Some(authz) = authz.first() {
                             match authz.status {
@@ -413,7 +410,6 @@ impl AcmeClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
 
     #[test]
     fn test_acme_config_creation() {

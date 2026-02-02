@@ -51,6 +51,7 @@ pub use events::{EventRecorder, EventStatistics, PhysicsEvent, WakeReason};
 pub use exporters::{CsvExporter, ExportError, JsonlExporter, SqliteExporter};
 pub use query::{PhysicsQueryAPI, QueryError, QueryResult};
 pub use snapshot::{
-    ColliderState, ConstraintState, ConstraintType, EntityState, IslandState, MaterialState,
-    PhysicsConfigSnapshot, PhysicsDebugSnapshot, ShapeParams, ShapeType, AABB,
+    BroadphasePairState, ColliderState, ConstraintState, ConstraintType, ContactManifoldState,
+    ContactPointState, EntityState, IslandState, MaterialState, PhysicsConfigSnapshot,
+    PhysicsDebugSnapshot, ShapeParams, ShapeType, AABB,
 };

@@ -176,6 +176,22 @@ pub enum ErrorCode {
     InvalidTransform = 1347,
     /// Draw call has zero vertices
     ZeroVertices = 1348,
+    /// Debug data export failed (I/O error)
+    DebugExportIo = 1349,
+    /// Debug data serialization failed
+    DebugExportSerialization = 1350,
+    /// Debug database operation failed
+    DebugExportDatabase = 1351,
+    /// PNG encoding failed
+    DebugExportPngEncoding = 1352,
+    /// Failed to read color buffer for frame capture
+    DebugCaptureColorBufferReadFailed = 1353,
+    /// Failed to read depth buffer for frame capture
+    DebugCaptureDepthBufferReadFailed = 1354,
+    /// Frame dimensions mismatch
+    DebugCaptureDimensionMismatch = 1355,
+    /// Invalid frame data
+    DebugCaptureInvalidFrameData = 1356,
 
     // Networking (1400-1499)
     /// Network connection failed

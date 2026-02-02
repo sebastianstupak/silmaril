@@ -66,3 +66,7 @@ harness = false
 [[bench]]
 name = "advanced_benches"
 harness = false
+
+[[bench]]
+name = "agentic_debug_benches"
+harness = false

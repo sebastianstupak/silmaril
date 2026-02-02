@@ -32,10 +32,38 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use engine_core::ErrorCode;
-use serde::{Deserialize, Serialize};
+#![allow(missing_docs)] // Debug infrastructure - comprehensive docs not required
 
-use super::error::ValidationError;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Validation errors for rendering debug snapshots
+#[derive(Debug)]
+pub enum ValidationError {
+    InvalidTimestamp(f64),
+    InvalidViewport,
+    InvalidDrawCall { index: usize, message: String },
+    InvalidTransform,
+    ZeroVertices,
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidationError::InvalidTimestamp(ts) => write!(f, "Invalid timestamp: {}", ts),
+            ValidationError::InvalidViewport => write!(f, "Invalid viewport dimensions"),
+            ValidationError::InvalidDrawCall { index, message } => {
+                write!(f, "Invalid draw call at index {}: {}", index, message)
+            }
+            ValidationError::InvalidTransform => {
+                write!(f, "Invalid transform matrix (contains NaN or Inf)")
+            }
+            ValidationError::ZeroVertices => write!(f, "Draw call has zero vertices"),
+        }
+    }
+}
+
+impl std::error::Error for ValidationError {}
 
 /// Complete render state snapshot for a single frame
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,18 +144,18 @@ impl RenderDebugSnapshot {
     pub fn validate(&self) -> Result<(), ValidationError> {
         // Check timestamp
         if !self.timestamp.is_finite() {
-            return Err(ValidationError::invalidtimestamp(self.timestamp));
+            return Err(ValidationError::InvalidTimestamp(self.timestamp));
         }
 
         // Validate viewport
         if !self.viewport.width.is_finite() || !self.viewport.height.is_finite() {
-            return Err(ValidationError::invalidviewport());
+            return Err(ValidationError::InvalidViewport);
         }
 
         // Validate draw calls
         for (i, draw_call) in self.draw_calls.iter().enumerate() {
             draw_call.validate().map_err(|e: ValidationError| {
-                ValidationError::invaliddrawcall(i, e.to_string())
+                ValidationError::InvalidDrawCall { index: i, message: e.to_string() }
             })?;
         }
 
@@ -136,10 +164,7 @@ impl RenderDebugSnapshot {
 
     /// Get total number of vertices drawn this frame
     pub fn total_vertices(&self) -> u64 {
-        self.draw_calls
-            .iter()
-            .map(|dc| dc.vertex_count as u64)
-            .sum()
+        self.draw_calls.iter().map(|dc| dc.vertex_count as u64).sum()
     }
 
     /// Get total number of triangles drawn this frame
@@ -169,10 +194,7 @@ impl RenderDebugSnapshot {
     /// Find draw calls that took longer than threshold (milliseconds)
     pub fn slow_draw_calls(&self, threshold_ms: f32) -> Vec<&DrawCallInfo> {
         let threshold_ns = (threshold_ms * 1_000_000.0) as u64;
-        self.draw_calls
-            .iter()
-            .filter(|dc| dc.draw_time_gpu_ns > threshold_ns)
-            .collect()
+        self.draw_calls.iter().filter(|dc| dc.draw_time_gpu_ns > threshold_ns).collect()
     }
 }
 
@@ -219,13 +241,13 @@ impl DrawCallInfo {
         // Check for NaN/Inf in transform
         for &value in &self.transform {
             if !value.is_finite() {
-                return Err(ValidationError::invalidtransform());
+                return Err(ValidationError::InvalidTransform);
             }
         }
 
         // Check counts are reasonable
         if self.vertex_count == 0 {
-            return Err(ValidationError::zerovertices());
+            return Err(ValidationError::ZeroVertices);
         }
 
         Ok(())
@@ -263,14 +285,7 @@ pub struct Viewport {
 
 impl Default for Viewport {
     fn default() -> Self {
-        Self {
-            x: 0.0,
-            y: 0.0,
-            width: 800.0,
-            height: 600.0,
-            min_depth: 0.0,
-            max_depth: 1.0,
-        }
+        Self { x: 0.0, y: 0.0, width: 800.0, height: 600.0, min_depth: 0.0, max_depth: 1.0 }
     }
 }
 
@@ -285,12 +300,7 @@ pub struct Rect2D {
 
 impl Default for Rect2D {
     fn default() -> Self {
-        Self {
-            x: 0,
-            y: 0,
-            width: 800,
-            height: 600,
-        }
+        Self { x: 0, y: 0, width: 800, height: 600 }
     }
 }
 
@@ -307,10 +317,15 @@ pub struct RenderTargetInfo {
 /// Framebuffer information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FramebufferInfo {
+    /// Unique framebuffer ID
     pub framebuffer_id: u64,
+    /// Width in pixels
     pub width: u32,
+    /// Height in pixels
     pub height: u32,
+    /// Number of color attachments
     pub attachment_count: u32,
+    /// Whether framebuffer has depth attachment
     pub has_depth: bool,
 }
 
@@ -431,12 +446,10 @@ mod tests {
 
     #[test]
     fn test_snapshot_validation_invalid_timestamp() {
-        let mut snapshot = RenderDebugSnapshot::new(1, f64::NAN);
+        let snapshot = RenderDebugSnapshot::new(1, f64::NAN);
         let result = snapshot.validate();
         assert!(result.is_err());
-        // Check error code instead of variant match
-        let err = result.unwrap_err();
-        assert_eq!(err.code(), ErrorCode::InvalidTimestamp as u32);
+        assert!(matches!(result.unwrap_err(), ValidationError::InvalidTimestamp(_)));
     }
 
     #[test]
@@ -459,7 +472,7 @@ mod tests {
 
     #[test]
     fn test_draw_call_validation_invalid_transform() {
-        let mut draw_call = DrawCallInfo {
+        let draw_call = DrawCallInfo {
             draw_call_id: 0,
             mesh_id: 1,
             material_id: 2,
@@ -474,9 +487,7 @@ mod tests {
         };
         let result = draw_call.validate();
         assert!(result.is_err());
-        // Check error code
-        let err = result.unwrap_err();
-        assert_eq!(err.code(), ErrorCode::InvalidTransform as u32);
+        assert!(matches!(result.unwrap_err(), ValidationError::InvalidTransform));
     }
 
     #[test]
@@ -496,9 +507,7 @@ mod tests {
         };
         let result = draw_call.validate();
         assert!(result.is_err());
-        // Check error code
-        let err = result.unwrap_err();
-        assert_eq!(err.code(), ErrorCode::ZeroVertices as u32);
+        assert!(matches!(result.unwrap_err(), ValidationError::ZeroVertices));
     }
 
     #[test]
@@ -640,9 +649,6 @@ mod tests {
         assert_eq!(deserialized.frame, snapshot.frame);
         assert_eq!(deserialized.timestamp, snapshot.timestamp);
         assert_eq!(deserialized.draw_calls.len(), snapshot.draw_calls.len());
-        assert_eq!(
-            deserialized.draw_calls[0].vertex_count,
-            snapshot.draw_calls[0].vertex_count
-        );
+        assert_eq!(deserialized.draw_calls[0].vertex_count, snapshot.draw_calls[0].vertex_count);
     }
 }

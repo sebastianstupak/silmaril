@@ -100,7 +100,10 @@
       "Bash(./test_shader_standalone.exe:*)",
       "Bash(Select-String -Pattern \"test result|running\")",
       "Bash(Select-Object -First 20)",
-      "Bash(timeout 15 tail:*)"
+      "Bash(timeout 15 tail:*)",
+      "Bash(for file in certificates/acme.rs certificates/manager.rs certificates/selfsigned.rs config.rs tcp.rs udp.rs)",
+      "Bash(do sed -i '/#\\\\[cfg\\(feature = \"\"backtrace\"\"\\)\\\\]/d; /backtrace: std::backtrace::Backtrace::capture\\(\\),/d' \"$file\")",
+      "Bash(git mv:*)"
     ]
   }
 }

@@ -52,9 +52,9 @@
 //! ChaCha20-Poly1305 AEAD cipher. Suitable when you control both endpoints.
 
 use super::error::{TlsError, TlsResult};
-use crate::udp::{UdpClient, UdpServer, UdpSocket};
+use crate::udp::UdpSocket;
 use std::net::SocketAddr;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Encrypted UDP client (application-level encryption)
 ///

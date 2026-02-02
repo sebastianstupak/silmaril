@@ -202,6 +202,47 @@ impl SqliteExporter {
                     FOREIGN KEY (frame) REFERENCES snapshots(frame)
                 );
 
+                -- Contact manifolds (A.0.5: Narrow-phase collision details)
+                CREATE TABLE IF NOT EXISTS contact_manifolds (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    frame INTEGER NOT NULL,
+                    entity_a INTEGER NOT NULL,
+                    entity_b INTEGER NOT NULL,
+                    normal_x REAL NOT NULL,
+                    normal_y REAL NOT NULL,
+                    normal_z REAL NOT NULL,
+                    total_impulse_magnitude REAL NOT NULL,
+                    has_active_contact INTEGER NOT NULL,
+                    relative_dominance INTEGER NOT NULL,
+                    FOREIGN KEY (frame) REFERENCES snapshots(frame)
+                );
+
+                -- Contact points within manifolds
+                CREATE TABLE IF NOT EXISTS contact_points (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    manifold_id INTEGER NOT NULL,
+                    frame INTEGER NOT NULL,
+                    point_x REAL NOT NULL,
+                    point_y REAL NOT NULL,
+                    point_z REAL NOT NULL,
+                    distance REAL NOT NULL,
+                    friction REAL NOT NULL,
+                    restitution REAL NOT NULL,
+                    FOREIGN KEY (manifold_id) REFERENCES contact_manifolds(id),
+                    FOREIGN KEY (frame) REFERENCES snapshots(frame)
+                );
+
+                -- Broadphase pairs (A.0.5: Spatial partitioning data)
+                CREATE TABLE IF NOT EXISTS broadphase_pairs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    frame INTEGER NOT NULL,
+                    entity_a INTEGER NOT NULL,
+                    entity_b INTEGER NOT NULL,
+                    aabb_distance REAL NOT NULL,
+                    in_narrowphase INTEGER NOT NULL,
+                    FOREIGN KEY (frame) REFERENCES snapshots(frame)
+                );
+
                 -- Indices for common queries
                 CREATE INDEX IF NOT EXISTS idx_entity_states_entity
                     ON entity_states(entity_id, frame);
@@ -217,6 +258,21 @@ impl SqliteExporter {
 
                 CREATE INDEX IF NOT EXISTS idx_events_frame
                     ON events(frame);
+
+                CREATE INDEX IF NOT EXISTS idx_contact_manifolds_frame
+                    ON contact_manifolds(frame);
+
+                CREATE INDEX IF NOT EXISTS idx_contact_manifolds_entities
+                    ON contact_manifolds(entity_a, entity_b, frame);
+
+                CREATE INDEX IF NOT EXISTS idx_contact_points_manifold
+                    ON contact_points(manifold_id);
+
+                CREATE INDEX IF NOT EXISTS idx_broadphase_pairs_frame
+                    ON broadphase_pairs(frame);
+
+                CREATE INDEX IF NOT EXISTS idx_broadphase_pairs_entities
+                    ON broadphase_pairs(entity_a, entity_b, frame);
                 "#,
             )
             .map_err(|e| ExportError::DatabaseError {
@@ -292,6 +348,100 @@ impl SqliteExporter {
                 ])
                 .map_err(|e| ExportError::DatabaseError {
                     reason: format!("Failed to insert entity {}: {}", entity.id, e),
+                })?;
+            }
+        }
+
+        // Insert contact manifolds (A.0.5)
+        {
+            let mut manifold_stmt = tx
+                .prepare(
+                    "INSERT INTO contact_manifolds
+                    (frame, entity_a, entity_b, normal_x, normal_y, normal_z, total_impulse_magnitude, has_active_contact, relative_dominance)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                )
+                .map_err(|e| ExportError::DatabaseError {
+                    reason: format!("Failed to prepare manifold insert: {}", e),
+                })?;
+
+            let mut point_stmt = tx
+                .prepare(
+                    "INSERT INTO contact_points
+                    (manifold_id, frame, point_x, point_y, point_z, distance, friction, restitution)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                )
+                .map_err(|e| ExportError::DatabaseError {
+                    reason: format!("Failed to prepare contact point insert: {}", e),
+                })?;
+
+            for manifold in &snapshot.contact_manifolds {
+                // Insert manifold and get its ID
+                manifold_stmt
+                    .execute(rusqlite::params![
+                        snapshot.frame as i64,
+                        manifold.entity_a as i64,
+                        manifold.entity_b as i64,
+                        manifold.normal.x,
+                        manifold.normal.y,
+                        manifold.normal.z,
+                        manifold.total_impulse_magnitude,
+                        manifold.has_active_contact as i32,
+                        manifold.relative_dominance as i32,
+                    ])
+                    .map_err(|e| ExportError::DatabaseError {
+                        reason: format!(
+                            "Failed to insert manifold for entities {} and {}: {}",
+                            manifold.entity_a, manifold.entity_b, e
+                        ),
+                    })?;
+
+                let manifold_id = tx.last_insert_rowid();
+
+                // Insert contact points for this manifold
+                for point in &manifold.contact_points {
+                    point_stmt
+                        .execute(rusqlite::params![
+                            manifold_id,
+                            snapshot.frame as i64,
+                            point.point.x,
+                            point.point.y,
+                            point.point.z,
+                            point.distance,
+                            point.friction,
+                            point.restitution,
+                        ])
+                        .map_err(|e| ExportError::DatabaseError {
+                            reason: format!("Failed to insert contact point: {}", e),
+                        })?;
+                }
+            }
+        }
+
+        // Insert broadphase pairs (A.0.5)
+        {
+            let mut stmt = tx
+                .prepare(
+                    "INSERT INTO broadphase_pairs
+                    (frame, entity_a, entity_b, aabb_distance, in_narrowphase)
+                    VALUES (?1, ?2, ?3, ?4, ?5)",
+                )
+                .map_err(|e| ExportError::DatabaseError {
+                    reason: format!("Failed to prepare broadphase pair insert: {}", e),
+                })?;
+
+            for pair in &snapshot.broadphase_pairs {
+                stmt.execute(rusqlite::params![
+                    snapshot.frame as i64,
+                    pair.entity_a as i64,
+                    pair.entity_b as i64,
+                    pair.aabb_distance,
+                    pair.in_narrowphase as i32,
+                ])
+                .map_err(|e| ExportError::DatabaseError {
+                    reason: format!(
+                        "Failed to insert broadphase pair for entities {} and {}: {}",
+                        pair.entity_a, pair.entity_b, e
+                    ),
                 })?;
             }
         }

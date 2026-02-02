@@ -6,6 +6,7 @@
 //! 3. Use query API to analyze data
 //! 4. Detect divergence between simulations
 //! 5. Verify AI agent can debug issues autonomously
+//! 6. Extract Rapier solver internals (A.0.5): contact manifolds, broadphase pairs
 
 use engine_math::{Quat, Vec3};
 use engine_physics::agentic_debug::WakeReason;
@@ -334,4 +335,165 @@ fn test_large_scale_export() {
     // Query entity history (should be fast)
     let history = query_api.entity_history(50, 0, 999).unwrap();
     assert_eq!(history.len(), 1000);
+}
+
+/// Test: A.0.5 - Extract Rapier solver internals (contact manifolds, broadphase pairs)
+#[test]
+fn test_solver_internals_extraction() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let mut world = PhysicsWorld::new(PhysicsConfig::default());
+
+    // Create collision scenario: ground + two boxes that will collide
+    world.add_rigidbody(0, &RigidBody::static_body(), Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY);
+    world.add_collider(0, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
+
+    world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 5.0, 0.0), Quat::IDENTITY);
+    world.add_collider(1, &Collider::box_collider(Vec3::new(0.5, 0.5, 0.5)));
+
+    world.add_rigidbody(2, &RigidBody::dynamic(1.0), Vec3::new(0.0, 7.0, 0.0), Quat::IDENTITY);
+    world.add_collider(2, &Collider::box_collider(Vec3::new(0.5, 0.5, 0.5)));
+
+    // Run simulation until collision happens
+    let dt = 1.0 / 60.0;
+    let mut found_contact = false;
+
+    for frame in 0..120 {
+        world.step(dt);
+
+        let snapshot = world.create_debug_snapshot(frame);
+
+        // Check for contact manifolds (A.0.5 feature)
+        if !snapshot.contact_manifolds.is_empty() {
+            found_contact = true;
+
+            println!(
+                "Frame {}: Found {} contact manifolds, {} contact points, {} broadphase pairs",
+                frame,
+                snapshot.contact_manifolds.len(),
+                snapshot.total_contact_points(),
+                snapshot.broadphase_pairs.len()
+            );
+
+            // Verify contact manifold structure
+            for manifold in &snapshot.contact_manifolds {
+                // Entities should be valid (not 0)
+                assert!(manifold.entity_a > 0 || manifold.entity_b > 0);
+
+                // Contact normal should be normalized (approximately)
+                let normal_length = manifold.normal.length();
+                assert!(normal_length > 0.9 && normal_length < 1.1);
+
+                // Contact points should have valid data
+                for point in &manifold.contact_points {
+                    // Friction and restitution should be in valid range
+                    assert!(point.friction >= 0.0);
+                    assert!(point.restitution >= 0.0 && point.restitution <= 1.0);
+
+                    // Point should be finite
+                    assert!(point.point.is_finite());
+                }
+            }
+
+            // Verify broadphase pairs
+            for pair in &snapshot.broadphase_pairs {
+                assert!(pair.entity_a > 0 || pair.entity_b > 0);
+                assert!(pair.aabb_distance >= 0.0);
+                assert!(pair.in_narrowphase); // Should be true since we iterate narrowphase pairs
+            }
+
+            // Test helper methods
+            let manifolds_for_entity_1 = snapshot.get_entity_contact_manifolds(1);
+            assert!(!manifolds_for_entity_1.is_empty());
+
+            let high_impulse_contacts = snapshot.find_high_impulse_contacts(0.0);
+            assert!(!high_impulse_contacts.is_empty());
+
+            let broadphase_for_entity_1 = snapshot.get_entity_broadphase_pairs(1);
+            assert!(!broadphase_for_entity_1.is_empty());
+
+            break;
+        }
+    }
+
+    assert!(found_contact, "Simulation should have produced contacts");
+
+    // === Test SQLite export of solver internals ===
+
+    let sqlite_path = temp_dir.path().join("solver_internals.db");
+    let mut sqlite_exporter = SqliteExporter::create(&sqlite_path).unwrap();
+
+    // Re-run and export
+    let mut world = PhysicsWorld::new(PhysicsConfig::default());
+    world.add_rigidbody(0, &RigidBody::static_body(), Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY);
+    world.add_collider(0, &Collider::box_collider(Vec3::new(10.0, 0.5, 10.0)));
+    world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 5.0, 0.0), Quat::IDENTITY);
+    world.add_collider(1, &Collider::box_collider(Vec3::new(0.5, 0.5, 0.5)));
+
+    for frame in 0..60 {
+        world.step(dt);
+        let snapshot = world.create_debug_snapshot(frame);
+        sqlite_exporter.write_snapshot(&snapshot).unwrap();
+    }
+
+    sqlite_exporter.optimize().unwrap();
+
+    // Verify data was inserted (basic check - detailed queries would require query API updates)
+    let conn = rusqlite::Connection::open(&sqlite_path).unwrap();
+
+    let manifold_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM contact_manifolds", [], |row| row.get(0))
+        .unwrap();
+    println!("Total contact manifolds in database: {}", manifold_count);
+
+    let point_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM contact_points", [], |row| row.get(0))
+        .unwrap();
+    println!("Total contact points in database: {}", point_count);
+
+    let pair_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM broadphase_pairs", [], |row| row.get(0))
+        .unwrap();
+    println!("Total broadphase pairs in database: {}", pair_count);
+
+    // Should have at least some data after 60 frames with collisions
+    assert!(manifold_count > 0, "Should have contact manifolds");
+    assert!(point_count > 0, "Should have contact points");
+    assert!(pair_count > 0, "Should have broadphase pairs");
+}
+
+/// Test: A.0.5 - Verify joint body handles are extracted correctly
+#[test]
+fn test_joint_entity_extraction() {
+    let mut world = PhysicsWorld::new(PhysicsConfig::default());
+
+    // Create two bodies connected by a joint
+    world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 5.0, 0.0), Quat::IDENTITY);
+    world.add_collider(1, &Collider::box_collider(Vec3::new(0.5, 0.5, 0.5)));
+
+    world.add_rigidbody(2, &RigidBody::dynamic(1.0), Vec3::new(0.0, 3.0, 0.0), Quat::IDENTITY);
+    world.add_collider(2, &Collider::box_collider(Vec3::new(0.5, 0.5, 0.5)));
+
+    // Add a fixed joint between them
+    let joint = Joint::Fixed(FixedJointConfig { anchor1: Vec3::ZERO, anchor2: Vec3::ZERO });
+    world.add_joint(1, 2, &joint);
+
+    // Step simulation
+    world.step(1.0 / 60.0);
+
+    // Create snapshot and verify joint entity mapping
+    let snapshot = world.create_debug_snapshot(0);
+
+    assert_eq!(snapshot.constraints.len(), 1);
+    let constraint = &snapshot.constraints[0];
+
+    // A.0.5: Entity IDs should now be correctly extracted (not 0)
+    assert!(constraint.entity_a == 1 || constraint.entity_a == 2);
+    assert!(constraint.entity_b == 1 || constraint.entity_b == 2);
+    assert_ne!(constraint.entity_a, constraint.entity_b);
+
+    println!(
+        "Joint connects entities {} and {} with impulse {}",
+        constraint.entity_a, constraint.entity_b, constraint.applied_impulse
+    );
 }

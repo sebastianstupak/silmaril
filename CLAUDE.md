@@ -381,9 +381,98 @@ ROADMAP.md                  ← Implementation progress (checkboxes only)
 
 ---
 
-### **10. NO examples/ Directories in Engine Crates - STRICTLY FORBIDDEN** ⚠️ **CRITICAL**
+### **10. Tests vs Benchmarks - Clear Separation (MANDATORY)** ⚠️ **CRITICAL**
 
-**Engine crates MUST NOT have `examples/` directories. Use tests or benchmarks instead.**
+**Tests and benchmarks serve different purposes and MUST be placed in the correct location.**
+
+#### **When to use tests/ (engine/{crate}/tests/)**
+
+**Purpose:** Verify correctness, functionality, edge cases, error handling
+
+```rust
+// ✅ CORRECT - Functional test in tests/
+#[test]
+fn test_raycast_hits_ground() {
+    let mut world = PhysicsWorld::new();
+    let hit = world.raycast(origin, direction);
+    assert!(hit.is_some());
+    assert_eq!(hit.unwrap().entity_id, ground_id);
+}
+```
+
+**Use tests/ for:**
+- ✅ Correctness validation (assert values, error conditions)
+- ✅ Edge case testing (empty inputs, boundary conditions)
+- ✅ Integration tests (multiple components working together)
+- ✅ Regression tests (prevent bugs from reappearing)
+- ✅ Error handling validation
+
+#### **When to use benches/ (engine/{crate}/benches/)**
+
+**Purpose:** Measure performance, track regressions, validate targets
+
+```rust
+// ✅ CORRECT - Performance benchmark in benches/
+fn bench_raycast_performance(c: &mut Criterion) {
+    let mut world = create_complex_scene();
+
+    c.bench_function("raycast_1000_objects", |b| {
+        b.iter(|| {
+            world.raycast(black_box(origin), black_box(direction))
+        });
+    });
+}
+```
+
+**Use benches/ for:**
+- ✅ Performance measurement (time, throughput, latency)
+- ✅ Scalability testing (1, 100, 1000, 10000 entities)
+- ✅ Regression tracking (ensure performance doesn't degrade)
+- ✅ Target validation (< 1ms, > 100 fps, etc.)
+- ✅ Profiling scenarios
+
+#### **FORBIDDEN: Mixing concerns**
+
+```rust
+// ❌ FORBIDDEN - Performance test in tests/
+#[test]
+fn test_snapshot_performance() {
+    let start = Instant::now();
+    let snapshot = world.create_debug_snapshot(0);
+    let elapsed = start.elapsed();
+
+    // This belongs in benches/, not tests/
+    println!("Took {:?}", elapsed);
+    assert!(elapsed < Duration::from_millis(1));
+}
+
+// ❌ FORBIDDEN - Functional test in benches/
+fn bench_raycast_correctness(c: &mut Criterion) {
+    c.bench_function("raycast", |b| {
+        b.iter(|| {
+            let hit = world.raycast(origin, direction);
+            // Don't test correctness in benchmarks!
+            assert!(hit.is_some());
+        });
+    });
+}
+```
+
+**Quick Decision Tree:**
+
+```
+Does it measure time/performance? → benches/
+Does it assert correctness? → tests/
+Does it measure AND assert? → Split into 2 files (1 test + 1 bench)
+```
+
+**Enforcement:** Code review MUST catch tests in wrong location
+
+---
+
+### **11. NO examples/ Directories in Engine Crates - STRICTLY FORBIDDEN** ⚠️ **CRITICAL**
+
+**Engine crates MUST NOT have `examples/` directories. Top-level examples/ MUST be full game demos only.**
 
 ```
 ❌ FORBIDDEN:
@@ -391,10 +480,14 @@ engine/physics/examples/      ← NO!
 engine/renderer/examples/     ← NO!
 engine/networking/examples/   ← NO!
 engine/interest/examples/     ← NO!
+examples/ai_agent_debugger/   ← NO! (not a full game)
+examples/simple_demo/         ← NO! (use test or benchmark)
 
-✅ CORRECT - Use tests or benchmarks:
-engine/physics/tests/         ← Integration tests
+✅ CORRECT:
+engine/physics/tests/         ← Functional tests
 engine/physics/benches/       ← Performance benchmarks
+examples/singleplayer/        ← Full game demo (OK)
+examples/mmorpg/              ← Full game demo (OK)
 ```
 
 **Why this is forbidden:**
@@ -402,6 +495,7 @@ engine/physics/benches/       ← Performance benchmarks
 - Examples can go stale and break
 - Examples duplicate test coverage
 - No clear ownership or maintenance
+- Examples blur the line between test/bench/demo
 
 **✅ What to do instead:**
 
@@ -410,8 +504,9 @@ engine/physics/benches/       ← Performance benchmarks
 | Demonstrate API usage | Documentation examples in rustdoc | `src/lib.rs` or `src/module.rs` |
 | Test functionality | Integration test | `engine/{crate}/tests/` |
 | Verify performance | Benchmark | `engine/{crate}/benches/` |
-| E2E demonstration | Top-level example game | `examples/` (root only) |
+| E2E demonstration | Top-level example game | `examples/` (root only, full games) |
 | Interactive demo | Test with `#[ignore]` flag | `engine/{crate}/tests/` |
+| Show debugging workflow | Benchmark with println | `engine/{crate}/benches/` |
 
 **Examples:**
 

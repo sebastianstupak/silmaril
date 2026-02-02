@@ -41,21 +41,22 @@
 //! - Export: Async, non-blocking
 //! - Query latency: < 10ms per query
 
-pub mod error;
+pub mod events;
+pub mod exporters;
 pub mod snapshot;
-// pub mod events;
-// pub mod exporters;
 // pub mod query;
-// pub mod capture;
+pub mod capture;
 
 // Re-export main types
-pub use error::ValidationError;
 pub use snapshot::{
-    DrawCallInfo, FramebufferInfo, GpuMemoryStats, QueueStateInfo, RenderDebugSnapshot,
-    RenderTargetInfo, ShaderStageInfo, TextureInfo, BufferInfo,
+    BufferInfo, DrawCallInfo, FramebufferInfo, GpuMemoryStats, QueueStateInfo, RenderDebugSnapshot,
+    RenderTargetInfo, ShaderStageInfo, TextureInfo, ValidationError,
 };
 
-// pub use events::{EventRecorder, RenderEvent};
-// pub use exporters::{JsonlExporter, SqliteExporter, PngExporter, ExportError};
+pub use events::{EventRecorder, RenderEvent};
+pub use exporters::{ExportError, JsonlExporter, PngExporter, SqliteExporter};
 // pub use query::{RenderingQueryAPI, QueryError};
-// pub use capture::{RenderingDebugger, FrameCaptureData, FrameDiff};
+pub use capture::{
+    Anomaly, CaptureError, DebugConfig, FrameCaptureData, FrameDiff, FrameMetadata, Rect,
+    RenderingDebugger,
+};
