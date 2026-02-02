@@ -13,6 +13,7 @@ engine-math = { path = "../math", features = ["serde", "simd"] }
 engine-macros = { path = "../macros" }
 agent-game-engine-profiling = { path = "../profiling", optional = true }
 puffin = { version = "0.19", optional = true }
+engine-renderer = { path = "../renderer", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 glam = "0.25"
@@ -26,6 +27,7 @@ sha2 = "0.10"
 [features]
 profiling = ["dep:agent-game-engine-profiling", "agent-game-engine-profiling/profiling-puffin", "puffin"]
 backtrace = []
+debug-render = ["dep:engine-renderer"]
 
 [build-dependencies]
 engine-build-utils = { path = "../build-utils" }

@@ -1183,6 +1183,43 @@ impl PhysicsWorld {
             }
         }
     }
+
+    // ===== Debug Rendering Accessors (Phase A.1) =====
+
+    /// Get reference to collider set (for debug rendering)
+    ///
+    /// # Note
+    ///
+    /// This is primarily used by the debug_render module when the `debug-render`
+    /// feature is enabled. Direct manipulation of colliders should be done via
+    /// the PhysicsWorld API methods.
+    #[cfg(feature = "debug-render")]
+    pub fn collider_set(&self) -> &ColliderSet {
+        &self.collider_set
+    }
+
+    /// Get reference to rigid body set (for debug rendering)
+    ///
+    /// # Note
+    ///
+    /// This is primarily used by the debug_render module when the `debug-render`
+    /// feature is enabled. Direct manipulation of bodies should be done via
+    /// the PhysicsWorld API methods.
+    #[cfg(feature = "debug-render")]
+    pub fn rigid_body_set(&self) -> &RigidBodySet {
+        &self.rigid_body_set
+    }
+
+    /// Get reference to impulse joint set (for debug rendering)
+    ///
+    /// # Note
+    ///
+    /// This is primarily used by the debug_render module when the `debug-render`
+    /// feature is enabled.
+    #[cfg(feature = "debug-render")]
+    pub fn impulse_joint_set(&self) -> &ImpulseJointSet {
+        &self.impulse_joint_set
+    }
 }
 
 /// Event collector using channels (thread-safe)

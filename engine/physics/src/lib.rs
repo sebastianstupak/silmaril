@@ -21,6 +21,10 @@ pub mod sync;
 pub mod systems;
 pub mod world;
 
+// Debug rendering (Phase A.1 - Visual Debugging)
+#[cfg(feature = "debug-render")]
+pub mod debug_render;
+
 // Re-exports
 pub use agentic_debug::{
     CsvExporter, DivergenceDetector, DivergenceReport, EntityDivergence, EntityState,
