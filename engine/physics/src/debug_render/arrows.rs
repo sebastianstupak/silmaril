@@ -29,10 +29,10 @@ pub struct VelocityRenderOptions {
 impl Default for VelocityRenderOptions {
     fn default() -> Self {
         Self {
-            scale: 0.2,                         // 1 m/s = 0.2m arrow
-            min_magnitude: 0.1,                 // Filter out very small velocities
-            max_magnitude: 50.0,                // Clamp extreme velocities
-            low_velocity_color: [0.0, 1.0, 0.0], // Green for slow
+            scale: 0.2,                           // 1 m/s = 0.2m arrow
+            min_magnitude: 0.1,                   // Filter out very small velocities
+            max_magnitude: 50.0,                  // Clamp extreme velocities
+            low_velocity_color: [0.0, 1.0, 0.0],  // Green for slow
             high_velocity_color: [1.0, 0.0, 0.0], // Red for fast
             show_linear: true,
             show_angular: false, // Angular velocity is complex to visualize
@@ -60,10 +60,10 @@ pub struct ForceRenderOptions {
 impl Default for ForceRenderOptions {
     fn default() -> Self {
         Self {
-            scale: 0.1,                       // Visual scaling
-            min_magnitude: 0.1,               // Filter small forces
-            force_color: [1.0, 1.0, 0.0],     // Yellow for forces
-            torque_color: [1.0, 0.0, 1.0],    // Magenta for torques
+            scale: 0.1,                    // Visual scaling
+            min_magnitude: 0.1,            // Filter small forces
+            force_color: [1.0, 1.0, 0.0],  // Yellow for forces
+            torque_color: [1.0, 0.0, 1.0], // Magenta for torques
             show_forces: true,
             show_torques: false, // Torques are complex to visualize
         }
@@ -198,12 +198,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add dynamic body with very small velocity
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::new(0.0, 1.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 1.0, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::ONE));
 
         // Set tiny velocity (below filter threshold)
@@ -217,11 +212,7 @@ mod tests {
         debug_renderer.begin_frame();
         debug_renderer.render_velocities(&world, &options);
 
-        assert_eq!(
-            debug_renderer.line_count(),
-            0,
-            "Should filter velocities below threshold"
-        );
+        assert_eq!(debug_renderer.line_count(), 0, "Should filter velocities below threshold");
     }
 
     #[test]
@@ -230,12 +221,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add dynamic body with significant velocity
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::new(0.0, 1.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 1.0, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::ONE));
 
         // Set significant velocity
@@ -245,11 +231,7 @@ mod tests {
         debug_renderer.render_velocities(&world, &VelocityRenderOptions::default());
 
         // Should render arrow (4 lines: 1 shaft + 3 head)
-        assert_eq!(
-            debug_renderer.line_count(),
-            4,
-            "Should render velocity arrow"
-        );
+        assert_eq!(debug_renderer.line_count(), 4, "Should render velocity arrow");
     }
 
     #[test]
@@ -258,12 +240,7 @@ mod tests {
         let mut debug_renderer = DebugRenderer::new(None);
 
         // Add body with low velocity
-        world.add_rigidbody(
-            1,
-            &RigidBody::dynamic(1.0),
-            Vec3::new(0.0, 1.0, 0.0),
-            Quat::IDENTITY,
-        );
+        world.add_rigidbody(1, &RigidBody::dynamic(1.0), Vec3::new(0.0, 1.0, 0.0), Quat::IDENTITY);
         world.add_collider(1, &Collider::box_collider(Vec3::ONE));
         world.set_velocity(1, Vec3::new(1.0, 0.0, 0.0), Vec3::ZERO);
 
@@ -279,10 +256,7 @@ mod tests {
         let lines = debug_renderer.end_frame();
 
         // Low velocity should be closer to green
-        assert!(
-            lines[0].color[1] > 0.8,
-            "Low velocity should be mostly green"
-        );
+        assert!(lines[0].color[1] > 0.8, "Low velocity should be mostly green");
 
         // Test with high velocity
         world.set_velocity(1, Vec3::new(45.0, 0.0, 0.0), Vec3::ZERO);

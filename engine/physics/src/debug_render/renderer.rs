@@ -33,11 +33,7 @@ impl DebugRenderer {
         let max_lines = max_lines.unwrap_or(100_000);
         debug!(max_lines, "Creating physics debug renderer");
 
-        Self {
-            lines: Vec::with_capacity(1024),
-            max_lines,
-            enabled: true,
-        }
+        Self { lines: Vec::with_capacity(1024), max_lines, enabled: true }
     }
 
     /// Begin a new frame
@@ -168,11 +164,7 @@ mod tests {
 
         // Add 20 lines (should only accept 10)
         for i in 0..20 {
-            renderer.add_line(
-                Vec3::ZERO,
-                Vec3::new(i as f32, 0.0, 0.0),
-                [1.0, 0.0, 0.0],
-            );
+            renderer.add_line(Vec3::ZERO, Vec3::new(i as f32, 0.0, 0.0), [1.0, 0.0, 0.0]);
         }
 
         assert_eq!(renderer.line_count(), 10, "Should enforce line limit");

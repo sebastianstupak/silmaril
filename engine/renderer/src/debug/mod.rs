@@ -41,11 +41,11 @@
 //! - Export: Async, non-blocking
 //! - Query latency: < 10ms per query
 
+pub mod capture;
 pub mod events;
 pub mod exporters;
+pub mod query;
 pub mod snapshot;
-// pub mod query;
-pub mod capture;
 
 // Re-export main types
 pub use snapshot::{
@@ -53,10 +53,13 @@ pub use snapshot::{
     RenderTargetInfo, ShaderStageInfo, TextureInfo, ValidationError,
 };
 
-pub use events::{EventRecorder, RenderEvent};
-pub use exporters::{ExportError, JsonlExporter, PngExporter, SqliteExporter};
-// pub use query::{RenderingQueryAPI, QueryError};
 pub use capture::{
     Anomaly, CaptureError, DebugConfig, FrameCaptureData, FrameDiff, FrameMetadata, Rect,
     RenderingDebugger,
+};
+pub use events::{EventRecorder, RenderEvent};
+pub use exporters::{ExportError, JsonlExporter, PngExporter, SqliteExporter};
+pub use query::{
+    BufferLifecycle, DatabaseStats, DrawCallError, ImageDiff, LeakedResource, QueryError,
+    RenderingQueryAPI, ShaderError, SwapchainEvent, TextureLifecycle, Value,
 };

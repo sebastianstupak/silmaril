@@ -39,27 +39,20 @@
 
 #![allow(missing_docs)] // Debug infrastructure - comprehensive docs not required
 
-use crate::debug::{DrawCallInfo, RenderDebugSnapshot, TextureInfo};
-use engine_core::{define_error, ErrorCode, ErrorSeverity};
+use crate::debug::RenderDebugSnapshot;
+use engine_core::{EngineError, ErrorCode, ErrorSeverity};
+use engine_macros::define_error;
 use rusqlite::{params, Connection};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
 define_error! {
-    /// Export errors for agentic debug data
     pub enum ExportError {
-        /// I/O error during export
         Io { details: String } = ErrorCode::DebugExportIo, ErrorSeverity::Error,
-
-        /// Serialization error during export
         Serialization { details: String } = ErrorCode::DebugExportSerialization, ErrorSeverity::Error,
-
-        /// Database operation failed during export
         Database { details: String } = ErrorCode::DebugExportDatabase, ErrorSeverity::Error,
-
-        /// PNG encoding error
         PngEncoding { details: String } = ErrorCode::DebugExportPngEncoding, ErrorSeverity::Error,
     }
 }
@@ -289,7 +282,7 @@ impl SqliteExporter {
                     texture.height,
                     texture.format,
                     texture.mip_levels,
-                    texture.memory_size_bytes,
+                    texture.memory_size,
                 ],
             )?;
         }
@@ -359,12 +352,13 @@ impl PngExporter {
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
 
-        let mut writer =
-            encoder.write_header().map_err(|e| ExportError::pngencoding(e.to_string()))?;
+        let mut writer = encoder
+            .write_header()
+            .map_err(|e: png::EncodingError| ExportError::pngencoding(e.to_string()))?;
 
         writer
             .write_image_data(color_data)
-            .map_err(|e| ExportError::pngencoding(e.to_string()))?;
+            .map_err(|e: png::EncodingError| ExportError::pngencoding(e.to_string()))?;
 
         Ok(())
     }
@@ -431,9 +425,7 @@ impl PngExporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::debug::{
-        BufferInfo, DrawCallInfo, GpuMemoryStats, RenderDebugSnapshot, TextureInfo,
-    };
+    use crate::debug::{DrawCallInfo, RenderDebugSnapshot, TextureInfo};
     use tempfile::TempDir;
 
     #[test]
@@ -541,8 +533,11 @@ mod tests {
         let mut stmt = conn
             .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             .unwrap();
-        let tables: Vec<String> =
-            stmt.query_map([], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
+        let tables: Vec<String> = stmt
+            .query_map([], |row: &rusqlite::Row| row.get(0))
+            .unwrap()
+            .map(|r: Result<String, _>| r.unwrap())
+            .collect();
 
         assert!(tables.contains(&"snapshots".to_string()));
         assert!(tables.contains(&"draw_calls".to_string()));
@@ -576,10 +571,11 @@ mod tests {
             texture_id: 10,
             width: 1024,
             height: 1024,
+            depth: 1,
             format: "RGBA8".to_string(),
             mip_levels: 1,
-            memory_size_bytes: 4194304,
-            usage_flags: vec!["SAMPLED".to_string()],
+            sample_count: 1,
+            memory_size: 4194304,
             created_frame: 1,
         });
 
@@ -590,15 +586,19 @@ mod tests {
 
         // Check snapshot
         let frame: u64 = conn
-            .query_row("SELECT frame FROM snapshots WHERE frame = 1", [], |row: &rusqlite::Row| row.get(0))
+            .query_row("SELECT frame FROM snapshots WHERE frame = 1", [], |row: &rusqlite::Row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(frame, 1);
 
         // Check draw call
         let mesh_id: u64 = conn
-            .query_row("SELECT mesh_id FROM draw_calls WHERE draw_call_id = 0", [], |row: &rusqlite::Row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT mesh_id FROM draw_calls WHERE draw_call_id = 0",
+                [],
+                |row: &rusqlite::Row| row.get(0),
+            )
             .unwrap();
         assert_eq!(mesh_id, 1);
 

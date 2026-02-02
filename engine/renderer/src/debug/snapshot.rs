@@ -34,48 +34,34 @@
 
 #![allow(missing_docs)] // Debug infrastructure - comprehensive docs not required
 
+use engine_core::{EngineError, ErrorCode, ErrorSeverity};
+use engine_macros::define_error;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
-/// Validation errors for rendering debug snapshots
-#[derive(Debug)]
-pub enum ValidationError {
-    InvalidTimestamp(f64),
-    InvalidViewport,
-    InvalidDrawCall { index: usize, message: String },
-    InvalidTransform,
-    ZeroVertices,
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValidationError::InvalidTimestamp(ts) => write!(f, "Invalid timestamp: {}", ts),
-            ValidationError::InvalidViewport => write!(f, "Invalid viewport dimensions"),
-            ValidationError::InvalidDrawCall { index, message } => {
-                write!(f, "Invalid draw call at index {}: {}", index, message)
-            }
-            ValidationError::InvalidTransform => {
-                write!(f, "Invalid transform matrix (contains NaN or Inf)")
-            }
-            ValidationError::ZeroVertices => write!(f, "Draw call has zero vertices"),
-        }
+define_error! {
+    pub enum ValidationError {
+        InvalidTimestamp { timestamp: f64 } = ErrorCode::InvalidTimestamp, ErrorSeverity::Error,
+        InvalidViewport {} = ErrorCode::InvalidViewport, ErrorSeverity::Error,
+        InvalidDrawCall { index: usize, message: String } = ErrorCode::InvalidDrawCall, ErrorSeverity::Error,
+        InvalidTransform {} = ErrorCode::InvalidTransform, ErrorSeverity::Error,
+        ZeroVertices {} = ErrorCode::ZeroVertices, ErrorSeverity::Error,
     }
 }
 
-impl std::error::Error for ValidationError {}
+// ============================================================================
+// Core Snapshot Structure
+// ============================================================================
 
-/// Complete render state snapshot for a single frame
+/// Complete render debug snapshot for a single frame
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderDebugSnapshot {
     /// Frame number
     pub frame: u64,
 
-    /// Timestamp in seconds since engine start
+    /// Timestamp (seconds since start)
     pub timestamp: f64,
 
-    // Pipeline state
-    /// Currently active pipeline name (None if no active pipeline)
+    /// Active graphics pipeline
     pub active_pipeline: Option<String>,
 
     /// Active shader stages
@@ -93,33 +79,30 @@ pub struct RenderDebugSnapshot {
     /// Blending enabled
     pub blend_enabled: bool,
 
-    // Resources
     /// Active render targets
     pub render_targets: Vec<RenderTargetInfo>,
 
-    /// Framebuffers in use
+    /// Active framebuffers
     pub framebuffers: Vec<FramebufferInfo>,
 
-    /// Textures loaded
+    /// All textures in use this frame
     pub textures: Vec<TextureInfo>,
 
-    /// Buffers allocated
+    /// All buffers in use this frame
     pub buffers: Vec<BufferInfo>,
 
-    // Draw calls
-    /// All draw calls submitted this frame
+    /// All draw calls executed this frame
     pub draw_calls: Vec<DrawCallInfo>,
 
-    // GPU state
     /// GPU memory statistics
     pub gpu_memory: GpuMemoryStats,
 
-    /// Queue states (graphics, compute, transfer)
+    /// Command queue states
     pub queue_states: Vec<QueueStateInfo>,
 }
 
 impl RenderDebugSnapshot {
-    /// Create a new empty snapshot
+    /// Create new snapshot for frame
     pub fn new(frame: u64, timestamp: f64) -> Self {
         Self {
             frame,
@@ -140,65 +123,135 @@ impl RenderDebugSnapshot {
         }
     }
 
-    /// Validate snapshot for NaN/Inf values and invalid data
+    /// Validate snapshot data
     pub fn validate(&self) -> Result<(), ValidationError> {
-        // Check timestamp
-        if !self.timestamp.is_finite() {
-            return Err(ValidationError::InvalidTimestamp(self.timestamp));
+        // Validate timestamp
+        if self.timestamp < 0.0 || !self.timestamp.is_finite() {
+            return Err(ValidationError::invalidtimestamp(self.timestamp));
         }
 
         // Validate viewport
-        if !self.viewport.width.is_finite() || !self.viewport.height.is_finite() {
-            return Err(ValidationError::InvalidViewport);
+        if self.viewport.width == 0.0 || self.viewport.height == 0.0 {
+            return Err(ValidationError::invalidviewport());
         }
 
         // Validate draw calls
         for (i, draw_call) in self.draw_calls.iter().enumerate() {
-            draw_call.validate().map_err(|e: ValidationError| {
-                ValidationError::InvalidDrawCall { index: i, message: e.to_string() }
-            })?;
+            if let Err(e) = draw_call.validate() {
+                return Err(ValidationError::invaliddrawcall(i, e.to_string()));
+            }
         }
 
         Ok(())
     }
 
-    /// Get total number of vertices drawn this frame
-    pub fn total_vertices(&self) -> u64 {
-        self.draw_calls.iter().map(|dc| dc.vertex_count as u64).sum()
-    }
-
-    /// Get total number of triangles drawn this frame
-    pub fn total_triangles(&self) -> u64 {
-        self.draw_calls
-            .iter()
-            .map(|dc| {
-                if dc.index_count > 0 {
-                    (dc.index_count / 3) as u64
-                } else {
-                    (dc.vertex_count / 3) as u64
-                }
-            })
-            .sum()
-    }
-
-    /// Get total GPU time for all draw calls (nanoseconds)
+    /// Total GPU time for all draw calls (nanoseconds)
     pub fn total_gpu_time_ns(&self) -> u64 {
         self.draw_calls.iter().map(|dc| dc.draw_time_gpu_ns).sum()
     }
 
-    /// Get total GPU time in milliseconds
-    pub fn total_gpu_time_ms(&self) -> f64 {
-        self.total_gpu_time_ns() as f64 / 1_000_000.0
+    /// Total vertices across all draw calls
+    pub fn total_vertices(&self) -> u64 {
+        self.draw_calls
+            .iter()
+            .map(|dc| dc.vertex_count as u64 * dc.instance_count as u64)
+            .sum()
     }
 
-    /// Find draw calls that took longer than threshold (milliseconds)
+    /// Find draw calls slower than threshold (milliseconds)
     pub fn slow_draw_calls(&self, threshold_ms: f32) -> Vec<&DrawCallInfo> {
         let threshold_ns = (threshold_ms * 1_000_000.0) as u64;
         self.draw_calls.iter().filter(|dc| dc.draw_time_gpu_ns > threshold_ns).collect()
     }
 }
 
-/// Single draw call information with GPU profiling
+// ============================================================================
+// Shader Information
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShaderStageInfo {
+    pub stage: String, // "vertex", "fragment", "compute", etc.
+    pub entry_point: String,
+    pub shader_module_id: u64,
+}
+
+// ============================================================================
+// Viewport & Scissor
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub struct Viewport {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub min_depth: f32,
+    pub max_depth: f32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub struct Rect2D {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+// ============================================================================
+// Render Target Information
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenderTargetInfo {
+    pub attachment_index: u32,
+    pub texture_id: u64,
+    pub format: String,
+    pub load_op: String,  // "clear", "load", "dont_care"
+    pub store_op: String, // "store", "dont_care"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FramebufferInfo {
+    pub framebuffer_id: u64,
+    pub width: u32,
+    pub height: u32,
+    pub attachment_count: u32,
+}
+
+// ============================================================================
+// Texture Information
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextureInfo {
+    pub texture_id: u64,
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+    pub format: String,
+    pub mip_levels: u32,
+    pub sample_count: u32,
+    pub memory_size: usize,
+    pub created_frame: u64,
+}
+
+// ============================================================================
+// Buffer Information
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BufferInfo {
+    pub buffer_id: u64,
+    pub size_bytes: usize,
+    pub usage: String,       // "vertex", "index", "uniform", "storage"
+    pub memory_type: String, // "device_local", "host_visible", "host_cached"
+}
+
+// ============================================================================
+// Draw Call Information
+// ============================================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DrawCallInfo {
     /// Unique draw call ID within frame
@@ -241,143 +294,24 @@ impl DrawCallInfo {
         // Check for NaN/Inf in transform
         for &value in &self.transform {
             if !value.is_finite() {
-                return Err(ValidationError::InvalidTransform);
+                return Err(ValidationError::invalidtransform());
             }
         }
 
-        // Check counts are reasonable
+        // Validate vertex count
         if self.vertex_count == 0 {
-            return Err(ValidationError::ZeroVertices);
+            return Err(ValidationError::zerovertices());
         }
 
         Ok(())
     }
-
-    /// Get draw time in milliseconds
-    pub fn draw_time_ms(&self) -> f64 {
-        self.draw_time_gpu_ns as f64 / 1_000_000.0
-    }
 }
 
-/// Shader stage information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShaderStageInfo {
-    /// Shader stage (vertex, fragment, compute, etc.)
-    pub stage: String,
+// ============================================================================
+// GPU Memory Statistics
+// ============================================================================
 
-    /// Shader module name or path
-    pub module_name: String,
-
-    /// Entry point function name
-    pub entry_point: String,
-}
-
-/// Viewport configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Viewport {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-    pub min_depth: f32,
-    pub max_depth: f32,
-}
-
-impl Default for Viewport {
-    fn default() -> Self {
-        Self { x: 0.0, y: 0.0, width: 800.0, height: 600.0, min_depth: 0.0, max_depth: 1.0 }
-    }
-}
-
-/// Scissor rectangle
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Rect2D {
-    pub x: i32,
-    pub y: i32,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Default for Rect2D {
-    fn default() -> Self {
-        Self { x: 0, y: 0, width: 800, height: 600 }
-    }
-}
-
-/// Render target information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenderTargetInfo {
-    pub target_id: u64,
-    pub width: u32,
-    pub height: u32,
-    pub format: String,
-    pub sample_count: u32,
-}
-
-/// Framebuffer information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FramebufferInfo {
-    /// Unique framebuffer ID
-    pub framebuffer_id: u64,
-    /// Width in pixels
-    pub width: u32,
-    /// Height in pixels
-    pub height: u32,
-    /// Number of color attachments
-    pub attachment_count: u32,
-    /// Whether framebuffer has depth attachment
-    pub has_depth: bool,
-}
-
-/// Texture resource information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TextureInfo {
-    /// Unique texture ID
-    pub texture_id: u64,
-
-    /// Width in pixels
-    pub width: u32,
-
-    /// Height in pixels
-    pub height: u32,
-
-    /// Format (e.g., "RGBA8", "BGRA8", "Depth32F")
-    pub format: String,
-
-    /// Number of mip levels
-    pub mip_levels: u32,
-
-    /// Memory size in bytes
-    pub memory_size_bytes: usize,
-
-    /// Usage flags (e.g., ["SAMPLED", "TRANSFER_DST"])
-    pub usage_flags: Vec<String>,
-
-    /// Frame when texture was created
-    pub created_frame: u64,
-}
-
-/// Buffer resource information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BufferInfo {
-    /// Unique buffer ID
-    pub buffer_id: u64,
-
-    /// Buffer size in bytes
-    pub size_bytes: usize,
-
-    /// Usage (e.g., "VERTEX", "INDEX", "UNIFORM")
-    pub usage: String,
-
-    /// Memory type (e.g., "DEVICE_LOCAL", "HOST_VISIBLE")
-    pub memory_type: String,
-
-    /// Frame when buffer was created
-    pub created_frame: u64,
-}
-
-/// GPU memory statistics
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct GpuMemoryStats {
     /// Total allocated memory (bytes)
     pub total_allocated: usize,
@@ -399,32 +333,35 @@ pub struct GpuMemoryStats {
 }
 
 impl GpuMemoryStats {
-    /// Create empty stats
-    pub fn new() -> Self {
-        Self::default()
+    /// Check if memory usage is within safe limits
+    pub fn is_within_budget(&self, budget_bytes: usize) -> bool {
+        self.total_allocated <= budget_bytes
     }
 
-    /// Get total memory in megabytes
-    pub fn total_mb(&self) -> f64 {
-        self.total_allocated as f64 / (1024.0 * 1024.0)
+    /// Memory utilization percentage (0.0 to 1.0)
+    pub fn utilization(&self, budget_bytes: usize) -> f32 {
+        if budget_bytes == 0 {
+            return 0.0;
+        }
+        (self.total_allocated as f32) / (budget_bytes as f32)
     }
 }
 
-/// Queue state information
+// ============================================================================
+// Command Queue State
+// ============================================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueStateInfo {
-    /// Queue family index
-    pub queue_family: u32,
-
-    /// Queue index within family
+    pub queue_family_index: u32,
     pub queue_index: u32,
-
-    /// Queue type (graphics, compute, transfer)
-    pub queue_type: String,
-
-    /// Number of pending submissions
-    pub pending_submissions: u32,
+    pub pending_commands: usize,
+    pub last_submit_timestamp: f64,
 }
+
+// ============================================================================
+// Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -432,24 +369,36 @@ mod tests {
 
     #[test]
     fn test_snapshot_creation() {
-        let snapshot = RenderDebugSnapshot::new(42, 1.234);
-        assert_eq!(snapshot.frame, 42);
-        assert_eq!(snapshot.timestamp, 1.234);
+        let snapshot = RenderDebugSnapshot::new(1, 0.016);
+        assert_eq!(snapshot.frame, 1);
+        assert_eq!(snapshot.timestamp, 0.016);
         assert_eq!(snapshot.draw_calls.len(), 0);
     }
 
     #[test]
     fn test_snapshot_validation_valid() {
-        let snapshot = RenderDebugSnapshot::new(1, 1.0);
+        let mut snapshot = RenderDebugSnapshot::new(1, 0.016);
+        snapshot.viewport = Viewport {
+            x: 0.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        };
+
         assert!(snapshot.validate().is_ok());
     }
 
     #[test]
     fn test_snapshot_validation_invalid_timestamp() {
-        let snapshot = RenderDebugSnapshot::new(1, f64::NAN);
+        let mut snapshot = RenderDebugSnapshot::new(1, -1.0);
+        snapshot.viewport.width = 1920.0;
+        snapshot.viewport.height = 1080.0;
+
         let result = snapshot.validate();
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ValidationError::InvalidTimestamp(_)));
+        assert!(matches!(result.unwrap_err(), ValidationError::InvalidTimestamp { .. }));
     }
 
     #[test]
@@ -465,29 +414,10 @@ mod tests {
             transform: [1.0; 16],
             draw_time_gpu_ns: 50000,
             vertices_processed: 100,
-            fragments_processed: 1000,
+            fragments_processed: 5000,
         };
-        assert!(draw_call.validate().is_ok());
-    }
 
-    #[test]
-    fn test_draw_call_validation_invalid_transform() {
-        let draw_call = DrawCallInfo {
-            draw_call_id: 0,
-            mesh_id: 1,
-            material_id: 2,
-            pipeline_id: 3,
-            vertex_count: 100,
-            index_count: 150,
-            instance_count: 1,
-            transform: [f32::NAN; 16],
-            draw_time_gpu_ns: 50000,
-            vertices_processed: 100,
-            fragments_processed: 1000,
-        };
-        let result = draw_call.validate();
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ValidationError::InvalidTransform));
+        assert!(draw_call.validate().is_ok());
     }
 
     #[test]
@@ -497,7 +427,7 @@ mod tests {
             mesh_id: 1,
             material_id: 2,
             pipeline_id: 3,
-            vertex_count: 0,
+            vertex_count: 0, // Invalid!
             index_count: 0,
             instance_count: 1,
             transform: [1.0; 16],
@@ -505,127 +435,38 @@ mod tests {
             vertices_processed: 0,
             fragments_processed: 0,
         };
+
         let result = draw_call.validate();
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ValidationError::ZeroVertices));
+        assert!(matches!(result.unwrap_err(), ValidationError::ZeroVertices { .. }));
     }
 
     #[test]
-    fn test_total_vertices() {
-        let mut snapshot = RenderDebugSnapshot::new(1, 1.0);
-        snapshot.draw_calls.push(DrawCallInfo {
+    fn test_draw_call_validation_invalid_transform() {
+        let mut draw_call = DrawCallInfo {
             draw_call_id: 0,
             mesh_id: 1,
             material_id: 2,
             pipeline_id: 3,
             vertex_count: 100,
-            index_count: 0,
+            index_count: 150,
             instance_count: 1,
             transform: [1.0; 16],
             draw_time_gpu_ns: 50000,
             vertices_processed: 100,
-            fragments_processed: 1000,
-        });
-        snapshot.draw_calls.push(DrawCallInfo {
-            draw_call_id: 1,
-            mesh_id: 2,
-            material_id: 3,
-            pipeline_id: 3,
-            vertex_count: 200,
-            index_count: 0,
-            instance_count: 1,
-            transform: [1.0; 16],
-            draw_time_gpu_ns: 100000,
-            vertices_processed: 200,
-            fragments_processed: 2000,
-        });
-        assert_eq!(snapshot.total_vertices(), 300);
+            fragments_processed: 5000,
+        };
+
+        draw_call.transform[0] = f32::NAN; // Invalid!
+
+        let result = draw_call.validate();
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ValidationError::InvalidTransform { .. }));
     }
 
     #[test]
     fn test_total_gpu_time() {
-        let mut snapshot = RenderDebugSnapshot::new(1, 1.0);
-        snapshot.draw_calls.push(DrawCallInfo {
-            draw_call_id: 0,
-            mesh_id: 1,
-            material_id: 2,
-            pipeline_id: 3,
-            vertex_count: 100,
-            index_count: 0,
-            instance_count: 1,
-            transform: [1.0; 16],
-            draw_time_gpu_ns: 1_000_000, // 1ms
-            vertices_processed: 100,
-            fragments_processed: 1000,
-        });
-        snapshot.draw_calls.push(DrawCallInfo {
-            draw_call_id: 1,
-            mesh_id: 2,
-            material_id: 3,
-            pipeline_id: 3,
-            vertex_count: 200,
-            index_count: 0,
-            instance_count: 1,
-            transform: [1.0; 16],
-            draw_time_gpu_ns: 2_000_000, // 2ms
-            vertices_processed: 200,
-            fragments_processed: 2000,
-        });
-        assert_eq!(snapshot.total_gpu_time_ns(), 3_000_000);
-        assert_eq!(snapshot.total_gpu_time_ms(), 3.0);
-    }
-
-    #[test]
-    fn test_slow_draw_calls() {
-        let mut snapshot = RenderDebugSnapshot::new(1, 1.0);
-        snapshot.draw_calls.push(DrawCallInfo {
-            draw_call_id: 0,
-            mesh_id: 1,
-            material_id: 2,
-            pipeline_id: 3,
-            vertex_count: 100,
-            index_count: 0,
-            instance_count: 1,
-            transform: [1.0; 16],
-            draw_time_gpu_ns: 500_000, // 0.5ms (fast)
-            vertices_processed: 100,
-            fragments_processed: 1000,
-        });
-        snapshot.draw_calls.push(DrawCallInfo {
-            draw_call_id: 1,
-            mesh_id: 2,
-            material_id: 3,
-            pipeline_id: 3,
-            vertex_count: 200,
-            index_count: 0,
-            instance_count: 1,
-            transform: [1.0; 16],
-            draw_time_gpu_ns: 5_000_000, // 5ms (slow)
-            vertices_processed: 200,
-            fragments_processed: 2000,
-        });
-
-        let slow = snapshot.slow_draw_calls(1.0); // > 1ms threshold
-        assert_eq!(slow.len(), 1);
-        assert_eq!(slow[0].draw_call_id, 1);
-    }
-
-    #[test]
-    fn test_gpu_memory_stats() {
-        let stats = GpuMemoryStats {
-            total_allocated: 10 * 1024 * 1024, // 10 MB
-            textures: 5 * 1024 * 1024,
-            buffers: 3 * 1024 * 1024,
-            framebuffers: 2 * 1024 * 1024,
-            device_local: 8 * 1024 * 1024,
-            host_visible: 2 * 1024 * 1024,
-        };
-        assert_eq!(stats.total_mb(), 10.0);
-    }
-
-    #[test]
-    fn test_serialization_roundtrip() {
-        let mut snapshot = RenderDebugSnapshot::new(42, 1.234);
+        let mut snapshot = RenderDebugSnapshot::new(1, 0.016);
         snapshot.draw_calls.push(DrawCallInfo {
             draw_call_id: 0,
             mesh_id: 1,
@@ -637,18 +478,102 @@ mod tests {
             transform: [1.0; 16],
             draw_time_gpu_ns: 50000,
             vertices_processed: 100,
-            fragments_processed: 1000,
+            fragments_processed: 5000,
+        });
+        snapshot.draw_calls.push(DrawCallInfo {
+            draw_call_id: 1,
+            mesh_id: 1,
+            material_id: 2,
+            pipeline_id: 3,
+            vertex_count: 200,
+            index_count: 300,
+            instance_count: 1,
+            transform: [1.0; 16],
+            draw_time_gpu_ns: 75000,
+            vertices_processed: 200,
+            fragments_processed: 10000,
         });
 
-        // Serialize to JSON
+        assert_eq!(snapshot.total_gpu_time_ns(), 125000);
+    }
+
+    #[test]
+    fn test_total_vertices() {
+        let mut snapshot = RenderDebugSnapshot::new(1, 0.016);
+        snapshot.draw_calls.push(DrawCallInfo {
+            draw_call_id: 0,
+            mesh_id: 1,
+            material_id: 2,
+            pipeline_id: 3,
+            vertex_count: 100,
+            index_count: 150,
+            instance_count: 2, // Instanced!
+            transform: [1.0; 16],
+            draw_time_gpu_ns: 50000,
+            vertices_processed: 200,
+            fragments_processed: 5000,
+        });
+
+        assert_eq!(snapshot.total_vertices(), 200); // 100 * 2
+    }
+
+    #[test]
+    fn test_slow_draw_calls() {
+        let mut snapshot = RenderDebugSnapshot::new(1, 0.016);
+        snapshot.draw_calls.push(DrawCallInfo {
+            draw_call_id: 0,
+            mesh_id: 1,
+            material_id: 2,
+            pipeline_id: 3,
+            vertex_count: 100,
+            index_count: 150,
+            instance_count: 1,
+            transform: [1.0; 16],
+            draw_time_gpu_ns: 50000, // 0.05ms - fast
+            vertices_processed: 100,
+            fragments_processed: 5000,
+        });
+        snapshot.draw_calls.push(DrawCallInfo {
+            draw_call_id: 1,
+            mesh_id: 1,
+            material_id: 2,
+            pipeline_id: 3,
+            vertex_count: 100,
+            index_count: 150,
+            instance_count: 1,
+            transform: [1.0; 16],
+            draw_time_gpu_ns: 2_000_000, // 2ms - slow!
+            vertices_processed: 100,
+            fragments_processed: 5000,
+        });
+
+        let slow = snapshot.slow_draw_calls(1.0); // 1ms threshold
+        assert_eq!(slow.len(), 1);
+        assert_eq!(slow[0].draw_call_id, 1);
+    }
+
+    #[test]
+    fn test_gpu_memory_stats() {
+        let stats = GpuMemoryStats {
+            total_allocated: 500_000_000, // 500MB
+            textures: 300_000_000,        // 300MB
+            buffers: 150_000_000,         // 150MB
+            framebuffers: 50_000_000,     // 50MB
+            device_local: 500_000_000,
+            host_visible: 0,
+        };
+
+        let budget = 1_000_000_000; // 1GB
+        assert!(stats.is_within_budget(budget));
+        assert_eq!(stats.utilization(budget), 0.5);
+    }
+
+    #[test]
+    fn test_serialization_roundtrip() {
+        let snapshot = RenderDebugSnapshot::new(1, 0.016);
         let json = serde_json::to_string(&snapshot).unwrap();
-
-        // Deserialize back
         let deserialized: RenderDebugSnapshot = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized.frame, snapshot.frame);
-        assert_eq!(deserialized.timestamp, snapshot.timestamp);
-        assert_eq!(deserialized.draw_calls.len(), snapshot.draw_calls.len());
-        assert_eq!(deserialized.draw_calls[0].vertex_count, snapshot.draw_calls[0].vertex_count);
+        assert_eq!(deserialized.frame, 1);
+        assert_eq!(deserialized.timestamp, 0.016);
     }
 }

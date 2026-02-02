@@ -12,7 +12,3 @@ repository.workspace = true
 [features]
 default = []
 cpuid = []  # Enable detailed CPU vendor/brand detection
-
-[[example]]
-name = "cpu_tier_detection"
-path = "examples/cpu_tier_detection.rs"
