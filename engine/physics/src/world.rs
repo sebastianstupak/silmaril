@@ -16,7 +16,7 @@ use rapier3d::prelude::*;
 use std::collections::HashMap;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Contact force event wrapper
 #[derive(Debug, Clone)]
@@ -1219,6 +1219,17 @@ impl PhysicsWorld {
     #[cfg(feature = "debug-render")]
     pub fn impulse_joint_set(&self) -> &ImpulseJointSet {
         &self.impulse_joint_set
+    }
+
+    /// Get reference to narrow phase (for collision visualization)
+    ///
+    /// # Note
+    ///
+    /// This is primarily used by the debug_render module when the `debug-render`
+    /// feature is enabled to visualize contact manifolds.
+    #[cfg(feature = "debug-render")]
+    pub fn narrow_phase(&self) -> &NarrowPhase {
+        &self.narrow_phase
     }
 }
 
