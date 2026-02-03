@@ -144,7 +144,7 @@ engine-renderer = { path = "../renderer" }
 engine-networking = { path = "../networking" }
 engine-templating = { path = "../templating" }
 glam = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
