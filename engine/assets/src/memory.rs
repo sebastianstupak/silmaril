@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_eviction_candidates_with_registry() {
-        use crate::AssetRegistry;
+        use crate::{AssetRegistry, RefType};
 
         let budget = MemoryBudget::default();
         let cache = LruCache::new(budget);
@@ -550,7 +550,10 @@ mod tests {
 
     #[test]
     fn test_memory_sized_texture() {
-        let texture = TextureData::solid_color([255, 0, 0, 255], 256, 256);
+        use crate::TextureFormat;
+
+        let data = vec![255u8; 256 * 256 * 4]; // Red solid color
+        let texture = TextureData::new(256, 256, TextureFormat::RGBA8Unorm, data).unwrap();
         let size = texture.size_bytes();
 
         // Should include struct size + pixel data

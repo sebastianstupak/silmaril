@@ -129,10 +129,12 @@ mod tests {
 
     #[test]
     fn test_metrics_targets() {
-        let mut metrics = CaptureMetrics::default();
-        metrics.copy_time_ms = 1.5;
-        metrics.encode_time_ms = 2.5;
-        metrics.total_time_ms = 4.5;
+        let mut metrics = CaptureMetrics {
+            copy_time_ms: 1.5,
+            encode_time_ms: 2.5,
+            total_time_ms: 4.5,
+            ..Default::default()
+        };
         assert!(metrics.meets_targets());
 
         metrics.total_time_ms = 6.0;

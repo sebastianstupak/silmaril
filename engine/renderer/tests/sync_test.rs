@@ -176,7 +176,7 @@ fn test_multiple_frames_in_flight() {
     // Test creating sync objects for different frame counts
     for frame_count in [1, 2, 3, 4] {
         let sync = FrameSync::create(&device, frame_count)
-            .expect(&format!("Failed to create FrameSync with {} frames", frame_count));
+            .unwrap_or_else(|_| panic!("Failed to create FrameSync with {} frames", frame_count));
 
         assert_eq!(sync.frames_in_flight, frame_count);
         assert_eq!(sync.image_available_semaphores.len(), frame_count);

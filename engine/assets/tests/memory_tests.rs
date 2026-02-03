@@ -277,12 +277,15 @@ fn test_texture_memory_sizing() {
 
 #[test]
 fn test_audio_memory_sizing() {
-    let samples = vec![0.0f32; 44100]; // 1 second at 44.1kHz
-    let audio = AudioData::from_samples(samples, 44100, 1);
+    use engine_assets::AudioFormat;
+
+    // 1 second of 16-bit PCM audio at 44.1kHz mono
+    let data = vec![0u8; 44100 * 2]; // 2 bytes per sample
+    let audio = AudioData::new(44100, 1, AudioFormat::PCM16, data);
     let size = audio.size_bytes();
 
     // Should include sample data
-    assert!(size >= 44100 * std::mem::size_of::<f32>());
+    assert!(size >= 44100 * 2);
 }
 
 #[test]

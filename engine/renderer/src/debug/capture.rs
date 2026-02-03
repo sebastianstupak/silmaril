@@ -602,7 +602,7 @@ mod tests {
         let mut frame2 = create_test_frame(1, 2, 2, [255, 0, 0, 255]);
 
         // Make bottom-right pixel different
-        let idx = (1 * 2 + 1) * 4; // (y=1, x=1)
+        let idx = (2 + 1) * 4; // (y=1, x=1)
         frame2.color_buffer[idx] = 0; // Change red to green
         frame2.color_buffer[idx + 1] = 255;
 

@@ -145,6 +145,8 @@ pub enum ErrorCode {
     MeshLoadFailed = 1330,
     /// Material loading failed
     MaterialLoadFailed = 1331,
+    /// Asset not found
+    AssetNotFound = 1332,
     /// Asset loading failed (general)
     AssetLoadFailed = 1339,
     /// Synchronization object creation failed

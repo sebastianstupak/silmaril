@@ -60,9 +60,10 @@ harness = false
 name = "delta_benches"
 harness = false
 
-[[bench]]
-name = "integration_benches"
-harness = false
+# Disabled: benchmark file not yet implemented
+# [[bench]]
+# name = "integration_benches"
+# harness = false
 
 [[bench]]
 name = "concurrent_connections_bench"

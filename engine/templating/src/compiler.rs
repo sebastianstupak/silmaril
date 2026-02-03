@@ -147,8 +147,7 @@ impl TryFrom<SerializableEntityDefinition> for EntityDefinition {
                     .map(|(k, yaml_str)| {
                         let value = serde_yaml::from_str(&yaml_str).map_err(|e| {
                             TemplateError::invalidyaml(format!(
-                                "Failed to parse component '{}': {}",
-                                k, e
+                                "Failed to parse component '{k}': {e}"
                             ))
                         })?;
                         Ok((k, value))
@@ -167,7 +166,7 @@ impl TryFrom<SerializableEntityDefinition> for EntityDefinition {
             .into_iter()
             .map(|(k, yaml_str)| {
                 let value = serde_yaml::from_str(&yaml_str).map_err(|e| {
-                    TemplateError::invalidyaml(format!("Failed to parse override '{}': {}", k, e))
+                    TemplateError::invalidyaml(format!("Failed to parse override '{k}': {e}"))
                 })?;
                 Ok((k, value))
             })
@@ -234,8 +233,7 @@ impl CompiledTemplate {
         // Verify checksum
         let template_bytes = bincode::serialize(&self.template).map_err(|e| {
             TemplateError::serialization(format!(
-                "Failed to serialize template for checksum validation: {}",
-                e
+                "Failed to serialize template for checksum validation: {e}"
             ))
         })?;
         let computed_checksum = xxh64(&template_bytes, 0);
@@ -375,7 +373,7 @@ impl TemplateCompiler {
 
         // Serialize to bincode
         let bincode_data = bincode::serialize(&compiled).map_err(|e| {
-            TemplateError::serialization(format!("Failed to serialize to bincode: {}", e))
+            TemplateError::serialization(format!("Failed to serialize to bincode: {e}"))
         })?;
 
         // Write to output file
@@ -449,7 +447,7 @@ impl TemplateCompiler {
 
         // Deserialize from bincode
         let compiled: CompiledTemplate = bincode::deserialize(&bincode_data).map_err(|e| {
-            TemplateError::serialization(format!("Failed to deserialize bincode: {}", e))
+            TemplateError::serialization(format!("Failed to deserialize bincode: {e}"))
         })?;
 
         // Validate magic number, version, and checksum

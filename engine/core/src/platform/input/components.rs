@@ -4,6 +4,7 @@
 //! They integrate with the platform input system and ECS for game logic.
 
 use super::{GamepadAxis, GamepadButton, GamepadId, KeyCode, MouseButton};
+use crate::ecs::Component;
 use rustc_hash::FxHashMap;
 
 /// Component that stores the current input state for an entity.
@@ -58,6 +59,9 @@ impl Default for InputState {
         }
     }
 }
+
+// Implement Component trait to make InputState usable in ECS
+impl Component for InputState {}
 
 impl InputState {
     /// Create a new empty input state.
@@ -175,6 +179,9 @@ impl Default for InputActions {
         }
     }
 }
+
+// Implement Component trait to make InputActions usable in ECS
+impl Component for InputActions {}
 
 impl InputActions {
     /// Create a new empty input action map.

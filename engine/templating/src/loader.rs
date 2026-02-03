@@ -38,6 +38,7 @@ pub struct TemplateLoader {
 
 impl TemplateLoader {
     /// Creates a new template loader with an empty cache.
+    #[must_use] 
     pub fn new() -> Self {
         Self { cache: FxHashMap::default(), compiler: TemplateCompiler::new() }
     }
@@ -204,7 +205,7 @@ impl TemplateLoader {
 
                 let entity = instance.entities.first().copied().ok_or_else(|| {
                     TemplateError::UnknownComponent {
-                        component: format!("Referenced template has no entities: {}", template),
+                        component: format!("Referenced template has no entities: {template}"),
                     }
                 })?;
 
@@ -291,9 +292,9 @@ impl TemplateLoader {
             return Ok(Health::new(100.0, 100.0));
         }
 
-        let current = value.get("current").and_then(|v| v.as_f64()).unwrap_or(100.0) as f32;
+        let current = value.get("current").and_then(serde_yaml::Value::as_f64).unwrap_or(100.0) as f32;
 
-        let max = value.get("max").and_then(|v| v.as_f64()).unwrap_or(100.0) as f32;
+        let max = value.get("max").and_then(serde_yaml::Value::as_f64).unwrap_or(100.0) as f32;
 
         Ok(Health::new(current, max))
     }
@@ -317,7 +318,7 @@ impl TemplateLoader {
             0
         };
 
-        let visible = value.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+        let visible = value.get("visible").and_then(serde_yaml::Value::as_bool).unwrap_or(true);
 
         Ok(MeshRenderer::with_visibility(mesh_id, visible))
     }
@@ -328,15 +329,15 @@ impl TemplateLoader {
             return Ok(Camera::default());
         }
 
-        let fov = value.get("fov").and_then(|v| v.as_f64()).unwrap_or(60.0) as f32;
+        let fov = value.get("fov").and_then(serde_yaml::Value::as_f64).unwrap_or(60.0) as f32;
 
         let fov_radians = fov.to_radians();
 
-        let aspect = value.get("aspect").and_then(|v| v.as_f64()).unwrap_or(16.0 / 9.0) as f32;
+        let aspect = value.get("aspect").and_then(serde_yaml::Value::as_f64).unwrap_or(16.0 / 9.0) as f32;
 
-        let near = value.get("near").and_then(|v| v.as_f64()).unwrap_or(0.1) as f32;
+        let near = value.get("near").and_then(serde_yaml::Value::as_f64).unwrap_or(0.1) as f32;
 
-        let far = value.get("far").and_then(|v| v.as_f64()).unwrap_or(1000.0) as f32;
+        let far = value.get("far").and_then(serde_yaml::Value::as_f64).unwrap_or(1000.0) as f32;
 
         Ok(Camera::with_planes(fov_radians, aspect, near, far))
     }
@@ -378,11 +379,13 @@ impl TemplateLoader {
     }
 
     /// Returns true if the cache is empty.
+    #[must_use] 
     pub fn is_cache_empty(&self) -> bool {
         self.cache.is_empty()
     }
 
     /// Returns the number of templates in the cache.
+    #[must_use] 
     pub fn cache_size(&self) -> usize {
         self.cache.len()
     }
@@ -429,6 +432,7 @@ impl TemplateInstance {
     }
 
     /// Returns the total number of entities in this instance (including references).
+    #[must_use] 
     pub fn total_entity_count(&self) -> usize {
         let mut count = self.entities.len();
         for reference in &self.references {

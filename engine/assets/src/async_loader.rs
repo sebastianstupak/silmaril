@@ -4,12 +4,11 @@
 
 #![cfg(feature = "async")]
 
-use crate::{AssetError, AssetHandle, AssetId, AssetLoader, AssetManager};
-use parking_lot::RwLock;
+use crate::{AssetError, AssetHandle, AssetLoader, AssetManager};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use tracing::{debug, error, info, instrument};
 
 /// Priority for asset loading.
@@ -44,6 +43,7 @@ pub enum LoadStatus {
 ///
 /// Can be used to check progress, cancel the operation, or wait for completion.
 pub struct AsyncLoadHandle<T> {
+    #[allow(dead_code)]
     id: u64,
     status: Arc<AtomicUsize>, // LoadStatus as usize
     progress: Arc<AtomicU64>, // Progress as u64 (0-10000 = 0-100.00%)
@@ -109,6 +109,7 @@ impl<T> AsyncLoadHandle<T> {
     }
 }
 
+#[allow(dead_code)]
 struct LoadRequest<T> {
     id: u64,
     path: PathBuf,

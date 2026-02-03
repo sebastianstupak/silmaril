@@ -331,10 +331,10 @@ pub trait AssetLoader {
     type Asset;
 
     /// Load an asset from a file path synchronously.
-    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error>>;
+    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Parse asset data from bytes (for async loading).
-    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error>>;
+    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Generate a content-addressable ID for the asset.
     fn generate_id(asset: &Self::Asset) -> AssetId;
@@ -354,7 +354,7 @@ pub trait AssetLoader {
 impl AssetLoader for MeshData {
     type Asset = MeshData;
 
-    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error>> {
+    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>> {
         let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
         match ext.to_lowercase().as_str() {
             "obj" => {
@@ -369,7 +369,7 @@ impl AssetLoader for MeshData {
         }
     }
 
-    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error>> {
+    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>> {
         // Try to detect format from data
         MeshData::from_gltf(data, None).map_err(Into::into)
     }
@@ -409,12 +409,12 @@ impl AssetLoader for MeshData {
 impl AssetLoader for TextureData {
     type Asset = TextureData;
 
-    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error>> {
+    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>> {
         let data = std::fs::read(path)?;
         Self::parse(&data)
     }
 
-    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error>> {
+    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>> {
         // Try DDS first (has magic number), then fall back to image
         if data.len() >= 4 && &data[0..4] == b"DDS " {
             TextureData::from_dds_bytes(data).map_err(Into::into)
@@ -444,12 +444,12 @@ impl AssetLoader for TextureData {
 impl AssetLoader for ShaderData {
     type Asset = ShaderData;
 
-    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error>> {
+    fn load(path: &Path) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>> {
         let data = std::fs::read(path)?;
         Self::parse(&data)
     }
 
-    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error>> {
+    fn parse(data: &[u8]) -> Result<Self::Asset, Box<dyn std::error::Error + Send + Sync>> {
         use crate::ShaderStage;
 
         // Simple heuristic: if starts with SPIR-V magic number, it's SPIR-V

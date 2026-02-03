@@ -239,6 +239,7 @@ impl RenderingQueryAPI {
             Ok((frame, json_data))
         })?;
 
+        #[allow(clippy::collapsible_match)]
         for row in rows {
             let (frame, json_data) = row?;
             if let Ok(event) = serde_json::from_str::<RenderEvent>(&json_data) {
@@ -268,6 +269,7 @@ impl RenderingQueryAPI {
             Ok((frame, json_data))
         })?;
 
+        #[allow(clippy::collapsible_match)]
         for row in rows {
             let (frame, json_data) = row?;
             if let Ok(event) = serde_json::from_str::<RenderEvent>(&json_data) {
@@ -310,6 +312,7 @@ impl RenderingQueryAPI {
             Ok((frame, json_data))
         })?;
 
+        #[allow(clippy::collapsible_match)]
         for row in rows {
             let (frame, json_data) = row?;
             if let Ok(event) = serde_json::from_str::<RenderEvent>(&json_data) {
@@ -332,6 +335,7 @@ impl RenderingQueryAPI {
         let mut results = Vec::new();
         let rows = stmt.query_map([], |row: &Row| {
             let mut map = HashMap::new();
+            #[allow(clippy::needless_range_loop)]
             for i in 0..column_count {
                 let value = match row.get_ref(i)? {
                     rusqlite::types::ValueRef::Null => Value::Null,

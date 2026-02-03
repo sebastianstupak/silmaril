@@ -41,6 +41,7 @@
 #![warn(clippy::print_stderr)]
 
 pub mod agentic_debug;
+pub mod asset_bridge;
 pub mod buffer;
 pub mod capture;
 pub mod command;
@@ -61,6 +62,7 @@ pub mod sync;
 pub mod window;
 
 // Re-export commonly used types
+pub use asset_bridge::{AssetBridge, AssetBridgeStats, GpuShader, GpuTexture};
 pub use buffer::{GpuBuffer, GpuMesh, IndexBuffer, VertexBuffer};
 pub use capture::{
     CaptureConfig, CaptureFormat, CaptureManager, CaptureMetrics, FrameEncoder, FrameReadback,

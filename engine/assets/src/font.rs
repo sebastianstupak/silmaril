@@ -412,6 +412,7 @@ mod tests {
     use crate::validation::{AssetValidator, ValidationError};
 
     // Helper function to create a minimal valid TTF font for testing
+    #[allow(dead_code)]
     fn create_minimal_ttf() -> Vec<u8> {
         // This is a minimal TTF header structure
         // In practice, you'd use a real font file or generate a valid one

@@ -246,7 +246,7 @@ pub struct SynchronizationState {
 }
 
 /// Resource usage summary
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResourceState {
     /// Total GPU memory allocated (bytes)
     pub gpu_memory_allocated: u64,
@@ -450,28 +450,6 @@ impl Default for SynchronizationState {
             layout_transitions: 0,
             queue_submissions: 0,
             device_idle_waits: 0,
-        }
-    }
-}
-
-impl Default for ResourceState {
-    fn default() -> Self {
-        Self {
-            gpu_memory_allocated: 0,
-            gpu_memory_used: 0,
-            host_memory_allocated: 0,
-            host_memory_used: 0,
-            buffer_count: 0,
-            buffers_allocated: 0,
-            buffers_freed: 0,
-            image_count: 0,
-            images_allocated: 0,
-            images_freed: 0,
-            pipeline_count: 0,
-            pipelines_created: 0,
-            pipelines_destroyed: 0,
-            descriptor_pool_count: 0,
-            descriptor_set_count: 0,
         }
     }
 }

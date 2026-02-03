@@ -540,3 +540,224 @@ fn test_performance_event_polling() {
     // Should be very fast (target: < 100us per update)
     assert!(avg_time_us < 100, "Input update took {}us (target: < 100us)", avg_time_us);
 }
+
+// ============================================================================
+// ECS Integration Tests
+// ============================================================================
+
+#[test]
+fn test_input_state_as_component() {
+    use engine_core::ecs::World;
+    use engine_core::platform::InputState;
+
+    let mut world = World::new();
+    world.register::<InputState>();
+
+    // Create an entity with input state
+    let entity = world.spawn();
+    let state = InputState::new();
+    world.add(entity, state);
+
+    // Verify component was added
+    let retrieved = world.get::<InputState>(entity);
+    assert!(retrieved.is_some(), "Failed to retrieve InputState component");
+}
+
+#[test]
+fn test_input_actions_as_component() {
+    use engine_core::ecs::World;
+    use engine_core::platform::InputActions;
+
+    let mut world = World::new();
+    world.register::<InputActions>();
+
+    // Create an entity with input actions
+    let entity = world.spawn();
+    let mut actions = InputActions::new();
+    actions.bind_key("jump", KeyCode::Space);
+    world.add(entity, actions);
+
+    // Verify component was added
+    let retrieved = world.get::<InputActions>(entity);
+    assert!(retrieved.is_some(), "Failed to retrieve InputActions component");
+}
+
+#[test]
+fn test_input_system_with_ecs() {
+    use engine_core::ecs::World;
+    use engine_core::platform::{InputState, InputSystem};
+
+    let mut world = World::new();
+    world.register::<InputState>();
+    let mut system = InputSystem::new();
+
+    // Create multiple entities with input state
+    let player1 = world.spawn();
+    world.add(player1, InputState::new());
+
+    let player2 = world.spawn();
+    world.add(player2, InputState::new());
+
+    // Update system (should not panic)
+    system.update(&mut world);
+
+    // Verify entities still exist
+    assert!(world.is_alive(player1));
+    assert!(world.is_alive(player2));
+}
+
+#[test]
+fn test_input_state_update_from_events() {
+    use engine_core::platform::{InputState, InputSystem};
+
+    let system = InputSystem::new();
+    let mut state = InputState::new();
+
+    // Test keyboard input
+    system.update_state_from_event(&mut state, &InputEvent::KeyPressed { key: KeyCode::W });
+    assert!(state.is_key_pressed(KeyCode::W));
+
+    system.update_state_from_event(&mut state, &InputEvent::KeyPressed { key: KeyCode::A });
+    assert!(state.is_key_pressed(KeyCode::A));
+
+    // Both keys should be pressed simultaneously
+    assert!(state.is_key_pressed(KeyCode::W));
+    assert!(state.is_key_pressed(KeyCode::A));
+
+    // Release one key
+    system.update_state_from_event(&mut state, &InputEvent::KeyReleased { key: KeyCode::W });
+    assert!(!state.is_key_pressed(KeyCode::W));
+    assert!(state.is_key_pressed(KeyCode::A));
+}
+
+#[test]
+fn test_input_actions_with_state() {
+    use engine_core::platform::{InputActions, InputState};
+
+    let mut actions = InputActions::new();
+    let mut state = InputState::new();
+
+    // Bind multiple keys to movement actions
+    actions.bind_key("move_forward", KeyCode::W);
+    actions.bind_key("move_forward", KeyCode::Up);
+    actions.bind_key("move_back", KeyCode::S);
+    actions.bind_key("move_left", KeyCode::A);
+    actions.bind_key("move_right", KeyCode::D);
+
+    // No actions active initially
+    assert!(!actions.is_action_active("move_forward", &state));
+
+    // Press W key
+    state.set_key_pressed(KeyCode::W, true);
+    assert!(actions.is_action_active("move_forward", &state));
+
+    // Press Up key (alternative binding)
+    state.set_key_pressed(KeyCode::W, false);
+    state.set_key_pressed(KeyCode::Up, true);
+    assert!(actions.is_action_active("move_forward", &state));
+
+    // Multiple actions at once
+    state.set_key_pressed(KeyCode::A, true);
+    assert!(actions.is_action_active("move_forward", &state));
+    assert!(actions.is_action_active("move_left", &state));
+}
+
+#[test]
+fn test_multiple_entities_with_different_input_bindings() {
+    use engine_core::ecs::World;
+    use engine_core::platform::{InputActions, InputState};
+
+    let mut world = World::new();
+    world.register::<InputActions>();
+    world.register::<InputState>();
+
+    // Player 1 uses WASD
+    let player1 = world.spawn();
+    let mut p1_actions = InputActions::new();
+    p1_actions.bind_key("move_forward", KeyCode::W);
+    p1_actions.bind_key("move_left", KeyCode::A);
+    world.add(player1, p1_actions);
+    world.add(player1, InputState::new());
+
+    // Player 2 uses arrow keys
+    let player2 = world.spawn();
+    let mut p2_actions = InputActions::new();
+    p2_actions.bind_key("move_forward", KeyCode::Up);
+    p2_actions.bind_key("move_left", KeyCode::Left);
+    world.add(player2, p2_actions);
+    world.add(player2, InputState::new());
+
+    // Verify both entities have their components
+    assert!(world.get::<InputActions>(player1).is_some());
+    assert!(world.get::<InputState>(player1).is_some());
+    assert!(world.get::<InputActions>(player2).is_some());
+    assert!(world.get::<InputState>(player2).is_some());
+}
+
+#[test]
+fn test_gamepad_analog_input_with_dead_zone() {
+    use engine_core::platform::{InputActions, InputState};
+
+    let mut actions = InputActions::with_dead_zone(0.2);
+    let mut state = InputState::new();
+
+    actions.bind_axis("move_horizontal", GamepadAxis::LeftStickX);
+
+    // Small input below dead zone
+    state.set_gamepad_axis(GamepadAxis::LeftStickX, 0.15);
+    assert_eq!(actions.get_action_value("move_horizontal", &state), 0.0);
+
+    // Input above dead zone
+    state.set_gamepad_axis(GamepadAxis::LeftStickX, 0.5);
+    let value = actions.get_action_value("move_horizontal", &state);
+    assert!(value > 0.0);
+    assert!(value < 0.5); // Should be remapped
+
+    // Full input
+    state.set_gamepad_axis(GamepadAxis::LeftStickX, 1.0);
+    assert_eq!(actions.get_action_value("move_horizontal", &state), 1.0);
+
+    // Negative direction
+    state.set_gamepad_axis(GamepadAxis::LeftStickX, -0.8);
+    let value = actions.get_action_value("move_horizontal", &state);
+    assert!(value < 0.0);
+}
+
+#[test]
+fn test_input_state_clear() {
+    use engine_core::platform::{InputState, InputSystem};
+
+    let system = InputSystem::new();
+    let mut state = InputState::new();
+    let gamepad_id = GamepadId::new(0);
+
+    // Set up various input states
+    system.update_state_from_event(&mut state, &InputEvent::KeyPressed { key: KeyCode::W });
+    system.update_state_from_event(
+        &mut state,
+        &InputEvent::MouseButtonPressed { button: MouseButton::Left },
+    );
+    system.update_state_from_event(&mut state, &InputEvent::MouseMoved { x: 100.0, y: 200.0 });
+    system.update_state_from_event(&mut state, &InputEvent::GamepadConnected { id: gamepad_id });
+    system.update_state_from_event(
+        &mut state,
+        &InputEvent::GamepadButtonPressed { id: gamepad_id, button: GamepadButton::South },
+    );
+
+    // Verify state is set
+    assert!(state.is_key_pressed(KeyCode::W));
+    assert!(state.is_mouse_button_pressed(MouseButton::Left));
+    assert_eq!(state.mouse_position, (100.0, 200.0));
+    assert_eq!(state.gamepad_id, Some(gamepad_id));
+    assert!(state.is_gamepad_button_pressed(GamepadButton::South));
+
+    // Clear all state
+    state.clear();
+
+    // Verify everything is cleared
+    assert!(!state.is_key_pressed(KeyCode::W));
+    assert!(!state.is_mouse_button_pressed(MouseButton::Left));
+    assert_eq!(state.mouse_position, (0.0, 0.0));
+    assert_eq!(state.gamepad_id, None);
+    assert!(!state.is_gamepad_button_pressed(GamepadButton::South));
+}

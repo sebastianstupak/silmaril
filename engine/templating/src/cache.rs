@@ -28,11 +28,13 @@ pub struct TemplateCache {
 
 impl TemplateCache {
     /// Creates a new empty cache.
+    #[must_use] 
     pub fn new() -> Self {
         Self { entries: FxHashMap::default() }
     }
 
     /// Gets a cached entry by path.
+    #[must_use] 
     pub fn get(&self, path: &Path) -> Option<&CacheEntry> {
         self.entries.get(path)
     }
@@ -56,11 +58,13 @@ impl TemplateCache {
     }
 
     /// Returns true if the cache is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Returns the number of cached templates.
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.entries.len()
     }

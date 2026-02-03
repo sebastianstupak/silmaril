@@ -7,6 +7,8 @@
 
 use crate::{AssetError, AssetHandle, AssetLoader, AssetManager};
 use std::path::Path;
+#[cfg(feature = "async")]
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
@@ -268,8 +270,16 @@ mod tests {
     use tempfile::NamedTempFile;
 
     fn create_test_obj() -> NamedTempFile {
-        let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nvn 0 0 1\nvt 0 0").unwrap();
+        let mut file = NamedTempFile::with_suffix(".obj").unwrap();
+        writeln!(file, "# Test OBJ file").unwrap();
+        writeln!(file, "v 0.0 0.0 0.0").unwrap();
+        writeln!(file, "v 1.0 0.0 0.0").unwrap();
+        writeln!(file, "v 0.0 1.0 0.0").unwrap();
+        writeln!(file, "vn 0.0 0.0 1.0").unwrap();
+        writeln!(file, "vt 0.0 0.0").unwrap();
+        writeln!(file, "vt 1.0 0.0").unwrap();
+        writeln!(file, "vt 0.0 1.0").unwrap();
+        writeln!(file, "f 1/1/1 2/2/1 3/3/1").unwrap();
         file.flush().unwrap();
         file
     }

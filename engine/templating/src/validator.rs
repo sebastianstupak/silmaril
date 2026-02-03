@@ -158,7 +158,7 @@ impl TemplateValidator {
         let template: Template = match serde_yaml::from_str(&yaml_content) {
             Ok(t) => t,
             Err(e) => {
-                let error_msg = format!("Invalid YAML syntax: {}", e);
+                let error_msg = format!("Invalid YAML syntax: {e}");
                 report.errors.push(error_msg.clone());
                 report.is_valid = false;
                 warn!(
@@ -267,8 +267,7 @@ impl TemplateValidator {
                 for component_name in components.keys() {
                     if !self.known_components.contains(component_name) {
                         errors.push(format!(
-                            "Entity '{}': Unknown component type '{}'",
-                            entity_name, component_name
+                            "Entity '{entity_name}': Unknown component type '{component_name}'"
                         ));
                     }
                 }
@@ -276,8 +275,7 @@ impl TemplateValidator {
                 // Warn if entity has no components
                 if components.is_empty() && tags.is_empty() && entity.children.is_empty() {
                     warnings.push(format!(
-                        "Entity '{}' has no components, tags, or children (unused entity)",
-                        entity_name
+                        "Entity '{entity_name}' has no components, tags, or children (unused entity)"
                     ));
                 }
             }
@@ -306,8 +304,7 @@ impl TemplateValidator {
         for component_name in entity.overrides.keys() {
             if !self.known_components.contains(component_name) {
                 errors.push(format!(
-                    "Entity '{}': Unknown component type in overrides '{}'",
-                    entity_name, component_name
+                    "Entity '{entity_name}': Unknown component type in overrides '{component_name}'"
                 ));
             }
         }
@@ -315,7 +312,7 @@ impl TemplateValidator {
         // Recursively validate children
         for (child_name, child) in &entity.children {
             self.validate_entity_definition(
-                &format!("{}.{}", entity_name, child_name),
+                &format!("{entity_name}.{child_name}"),
                 child,
                 template_path,
                 errors,

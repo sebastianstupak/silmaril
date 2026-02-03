@@ -705,7 +705,7 @@ mod tests {
     #[test]
     fn test_validate_data_spirv_too_small() {
         // Create with valid magic but then manually reduce size for testing
-        let mut shader = ShaderData {
+        let shader = ShaderData {
             stage: ShaderStage::Vertex,
             source: ShaderSource::Spirv(vec![0x07230203, 0x00010000]), // Only 2 words
             entry_point: "main".to_string(),

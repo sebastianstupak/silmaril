@@ -812,6 +812,7 @@ fn find_queue_families(
 }
 
 /// Create logical device and queues.
+#[allow(clippy::type_complexity)]
 #[instrument(skip(instance))]
 fn create_logical_device(
     instance: &ash::Instance,

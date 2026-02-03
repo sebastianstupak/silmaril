@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "xtask",
     "engine/cli",
+    "engine/cli/asset-cooker",
     "engine/core",
     "engine/math",
     "engine/build-utils",

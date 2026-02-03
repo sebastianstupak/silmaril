@@ -320,6 +320,7 @@ impl OffscreenTarget {
     ///
     /// # Safety
     /// Command buffer must be in recording state and executed on appropriate queue.
+    #[allow(clippy::too_many_arguments)]
     pub unsafe fn transition_color_layout(
         &self,
         command_buffer: vk::CommandBuffer,
@@ -353,6 +354,7 @@ impl OffscreenTarget {
     /// # Safety
     /// Command buffer must be in recording state and executed on appropriate queue.
     /// Target must have depth attachment.
+    #[allow(clippy::too_many_arguments)]
     pub unsafe fn transition_depth_layout(
         &self,
         command_buffer: vk::CommandBuffer,

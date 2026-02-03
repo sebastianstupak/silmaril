@@ -24,7 +24,7 @@ define_error! {
 pub type TemplateResult<T> = Result<T, TemplateError>;
 
 impl TemplateError {
-    /// Create an Io error from a std::io::Error and a path.
+    /// Create an Io error from a `std::io::Error` and a path.
     pub fn from_io_error(path: impl Into<String>, error: std::io::Error) -> Self {
         Self::io(path.into(), error.to_string())
     }

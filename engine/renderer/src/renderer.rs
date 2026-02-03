@@ -389,7 +389,7 @@ impl Renderer {
                     let mesh_data = assets.get_mesh(mesh_id).ok_or_else(|| {
                         RendererError::invalidmeshdata(format!("Mesh not found: {:?}", mesh_id))
                     })?;
-                    self.gpu_cache.upload_mesh(&self.context, mesh_id, &*mesh_data)?;
+                    self.gpu_cache.upload_mesh(&self.context, mesh_id, &mesh_data)?;
                 }
 
                 // Calculate MVP matrix (Model * View * Projection)
@@ -884,4 +884,51 @@ impl Renderer {
     }
 }
 
-// Cleanup happens automatically via Drop implementations of contained types
+// Manual Drop implementation to ensure correct Vulkan cleanup order
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        info!("Destroying renderer");
+
+        // CRITICAL: Wait for GPU to finish all work before destroying resources
+        if let Err(e) = self.context.wait_idle() {
+            error!(error = ?e, "Failed to wait for device idle during cleanup");
+        }
+
+        // Vulkan cleanup must happen in specific order to avoid access violations:
+        // 1. Command buffers (reference framebuffers, pipelines)
+        // 2. Framebuffers (reference render pass, depth buffer)
+        // 3. Depth buffer (GPU memory allocation)
+        // 4. Pipelines (reference render pass)
+        // 5. Render pass
+        // 6. Swapchain
+        // 7. Surface
+        // 8. Device/Context
+        //
+        // We explicitly drop in correct order (rest happens automatically):
+
+        // Drop command buffers first (they reference many resources)
+        drop(self.command_buffers.drain(..));
+
+        // Drop framebuffers (they reference depth buffer and render pass)
+        drop(self.framebuffers.drain(..));
+
+        // Drop depth buffer (now safe, framebuffers are gone)
+        drop(self._depth_buffer.take());
+
+        // Drop mesh pipeline (references render pass)
+        drop(self.mesh_pipeline.take());
+
+        // Drop GPU cache (has GPU buffer allocations)
+        // Note: This has its own Drop that properly frees GPU memory
+        // We don't explicitly drop it, but mentioning for documentation
+
+        // Remaining cleanup happens automatically in reverse field order:
+        // - render_pass
+        // - swapchain (references surface)
+        // - surface
+        // - context (device, instance)
+        // - window
+
+        info!("Renderer destroyed");
+    }
+}

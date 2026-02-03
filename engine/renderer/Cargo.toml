@@ -82,3 +82,7 @@ harness = false
 [[bench]]
 name = "capture_benches"
 harness = false
+
+[[bench]]
+name = "asset_upload_benches"
+harness = false

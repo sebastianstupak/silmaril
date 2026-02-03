@@ -14,6 +14,7 @@ use engine_core::serialization::{
 ///
 /// Player with position, inventory, stats
 #[test]
+#[cfg(feature = "compression")]
 fn test_mmo_player_save() {
     let mut world = World::new();
     world.register::<Transform>();
@@ -63,6 +64,7 @@ fn test_mmo_player_save() {
 ///
 /// Client sends incremental updates to server
 #[test]
+#[cfg(feature = "compression")]
 fn test_network_state_sync_60fps() {
     let mut world = World::new();
     world.register::<Transform>();
@@ -201,6 +203,7 @@ fn test_save_version_migration() {
 ///
 /// Game auto-saves every 30 seconds using deltas
 #[test]
+#[cfg(feature = "compression")]
 fn test_autosave_with_deltas() {
     let mut world = World::new();
     world.register::<Transform>();
@@ -283,6 +286,7 @@ fn test_flatbuffers_network_packet() {
 ///
 /// 10,000 entity world with persistence
 #[test]
+#[cfg(feature = "compression")]
 fn test_large_world_persistence() {
     let mut world = World::new();
     world.register::<Transform>();

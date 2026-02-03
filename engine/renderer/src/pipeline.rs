@@ -459,10 +459,10 @@ mod tests {
 
         let vertex_ptr = &vertex as *const Vertex as *const u8;
         let pos_offset =
-            &vertex.position as *const glam::Vec3 as *const u8 as usize - vertex_ptr as usize;
+            std::ptr::addr_of!(vertex.position) as *const u8 as usize - vertex_ptr as usize;
         let normal_offset =
-            &vertex.normal as *const glam::Vec3 as *const u8 as usize - vertex_ptr as usize;
-        let uv_offset = &vertex.uv as *const glam::Vec2 as *const u8 as usize - vertex_ptr as usize;
+            std::ptr::addr_of!(vertex.normal) as *const u8 as usize - vertex_ptr as usize;
+        let uv_offset = std::ptr::addr_of!(vertex.uv) as *const u8 as usize - vertex_ptr as usize;
 
         assert_eq!(pos_offset, 0, "Position offset must be 0");
         assert_eq!(normal_offset, 12, "Normal offset must be 12");
