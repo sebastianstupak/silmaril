@@ -29,6 +29,10 @@ pub enum TestCommand {
     Networking,
     /// Test profiling
     Profiling,
+    /// Run E2E integration tests
+    E2e,
+    /// Run E2E tests with output
+    E2eVerbose,
 }
 
 pub fn execute(cmd: TestCommand) -> Result<()> {
@@ -106,6 +110,25 @@ pub fn execute(cmd: TestCommand) -> Result<()> {
             print_section("Testing Profiling");
             run_cargo_streaming(&["test", "--package", "engine-profiling"])?;
             print_success("Profiling tests passed");
+        }
+        TestCommand::E2e => {
+            print_section("Running E2E Integration Tests");
+            print_info("Running connectivity tests...");
+            run_cargo_streaming(&["test", "--package", "engine-shared", "--test", "e2e_tests"])?;
+            print_success("E2E tests passed");
+        }
+        TestCommand::E2eVerbose => {
+            print_section("Running E2E Integration Tests (verbose)");
+            run_cargo_streaming(&[
+                "test",
+                "--package",
+                "engine-shared",
+                "--test",
+                "e2e_tests",
+                "--",
+                "--nocapture",
+            ])?;
+            print_success("E2E tests passed");
         }
     }
     Ok(())

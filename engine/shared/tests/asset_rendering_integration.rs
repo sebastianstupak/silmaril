@@ -30,11 +30,19 @@ use tracing::{debug, info};
 // =============================================================================
 
 #[test]
-fn test_mesh_loading_from_memory() {
+fn test_mesh_loading_cube_from_memory() {
     let mesh = MeshData::cube();
     assert_eq!(mesh.vertex_count(), 24);
     assert_eq!(mesh.index_count(), 36);
     assert_eq!(mesh.triangle_count(), 12);
+}
+
+#[test]
+fn test_mesh_loading_triangle_from_memory() {
+    let mesh = MeshData::triangle();
+    assert_eq!(mesh.vertex_count(), 3);
+    assert_eq!(mesh.index_count(), 3);
+    assert_eq!(mesh.triangle_count(), 1);
 }
 
 #[test]

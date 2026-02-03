@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use std::path::Path;
 
 /// Update module exports in a mod.rs file
@@ -36,7 +36,7 @@ pub fn update_module_exports(target_dir: &Path, item_name: &str, item_type: &str
     let snake_name = to_snake_case(item_name);
 
     // Read existing mod.rs or create new with header
-    let mut content = if mod_file.exists() {
+    let content = if mod_file.exists() {
         std::fs::read_to_string(&mod_file)
             .with_context(|| format!("Failed to read mod.rs at {:?}", mod_file))?
     } else {
