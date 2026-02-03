@@ -35,6 +35,9 @@ pub const MAX_TICK_DURATION: Duration = Duration::from_millis(33);
 /// Maximum accumulated time before skipping ticks
 pub const MAX_ACCUMULATOR: Duration = Duration::from_millis(100);
 
+/// Client timeout duration (30 seconds of inactivity)
+pub const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Server tick loop errors
 #[derive(Debug)]
 pub enum ServerLoopError {
@@ -302,6 +305,7 @@ impl ServerLoop {
         let mut last_tick = Instant::now();
         let mut tick_times = Vec::with_capacity(60);
         let mut last_stats_update = Instant::now();
+        let mut last_timeout_check = Instant::now();
         let mut messages_this_second = 0u64;
 
         loop {
@@ -355,6 +359,12 @@ impl ServerLoop {
                 tick_times.clear();
                 messages_this_second = 0;
                 last_stats_update = Instant::now();
+            }
+
+            // Check for timed-out clients every second
+            if last_timeout_check.elapsed() >= Duration::from_secs(1) {
+                self.check_timeouts().await;
+                last_timeout_check = Instant::now();
             }
 
             // Sleep to maintain target tick rate
@@ -467,13 +477,28 @@ impl ServerLoop {
         match message {
             ClientMessage::Handshake { version, client_name } => {
                 if version != PROTOCOL_VERSION {
-                    warn!(
+                    error!(
                         client_id = client_id,
                         client_version = version,
                         server_version = PROTOCOL_VERSION,
-                        "Protocol version mismatch"
+                        "Protocol version mismatch - disconnecting client"
                     );
-                    // Could disconnect client here
+
+                    // Send error response before disconnecting
+                    if let Some(client) = self.clients.lock().await.get(&client_id) {
+                        let error_msg = ServerMessage::ChatBroadcast {
+                            sender: "Server".to_string(),
+                            message: format!(
+                                "Protocol version mismatch: client={}, server={}. Please update your client.",
+                                version, PROTOCOL_VERSION
+                            ),
+                            channel: 0,
+                        };
+                        let _ = client.message_tx.send(error_msg);
+                    }
+
+                    // Disconnect the client
+                    self.clients.lock().await.remove(&client_id);
                     return;
                 }
 
@@ -679,6 +704,57 @@ impl ServerLoop {
     pub fn tick(&self) -> u64 {
         self.tick
     }
+
+    /// Check for and remove timed-out clients
+    ///
+    /// Removes clients that haven't sent any messages within CLIENT_TIMEOUT duration.
+    /// Returns the number of clients that were removed.
+    pub async fn check_timeouts(&mut self) -> usize {
+        let now = Instant::now();
+        let mut timed_out = Vec::new();
+
+        // Find timed-out clients
+        {
+            let clients = self.clients.lock().await;
+            for (client_id, client) in clients.iter() {
+                let idle_duration = now.duration_since(client.last_message_at);
+                if idle_duration > CLIENT_TIMEOUT {
+                    timed_out.push((*client_id, client.address, idle_duration));
+                }
+            }
+        }
+
+        // Remove timed-out clients and cleanup their resources
+        let mut removed_count = 0;
+        for (client_id, address, idle_duration) in timed_out {
+            if let Some(client) = self.clients.lock().await.remove(&client_id) {
+                warn!(
+                    client_id = client_id,
+                    address = %address,
+                    idle_secs = idle_duration.as_secs(),
+                    "Client timed out due to inactivity"
+                );
+
+                // Despawn player entity if it exists
+                if let Some(entity) = client.player_entity {
+                    let mut world = self.world.lock().await;
+                    world.despawn(entity);
+                }
+
+                removed_count += 1;
+            }
+        }
+
+        if removed_count > 0 {
+            info!(
+                removed_count = removed_count,
+                remaining_clients = self.clients.lock().await.len(),
+                "Removed timed-out clients"
+            );
+        }
+
+        removed_count
+    }
 }
 
 #[cfg(test)]
@@ -727,5 +803,113 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_client_timeout_detection() {
+        let world = World::new();
+        let mut server_loop = ServerLoop::new(world);
+
+        // Create a test server to get a valid connection
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // Spawn a task to accept the connection
+        let accept_handle = tokio::spawn(async move { listener.accept().await.unwrap() });
+
+        // Connect a client
+        let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let (server_stream, _) = accept_handle.await.unwrap();
+
+        let (message_tx, _message_rx) = mpsc::unbounded_channel();
+        let client_id = 999u64;
+        let old_timestamp = Instant::now() - Duration::from_secs(35); // 35 seconds ago (exceeds 30s timeout)
+
+        {
+            let mut clients = server_loop.clients.lock().await;
+            clients.insert(
+                client_id,
+                ClientState {
+                    connection: Arc::new(TcpConnection::new(server_stream).unwrap()),
+                    player_entity: None,
+                    address: addr,
+                    name: "TestClient".to_string(),
+                    connected_at: old_timestamp,
+                    last_message_at: old_timestamp,
+                    message_tx,
+                },
+            );
+        }
+
+        // Verify client was added
+        assert_eq!(server_loop.client_count().await, 1);
+
+        // Check for timeouts
+        let removed = server_loop.check_timeouts().await;
+
+        // Verify client was removed due to timeout
+        assert_eq!(removed, 1, "Expected 1 client to be removed due to timeout");
+        assert_eq!(
+            server_loop.client_count().await,
+            0,
+            "Expected 0 clients remaining after timeout"
+        );
+
+        // Cleanup
+        drop(client_stream);
+    }
+
+    #[tokio::test]
+    async fn test_client_timeout_not_triggered_for_active_clients() {
+        let world = World::new();
+        let mut server_loop = ServerLoop::new(world);
+
+        // Create a test server to get a valid connection
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // Spawn a task to accept the connection
+        let accept_handle = tokio::spawn(async move { listener.accept().await.unwrap() });
+
+        // Connect a client
+        let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let (server_stream, _) = accept_handle.await.unwrap();
+
+        let (message_tx, _message_rx) = mpsc::unbounded_channel();
+        let client_id = 998u64;
+        let recent_timestamp = Instant::now() - Duration::from_secs(10); // Only 10 seconds ago (within 30s timeout)
+
+        {
+            let mut clients = server_loop.clients.lock().await;
+            clients.insert(
+                client_id,
+                ClientState {
+                    connection: Arc::new(TcpConnection::new(server_stream).unwrap()),
+                    player_entity: None,
+                    address: addr,
+                    name: "ActiveClient".to_string(),
+                    connected_at: recent_timestamp,
+                    last_message_at: recent_timestamp,
+                    message_tx,
+                },
+            );
+        }
+
+        // Verify client was added
+        assert_eq!(server_loop.client_count().await, 1);
+
+        // Check for timeouts
+        let removed = server_loop.check_timeouts().await;
+
+        // Verify client was NOT removed (still active)
+        assert_eq!(removed, 0, "Expected 0 clients to be removed (client is active)");
+        assert_eq!(
+            server_loop.client_count().await,
+            1,
+            "Expected 1 client remaining (active client should not timeout)"
+        );
+
+        // Cleanup
+        drop(client_stream);
     }
 }

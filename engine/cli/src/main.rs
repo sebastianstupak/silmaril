@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 
+mod codegen;
 mod commands;
 mod templates;
 
@@ -32,6 +33,12 @@ enum Commands {
         #[command(subcommand)]
         command: commands::template::TemplateCommand,
     },
+
+    /// Add components and systems
+    Add {
+        #[command(subcommand)]
+        command: commands::add::AddCommand,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -43,6 +50,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Template { command } => {
             commands::template::handle_template_command(command)?;
+        }
+        Commands::Add { command } => {
+            commands::add::handle_add_command(command)?;
         }
     }
 

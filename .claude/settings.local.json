@@ -111,7 +111,14 @@
       "Bash(cloc:*)",
       "Bash(timeout 10 cat:*)",
       "Bash(Select-String -Pattern \"error\" -Context 2,2)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(cmd /c \"cargo check --bin client 2>&1\")",
+      "Bash(Select-String -Pattern \"\\(error|warning|Compiling|Finished\\)\")",
+      "Bash(Select-Object -First 50)",
+      "Bash(./test_component_gen.exe:*)",
+      "Bash(if [ -f \"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\b935b52.output\" ])",
+      "Bash(then tail -80 \"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\b935b52.output\")",
+      "Bash(else echo \"Still running...\")"
     ]
   }
 }

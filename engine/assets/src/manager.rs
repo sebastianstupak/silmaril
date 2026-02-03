@@ -174,10 +174,11 @@ impl AssetManager {
 
         // Parse in background thread (CPU-bound operation)
         let path_clone = path.to_path_buf();
-        let asset = tokio::task::spawn_blocking(move || T::parse(&data))
+        let path_str = path.display().to_string();
+        let asset = tokio::task::spawn_blocking(move || T::parse(&data).map_err(|e| e.to_string()))
             .await
             .map_err(|e| AssetError::loadfailed(path_clone.display().to_string(), e.to_string()))?
-            .map_err(|e| AssetError::loadfailed(path.display().to_string(), e.to_string()))?;
+            .map_err(|e| AssetError::loadfailed(path_str, e))?;
 
         // Generate ID from content
         let id = T::generate_id(&asset);

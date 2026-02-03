@@ -84,11 +84,7 @@ pub fn run(
 
     pb.finish_with_message("Cooking complete");
 
-    info!(
-        cooked = cooked_count,
-        errors = error_count,
-        "Asset cooking finished"
-    );
+    info!(cooked = cooked_count, errors = error_count, "Asset cooking finished");
 
     if error_count > 0 {
         anyhow::bail!("{} assets failed to cook", error_count);
@@ -206,7 +202,8 @@ fn cook_texture(source_path: &Path, output_path: &Path, generate_mipmaps: bool) 
 
     // Generate mipmaps if requested and texture is power-of-2
     let texture = if generate_mipmaps
-        && (texture.format == TextureFormat::RGBA8Unorm || texture.format == TextureFormat::RGBA8Srgb)
+        && (texture.format == TextureFormat::RGBA8Unorm
+            || texture.format == TextureFormat::RGBA8Srgb)
         && texture.width.is_power_of_two()
         && texture.height.is_power_of_two()
     {

@@ -7,6 +7,10 @@ license = "Apache-2.0"
 description = "Silmaril game engine CLI tool - code-first game development"
 repository = "https://github.com/your-org/silmaril"
 
+[lib]
+name = "silm"
+path = "src/lib.rs"
+
 [[bin]]
 name = "silm"
 path = "src/main.rs"
@@ -24,6 +28,10 @@ serde_yaml = "0.9"
 # UI
 colored = "2.0"
 walkdir = "2.4"
+
+# Serialization for dates
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
 
 # Engine dependencies
 engine-templating = { path = "../templating" }

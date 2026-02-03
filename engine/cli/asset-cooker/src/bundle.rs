@@ -54,22 +54,17 @@ pub fn run(manifest_path: PathBuf, output_path: PathBuf, compression: &str) -> R
             continue;
         }
 
-        let asset_data = fs::read(&asset_path).with_context(|| {
-            format!("Failed to read asset file: {}", asset_path.display())
-        })?;
+        let asset_data = fs::read(&asset_path)
+            .with_context(|| format!("Failed to read asset file: {}", asset_path.display()))?;
 
-        bundle.add_asset(entry.id, asset_data).with_context(|| {
-            format!("Failed to add asset to bundle: {}", entry.id)
-        })?;
+        bundle
+            .add_asset(entry.id, asset_data)
+            .with_context(|| format!("Failed to add asset to bundle: {}", entry.id))?;
 
         loaded_count += 1;
     }
 
-    info!(
-        loaded = loaded_count,
-        missing = missing_count,
-        "Assets loaded into bundle"
-    );
+    info!(loaded = loaded_count, missing = missing_count, "Assets loaded into bundle");
 
     if missing_count > 0 {
         warn!("{} assets were missing and not included in bundle", missing_count);

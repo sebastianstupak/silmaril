@@ -224,10 +224,7 @@ fn test_invalid_mesh() {
     let mut bridge = AssetBridge::new(context, asset_manager.clone());
 
     // Create empty mesh (invalid)
-    let empty_mesh = MeshData {
-        vertices: vec![],
-        indices: vec![],
-    };
+    let empty_mesh = MeshData { vertices: vec![], indices: vec![] };
     let mesh_id = engine_assets::AssetId::from_content(b"empty");
     asset_manager.meshes().insert(mesh_id, empty_mesh);
 

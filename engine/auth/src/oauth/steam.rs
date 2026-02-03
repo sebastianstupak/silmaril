@@ -75,6 +75,7 @@ impl SteamAuth {
     /// # Returns
     ///
     /// Steam ID (64-bit) as a string
+    #[allow(clippy::unused_async)]
     pub async fn verify_and_get_steam_id(
         &self,
         query_params: &[(String, String)],

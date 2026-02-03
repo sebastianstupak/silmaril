@@ -23,8 +23,8 @@ fn test_renderer_cleanup_manual() {
     };
 
     println!("Creating renderer...");
-    let mut renderer = Renderer::new(config, "CleanupManualTest")
-        .expect("Failed to create renderer");
+    let mut renderer =
+        Renderer::new(config, "CleanupManualTest").expect("Failed to create renderer");
 
     println!("Rendering 5 frames...");
     for i in 0..5 {

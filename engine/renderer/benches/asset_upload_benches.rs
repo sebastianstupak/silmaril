@@ -29,10 +29,7 @@ fn bench_mesh_upload(c: &mut Criterion) {
     let (_context, asset_manager, mut bridge) = setup;
 
     // Create meshes of different sizes
-    let meshes = vec![
-        ("triangle_3v", MeshData::triangle(), 3),
-        ("cube_24v", MeshData::cube(), 24),
-    ];
+    let meshes = vec![("triangle_3v", MeshData::triangle(), 3), ("cube_24v", MeshData::cube(), 24)];
 
     let mut group = c.benchmark_group("mesh_upload");
     group.sample_size(20); // Fewer samples for GPU operations

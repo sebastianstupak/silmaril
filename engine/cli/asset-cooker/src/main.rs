@@ -106,13 +106,7 @@ fn main() -> anyhow::Result<()> {
     info!("Asset Cooker v{}", env!("CARGO_PKG_VERSION"));
 
     match cli.command {
-        Commands::Cook {
-            source_dir,
-            output_dir,
-            generate_mipmaps,
-            optimize_meshes,
-            recursive,
-        } => {
+        Commands::Cook { source_dir, output_dir, generate_mipmaps, optimize_meshes, recursive } => {
             cook::run(source_dir, output_dir, generate_mipmaps, optimize_meshes, recursive)?;
         }
         Commands::Bundle { manifest, output, compression } => {

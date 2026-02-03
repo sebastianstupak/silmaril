@@ -118,7 +118,10 @@ fn test_bundle_with_missing_assets() {
         .expect("Failed to execute asset-cooker");
 
     // Should still succeed (warnings are logged, not errors)
-    assert!(output.status.success(), "Bundle command should succeed even with missing assets");
+    assert!(
+        output.status.success(),
+        "Bundle command should succeed even with missing assets"
+    );
 }
 
 #[test]

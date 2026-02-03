@@ -1,3 +1,8 @@
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::match_same_arms)]
+#![allow(clippy::should_implement_trait)]
+#![allow(clippy::unused_async)]
+
 //! Authentication system for Silmaril.
 //!
 //! Production-grade authentication with AAA game studio quality standards.

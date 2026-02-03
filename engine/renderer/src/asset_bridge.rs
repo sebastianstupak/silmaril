@@ -199,8 +199,7 @@ impl AssetBridge {
 
         // Create vertex buffer
         let vertex_size = std::mem::size_of_val(&mesh_data.vertices[..]) as u64;
-        let vertex_usage =
-            vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST;
+        let vertex_usage = vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST;
 
         let mut vertex_buffer =
             GpuBuffer::new(&self.context, vertex_size, vertex_usage, MemoryLocation::CpuToGpu)?;
@@ -278,7 +277,10 @@ impl AssetBridge {
     /// Creates a Vulkan image and uploads the texture data.
     /// For now, this is a placeholder - full implementation requires
     /// command buffer submission and image layout transitions.
-    fn upload_texture_data(&self, _texture_data: &TextureData) -> Result<GpuTexture, RendererError> {
+    fn upload_texture_data(
+        &self,
+        _texture_data: &TextureData,
+    ) -> Result<GpuTexture, RendererError> {
         // TODO: Full implementation requires:
         // 1. Create VkImage
         // 2. Allocate GPU memory

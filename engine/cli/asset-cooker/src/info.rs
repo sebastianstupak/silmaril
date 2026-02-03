@@ -110,7 +110,8 @@ fn display_texture_info(path: &PathBuf) -> Result<()> {
     println!("  Dimensions: {}x{}", texture.width, texture.height);
     println!("  Format:     {:?}", texture.format);
     println!("  Mip Levels: {}", texture.mip_count());
-    println!("  Memory:     {} bytes ({:.2} KB)",
+    println!(
+        "  Memory:     {} bytes ({:.2} KB)",
         texture.memory_size(),
         texture.memory_size() as f64 / 1024.0
     );

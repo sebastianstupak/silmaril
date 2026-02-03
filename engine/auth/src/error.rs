@@ -90,6 +90,7 @@ pub enum AuthErrorCode {
 impl AuthErrorCode {
     /// Convert to engine `ErrorCode`
     #[must_use]
+    #[allow(clippy::match_same_arms)]
     pub fn to_engine_code(self) -> ErrorCode {
         // Auth errors are in the networking range (1400-1499)
         // We map our auth codes to a subset
@@ -365,6 +366,7 @@ impl AuthError {
 
     /// Get severity level for this error.
     #[must_use]
+    #[allow(clippy::match_same_arms)]
     pub fn severity(&self) -> ErrorSeverity {
         match self {
             Self::WeakPassword { .. }

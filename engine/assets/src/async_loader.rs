@@ -2,8 +2,6 @@
 //!
 //! Provides background loading with progress tracking, cancellation, and priorities.
 
-#![cfg(feature = "async")]
-
 use crate::{AssetError, AssetHandle, AssetLoader, AssetManager};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -236,18 +234,20 @@ impl AsyncLoader {
 
             // Parse in background thread
             let path_clone2 = path_clone.clone();
-            let asset = match tokio::task::spawn_blocking(move || T::parse(&data)).await {
+            let asset = match tokio::task::spawn_blocking(move || {
+                T::parse(&data).map_err(|e| e.to_string())
+            })
+            .await
+            {
                 Ok(Ok(asset)) => {
                     progress_clone.store(9000, Ordering::Relaxed); // 90%
                     asset
                 }
                 Ok(Err(e)) => {
-                    error!(path = ?path_clone, error = ?e, "Failed to parse asset");
+                    error!(path = ?path_clone, error = %e, "Failed to parse asset");
                     status_clone.store(3, Ordering::Relaxed); // Failed
-                    let _ = result_tx.send(Err(AssetError::loadfailed(
-                        path_clone.display().to_string(),
-                        e.to_string(),
-                    )));
+                    let _ = result_tx
+                        .send(Err(AssetError::loadfailed(path_clone.display().to_string(), e)));
                     return;
                 }
                 Err(e) => {

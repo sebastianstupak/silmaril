@@ -60,7 +60,10 @@ fn generate_mesh(params: Vec<String>, output_path: PathBuf) -> Result<()> {
             let segments = parse_u32(&params, 3, "segments", 16)?;
             generate_cylinder(radius, height, segments)
         }
-        _ => anyhow::bail!("Unknown mesh type: {}. Supported: cube, sphere, plane, cylinder", mesh_type),
+        _ => anyhow::bail!(
+            "Unknown mesh type: {}. Supported: cube, sphere, plane, cylinder",
+            mesh_type
+        ),
     };
 
     info!(mesh_type = mesh_type, "Generating mesh");
@@ -152,7 +155,10 @@ fn generate_sphere(radius: f32, subdivisions_lat: u32, subdivisions_lon: u32) ->
 
             let position = Vec3::new(x, y, z) * radius;
             let normal = Vec3::new(x, y, z);
-            let uv = Vec2::new(lon as f32 / subdivisions_lon as f32, lat as f32 / subdivisions_lat as f32);
+            let uv = Vec2::new(
+                lon as f32 / subdivisions_lon as f32,
+                lat as f32 / subdivisions_lat as f32,
+            );
 
             vertices.push(Vertex::new(position, normal, uv));
         }
@@ -260,18 +266,10 @@ fn generate_cylinder(radius: f32, height: f32, segments: u32) -> MeshData {
 
     // Add caps (simplified - center vertex + ring)
     let bottom_center = vertices.len() as u32;
-    vertices.push(Vertex::new(
-        Vec3::new(0.0, -half_height, 0.0),
-        Vec3::NEG_Y,
-        Vec2::new(0.5, 0.5),
-    ));
+    vertices.push(Vertex::new(Vec3::new(0.0, -half_height, 0.0), Vec3::NEG_Y, Vec2::new(0.5, 0.5)));
 
     let top_center = vertices.len() as u32;
-    vertices.push(Vertex::new(
-        Vec3::new(0.0, half_height, 0.0),
-        Vec3::Y,
-        Vec2::new(0.5, 0.5),
-    ));
+    vertices.push(Vertex::new(Vec3::new(0.0, half_height, 0.0), Vec3::Y, Vec2::new(0.5, 0.5)));
 
     for i in 0..segments {
         let angle = 2.0 * PI * i as f32 / segments as f32;
@@ -336,7 +334,10 @@ fn generate_texture(params: Vec<String>, output_path: PathBuf) -> Result<()> {
             let height = parse_u32(&params, 2, "height", 256)?;
             generate_noise(width, height)?
         }
-        _ => anyhow::bail!("Unknown texture type: {}. Supported: checkerboard, gradient, noise", texture_type),
+        _ => anyhow::bail!(
+            "Unknown texture type: {}. Supported: checkerboard, gradient, noise",
+            texture_type
+        ),
     };
 
     info!(texture_type = texture_type, "Generating texture");
@@ -472,12 +473,7 @@ fn generate_sine_wave(frequency: f32, duration_secs: f32) -> AudioData {
         samples.push(sample.to_le_bytes()[1]);
     }
 
-    AudioData {
-        sample_rate: SAMPLE_RATE,
-        channels: 2,
-        format: AudioFormat::PCM16,
-        data: samples,
-    }
+    AudioData { sample_rate: SAMPLE_RATE, channels: 2, format: AudioFormat::PCM16, data: samples }
 }
 
 /// Generate white noise
@@ -498,12 +494,7 @@ fn generate_white_noise(duration_secs: f32) -> AudioData {
         samples.push(sample.to_le_bytes()[1]);
     }
 
-    AudioData {
-        sample_rate: SAMPLE_RATE,
-        channels: 2,
-        format: AudioFormat::PCM16,
-        data: samples,
-    }
+    AudioData { sample_rate: SAMPLE_RATE, channels: 2, format: AudioFormat::PCM16, data: samples }
 }
 
 /// Parse f32 parameter from string array

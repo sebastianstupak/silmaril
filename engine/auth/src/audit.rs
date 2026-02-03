@@ -207,6 +207,7 @@ impl AuditLogger {
     }
 
     /// Log a failed login attempt.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn log_login_failed(
         &self,
         username: String,
@@ -275,6 +276,7 @@ impl AuditLogger {
     }
 
     /// Log account locked.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn log_account_locked(
         &self,
         user_id: String,

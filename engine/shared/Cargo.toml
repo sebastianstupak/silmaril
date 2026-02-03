@@ -38,6 +38,82 @@ name = "asset_rendering_integration"
 path = "tests/asset_rendering_integration.rs"
 harness = true
 
+[[test]]
+name = "e2e_simple_test"
+path = "tests/e2e_simple_test.rs"
+harness = true
+
+[[test]]
+name = "e2e_tests"
+path = "tests/e2e_tests.rs"
+harness = true
+
+[[test]]
+name = "template_ecs_integration"
+path = "tests/template_ecs_integration.rs"
+harness = true
+
+[[test]]
+name = "physics_rendering_test"
+path = "tests/physics_rendering_test.rs"
+harness = true
+
+[[test]]
+name = "ecs_rendering_integration"
+path = "tests/ecs_rendering_integration.rs"
+harness = true
+
+# Networking integration tests
+[[test]]
+name = "delta_integration_test"
+path = "tests/networking/delta_integration_test.rs"
+harness = true
+
+[[test]]
+name = "network_replication_test"
+path = "tests/networking/network_replication_test.rs"
+harness = true
+
+[[test]]
+name = "interest_management_test"
+path = "tests/networking/interest_management_test.rs"
+harness = true
+
+[[test]]
+name = "interest_integration_advanced_test"
+path = "tests/networking/interest_integration_advanced_test.rs"
+harness = true
+
+[[test]]
+name = "interest_edge_cases_test"
+path = "tests/networking/interest_edge_cases_test.rs"
+harness = true
+
+[[test]]
+name = "interest_mmo_scenarios_test"
+path = "tests/networking/interest_mmo_scenarios_test.rs"
+harness = true
+
+[[test]]
+name = "auth_encryption_integration_test"
+path = "tests/networking/auth_encryption_integration_test.rs"
+harness = true
+
+[[test]]
+name = "interpolation_integration_test"
+path = "tests/networking/interpolation_integration_test.rs"
+harness = true
+
+[[test]]
+name = "server_loop_test"
+path = "tests/networking/server_loop_test.rs"
+harness = true
+
+[[test]]
+name = "world_streaming_integration_test"
+path = "tests/networking/world_streaming_integration_test.rs"
+harness = true
+
 [[bench]]
 name = "integration_bench"
 path = "benches/integration_bench.rs"
@@ -65,7 +141,11 @@ engine-physics = { path = "../physics" }
 engine-audio = { path = "../audio" }
 engine-assets = { path = "../assets" }
 engine-renderer = { path = "../renderer" }
+engine-networking = { path = "../networking" }
+engine-templating = { path = "../templating" }
 glam = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

@@ -268,7 +268,10 @@ fn test_memory_usage_calculation() {
 
 #[test]
 fn test_texture_memory_sizing() {
-    let texture = TextureData::solid_color([255, 0, 0, 255], 1024, 1024);
+    use engine_assets::TextureFormat;
+
+    let data = vec![255u8; 1024 * 1024 * 4]; // Red solid color
+    let texture = TextureData::new(1024, 1024, TextureFormat::RGBA8Unorm, data).unwrap();
     let size = texture.size_bytes();
 
     // 1024x1024 RGBA8 should be at least 4MB

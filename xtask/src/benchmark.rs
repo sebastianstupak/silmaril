@@ -39,6 +39,8 @@ pub enum BenchmarkCommand {
     Serialization,
     /// Run asset loading benchmarks
     Assets,
+    /// Run asset system industry comparison benchmarks
+    AssetsCompare,
     /// Run spatial data structure benchmarks
     Spatial,
     /// Run allocator benchmarks
@@ -207,8 +209,56 @@ pub fn execute(cmd: BenchmarkCommand) -> Result<()> {
         }
         BenchmarkCommand::Assets => {
             print_section("Running Asset Benchmarks");
-            run_cargo_streaming(&["bench", "--package", "engine-assets"])?;
+            print_info("Running all asset benchmarks (15 benchmark suites)");
+            println!();
+            println!("📦 Benchmarks included:");
+            println!("  • Asset Handle System (creation, cloning, ref counting)");
+            println!("  • Asset Loading (sync, async, streaming)");
+            println!("  • Memory Management (LRU cache, budgets, eviction)");
+            println!("  • Hot-Reload (file watching, debouncing, batching)");
+            println!("  • Network Transfer (compression, checksums, chunking)");
+            println!("  • Manifest & Bundles (YAML, Bincode, packing)");
+            println!("  • Validation (format, data integrity, checksums)");
+            println!("  • Procedural Generation (meshes, textures, audio)");
+            println!();
+
+            run_cargo_streaming(&["bench", "--package", "engine-assets", "--all-features"])?;
+
+            println!();
+            print_info("💡 Tip: Run 'cargo xtask bench assets-compare' for industry comparisons");
             print_success("Asset benchmarks complete");
+        }
+        BenchmarkCommand::AssetsCompare => {
+            print_section("Running Asset System Industry Comparison");
+            print_info("Comparing Silmaril's asset system against:");
+            println!("  • Unity (AssetDatabase, AssetBundles)");
+            println!("  • Unreal Engine (AssetRegistry, Pak files)");
+            println!("  • Godot (ResourceLoader, PCK files)");
+            println!("  • Bevy (AssetServer, hot-reload)");
+            println!();
+
+            print_info("Performance targets:");
+            println!("  ✓ Asset loading: < 5ms (Unity parity)");
+            println!("  ✓ Hot-reload: < 100ms (2-5x faster)");
+            println!("  ✓ Memory overhead: < 100 bytes/asset");
+            println!("  ✓ Network transfer: > 50 MB/s");
+            println!("  ✓ Bundle packing: > 100 MB/s");
+            println!();
+
+            run_cargo_streaming(&[
+                "bench",
+                "--package",
+                "engine-assets",
+                "--bench",
+                "industry_comparison",
+                "--all-features",
+            ])?;
+
+            println!();
+            print_success("Industry comparison complete");
+            print_info(
+                "📊 View detailed report: target/criterion/industry_comparison/report/index.html",
+            );
         }
         BenchmarkCommand::Spatial => {
             print_section("Running Spatial Benchmarks");

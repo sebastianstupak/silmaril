@@ -57,11 +57,9 @@ fn validate_mesh(path: &PathBuf) -> Result<()> {
         "mesh" => {
             // Binary mesh format
             let data = fs::read(path)?;
-            MeshData::validate_format(&data)
-                .context("Format validation failed")?;
+            MeshData::validate_format(&data).context("Format validation failed")?;
 
-            let mesh = MeshData::from_binary(&data)
-                .context("Failed to load mesh")?;
+            let mesh = MeshData::from_binary(&data).context("Failed to load mesh")?;
 
             let report = mesh.validate_all();
             if !report.is_valid() {
@@ -70,8 +68,7 @@ fn validate_mesh(path: &PathBuf) -> Result<()> {
         }
         "obj" => {
             let obj_data = fs::read_to_string(path)?;
-            let mesh = MeshData::from_obj(&obj_data)
-                .context("Failed to parse OBJ")?;
+            let mesh = MeshData::from_obj(&obj_data).context("Failed to parse OBJ")?;
 
             let report = mesh.validate_all();
             if !report.is_valid() {
@@ -80,8 +77,7 @@ fn validate_mesh(path: &PathBuf) -> Result<()> {
         }
         "gltf" | "glb" => {
             let gltf_data = fs::read(path)?;
-            let mesh = MeshData::from_gltf(&gltf_data, None)
-                .context("Failed to parse glTF")?;
+            let mesh = MeshData::from_gltf(&gltf_data, None).context("Failed to parse glTF")?;
 
             let report = mesh.validate_all();
             if !report.is_valid() {
@@ -102,8 +98,8 @@ fn validate_texture(path: &PathBuf) -> Result<()> {
         "texture" => {
             // Binary texture format
             let data = fs::read(path)?;
-            let texture: TextureData = bincode::deserialize(&data)
-                .context("Failed to deserialize texture")?;
+            let texture: TextureData =
+                bincode::deserialize(&data).context("Failed to deserialize texture")?;
 
             let report = texture.validate_all();
             if !report.is_valid() {
@@ -112,8 +108,8 @@ fn validate_texture(path: &PathBuf) -> Result<()> {
         }
         "png" | "jpg" | "jpeg" => {
             let image_data = fs::read(path)?;
-            let texture = TextureData::from_image_bytes(&image_data)
-                .context("Failed to load image")?;
+            let texture =
+                TextureData::from_image_bytes(&image_data).context("Failed to load image")?;
 
             let report = texture.validate_all();
             if !report.is_valid() {
@@ -122,8 +118,7 @@ fn validate_texture(path: &PathBuf) -> Result<()> {
         }
         "dds" => {
             let dds_data = fs::read(path)?;
-            let texture = TextureData::from_dds_bytes(&dds_data)
-                .context("Failed to load DDS")?;
+            let texture = TextureData::from_dds_bytes(&dds_data).context("Failed to load DDS")?;
 
             let report = texture.validate_all();
             if !report.is_valid() {

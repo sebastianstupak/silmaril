@@ -47,10 +47,10 @@ impl ThreadingBackend for WindowsThreading {
         let result = unsafe { SetThreadPriority(GetCurrentThread(), win_priority) };
 
         if result == 0 {
-            return Err(PlatformError::ThreadingError {
-                operation: "set_priority".to_string(),
-                details: format!("SetThreadPriority failed for {:?}", priority),
-            });
+            return Err(PlatformError::threadingerror(
+                "set_priority".to_string(),
+                format!("SetThreadPriority failed for {:?}", priority),
+            ));
         }
 
         Ok(())
@@ -58,19 +58,19 @@ impl ThreadingBackend for WindowsThreading {
 
     fn set_thread_affinity(&self, cores: &[usize]) -> Result<(), PlatformError> {
         if cores.is_empty() {
-            return Err(PlatformError::ThreadingError {
-                operation: "set_affinity".to_string(),
-                details: "Core list cannot be empty".to_string(),
-            });
+            return Err(PlatformError::threadingerror(
+                "set_affinity".to_string(),
+                "Core list cannot be empty".to_string(),
+            ));
         }
 
         // Validate core indices before building mask
         for &core in cores {
             if core >= self.num_cpus {
-                return Err(PlatformError::ThreadingError {
-                    operation: "set_affinity".to_string(),
-                    details: format!("Core {} exceeds available CPUs ({})", core, self.num_cpus),
-                });
+                return Err(PlatformError::threadingerror(
+                    "set_affinity".to_string(),
+                    format!("Core {} exceeds available CPUs ({})", core, self.num_cpus),
+                ));
             }
         }
 
@@ -78,10 +78,10 @@ impl ThreadingBackend for WindowsThreading {
         let mut mask: usize = 0;
         for &core in cores {
             if core >= std::mem::size_of::<usize>() * 8 {
-                return Err(PlatformError::ThreadingError {
-                    operation: "set_affinity".to_string(),
-                    details: format!("Core index {} is out of range", core),
-                });
+                return Err(PlatformError::threadingerror(
+                    "set_affinity".to_string(),
+                    format!("Core index {} is out of range", core),
+                ));
             }
             mask |= 1 << core;
         }
@@ -89,10 +89,10 @@ impl ThreadingBackend for WindowsThreading {
         let result = unsafe { SetThreadAffinityMask(GetCurrentThread(), mask) };
 
         if result == 0 {
-            return Err(PlatformError::ThreadingError {
-                operation: "set_affinity".to_string(),
-                details: "SetThreadAffinityMask failed".to_string(),
-            });
+            return Err(PlatformError::threadingerror(
+                "set_affinity".to_string(),
+                "SetThreadAffinityMask failed".to_string(),
+            ));
         }
 
         Ok(())
