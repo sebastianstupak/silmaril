@@ -155,6 +155,30 @@ impl PhysicsConfig {
         self
     }
 
+    /// Set solver iteration count (Phase C.1.2)
+    ///
+    /// Higher values improve stability and accuracy but increase CPU cost.
+    ///
+    /// # Arguments
+    ///
+    /// * `iterations` - Number of solver iterations (typical range: 2-16)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use engine_physics::PhysicsConfig;
+    ///
+    /// // Fast but less stable
+    /// let fast_config = PhysicsConfig::default().with_solver_iterations(2);
+    ///
+    /// // Slow but very stable
+    /// let stable_config = PhysicsConfig::default().with_solver_iterations(16);
+    /// ```
+    pub fn with_solver_iterations(mut self, iterations: u32) -> Self {
+        self.solver_iterations = iterations;
+        self
+    }
+
     /// Get timestep in seconds
     pub fn timestep(&self) -> f32 {
         1.0 / self.timestep_hz as f32
