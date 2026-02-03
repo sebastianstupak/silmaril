@@ -1,0 +1,17 @@
+[game]
+name = "rotating-cube"
+version = "0.1.0"
+description = "A game built with Silmaril"
+
+[dependencies]
+# Engine dependencies are specified in each crate's Cargo.toml
+
+[modules]
+# Game modules added via `silm add module` appear here
+# Example:
+# combat = { source = "git", version = "0.1.0" }
+
+[features]
+client = []
+server = []
+networking = []

@@ -1,3 +1,7 @@
+// Allow dead code for now - this module is part of the codegen API
+// and will be used when component/system registry features are implemented
+#![allow(dead_code)]
+
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

@@ -2,6 +2,9 @@ use anyhow::{bail, Result};
 
 use super::validator::validate_pascal_case;
 
+// Allow dead code for QueryComponent::new which is part of the public API
+#[allow(dead_code)]
+
 /// Query access mode for components
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryAccess {
@@ -17,6 +20,7 @@ pub struct QueryComponent {
 }
 
 impl QueryComponent {
+    #[allow(dead_code)]
     pub fn new(name: String, access: QueryAccess) -> Self {
         Self { name, access }
     }

@@ -7,6 +7,9 @@
 use std::path::PathBuf;
 use std::sync::Once;
 
+// Error recovery and resilience tests
+pub mod error_recovery_test;
+
 static INIT: Once = Once::new();
 
 /// Initialize test environment (logging, tracing, etc.)

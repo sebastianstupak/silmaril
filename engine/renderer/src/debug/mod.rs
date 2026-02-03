@@ -41,11 +41,15 @@
 //! - Export: Async, non-blocking
 //! - Query latency: < 10ms per query
 
+pub mod bounds;
 pub mod capture;
 pub mod events;
 pub mod exporters;
+pub mod performance_overlay;
 pub mod query;
 pub mod snapshot;
+pub mod visual_validator;
+pub mod wireframe;
 
 // Re-export main types
 pub use snapshot::{
@@ -53,13 +57,17 @@ pub use snapshot::{
     RenderTargetInfo, ShaderStageInfo, TextureInfo, ValidationError,
 };
 
+pub use bounds::{Aabb, BoundingBoxRenderer, BoundsConfig, Obb};
 pub use capture::{
     Anomaly, CaptureError, DebugConfig, FrameCaptureData, FrameDiff, FrameMetadata, Rect,
     RenderingDebugger,
 };
 pub use events::{EventRecorder, RenderEvent};
 pub use exporters::{ExportError, JsonlExporter, PngExporter, SqliteExporter};
+pub use performance_overlay::{OverlayConfig, PerformanceOverlay, PerformanceStats};
 pub use query::{
     BufferLifecycle, DatabaseStats, DrawCallError, ImageDiff, LeakedResource, QueryError,
     RenderingQueryAPI, ShaderError, SwapchainEvent, TextureLifecycle, Value,
 };
+pub use visual_validator::{ComparisonConfig, ComparisonResult, VisualValidator};
+pub use wireframe::{WireframeConfig, WireframeRenderer};

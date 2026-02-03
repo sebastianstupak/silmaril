@@ -3,7 +3,7 @@
 //! This file contains 25+ tests covering all edge cases and scenarios
 //! for field parsing, query parsing, array extraction, and default value generation.
 
-use silm::codegen::parser::{
+use silm::codegen::{
     default_value_for_type, extract_array_type, parse_fields, parse_query_components, QueryAccess,
 };
 

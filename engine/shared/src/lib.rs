@@ -74,3 +74,6 @@
 pub use engine_core;
 pub use engine_math;
 pub use engine_physics;
+
+/// Stress testing utilities for performance and load testing
+pub mod stress_testing;

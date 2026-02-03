@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = [
+    "xtask",
+    "shared",
+    "server",
+    "client",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["rotating-cube Team"]
+license = "Apache-2.0"
+
+[workspace.dependencies]
+# Silmaril engine dependencies (using local paths)
+silmaril-core = { path = "../../engine/core" }
+silmaril-ecs = { path = "../../engine/ecs" }
+silmaril-math = { path = "../../engine/math" }
+silmaril-renderer = { path = "../../engine/renderer" }
+silmaril-networking = { path = "../../engine/networking" }
+silmaril-physics = { path = "../../engine/physics" }
+silmaril-assets = { path = "../../engine/assets" }
+engine-math = { path = "../../engine/math" }
+engine-core = { path = "../../engine/core" }
+engine-assets = { path = "../../engine/assets" }
+engine-renderer = { path = "../../engine/renderer" }
+
+# Common dependencies
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+anyhow = "1.0"
+
+[profile.dev]
+opt-level = 1  # Faster debug builds
+
+[profile.dev.package."*"]
+opt-level = 3  # Optimize dependencies even in debug
+
+[profile.release]
+lto = "thin"
+codegen-units = 16
+opt-level = 3
+
+[profile.release-server]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+opt-level = "z"  # Optimize for size
+strip = true

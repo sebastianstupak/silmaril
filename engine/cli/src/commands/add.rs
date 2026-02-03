@@ -4,12 +4,36 @@ use colored::Colorize;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::codegen::parser::{parse_query_components, to_snake_case};
+use crate::codegen::{
+    generate_component_code, parse_fields, parse_query_components, to_snake_case,
+};
 use crate::codegen::system::{generate_system_code, SystemPhase};
-use crate::codegen::validator::validate_snake_case;
+use crate::codegen::validator::{validate_pascal_case, validate_snake_case};
 
 #[derive(Subcommand)]
 pub enum AddCommand {
+    /// Add a new component
+    Component {
+        /// Component name in PascalCase (e.g., Health, PlayerState)
+        name: String,
+
+        /// Component fields (e.g., "current:f32,max:f32")
+        #[arg(short, long)]
+        fields: String,
+
+        /// Location: shared, client, server
+        #[arg(short, long, default_value = "shared")]
+        location: String,
+
+        /// Additional derives (e.g., "Default,PartialEq")
+        #[arg(short, long)]
+        derive: Option<String>,
+
+        /// Documentation string
+        #[arg(long)]
+        doc: Option<String>,
+    },
+
     /// Add a new system
     System {
         /// System name in snake_case (e.g., health_regen, movement)
@@ -35,13 +59,78 @@ pub enum AddCommand {
 
 pub fn handle_add_command(command: AddCommand) -> Result<()> {
     match command {
+        AddCommand::Component { name, fields, location, derive, doc } => {
+            add_component(&name, &fields, &location, derive, doc)
+        }
         AddCommand::System { name, query, location, phase, doc } => {
             add_system(&name, &query, &location, &phase, doc)
         }
     }
 }
 
-fn add_system(
+pub fn add_component(
+    name: &str,
+    fields_str: &str,
+    location: &str,
+    derive: Option<String>,
+    doc: Option<String>,
+) -> Result<()> {
+    // Validate component name
+    validate_pascal_case(name)?;
+
+    // Validate location
+    if !["shared", "client", "server"].contains(&location) {
+        bail!("Invalid location '{}'. Must be: shared, client, or server", location);
+    }
+
+    // Parse fields
+    let fields = parse_fields(fields_str)?;
+
+    if fields.is_empty() {
+        bail!("Component must have at least one field");
+    }
+
+    // Generate code
+    let code = generate_component_code(name, &fields, derive.clone(), doc.clone());
+
+    // Determine file path
+    let snake_name = to_snake_case(name);
+    let components_dir = PathBuf::from(location).join("src").join("components");
+    let file_path = components_dir.join(format!("{}.rs", snake_name));
+
+    // Create directory if it doesn't exist
+    if !components_dir.exists() {
+        fs::create_dir_all(&components_dir)?;
+    }
+
+    // Check if file already exists
+    if file_path.exists() {
+        bail!("Component file already exists: {}", file_path.display());
+    }
+
+    // Write file
+    fs::write(&file_path, code)?;
+
+    // Print success message
+    println!("{}", "✅ Component created successfully!".green().bold());
+    println!();
+    println!("{}", "📁 Files:".bold());
+    println!("  ✓ {}", file_path.display());
+    println!();
+    println!("{}", "📝 Next steps:".bold());
+    println!("  1. Review generated code");
+    println!("  2. Add to templates: silm template edit player.yaml");
+    println!("  3. Implement additional methods if needed");
+    println!("  4. Run tests: cargo test {}", snake_name);
+    println!();
+    println!("{}", "⚠️  Manual steps required:".yellow().bold());
+    println!("  - Add 'pub mod {};' to {}/src/components/mod.rs", snake_name, location);
+    println!("  - Add 'pub use {}::{};' to export the component", snake_name, name);
+
+    Ok(())
+}
+
+pub fn add_system(
     name: &str,
     query: &str,
     location: &str,

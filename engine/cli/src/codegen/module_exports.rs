@@ -1,3 +1,7 @@
+// Allow dead code for now - these functions are part of the codegen API
+// and will be used when module management commands are implemented
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use std::path::Path;
 
@@ -19,7 +23,7 @@ use std::path::Path;
 /// # Example
 /// ```no_run
 /// use std::path::Path;
-/// use engine_cli::codegen::module_exports::update_module_exports;
+/// use silm::codegen::update_module_exports;
 ///
 /// let components_dir = Path::new("shared/src/components");
 /// update_module_exports(components_dir, "Health", "component")?;
@@ -97,7 +101,7 @@ pub fn update_module_exports(target_dir: &Path, item_name: &str, item_type: &str
 ///
 /// # Examples
 /// ```
-/// use engine_cli::codegen::module_exports::to_snake_case;
+/// use silm::codegen::to_snake_case;
 ///
 /// assert_eq!(to_snake_case("Health"), "health");
 /// assert_eq!(to_snake_case("PlayerState"), "player_state");

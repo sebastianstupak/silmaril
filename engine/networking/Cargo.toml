@@ -128,3 +128,11 @@ harness = false
 [[bench]]
 name = "server_bench"
 harness = false
+
+[[bench]]
+name = "protocol_version_bench"
+harness = false
+
+[[bench]]
+name = "timeout_detection_bench"
+harness = false

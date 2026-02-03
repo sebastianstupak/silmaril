@@ -16,14 +16,12 @@
 //! It MUST be in engine/shared/tests/ per TESTING_ARCHITECTURE.md.
 
 use engine_assets::{
-    AssetError, AssetLoader, AssetManager, MeshData, TextureData, TextureFormat, Vertex,
+    AssetManager, AssetValidator, MeshData, TextureData, TextureFormat, Vertex,
 };
-use engine_core::ecs::{Component, World};
-use engine_math::{Quat, Vec2, Vec3};
-use engine_renderer::{AssetBridge, GpuCache, RendererError, VulkanContext};
+use engine_renderer::{AssetBridge, VulkanContext};
+use glam::{Vec2, Vec3};
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, info};
 
 // =============================================================================
 // Category 1: Asset Loading Tests
@@ -52,7 +50,6 @@ fn test_mesh_loading_with_validation() {
     assert!(mesh.indices.len() == 3);
 
     // Validate mesh data
-    use engine_assets::validation::AssetValidator;
     let report = mesh.validate_all();
     assert!(report.is_valid(), "Triangle mesh should pass validation");
 }
@@ -155,7 +152,6 @@ fn test_corrupted_obj_data_error() {
 #[test]
 fn test_empty_mesh_validation_error() {
     let empty_mesh = MeshData::new();
-    use engine_assets::validation::AssetValidator;
     let result = empty_mesh.validate_data();
     assert!(result.is_err(), "Empty mesh should fail validation");
 }
@@ -165,7 +161,6 @@ fn test_out_of_bounds_indices_error() {
     let mut mesh = MeshData::triangle();
     mesh.indices.push(999); // Out of bounds
 
-    use engine_assets::validation::AssetValidator;
     let result = mesh.validate_data();
     assert!(result.is_err(), "Out-of-bounds indices should fail validation");
 }
@@ -175,7 +170,6 @@ fn test_nan_vertex_position_error() {
     let mut mesh = MeshData::triangle();
     mesh.vertices[0].position.x = f32::NAN;
 
-    use engine_assets::validation::AssetValidator;
     let result = mesh.validate_data();
     assert!(result.is_err(), "NaN in vertex data should fail validation");
 }
@@ -185,7 +179,6 @@ fn test_infinite_normal_error() {
     let mut mesh = MeshData::triangle();
     mesh.vertices[1].normal.y = f32::INFINITY;
 
-    use engine_assets::validation::AssetValidator;
     let result = mesh.validate_data();
     assert!(result.is_err(), "Infinity in normal should fail validation");
 }
@@ -196,7 +189,6 @@ fn test_texture_zero_dimensions_error() {
         TextureData::new(8, 8, TextureFormat::RGBA8Unorm, vec![0u8; 256]).expect("Valid texture");
     texture.width = 0;
 
-    use engine_assets::validation::AssetValidator;
     let result = texture.validate_data();
     assert!(result.is_err(), "Zero dimensions should fail validation");
 }
@@ -207,7 +199,6 @@ fn test_texture_oversized_dimensions_error() {
         TextureData::new(8, 8, TextureFormat::RGBA8Unorm, vec![0u8; 256]).expect("Valid texture");
     texture.width = 20000; // Exceeds MAX_DIMENSION (16384)
 
-    use engine_assets::validation::AssetValidator;
     let result = texture.validate_data();
     assert!(result.is_err(), "Oversized dimensions should fail validation");
 }
@@ -335,7 +326,6 @@ fn test_obj_invalid_face_indices() {
 #[test]
 fn test_mesh_validation_aggregation() {
     let valid_mesh = MeshData::cube();
-    use engine_assets::validation::AssetValidator;
     let report = valid_mesh.validate_all();
 
     assert!(report.is_valid());
@@ -350,7 +340,6 @@ fn test_mesh_validation_multiple_errors() {
     mesh.vertices[1].normal.y = f32::INFINITY;
     mesh.indices.push(999); // Out of bounds
 
-    use engine_assets::validation::AssetValidator;
     let report = mesh.validate_all();
 
     assert!(!report.is_valid());
@@ -363,7 +352,6 @@ fn test_texture_checksum_validation() {
     let texture = TextureData::new(4, 4, TextureFormat::RGBA8Unorm, vec![128u8; 64])
         .expect("Valid texture");
 
-    use engine_assets::validation::AssetValidator;
     let checksum = texture.compute_checksum();
     assert!(texture.validate_checksum(&checksum).is_ok());
 
@@ -375,7 +363,6 @@ fn test_texture_checksum_validation() {
 #[test]
 fn test_mesh_checksum_deterministic() {
     let mesh = MeshData::cube();
-    use engine_assets::validation::AssetValidator;
 
     let checksum1 = mesh.compute_checksum();
     let checksum2 = mesh.compute_checksum();
@@ -628,57 +615,57 @@ fn test_asset_type_detection() {
 // Summary
 // =============================================================================
 
-/// Test coverage summary:
-///
-/// ✅ Asset Loading (7 tests)
-///    - Mesh loading from memory (cube, triangle)
-///    - OBJ format parsing
-///    - Texture creation (RGBA8)
-///    - Mipmap generation
-///    - Asset manager lifecycle
-///
-/// ✅ Fallback Handling (11 tests) - CRITICAL
-///    - Missing assets
-///    - Corrupted OBJ data
-///    - Empty meshes
-///    - Out-of-bounds indices
-///    - NaN/Infinity in vertex data
-///    - Zero/oversized texture dimensions
-///    - Invalid texture data size
-///    - Non-power-of-two mipmap errors
-///
-/// ✅ Memory Management (6 tests)
-///    - Multiple asset tracking
-///    - Unload operations
-///    - Binary serialization roundtrip
-///    - Memory size calculations
-///    - Bounding box/centroid
-///
-/// ✅ Error Recovery (6 tests)
-///    - Graceful handling of missing data
-///    - Invalid face indices
-///    - Validation aggregation
-///    - Checksum validation
-///    - Deterministic checksums
-///
-/// ✅ Asset Lifecycle (7 tests) - Cross-Crate Integration
-///    - AssetBridge mesh upload
-///    - GPU cache hits
-///    - Missing asset errors
-///    - Cache statistics
-///    - Eviction
-///    - Hot-reload
-///    - Clear all caches
-///
-/// ✅ Concurrent Operations (2 tests)
-///    - Thread safety
-///    - Concurrent loads
-///
-/// ✅ Large Assets (2 tests)
-///    - 100K vertex mesh
-///    - 1024x1024 texture
-///
-/// ✅ Format Detection (1 test)
-///    - Asset type from extension
-///
-/// Total: 42+ test cases covering the entire asset → rendering pipeline
+// Test coverage summary:
+//
+// ✅ Asset Loading (8 tests)
+//    - Mesh loading from memory (cube, triangle)
+//    - OBJ format parsing
+//    - Texture creation (RGBA8)
+//    - Mipmap generation
+//    - Asset manager lifecycle
+//
+// ✅ Fallback Handling (11 tests) - CRITICAL
+//    - Missing assets
+//    - Corrupted OBJ data
+//    - Empty meshes
+//    - Out-of-bounds indices
+//    - NaN/Infinity in vertex data
+//    - Zero/oversized texture dimensions
+//    - Invalid texture data size
+//    - Non-power-of-two mipmap errors
+//
+// ✅ Memory Management (6 tests)
+//    - Multiple asset tracking
+//    - Unload operations
+//    - Binary serialization roundtrip
+//    - Memory size calculations
+//    - Bounding box/centroid
+//
+// ✅ Error Recovery (6 tests)
+//    - Graceful handling of missing data
+//    - Invalid face indices
+//    - Validation aggregation
+//    - Checksum validation
+//    - Deterministic checksums
+//
+// ✅ Asset Lifecycle (7 tests) - Cross-Crate Integration
+//    - AssetBridge mesh upload
+//    - GPU cache hits
+//    - Missing asset errors
+//    - Cache statistics
+//    - Eviction
+//    - Hot-reload
+//    - Clear all caches
+//
+// ✅ Concurrent Operations (2 tests)
+//    - Thread safety
+//    - Concurrent loads
+//
+// ✅ Large Assets (2 tests)
+//    - 100K vertex mesh
+//    - 1024x1024 texture
+//
+// ✅ Format Detection (1 test)
+//    - Asset type from extension
+//
+// Total: 43 test cases covering the entire asset → rendering pipeline

@@ -1,0 +1,12 @@
+// Client configuration
+(
+    network: (
+        server_address: "127.0.0.1:7777",
+        connect_timeout_ms: 5000,
+    ),
+    graphics: (
+        resolution: (1920, 1080),
+        vsync: true,
+        fullscreen: false,
+    ),
+)

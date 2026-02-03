@@ -360,7 +360,8 @@ fn compile_template(path: &Path, output: Option<PathBuf>, all: bool, watch: bool
 
     let output_path = output.unwrap_or_else(|| path.with_extension("bin"));
 
-    let compiled = compiler
+    // Compile the template
+    let _compiled = compiler
         .compile(path, &output_path)
         .with_context(|| format!("Failed to compile template: {}", path.display()))?;
 
@@ -376,7 +377,12 @@ fn compile_template(path: &Path, output: Option<PathBuf>, all: bool, watch: bool
         "✓".bright_green(),
         format!("Compiled: {}", output_path.display()).bright_white()
     );
-    println!("   Entities: {}", compiled.template.entity_count());
+
+    // Load the compiled template to get entity count
+    let template = compiler
+        .load_compiled(&output_path)
+        .with_context(|| format!("Failed to load compiled template: {}", output_path.display()))?;
+    println!("   Entities: {}", template.entity_count());
     println!("   YAML size: {} bytes", yaml_size);
     println!("   Bincode size: {} bytes", bin_size);
     println!("   Compression: {:.1}%", compression_ratio);

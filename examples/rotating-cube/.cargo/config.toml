@@ -1,0 +1,6 @@
+[alias]
+xtask = "run --package xtask --"
+
+[build]
+# Uncomment for native CPU optimizations (10-30% faster, but less portable)
+# rustflags = ["-C", "target-cpu=native"]

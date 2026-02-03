@@ -1,0 +1,12 @@
+// Server configuration
+(
+    network: (
+        bind_address: "0.0.0.0:7777",
+        max_players: 100,
+        tick_rate: 60,
+    ),
+    gameplay: (
+        gravity: -9.81,
+        max_velocity: 50.0,
+    ),
+)

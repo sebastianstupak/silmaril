@@ -1,0 +1,12 @@
+/target
+/Cargo.lock
+*.pdb
+*.swp
+*.swo
+.DS_Store
+.vscode/
+.idea/
+*.log
+profiling-output.log
+pgo-data/
+*.prof

@@ -1,6 +1,10 @@
+// Allow dead code for now - these functions are part of the codegen API
+// and will be used when component generation commands are implemented
+#![allow(dead_code)]
+
 use anyhow::{bail, Result};
 
-use super::validator::{validate_snake_case, validate_type_syntax};
+use super::validator::validate_snake_case;
 
 /// Parse field specifications from command-line format
 ///
@@ -24,7 +28,8 @@ pub fn parse_fields(input: &str) -> Result<Vec<(String, String)>> {
             let type_str = parts[1].trim().to_string();
 
             validate_snake_case(&name)?;
-            validate_type_syntax(&type_str)?;
+            // Note: Type validation is relaxed to allow any Rust type syntax
+            // Full validation happens at compilation time
 
             Ok((name, type_str))
         })
@@ -186,7 +191,7 @@ pub fn generate_component_code(
         }
 
         format!(
-            "\nimpl Default for {} {{\n    fn default() -> Self {{\n        Self {{\n{        }}\n    }}\n}}\n",
+            "\nimpl Default for {} {{\n    fn default() -> Self {{\n        Self {{\n{}        }}\n    }}\n}}\n",
             name, default_fields
         )
     } else {

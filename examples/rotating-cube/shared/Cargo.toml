@@ -1,0 +1,15 @@
+[package]
+name = "rotating-cube-shared"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+engine-core = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+glam = "0.29"
+
+[dev-dependencies]
+tokio-test = "0.4"

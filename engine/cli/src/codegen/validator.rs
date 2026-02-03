@@ -11,8 +11,8 @@ pub fn validate_pascal_case(name: &str) -> Result<()> {
         bail!("Component name must start with uppercase: '{}'", name);
     }
 
-    if !name.chars().all(|c| c.is_alphanumeric()) {
-        bail!("Component name must be alphanumeric: '{}'", name);
+    if !name.chars().all(|c| c.is_ascii_alphanumeric()) {
+        bail!("Component name must be alphanumeric (ASCII only): '{}'", name);
     }
 
     Ok(())
@@ -29,8 +29,8 @@ pub fn validate_snake_case(name: &str) -> Result<()> {
         bail!("Name must start with lowercase or underscore: '{}'", name);
     }
 
-    if !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        bail!("Name must be alphanumeric or underscore: '{}'", name);
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        bail!("Name must be alphanumeric (ASCII only) or underscore: '{}'", name);
     }
 
     Ok(())
