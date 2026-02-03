@@ -1,0 +1,294 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+    Blocking waiting for file lock on build directory
+   Compiling getrandom v0.3.4
+   Compiling cfg-if v1.0.4
+   Compiling simd-adler32 v0.3.8
+   Compiling equator-macro v0.4.2
+   Compiling num-integer v0.1.46
+   Compiling jobserver v0.1.34
+   Compiling crc32fast v1.5.0
+   Compiling cc v1.2.55
+   Compiling thiserror v2.0.18
+   Compiling adler2 v2.0.1
+   Compiling equator v0.4.2
+   Compiling miniz_oxide v0.8.9
+   Compiling aligned-vec v0.6.4
+   Compiling anyhow v1.0.100
+   Compiling num-bigint v0.4.6
+   Compiling thiserror-impl v2.0.18
+   Compiling stable_deref_trait v1.2.1
+   Compiling as-slice v0.2.1
+   Compiling v_frame v0.3.9
+   Compiling num-rational v0.4.2
+   Compiling windows-interface v0.59.3
+   Compiling windows-implement v0.60.2
+   Compiling windows-result v0.4.1
+   Compiling windows-strings v0.5.1
+   Compiling built v0.8.0
+   Compiling libc v0.2.180
+   Compiling av-scenechange v0.14.1
+   Compiling windows-core v0.62.2
+   Compiling flate2 v1.1.8
+   Compiling ahash v0.8.12
+   Compiling rav1e v0.8.1
+   Compiling aligned v0.4.3
+   Compiling arg_enum_proc_macro v0.3.4
+   Compiling profiling-procmacros v1.0.17
+   Compiling core2 v0.4.0
+   Compiling nom v8.0.0
+   Compiling quick-error v2.0.1
+   Compiling spin v0.9.8
+   Compiling pastey v0.1.1
+   Compiling byteorder v1.5.0
+   Compiling syn v1.0.109
+   Compiling y4m v0.8.0
+   Compiling hashbrown v0.14.5
+   Compiling lazy_static v1.5.0
+   Compiling num-traits v0.2.19
+   Compiling bitstream-io v4.9.0
+   Compiling profiling v1.0.17
+   Compiling fdeflate v0.3.7
+   Compiling maybe-rayon v0.1.1
+   Compiling itertools v0.14.0
+   Compiling fax_derive v0.2.0
+   Compiling num-derive v0.4.2
+   Compiling simd_helpers v0.1.0
+   Compiling weezl v0.1.12
+   Compiling av1-grain v0.2.5
+   Compiling imgref v1.12.0
+   Compiling new_debug_unreachable v1.0.6
+   Compiling zune-core v0.4.12
+   Compiling noop_proc_macro v0.3.0
+   Compiling inflections v1.1.1
+   Compiling ash v0.38.0+1.3.281
+   Compiling gltf-derive v1.4.1
+   Compiling zune-jpeg v0.4.21
+   Compiling libsqlite3-sys v0.27.0
+   Compiling loop9 v0.1.5
+   Compiling fax v0.2.6
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+   Compiling blake3 v1.8.3
+   Compiling avif-serialize v0.8.6
+   Compiling zune-inflate v0.2.54
+   Compiling pxfm v0.1.27
+   Compiling libloading v0.8.9
+   Compiling windows-threading v0.2.1
+   Compiling color_quant v1.1.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling rgb v0.8.52
+   Compiling lebe v0.5.3
+   Compiling cfg_aliases v0.2.1
+   Compiling byteorder-lite v0.1.0
+   Compiling zune-core v0.5.1
+   Compiling bit_field v0.10.3
+   Compiling exr v1.74.0
+   Compiling zune-jpeg v0.5.12
+   Compiling image-webp v0.2.4
+   Compiling ravif v0.12.0
+   Compiling moxcms v0.7.11
+   Compiling winit v0.30.12
+   Compiling enum-primitive-derive v0.2.2
+   Compiling tinyvec v1.10.0
+   Compiling gif v0.14.1
+   Compiling windows-future v0.3.2
+   Compiling tiff v0.10.3
+   Compiling gltf-json v1.4.1
+   Compiling png v0.18.0
+   Compiling ogg v0.8.0
+   Compiling windows-numerics v0.3.1
+   Compiling windows-collections v0.3.2
+   Compiling qoi v0.4.1
+   Compiling raw-window-handle v0.6.2
+   Compiling mint v0.5.9
+   Compiling arrayref v0.3.9
+   Compiling constant_time_eq v0.4.2
+   Compiling glam v0.25.0
+   Compiling image v0.25.9
+   Compiling windows v0.62.2
+   Compiling lewton v0.10.2
+   Compiling gltf v1.4.1
+   Compiling windows-sys v0.52.0
+   Compiling ddsfile v0.5.2
+   Compiling hashlink v0.8.4
+   Compiling dashmap v5.5.3
+   Compiling engine-renderer v0.1.0 (D:\dev\agent-game-engine\engine\renderer)
+   Compiling ttf-parser v0.24.1
+   Compiling dpi v0.1.2
+   Compiling presser v0.3.1
+   Compiling smol_str v0.2.2
+   Compiling hound v3.5.1
+   Compiling unicode-segmentation v1.12.0
+   Compiling cursor-icon v1.2.0
+   Compiling rusqlite v0.30.0
+   Compiling engine-assets v0.1.0 (D:\dev\agent-game-engine\engine\assets)
+   Compiling gpu-allocator v0.28.0
+warning: engine-renderer@0.1.0: Using glslc for shader compilation
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.vert"
+   Compiling ash-window v0.13.0
+   Compiling matchers v0.2.0
+   Compiling png v0.17.16
+   Compiling sharded-slab v0.1.7
+   Compiling tracing-serde v0.2.0
+   Compiling nu-ansi-term v0.50.3
+   Compiling tracing-subscriber v0.3.22
+error[E0433]: failed to resolve: use of undeclared type `Buffer`
+   --> engine\renderer\benches\gpu_performance_comprehensive.rs:156:34
+    |
+156 |                     let buffer = Buffer::new(
+    |                                  ^^^^^^ use of undeclared type `Buffer`
+    |
+help: consider importing this struct
+    |
+ 15 + use ash::vk::Buffer;
+    |
+
+error[E0433]: failed to resolve: use of undeclared type `FramebufferConfig`
+  --> engine\renderer\benches\gpu_performance_comprehensive.rs:81:9
+   |
+81 |         FramebufferConfig::default(),
+   |         ^^^^^^^^^^^^^^^^^ use of undeclared type `FramebufferConfig`
+
+error[E0061]: this function takes 4 arguments but 5 arguments were supplied
+  --> engine\renderer\benches\gpu_performance_comprehensive.rs:76:23
+   |
+76 |     let framebuffer = Framebuffer::new(
+   |                       ^^^^^^^^^^^^^^^^
+77 |         &context.device,
+78 |         &render_pass,
+   |         ------------ expected `RenderPass`, found `&RenderPass`
+79 |         &target,
+   |         ------- expected `ImageView`, found `&OffscreenTarget`
+80 |         extent,
+81 |         FramebufferConfig::default(),
+   |         ---------------------------- unexpected argument #5
+   |
+note: associated function defined here
+  --> D:\dev\agent-game-engine\engine\renderer\src\framebuffer.rs:60:12
+   |
+60 |     pub fn new(
+   |            ^^^
+help: remove the extra argument
+   |
+78 ~         /* ash::vk::RenderPass */,
+79 ~         /* ImageView */,
+80 ~         extent,
+   |
+
+error[E0599]: no function or associated item named `new` found for struct `engine_renderer::ShaderModule` in the current scope
+   --> engine\renderer\benches\gpu_performance_comprehensive.rs:232:31
+    |
+232 |                 ShaderModule::new(&context.device, vert_spirv).expect("Failed to create shader");
+    |                               ^^^ function or associated item not found in `engine_renderer::ShaderModule`
+    |
+note: if you're trying to build a new `engine_renderer::ShaderModule` consider using one of the following associated functions:
+      engine_renderer::ShaderModule::from_spirv
+      engine_renderer::ShaderModule::from_spirv_file
+   --> D:\dev\agent-game-engine\engine\renderer\src\shader.rs:64:5
+    |
+ 64 | /     pub fn from_spirv(
+ 65 | |         device: &ash::Device,
+ 66 | |         spirv_code: &[u32],
+ 67 | |         stage: vk::ShaderStageFlags,
+ 68 | |         entry_point: &str,
+ 69 | |     ) -> Result<Self, RendererError> {
+    | |____________________________________^
+...
+121 | /     pub fn from_spirv_file(
+122 | |         device: &ash::Device,
+123 | |         path: &Path,
+124 | |         stage: vk::ShaderStageFlags,
+125 | |         entry_point: &str,
+126 | |     ) -> Result<Self, RendererError> {
+    | |____________________________________^
+
+error[E0599]: no function or associated item named `new` found for struct `engine_renderer::ShaderModule` in the current scope
+   --> engine\renderer\benches\gpu_performance_comprehensive.rs:242:31
+    |
+242 |                 ShaderModule::new(&context.device, frag_spirv).expect("Failed to create shader");
+    |                               ^^^ function or associated item not found in `engine_renderer::ShaderModule`
+    |
+note: if you're trying to build a new `engine_renderer::ShaderModule` consider using one of the following associated functions:
+      engine_renderer::ShaderModule::from_spirv
+      engine_renderer::ShaderModule::from_spirv_file
+   --> D:\dev\agent-game-engine\engine\renderer\src\shader.rs:64:5
+    |
+ 64 | /     pub fn from_spirv(
+ 65 | |         device: &ash::Device,
+ 66 | |         spirv_code: &[u32],
+ 67 | |         stage: vk::ShaderStageFlags,
+ 68 | |         entry_point: &str,
+ 69 | |     ) -> Result<Self, RendererError> {
+    | |____________________________________^
+...
+121 | /     pub fn from_spirv_file(
+122 | |         device: &ash::Device,
+123 | |         path: &Path,
+124 | |         stage: vk::ShaderStageFlags,
+125 | |         entry_point: &str,
+126 | |     ) -> Result<Self, RendererError> {
+    | |____________________________________^
+
+error[E0433]: failed to resolve: use of undeclared type `FramebufferConfig`
+   --> engine\renderer\benches\gpu_performance_comprehensive.rs:376:9
+    |
+376 |         FramebufferConfig::default(),
+    |         ^^^^^^^^^^^^^^^^^ use of undeclared type `FramebufferConfig`
+
+error[E0061]: this function takes 4 arguments but 5 arguments were supplied
+   --> engine\renderer\benches\gpu_performance_comprehensive.rs:371:23
+    |
+371 |     let framebuffer = Framebuffer::new(
+    |                       ^^^^^^^^^^^^^^^^
+372 |         &context.device,
+373 |         &render_pass,
+    |         ------------ expected `RenderPass`, found `&RenderPass`
+374 |         &target,
+    |         ------- expected `ImageView`, found `&OffscreenTarget`
+375 |         extent,
+376 |         FramebufferConfig::default(),
+    |         ---------------------------- unexpected argument #5
+    |
+note: associated function defined here
+   --> D:\dev\agent-game-engine\engine\renderer\src\framebuffer.rs:60:12
+    |
+ 60 |     pub fn new(
+    |            ^^^
+help: remove the extra argument
+    |
+373 ~         /* ash::vk::RenderPass */,
+374 ~         /* ImageView */,
+375 ~         extent,
+    |
+
+Some errors have detailed explanations: E0061, E0433, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: engine-renderer@0.1.0: Using glslc for shader compilation
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.vert"
+error: could not compile `engine-renderer` (bench "gpu_performance_comprehensive") due to 7 previous errors

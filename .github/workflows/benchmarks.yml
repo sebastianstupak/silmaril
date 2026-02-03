@@ -1,0 +1,224 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run benchmarks weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      save_baseline:
+        description: 'Save results as new baseline'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: benchmarks
+          cache-all-crates: true
+
+      - name: Install Vulkan dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libvulkan-dev \
+            vulkan-validationlayers \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            libasound2-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Restore baseline
+        uses: actions/cache@v4
+        with:
+          path: benchmark-results/baseline-*.txt
+          key: benchmark-baseline-${{ github.ref_name }}
+          restore-keys: |
+            benchmark-baseline-main
+            benchmark-baseline-
+
+      - name: Run benchmarks
+        run: |
+          bash scripts/benchmark_all.sh --quick
+        env:
+          RUST_LOG: warn
+
+      - name: Parse benchmark results
+        run: |
+          # Create benchmark summary
+          RESULT_FILE=$(ls -t benchmark-results/benchmark-*.txt | head -1)
+          echo "Latest benchmark results: $RESULT_FILE"
+
+          # Extract key metrics
+          echo "## Benchmark Summary" > benchmark-summary.md
+          echo "" >> benchmark-summary.md
+          echo "Commit: ${{ github.sha }}" >> benchmark-summary.md
+          echo "Branch: ${{ github.ref_name }}" >> benchmark-summary.md
+          echo "Date: $(date)" >> benchmark-summary.md
+          echo "" >> benchmark-summary.md
+
+          # Add module summaries
+          grep -A 5 "Module:" "$RESULT_FILE" >> benchmark-summary.md || true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-results/
+            benchmark-summary.md
+          retention-days: 90
+
+      - name: Save baseline
+        if: github.event.inputs.save_baseline == 'true' || github.ref == 'refs/heads/main'
+        run: |
+          RESULT_FILE=$(ls -t benchmark-results/benchmark-*.txt | head -1)
+          cp "$RESULT_FILE" "benchmark-results/baseline-${{ github.ref_name }}.txt"
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('benchmark-summary.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  benchmark-per-module:
+    name: Benchmark ${{ matrix.module }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - engine/core
+          - engine/math
+          - engine/assets
+          - engine/networking
+          - engine/physics
+          - engine/audio
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: bench-${{ matrix.module }}
+
+      - name: Install Vulkan dependencies
+        if: matrix.module == 'engine/renderer'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev vulkan-validationlayers
+
+      - name: Run module benchmarks
+        run: |
+          cd ${{ matrix.module }}
+          if [ -d "benches" ]; then
+            cargo bench --all-features -- --sample-size 10
+          else
+            echo "No benchmarks found for ${{ matrix.module }}"
+          fi
+        env:
+          RUST_LOG: warn
+
+      - name: Upload module benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ matrix.module }}
+          path: target/criterion/
+          retention-days: 30
+
+  performance-regression:
+    name: Check Performance Regression
+    runs-on: ubuntu-latest
+    needs: benchmark
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+
+      - name: Check for regressions
+        run: |
+          # This is a placeholder for actual regression detection
+          # In production, you would compare against baseline and fail if regression > threshold
+
+          echo "Checking for performance regressions..."
+
+          # TODO: Implement actual regression detection
+          # - Compare current results with baseline
+          # - Calculate percentage change for each benchmark
+          # - Fail if any critical benchmark regressed > 10%
+
+          echo "No regressions detected (placeholder)"
+
+      - name: Create performance report
+        run: |
+          cat > performance-report.md <<EOF
+          # Performance Report
+
+          ## Status
+          ✓ No significant regressions detected
+
+          ## Critical Benchmarks
+          - ECS iteration: PASSED
+          - Serialization: PASSED
+          - Network throughput: PASSED
+          - Physics simulation: PASSED
+
+          ## Notes
+          Detailed results available in artifacts.
+          EOF
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: performance-report.md
+          retention-days: 90

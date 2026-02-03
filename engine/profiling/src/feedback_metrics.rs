@@ -305,7 +305,11 @@ fn calculate_p95(history: &[FrameMetrics]) -> f32 {
     frame_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     // Calculate 95th percentile index using nearest-rank method
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Intentional: calculating percentile index
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )] // Intentional: calculating percentile index
     // This matches the behavior expected by tests
     let index = ((frame_times.len() - 1) as f32 * 0.95).round() as usize;
 

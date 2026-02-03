@@ -1,0 +1,62 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+warning: engine-renderer@0.1.0: Using glslc for shader compilation
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.vert"
+   Compiling engine-renderer v0.1.0 (D:\dev\agent-game-engine\engine\renderer)
+error[E0716]: temporary value dropped while borrowed
+   --> engine\renderer\benches\gpu_aaa_rendering.rs:609:39
+    |
+609 |                     .command_buffers(&[command_buffer])
+    |                                       ^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
+610 |                     .signal_semaphores(&[sync.render_finished_semaphore]);
+    |                                                                          - temporary value is freed at the end of this statement
+...
+614 |                     .queue_submit(context.graphics_queue, &[submit_info], sync.in_flight_fence)
+    |                                                             ----------- borrow later used here
+    |
+    = note: consider using a `let` binding to create a longer lived value
+
+error[E0716]: temporary value dropped while borrowed
+   --> engine\renderer\benches\gpu_aaa_rendering.rs:610:41
+    |
+610 |                     .signal_semaphores(&[sync.render_finished_semaphore]);
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ - temporary value is freed at the end of this statement
+    |                                         |
+    |                                         creates a temporary value which is freed while still in use
+...
+614 |                     .queue_submit(context.graphics_queue, &[submit_info], sync.in_flight_fence)
+    |                                                             ----------- borrow later used here
+    |
+    = note: consider using a `let` binding to create a longer lived value
+
+For more information about this error, try `rustc --explain E0716`.
+warning: engine-renderer@0.1.0: Using glslc for shader compilation
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.vert"
+error: could not compile `engine-renderer` (bench "gpu_aaa_rendering") due to 2 previous errors

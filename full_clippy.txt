@@ -1,0 +1,29 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+    Blocking waiting for file lock on build directory
+   Compiling engine-math v0.1.0 (D:\dev\agent-game-engine\engine\math)
+   Compiling engine-core v0.1.0 (D:\dev\agent-game-engine\engine\core)
+    Checking ravif v0.12.0
+   Compiling enum-primitive-derive v0.2.2
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+    Checking gltf-json v1.4.1
+    Checking image v0.25.9
+    Checking lewton v0.10.2
+    Checking gltf v1.4.1
+error: use of `or_insert_with` to construct default value
+   --> engine\core\src\platform\input\components.rs:207:49
+    |
+207 |         self.axis_bindings.entry(action.into()).or_insert_with(Vec::new).push(axis);
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unwrap_or_default
+    = note: `-D clippy::unwrap-or-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unwrap_or_default)]`
+
+    Checking ddsfile v0.5.2
+error: could not compile `engine-core` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

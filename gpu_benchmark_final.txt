@@ -1,0 +1,148 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+   Compiling engine-assets v0.1.0 (D:\dev\agent-game-engine\engine\assets)
+   Compiling engine-renderer v0.1.0 (D:\dev\agent-game-engine\engine\renderer)
+warning: engine-renderer@0.1.0: Using glslc for shader compilation
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.vert"
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 03s
+     Running benches\gpu_performance_comprehensive.rs (target\release\deps\gpu_performance_comprehensive-106718bd65282baf.exe)
+Gnuplot not found, using plotters backend
+Creating shared Vulkan context for GPU benchmarks...
+Vulkan context created successfully
+Benchmarking gpu_draw_calls/10_draws
+Benchmarking gpu_draw_calls/10_draws: Warming up for 3.0000 s
+Benchmarking gpu_draw_calls/10_draws: Collecting 100 samples in estimated 10.000 s (1.7B iterations)
+Benchmarking gpu_draw_calls/10_draws: Analyzing
+gpu_draw_calls/10_draws time:   [6.2038 ns 6.4471 ns 6.7507 ns]
+                        thrpt:  [1.4813 Gelem/s 1.5511 Gelem/s 1.6119 Gelem/s]
+                 change:
+                        time:   [+0.4771% +7.4433% +15.038%] (p = 0.05 > 0.05)
+                        thrpt:  [-13.072% -6.9277% -0.4749%]
+                        No change in performance detected.
+Found 14 outliers among 100 measurements (14.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  11 (11.00%) high severe
+Benchmarking gpu_draw_calls/100_draws
+Benchmarking gpu_draw_calls/100_draws: Warming up for 3.0000 s
+Benchmarking gpu_draw_calls/100_draws: Collecting 100 samples in estimated 10.000 s (157M iterations)
+Benchmarking gpu_draw_calls/100_draws: Analyzing
+gpu_draw_calls/100_draws
+                        time:   [57.641 ns 59.059 ns 60.579 ns]
+                        thrpt:  [1.6507 Gelem/s 1.6932 Gelem/s 1.7349 Gelem/s]
+                 change:
+                        time:   [-8.9370% -6.1627% -3.3713%] (p = 0.00 < 0.05)
+                        thrpt:  [+3.4889% +6.5674% +9.8141%]
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking gpu_draw_calls/1000_draws
+Benchmarking gpu_draw_calls/1000_draws: Warming up for 3.0000 s
+Benchmarking gpu_draw_calls/1000_draws: Collecting 100 samples in estimated 10.001 s (16M iterations)
+Benchmarking gpu_draw_calls/1000_draws: Analyzing
+gpu_draw_calls/1000_draws
+                        time:   [535.88 ns 551.03 ns 567.09 ns]
+                        thrpt:  [1.7634 Gelem/s 1.8148 Gelem/s 1.8661 Gelem/s]
+                 change:
+                        time:   [-13.670% -10.460% -7.3557%] (p = 0.00 < 0.05)
+                        thrpt:  [+7.9397% +11.682% +15.835%]
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  6 (6.00%) high mild
+Benchmarking gpu_draw_calls/2000_draws
+Benchmarking gpu_draw_calls/2000_draws: Warming up for 3.0000 s
+Benchmarking gpu_draw_calls/2000_draws: Collecting 100 samples in estimated 10.001 s (8.6M iterations)
+Benchmarking gpu_draw_calls/2000_draws: Analyzing
+gpu_draw_calls/2000_draws
+                        time:   [1.0513 µs 1.1181 µs 1.1975 µs]
+                        thrpt:  [1.6701 Gelem/s 1.7887 Gelem/s 1.9024 Gelem/s]
+                 change:
+                        time:   [-19.744% -16.114% -11.708%] (p = 0.00 < 0.05)
+                        thrpt:  [+13.260% +19.210% +24.601%]
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking gpu_triangle_throughput/10000_tris
+Benchmarking gpu_triangle_throughput/10000_tris: Warming up for 3.0000 s
+Benchmarking gpu_triangle_throughput/10000_tris: Collecting 100 samples in estimated 10.000 s (16B iterations)
+Benchmarking gpu_triangle_throughput/10000_tris: Analyzing
+gpu_triangle_throughput/10000_tris
+                        time:   [516.52 ps 540.31 ps 569.50 ps]
+                        thrpt:  [ 17559 Gelem/s  18508 Gelem/s  19360 Gelem/s]
+                 change:
+                        time:   [-23.852% -17.602% -11.848%] (p = 0.00 < 0.05)
+                        thrpt:  [+13.440% +21.362% +31.323%]
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking gpu_triangle_throughput/100000_tris
+Benchmarking gpu_triangle_throughput/100000_tris: Warming up for 3.0000 s
+Benchmarking gpu_triangle_throughput/100000_tris: Collecting 100 samples in estimated 10.000 s (20B iterations)
+Benchmarking gpu_triangle_throughput/100000_tris: Analyzing
+gpu_triangle_throughput/100000_tris
+                        time:   [535.79 ps 571.40 ps 614.07 ps]
+                        thrpt:  [162847 Gelem/s 175008 Gelem/s 186639 Gelem/s]
+                 change:
+                        time:   [-21.326% -17.050% -12.718%] (p = 0.00 < 0.05)
+                        thrpt:  [+14.571% +20.555% +27.107%]
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high severe
+Benchmarking gpu_triangle_throughput/1000000_tris
+Benchmarking gpu_triangle_throughput/1000000_tris: Warming up for 3.0000 s
+Benchmarking gpu_triangle_throughput/1000000_tris: Collecting 100 samples in estimated 10.000 s (18B iterations)
+Benchmarking gpu_triangle_throughput/1000000_tris: Analyzing
+gpu_triangle_throughput/1000000_tris
+                        time:   [555.48 ps 569.19 ps 585.17 ps]
+                        thrpt:  [1708908 Gelem/s 1756885 Gelem/s 1800233 Gelem/s]
+                 change:
+                        time:   [-6.3452% -2.9873% +1.5307%] (p = 0.12 > 0.05)
+                        thrpt:  [-1.5076% +3.0793% +6.7751%]
+                        No change in performance detected.
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+Benchmarking gpu_triangle_throughput/5000000_tris
+Benchmarking gpu_triangle_throughput/5000000_tris: Warming up for 3.0000 s
+Benchmarking gpu_triangle_throughput/5000000_tris: Collecting 100 samples in estimated 10.000 s (17B iterations)
+Benchmarking gpu_triangle_throughput/5000000_tris: Analyzing
+gpu_triangle_throughput/5000000_tris
+                        time:   [554.44 ps 566.63 ps 581.11 ps]
+                        thrpt:  [8604186 Gelem/s 8824096 Gelem/s 9018064 Gelem/s]
+                 change:
+                        time:   [-23.059% -19.100% -14.981%] (p = 0.00 < 0.05)
+                        thrpt:  [+17.620% +23.610% +29.970%]
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking gpu_memory/64kb_alloc
+Benchmarking gpu_memory/64kb_alloc: Warming up for 1.0000 s
+Benchmarking gpu_memory/64kb_alloc: Collecting 10 samples in estimated 5.0006 s (82k iterations)
+
+thread 'main' (27236) panicked at engine\renderer\benches\gpu_performance_comprehensive.rs:165:26:
+Failed to allocate buffer: MemoryAllocationFailed { size: 65536, reason: "Allocation failed: OutOfMemory" }
+stack backtrace:
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+error: bench failed, to rerun pass `-p engine-renderer --bench gpu_performance_comprehensive`

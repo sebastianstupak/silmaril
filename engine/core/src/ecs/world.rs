@@ -491,6 +491,9 @@ impl World {
             crate::serialization::ComponentData::MeshRenderer(m) => {
                 self.add(entity, m);
             }
+            crate::serialization::ComponentData::Camera(c) => {
+                self.add(entity, c);
+            }
         }
     }
 

@@ -1,0 +1,34 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+   Compiling engine-core v0.1.0 (D:\dev\agent-game-engine\engine\core)
+   Compiling engine-templating v0.1.0 (D:\dev\agent-game-engine\engine\templating)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `engine_template_system`
+  --> engine\templating\benches\template_loading.rs:21:5
+   |
+21 | use engine_template_system::loader::TemplateLoader;
+   |     ^^^^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `engine_template_system`
+   |
+   = help: if you wanted to use a crate named `engine_template_system`, use `cargo add engine_template_system` to add it to your `Cargo.toml`
+
+error[E0282]: type annotations needed for `(_, _)`
+   --> engine\templating\benches\template_loading.rs:295:14
+    |
+295 |             |(mut world, instance)| {
+    |              ^^^^^^^^^^^^^^^^^^^^^
+296 |                 // Benchmark: Despawn
+297 |                 instance.despawn(&mut world);
+    |                 -------- type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type, where the placeholders `_` are specified
+    |
+295 |             |(mut world, instance): (_, _)| {
+    |                                   ++++++++
+
+Some errors have detailed explanations: E0282, E0433.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `engine-templating` (bench "template_loading") due to 2 previous errors

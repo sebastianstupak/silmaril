@@ -39,6 +39,7 @@ engine-macros = { path = "../macros" }
 criterion = "0.5"
 proptest = "1.4"
 tempfile = "3.8"
+tokio = { version = "1.35", features = ["fs", "rt", "rt-multi-thread", "sync", "time", "macros"] }
 
 [[bench]]
 name = "mesh_benches"
@@ -75,4 +76,12 @@ harness = false
 
 [[bench]]
 name = "manager_benches"
+harness = false
+
+[[bench]]
+name = "loader_benches"
+harness = false
+
+[[bench]]
+name = "memory_benches"
 harness = false

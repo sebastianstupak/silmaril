@@ -2,7 +2,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use engine_assets::{
-    AssetValidator, AudioData, AudioFormat, MaterialData, MeshData, TextureData, TextureFormat,
+    AssetValidator, AudioData, AudioFormat, FontData, FontMetrics, FontStyle, FontWeight,
+    MaterialData, MeshData, ShaderData, ShaderStage, TextureData, TextureFormat,
 };
 use glam::{Vec2, Vec3};
 
@@ -124,6 +125,92 @@ fn bench_audio_validation(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_shader_validation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("shader_validation");
+
+    // GLSL shader
+    let glsl_source = r#"
+        #version 450
+        layout(location = 0) in vec3 position;
+        layout(location = 1) in vec3 normal;
+        layout(location = 2) in vec2 uv;
+
+        layout(set = 0, binding = 0) uniform UniformBuffer {
+            mat4 model;
+            mat4 view;
+            mat4 projection;
+        } ubo;
+
+        layout(location = 0) out vec3 fragNormal;
+        layout(location = 1) out vec2 fragUV;
+
+        void main() {
+            gl_Position = ubo.projection * ubo.view * ubo.model * vec4(position, 1.0);
+            fragNormal = normal;
+            fragUV = uv;
+        }
+    "#
+    .to_string();
+
+    let glsl_shader = ShaderData::from_glsl(ShaderStage::Vertex, glsl_source, None).unwrap();
+
+    group.bench_function("validate_data_glsl", |b| {
+        b.iter(|| {
+            black_box(glsl_shader.validate_data()).unwrap();
+        });
+    });
+
+    group.bench_function("validate_all_glsl", |b| {
+        b.iter(|| {
+            black_box(glsl_shader.validate_all());
+        });
+    });
+
+    // SPIR-V shader
+    let mut spirv = vec![0x07230203, 0x00010000, 0x00000000, 0x00000001, 0x00000000];
+    spirv.extend(vec![0u32; 100]); // Add some dummy SPIR-V data
+
+    let spirv_shader = ShaderData::from_spirv(ShaderStage::Fragment, spirv, None).unwrap();
+
+    group.bench_function("validate_data_spirv", |b| {
+        b.iter(|| {
+            black_box(spirv_shader.validate_data()).unwrap();
+        });
+    });
+
+    group.bench_function("validate_all_spirv", |b| {
+        b.iter(|| {
+            black_box(spirv_shader.validate_all());
+        });
+    });
+
+    group.finish();
+}
+
+fn bench_font_validation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("font_validation");
+
+    // Create dummy font data (not a real font, just for benchmarking)
+    let font_data = vec![0u8; 50000]; // 50KB font
+    let font = FontData::new(
+        "BenchmarkFont".to_string(),
+        FontStyle::Normal,
+        FontWeight::Normal,
+        font_data,
+        FontMetrics::new(800, -200, 100, 1000),
+    );
+
+    group.bench_function("validate_data", |b| {
+        b.iter(|| {
+            // Note: This will fail validation because it's not a real font,
+            // but we're benchmarking the validation logic performance
+            let _ = black_box(font.validate_data());
+        });
+    });
+
+    group.finish();
+}
+
 // ============================================================================
 // Checksum Computation Benchmarks
 // ============================================================================
@@ -216,6 +303,54 @@ fn bench_audio_checksum(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_shader_checksum(c: &mut Criterion) {
+    let mut group = c.benchmark_group("shader_checksum");
+
+    // GLSL shader
+    let glsl_source = "#version 450\nvoid main() { gl_Position = vec4(0.0); }".to_string();
+    let glsl_shader = ShaderData::from_glsl(ShaderStage::Vertex, glsl_source, None).unwrap();
+
+    group.bench_function("compute_checksum_glsl", |b| {
+        b.iter(|| {
+            black_box(glsl_shader.compute_checksum());
+        });
+    });
+
+    // SPIR-V shader
+    let mut spirv = vec![0x07230203, 0x00010000, 0x00000000, 0x00000001, 0x00000000];
+    spirv.extend(vec![0u32; 1000]); // 1000 words
+    let spirv_shader = ShaderData::from_spirv(ShaderStage::Fragment, spirv, None).unwrap();
+
+    group.bench_function("compute_checksum_spirv", |b| {
+        b.iter(|| {
+            black_box(spirv_shader.compute_checksum());
+        });
+    });
+
+    group.finish();
+}
+
+fn bench_font_checksum(c: &mut Criterion) {
+    let mut group = c.benchmark_group("font_checksum");
+
+    let font_data = vec![0u8; 50000]; // 50KB
+    let font = FontData::new(
+        "BenchmarkFont".to_string(),
+        FontStyle::Normal,
+        FontWeight::Normal,
+        font_data,
+        FontMetrics::new(800, -200, 100, 1000),
+    );
+
+    group.bench_function("compute_checksum", |b| {
+        b.iter(|| {
+            black_box(font.compute_checksum());
+        });
+    });
+
+    group.finish();
+}
+
 // ============================================================================
 // Format Validation Benchmarks
 // ============================================================================
@@ -252,10 +387,14 @@ criterion_group!(
     bench_texture_validation,
     bench_material_validation,
     bench_audio_validation,
+    bench_shader_validation,
+    bench_font_validation,
     bench_mesh_checksum,
     bench_texture_checksum,
     bench_material_checksum,
     bench_audio_checksum,
+    bench_shader_checksum,
+    bench_font_checksum,
     bench_format_validation,
 );
 

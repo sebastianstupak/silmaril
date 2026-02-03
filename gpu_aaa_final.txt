@@ -1,0 +1,34 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+warning: engine-renderer@0.1.0: Using glslc for shader compilation
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\mesh.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\mesh.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "mesh.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\test.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\test.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "test.vert"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.frag" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.frag.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.frag"
+warning: engine-renderer@0.1.0: Compiling shader: "shaders\\triangle.vert" -> "D:\\dev\\agent-game-engine\\target\\release\\build\\engine-renderer-6808001bb0a3ee4b\\out\\shaders\\triangle.vert.spv"
+warning: engine-renderer@0.1.0: Successfully compiled "triangle.vert"
+   Compiling engine-renderer v0.1.0 (D:\dev\agent-game-engine\engine\renderer)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 30s
+     Running benches\gpu_aaa_rendering.rs (target\release\deps\gpu_aaa_rendering-3d9c8845eb1dd560.exe)
+Gnuplot not found, using plotters backend
+Creating shared Vulkan context for AAA GPU benchmarks...
+Vulkan context created successfully
+Benchmarking gpu_aaa_command_recording/100_draws
+Benchmarking gpu_aaa_command_recording/100_draws: Warming up for 3.0000 s
+error: bench failed, to rerun pass `-p engine-renderer --bench gpu_aaa_rendering`
+
+Caused by:
+  process didn't exit successfully: `D:\dev\agent-game-engine\target\release\deps\gpu_aaa_rendering-3d9c8845eb1dd560.exe --bench` (exit code: 0xc0000005, STATUS_ACCESS_VIOLATION)
+error: 1 target failed:
+    `-p engine-renderer --bench gpu_aaa_rendering`

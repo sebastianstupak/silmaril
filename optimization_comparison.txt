@@ -1,0 +1,192 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+   Compiling engine-templating v0.1.0 (D:\dev\agent-game-engine\engine\templating)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 02s
+     Running benches\optimization_comparison.rs (target\release\deps\optimization_comparison-5f71a146cbf272a3.exe)
+Gnuplot not found, using plotters backend
+Benchmarking original_small_1_entity
+Benchmarking original_small_1_entity: Warming up for 3.0000 s
+Benchmarking original_small_1_entity: Collecting 100 samples in estimated 5.1783 s (10k iterations)
+Benchmarking original_small_1_entity: Analyzing
+original_small_1_entity time:   [513.26 µs 521.64 µs 530.95 µs]
+Found 7 outliers among 100 measurements (7.00%)
+  7 (7.00%) high mild
+
+Benchmarking optimized_small_1_entity
+Benchmarking optimized_small_1_entity: Warming up for 3.0000 s
+Benchmarking optimized_small_1_entity: Collecting 100 samples in estimated 5.2940 s (10k iterations)
+Benchmarking optimized_small_1_entity: Analyzing
+optimized_small_1_entity
+                        time:   [514.46 µs 519.44 µs 524.54 µs]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) low mild
+
+Benchmarking original_medium_100_entities
+Benchmarking original_medium_100_entities: Warming up for 3.0000 s
+Benchmarking original_medium_100_entities: Collecting 100 samples in estimated 5.4286 s (900 iterations)
+Benchmarking original_medium_100_entities: Analyzing
+original_medium_100_entities
+                        time:   [5.7076 ms 5.7672 ms 5.8264 ms]
+
+Benchmarking optimized_medium_100_entities
+Benchmarking optimized_medium_100_entities: Warming up for 3.0000 s
+Benchmarking optimized_medium_100_entities: Collecting 100 samples in estimated 5.1885 s (700 iterations)
+Benchmarking optimized_medium_100_entities: Analyzing
+optimized_medium_100_entities
+                        time:   [7.3944 ms 7.4976 ms 7.6047 ms]
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking original_large_1000_entities
+Benchmarking original_large_1000_entities: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.5s, or reduce sample count to 90.
+Benchmarking original_large_1000_entities: Collecting 100 samples in estimated 5.4574 s (100 iterations)
+Benchmarking original_large_1000_entities: Analyzing
+original_large_1000_entities
+                        time:   [53.846 ms 54.647 ms 55.402 ms]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low severe
+  2 (2.00%) low mild
+  1 (1.00%) high mild
+
+Benchmarking optimized_large_1000_entities
+Benchmarking optimized_large_1000_entities: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.4s, or reduce sample count to 60.
+Benchmarking optimized_large_1000_entities: Collecting 100 samples in estimated 7.3511 s (100 iterations)
+Benchmarking optimized_large_1000_entities: Analyzing
+optimized_large_1000_entities
+                        time:   [72.237 ms 73.190 ms 74.155 ms]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+
+Benchmarking cache_hit_comparison/original_cache_hit
+Benchmarking cache_hit_comparison/original_cache_hit: Warming up for 3.0000 s
+Benchmarking cache_hit_comparison/original_cache_hit: Collecting 100 samples in estimated 5.6509 s (30k iterations)
+Benchmarking cache_hit_comparison/original_cache_hit: Analyzing
+cache_hit_comparison/original_cache_hit
+                        time:   [191.18 µs 194.24 µs 197.32 µs]
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+Benchmarking cache_hit_comparison/optimized_cache_hit
+Benchmarking cache_hit_comparison/optimized_cache_hit: Warming up for 3.0000 s
+Benchmarking cache_hit_comparison/optimized_cache_hit: Collecting 100 samples in estimated 5.6035 s (35k iterations)
+Benchmarking cache_hit_comparison/optimized_cache_hit: Analyzing
+cache_hit_comparison/optimized_cache_hit
+                        time:   [158.92 µs 161.47 µs 164.10 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+
+Benchmarking scaling_comparison/original/10
+Benchmarking scaling_comparison/original/10: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.0s, enable flat sampling, or reduce sample count to 70.
+Benchmarking scaling_comparison/original/10: Collecting 100 samples in estimated 5.0431 s (5050 iterations)
+Benchmarking scaling_comparison/original/10: Analyzing
+scaling_comparison/original/10
+                        time:   [964.21 µs 978.23 µs 991.93 µs]
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) low mild
+  3 (3.00%) high mild
+Benchmarking scaling_comparison/optimized/10
+Benchmarking scaling_comparison/optimized/10: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.8s, enable flat sampling, or reduce sample count to 60.
+Benchmarking scaling_comparison/optimized/10: Collecting 100 samples in estimated 5.7682 s (5050 iterations)
+Benchmarking scaling_comparison/optimized/10: Analyzing
+scaling_comparison/optimized/10
+                        time:   [1.0945 ms 1.1087 ms 1.1225 ms]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+Benchmarking scaling_comparison/original/50
+Benchmarking scaling_comparison/original/50: Warming up for 3.0000 s
+Benchmarking scaling_comparison/original/50: Collecting 100 samples in estimated 5.3019 s (1700 iterations)
+Benchmarking scaling_comparison/original/50: Analyzing
+scaling_comparison/original/50
+                        time:   [3.0987 ms 3.1453 ms 3.1926 ms]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+Benchmarking scaling_comparison/optimized/50
+Benchmarking scaling_comparison/optimized/50: Warming up for 3.0000 s
+Benchmarking scaling_comparison/optimized/50: Collecting 100 samples in estimated 5.0698 s (1300 iterations)
+Benchmarking scaling_comparison/optimized/50: Analyzing
+scaling_comparison/optimized/50
+                        time:   [3.7255 ms 3.7857 ms 3.8450 ms]
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) low mild
+  3 (3.00%) high mild
+Benchmarking scaling_comparison/original/100
+Benchmarking scaling_comparison/original/100: Warming up for 3.0000 s
+Benchmarking scaling_comparison/original/100: Collecting 100 samples in estimated 5.1547 s (900 iterations)
+Benchmarking scaling_comparison/original/100: Analyzing
+scaling_comparison/original/100
+                        time:   [5.4597 ms 5.5441 ms 5.6248 ms]
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low severe
+  4 (4.00%) low mild
+  1 (1.00%) high mild
+Benchmarking scaling_comparison/optimized/100
+Benchmarking scaling_comparison/optimized/100: Warming up for 3.0000 s
+Benchmarking scaling_comparison/optimized/100: Collecting 100 samples in estimated 5.0450 s (700 iterations)
+Benchmarking scaling_comparison/optimized/100: Analyzing
+scaling_comparison/optimized/100
+                        time:   [7.0681 ms 7.1731 ms 7.2828 ms]
+Found 8 outliers among 100 measurements (8.00%)
+  4 (4.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking scaling_comparison/original/500
+Benchmarking scaling_comparison/original/500: Warming up for 3.0000 s
+Benchmarking scaling_comparison/original/500: Collecting 100 samples in estimated 5.4495 s (200 iterations)
+Benchmarking scaling_comparison/original/500: Analyzing
+scaling_comparison/original/500
+                        time:   [26.890 ms 27.241 ms 27.584 ms]
+Found 15 outliers among 100 measurements (15.00%)
+  1 (1.00%) low severe
+  9 (9.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking scaling_comparison/optimized/500
+Benchmarking scaling_comparison/optimized/500: Warming up for 3.0000 s
+Benchmarking scaling_comparison/optimized/500: Collecting 100 samples in estimated 7.1450 s (200 iterations)
+Benchmarking scaling_comparison/optimized/500: Analyzing
+scaling_comparison/optimized/500
+                        time:   [35.661 ms 35.953 ms 36.234 ms]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+Benchmarking scaling_comparison/original/1000
+Benchmarking scaling_comparison/original/1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.6s, or reduce sample count to 90.
+Benchmarking scaling_comparison/original/1000: Collecting 100 samples in estimated 5.5535 s (100 iterations)
+Benchmarking scaling_comparison/original/1000: Analyzing
+scaling_comparison/original/1000
+                        time:   [54.888 ms 55.551 ms 56.206 ms]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+Benchmarking scaling_comparison/optimized/1000
+Benchmarking scaling_comparison/optimized/1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.3s, or reduce sample count to 60.
+Benchmarking scaling_comparison/optimized/1000: Collecting 100 samples in estimated 7.2614 s (100 iterations)
+Benchmarking scaling_comparison/optimized/1000: Analyzing
+scaling_comparison/optimized/1000
+                        time:   [71.598 ms 72.461 ms 73.324 ms]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high mild
+

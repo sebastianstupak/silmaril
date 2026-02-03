@@ -76,7 +76,7 @@ impl TracyBackend {
     /// Create a new Tracy backend.
     ///
     /// Tracy is automatically initialized on first use.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self { frame_count: 0 }
     }
@@ -101,7 +101,7 @@ impl TracyBackend {
     }
 
     /// Get the current frame count.
-    #[must_use] 
+    #[must_use]
     pub fn frame_count(&self) -> u64 {
         self.frame_count
     }

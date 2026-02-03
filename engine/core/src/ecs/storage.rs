@@ -649,7 +649,7 @@ impl<T: Component> ComponentStorage for SparseSet<T> {
         use crate::gameplay::Health;
         use crate::math::Transform;
         use crate::physics_components::Velocity;
-        use crate::rendering::MeshRenderer;
+        use crate::rendering::{Camera, MeshRenderer};
         use crate::serialization::ComponentData;
         use std::any::TypeId;
 
@@ -668,6 +668,9 @@ impl<T: Component> ComponentStorage for SparseSet<T> {
         } else if type_id == TypeId::of::<MeshRenderer>() {
             let storage = self.as_any().downcast_ref::<SparseSet<MeshRenderer>>()?;
             storage.get(entity).cloned().map(ComponentData::MeshRenderer)
+        } else if type_id == TypeId::of::<Camera>() {
+            let storage = self.as_any().downcast_ref::<SparseSet<Camera>>()?;
+            storage.get(entity).cloned().map(ComponentData::Camera)
         } else {
             None
         }

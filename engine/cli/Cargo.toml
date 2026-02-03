@@ -1,0 +1,32 @@
+[package]
+name = "silm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Silmaril Team"]
+license = "Apache-2.0"
+description = "Silmaril game engine CLI tool - code-first game development"
+repository = "https://github.com/your-org/silmaril"
+
+[[bin]]
+name = "silm"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.4", features = ["derive", "cargo"] }
+anyhow = "1.0"
+
+# Serialization
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+
+# UI
+colored = "2.0"
+walkdir = "2.4"
+
+# Engine dependencies
+engine-templating = { path = "../templating" }
+
+[dev-dependencies]
+tempfile = "3.10"

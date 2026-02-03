@@ -456,7 +456,7 @@ impl From<ConfigFile> for ProfilerConfig {
 // Serde serialization for budgets (Duration -> String)
 #[cfg(feature = "config")]
 mod budget_serde {
-    use super::{HashMap, Duration, format_duration, Deserialize, parse_duration};
+    use super::{format_duration, parse_duration, Deserialize, Duration, HashMap};
     use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(
@@ -487,9 +487,7 @@ mod budget_serde {
                     result.insert(k, duration);
                 }
                 Err(_) => {
-                    return Err(serde::de::Error::custom(format!(
-                        "Invalid duration format: {v}"
-                    )));
+                    return Err(serde::de::Error::custom(format!("Invalid duration format: {v}")));
                 }
             }
         }
@@ -516,10 +514,10 @@ mod budget_serde {
 /// assert_eq!(parse_duration("1s").unwrap(), Duration::from_secs(1));
 /// assert_eq!(parse_duration("500us").unwrap(), Duration::from_micros(500));
 /// ```
-    /// # Errors
-    ///
-    /// Returns `ConfigError::InvalidDuration` if the string format is invalid.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+/// # Errors
+///
+/// Returns `ConfigError::InvalidDuration` if the string format is invalid.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn parse_duration(s: &str) -> Result<Duration, ConfigError> {
     let s = s.trim();
 
@@ -567,7 +565,7 @@ pub fn parse_duration(s: &str) -> Result<Duration, ConfigError> {
 /// use silmaril_profiling::format_duration;
 /// use std::time::Duration;
 ///
-    #[allow(clippy::cast_precision_loss)] // Intentional: formatting for display
+#[allow(clippy::cast_precision_loss)] // Intentional: formatting for display
 /// assert_eq!(format_duration(&Duration::from_millis(16)), "16.0ms");
 /// assert_eq!(format_duration(&Duration::from_secs(1)), "1000.0ms");
 /// ```

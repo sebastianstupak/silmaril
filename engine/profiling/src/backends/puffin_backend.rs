@@ -82,7 +82,7 @@ impl PuffinBackend {
     /// let backend = PuffinBackend::new();
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         // Enable Puffin profiling
         puffin::set_scopes_on(true);
@@ -145,7 +145,7 @@ impl PuffinBackend {
     /// // Open chrome://tracing and load trace.json
     /// # }
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn export_chrome_trace(&self) -> String {
         // For Phase 0.5.2, we implement a basic Chrome Trace exporter
         // The full implementation requires deep integration with Puffin's internal

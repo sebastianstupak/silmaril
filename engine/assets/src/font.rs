@@ -3,6 +3,7 @@
 //! Pure data structures for font assets (TTF/OTF fonts).
 //! No text rendering or GPU dependencies - can be used by server, tools, or client.
 
+use crate::validation::{compute_hash, AssetValidator, ValidationError};
 use engine_core::{EngineError, ErrorCode, ErrorSeverity};
 use engine_macros::define_error;
 use serde::{Deserialize, Serialize};
@@ -250,6 +251,112 @@ impl FontData {
     }
 }
 
+// ============================================================================
+// Validation Implementation
+// ============================================================================
+
+impl AssetValidator for FontData {
+    /// Validate font format (TTF/OTF headers)
+    fn validate_format(data: &[u8]) -> Result<(), ValidationError> {
+        if data.is_empty() {
+            return Err(ValidationError::emptydata());
+        }
+
+        // Check minimum size for font header
+        if data.len() < 12 {
+            return Err(ValidationError::invaliddimensions(
+                "Font file too small (< 12 bytes)".to_string(),
+            ));
+        }
+
+        // Check for TTF/OTF signatures
+        // TTF: 0x00010000 or "true" (0x74727565)
+        // OTF: "OTTO" (0x4F54544F)
+        let signature = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+
+        let valid_signature = signature == 0x00010000  // TTF version 1.0
+            || signature == 0x74727565  // TTF "true"
+            || signature == 0x4F54544F  // OTF "OTTO"
+            || signature == 0x74746366; // TTC "ttcf" (TrueType Collection)
+
+        if !valid_signature {
+            return Err(ValidationError::invalidmagic(
+                "TTF/OTF signature".to_string(),
+                format!("0x{:08X}", signature),
+            ));
+        }
+
+        // Try to parse the font to validate structure
+        ttf_parser::Face::parse(data, 0).map_err(|e| {
+            ValidationError::invaliddimensions(format!("Failed to parse font: {:?}", e))
+        })?;
+
+        Ok(())
+    }
+
+    /// Validate font data integrity
+    fn validate_data(&self) -> Result<(), ValidationError> {
+        // Validate family name is non-empty
+        if self.family.trim().is_empty() {
+            return Err(ValidationError::invaliddimensions(
+                "Font family name cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate data is non-empty
+        if self.data.is_empty() {
+            return Err(ValidationError::emptydata());
+        }
+
+        // Validate font can be parsed
+        ttf_parser::Face::parse(&self.data, 0).map_err(|e| {
+            ValidationError::invaliddimensions(format!("Font data is corrupted: {:?}", e))
+        })?;
+
+        // Validate metrics
+        if self.metrics.units_per_em == 0 {
+            return Err(ValidationError::invaliddimensions(
+                "Font units_per_em cannot be zero".to_string(),
+            ));
+        }
+
+        // Check for reasonable units_per_em (typically 1000, 1024, 2048, 4096)
+        const MAX_UNITS_PER_EM: u16 = 16384;
+        if self.metrics.units_per_em > MAX_UNITS_PER_EM {
+            return Err(ValidationError::invaliddimensions(format!(
+                "Font units_per_em too large: {} (max {})",
+                self.metrics.units_per_em, MAX_UNITS_PER_EM
+            )));
+        }
+
+        // Check for reasonable file size (< 50MB)
+        const MAX_FONT_SIZE: usize = 50 * 1024 * 1024;
+        if self.data.len() > MAX_FONT_SIZE {
+            return Err(ValidationError::invaliddimensions(format!(
+                "Font file too large: {} bytes (max {})",
+                self.data.len(),
+                MAX_FONT_SIZE
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Validate checksum
+    fn validate_checksum(&self, expected: &[u8; 32]) -> Result<(), ValidationError> {
+        let actual = self.compute_checksum();
+        if &actual != expected {
+            return Err(ValidationError::checksummismatch(*expected, actual));
+        }
+        Ok(())
+    }
+
+    /// Compute Blake3 checksum of font data
+    fn compute_checksum(&self) -> [u8; 32] {
+        compute_hash(&self.data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,5 +403,172 @@ mod tests {
         // Should include size of struct + data + family string
         let usage = font.memory_usage();
         assert!(usage >= 1000); // At least the data size
+    }
+
+    // ============================================================================
+    // Validation Tests
+    // ============================================================================
+
+    use crate::validation::{AssetValidator, ValidationError};
+
+    // Helper function to create a minimal valid TTF font for testing
+    fn create_minimal_ttf() -> Vec<u8> {
+        // This is a minimal TTF header structure
+        // In practice, you'd use a real font file or generate a valid one
+        // For testing, we'll use an empty vec and skip tests that require valid fonts
+        vec![]
+    }
+
+    #[test]
+    fn test_validate_format_empty_data() {
+        let result = FontData::validate_format(&[]);
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::EmptyData {}) => {}
+            _ => panic!("Expected EmptyData error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_format_too_small() {
+        let data = vec![0u8; 8]; // Too small for font header
+        let result = FontData::validate_format(&data);
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::InvalidDimensions { .. }) => {}
+            _ => panic!("Expected InvalidDimensions error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_format_invalid_signature() {
+        let mut data = vec![0u8; 12];
+        // Set invalid signature
+        data[0..4].copy_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+
+        let result = FontData::validate_format(&data);
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::InvalidMagic { .. }) => {}
+            _ => panic!("Expected InvalidMagic error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_data_empty_family_name() {
+        let data = vec![1, 2, 3, 4]; // Dummy data
+        let font = FontData::new(
+            "".to_string(), // Empty family
+            FontStyle::Normal,
+            FontWeight::Normal,
+            data,
+            FontMetrics::new(800, -200, 100, 1000),
+        );
+
+        let result = font.validate_data();
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::InvalidDimensions { reason }) => {
+                assert!(reason.contains("family"));
+            }
+            _ => panic!("Expected InvalidDimensions error for empty family"),
+        }
+    }
+
+    #[test]
+    fn test_validate_data_empty_font_data() {
+        let font = FontData::new(
+            "Test".to_string(),
+            FontStyle::Normal,
+            FontWeight::Normal,
+            vec![], // Empty data
+            FontMetrics::new(800, -200, 100, 1000),
+        );
+
+        let result = font.validate_data();
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::EmptyData {}) => {}
+            _ => panic!("Expected EmptyData error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_data_zero_units_per_em() {
+        let data = vec![1, 2, 3, 4]; // Dummy data
+        let font = FontData::new(
+            "Test".to_string(),
+            FontStyle::Normal,
+            FontWeight::Normal,
+            data,
+            FontMetrics::new(800, -200, 100, 0), // Zero units_per_em
+        );
+
+        let result = font.validate_data();
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::InvalidDimensions { reason }) => {
+                assert!(reason.contains("units_per_em"));
+            }
+            _ => panic!("Expected InvalidDimensions error for zero units_per_em"),
+        }
+    }
+
+    #[test]
+    fn test_validate_data_excessive_units_per_em() {
+        let data = vec![1, 2, 3, 4]; // Dummy data
+        let font = FontData::new(
+            "Test".to_string(),
+            FontStyle::Normal,
+            FontWeight::Normal,
+            data,
+            FontMetrics::new(800, -200, 100, 20000), // Too large
+        );
+
+        let result = font.validate_data();
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::InvalidDimensions { reason }) => {
+                assert!(reason.contains("units_per_em"));
+            }
+            _ => panic!("Expected InvalidDimensions error for excessive units_per_em"),
+        }
+    }
+
+    #[test]
+    fn test_checksum_deterministic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let font = FontData::new(
+            "Test".to_string(),
+            FontStyle::Normal,
+            FontWeight::Normal,
+            data,
+            FontMetrics::new(800, -200, 100, 1000),
+        );
+
+        let hash1 = font.compute_checksum();
+        let hash2 = font.compute_checksum();
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_checksum_different_for_different_data() {
+        let font1 = FontData::new(
+            "Test".to_string(),
+            FontStyle::Normal,
+            FontWeight::Normal,
+            vec![1, 2, 3],
+            FontMetrics::new(800, -200, 100, 1000),
+        );
+
+        let font2 = FontData::new(
+            "Test".to_string(),
+            FontStyle::Normal,
+            FontWeight::Normal,
+            vec![4, 5, 6], // Different data
+            FontMetrics::new(800, -200, 100, 1000),
+        );
+
+        assert_ne!(font1.compute_checksum(), font2.compute_checksum());
     }
 }

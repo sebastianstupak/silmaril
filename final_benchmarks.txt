@@ -1,0 +1,141 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+    Blocking waiting for file lock on build directory
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+   Compiling engine-core v0.1.0 (D:\dev\agent-game-engine\engine\core)
+   Compiling engine-templating v0.1.0 (D:\dev\agent-game-engine\engine\templating)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 2m 11s
+     Running benches\template_loading.rs (target\release\deps\template_loading-0c8a429b2624a507.exe)
+Gnuplot not found, using plotters backend
+Benchmarking template_load_small_1_entity
+Benchmarking template_load_small_1_entity: Warming up for 3.0000 s
+Benchmarking template_load_small_1_entity: Collecting 100 samples in estimated 6.5419 s (10k iterations)
+Benchmarking template_load_small_1_entity: Analyzing
+template_load_small_1_entity
+                        time:   [653.38 µs 696.15 µs 739.36 µs]
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking template_load_medium_100_entities
+Benchmarking template_load_medium_100_entities: Warming up for 3.0000 s
+Benchmarking template_load_medium_100_entities: Collecting 100 samples in estimated 5.7530 s (600 iterations)
+Benchmarking template_load_medium_100_entities: Analyzing
+template_load_medium_100_entities
+                        time:   [8.2474 ms 8.9861 ms 9.8007 ms]
+Found 8 outliers among 100 measurements (8.00%)
+  4 (4.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking template_load_large_1000_entities
+Benchmarking template_load_large_1000_entities: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.6s, or reduce sample count to 70.
+Benchmarking template_load_large_1000_entities: Collecting 100 samples in estimated 6.6378 s (100 iterations)
+Benchmarking template_load_large_1000_entities: Analyzing
+template_load_large_1000_entities
+                        time:   [62.991 ms 64.898 ms 66.933 ms]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking template_load_with_10_references
+Benchmarking template_load_with_10_references: Warming up for 3.0000 s
+Benchmarking template_load_with_10_references: Collecting 100 samples in estimated 5.0809 s (1200 iterations)
+Benchmarking template_load_with_10_references: Analyzing
+template_load_with_10_references
+                        time:   [3.2892 ms 3.3977 ms 3.5130 ms]
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+
+Benchmarking template_load_cache_hit
+Benchmarking template_load_cache_hit: Warming up for 3.0000 s
+Benchmarking template_load_cache_hit: Collecting 100 samples in estimated 5.9755 s (25k iterations)
+Benchmarking template_load_cache_hit: Analyzing
+template_load_cache_hit time:   [271.89 µs 288.78 µs 306.06 µs]
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking template_load_scaling/1
+Benchmarking template_load_scaling/1: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 9.9s, enable flat sampling, or reduce sample count to 50.
+Benchmarking template_load_scaling/1: Collecting 100 samples in estimated 9.8658 s (5050 iterations)
+Benchmarking template_load_scaling/1: Analyzing
+template_load_scaling/1 time:   [711.58 µs 777.17 µs 855.36 µs]
+Found 7 outliers among 100 measurements (7.00%)
+  3 (3.00%) high mild
+  4 (4.00%) high severe
+Benchmarking template_load_scaling/10
+Benchmarking template_load_scaling/10: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.5s, enable flat sampling, or reduce sample count to 50.
+Benchmarking template_load_scaling/10: Collecting 100 samples in estimated 8.5443 s (5050 iterations)
+Benchmarking template_load_scaling/10: Analyzing
+template_load_scaling/10
+                        time:   [1.1758 ms 1.2139 ms 1.2535 ms]
+Found 9 outliers among 100 measurements (9.00%)
+  9 (9.00%) high mild
+Benchmarking template_load_scaling/50
+Benchmarking template_load_scaling/50: Warming up for 3.0000 s
+Benchmarking template_load_scaling/50: Collecting 100 samples in estimated 5.2321 s (1300 iterations)
+Benchmarking template_load_scaling/50: Analyzing
+template_load_scaling/50
+                        time:   [3.7603 ms 4.0148 ms 4.2986 ms]
+Found 19 outliers among 100 measurements (19.00%)
+  2 (2.00%) high mild
+  17 (17.00%) high severe
+Benchmarking template_load_scaling/100
+Benchmarking template_load_scaling/100: Warming up for 3.0000 s
+Benchmarking template_load_scaling/100: Collecting 100 samples in estimated 5.7285 s (700 iterations)
+Benchmarking template_load_scaling/100: Analyzing
+template_load_scaling/100
+                        time:   [6.5398 ms 6.8677 ms 7.2347 ms]
+Found 9 outliers among 100 measurements (9.00%)
+  6 (6.00%) high mild
+  3 (3.00%) high severe
+Benchmarking template_load_scaling/500
+Benchmarking template_load_scaling/500: Warming up for 3.0000 s
+Benchmarking template_load_scaling/500: Collecting 100 samples in estimated 5.9100 s (200 iterations)
+Benchmarking template_load_scaling/500: Analyzing
+template_load_scaling/500
+                        time:   [27.693 ms 28.462 ms 29.265 ms]
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+Benchmarking template_load_scaling/1000
+Benchmarking template_load_scaling/1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.4s, or reduce sample count to 90.
+Benchmarking template_load_scaling/1000: Collecting 100 samples in estimated 5.3711 s (100 iterations)
+Benchmarking template_load_scaling/1000: Analyzing
+template_load_scaling/1000
+                        time:   [54.211 ms 55.249 ms 56.370 ms]
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking template_despawn_100_entities
+Benchmarking template_despawn_100_entities: Warming up for 3.0000 s
+Benchmarking template_despawn_100_entities: Collecting 100 samples in estimated 5.5419 s (1000 iterations)
+Benchmarking template_despawn_100_entities: Analyzing
+template_despawn_100_entities
+                        time:   [15.148 µs 19.455 µs 27.050 µs]
+Found 10 outliers among 100 measurements (10.00%)
+  6 (6.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking template_load_nested_5_levels
+Benchmarking template_load_nested_5_levels: Warming up for 3.0000 s
+Benchmarking template_load_nested_5_levels: Collecting 100 samples in estimated 9.0328 s (10k iterations)
+Benchmarking template_load_nested_5_levels: Analyzing
+template_load_nested_5_levels
+                        time:   [916.18 µs 949.94 µs 984.00 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+

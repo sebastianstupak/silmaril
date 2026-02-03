@@ -3,7 +3,7 @@
 use crate::gameplay::Health;
 use crate::math::Transform;
 use crate::physics_components::Velocity;
-use crate::rendering::MeshRenderer;
+use crate::rendering::{Camera, MeshRenderer};
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
 
@@ -22,6 +22,8 @@ pub enum ComponentData {
     Velocity(Velocity),
     /// Mesh renderer component
     MeshRenderer(MeshRenderer),
+    /// Camera component
+    Camera(Camera),
 }
 
 impl ComponentData {
@@ -32,6 +34,7 @@ impl ComponentData {
             Self::Health(_) => TypeId::of::<Health>(),
             Self::Velocity(_) => TypeId::of::<Velocity>(),
             Self::MeshRenderer(_) => TypeId::of::<MeshRenderer>(),
+            Self::Camera(_) => TypeId::of::<Camera>(),
         }
     }
 
@@ -42,6 +45,7 @@ impl ComponentData {
             Self::Health(_) => "Health",
             Self::Velocity(_) => "Velocity",
             Self::MeshRenderer(_) => "MeshRenderer",
+            Self::Camera(_) => "Camera",
         }
     }
 }
@@ -66,5 +70,47 @@ mod tests {
         let deserialized: ComponentData = bincode::deserialize(&bytes).unwrap();
 
         assert_eq!(health, deserialized);
+    }
+
+    #[test]
+    fn test_camera_serialization() {
+        use std::f32::consts::PI;
+
+        let camera = ComponentData::Camera(Camera::new(PI / 4.0, 16.0 / 9.0));
+
+        // Test bincode serialization (Camera has #[serde(skip)] fields that should be handled)
+        let bytes = bincode::serialize(&camera).unwrap();
+        let deserialized: ComponentData = bincode::deserialize(&bytes).unwrap();
+
+        // Camera should roundtrip correctly (skipped fields are reconstructed)
+        if let ComponentData::Camera(c) = deserialized {
+            if let ComponentData::Camera(orig) = camera {
+                assert!((c.fov - orig.fov).abs() < 0.0001);
+                assert!((c.aspect - orig.aspect).abs() < 0.0001);
+                assert!((c.near - orig.near).abs() < 0.0001);
+                assert!((c.far - orig.far).abs() < 0.0001);
+            }
+        } else {
+            panic!("Expected Camera component");
+        }
+    }
+
+    #[test]
+    fn test_all_component_types() {
+        // Ensure all 5 component types are in the enum
+        let components = vec![
+            ComponentData::Transform(Transform::default()),
+            ComponentData::Health(Health::new(100.0, 100.0)),
+            ComponentData::Velocity(Velocity::default()),
+            ComponentData::MeshRenderer(MeshRenderer::new(123)),
+            ComponentData::Camera(Camera::new(1.57, 1.78)),
+        ];
+
+        // All should serialize/deserialize correctly
+        for comp in components {
+            let bytes = bincode::serialize(&comp).unwrap();
+            let _deserialized: ComponentData = bincode::deserialize(&bytes).unwrap();
+            // Just verify no panics
+        }
     }
 }

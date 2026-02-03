@@ -194,6 +194,7 @@ impl MeshData {
                     })?;
                     uvs.push(Vec2::new(u, v));
                 }
+                #[allow(clippy::needless_range_loop)]
                 "f" if parts.len() >= 4 => {
                     for i in 1..parts.len() {
                         let vert_parts: Vec<&str> = parts[i].split('/').collect();
@@ -355,6 +356,7 @@ impl MeshData {
             (0..positions.len() as u32).collect()
         };
 
+        #[allow(clippy::needless_range_loop)]
         // Build vertices
         for i in 0..positions.len() {
             vertices.push(Vertex::new(

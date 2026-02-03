@@ -1,0 +1,495 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+   Compiling engine-build-utils v0.1.0 (D:\dev\agent-game-engine\engine\build-utils)
+    Checking silmaril-profiling v0.1.0 (D:\dev\agent-game-engine\engine\profiling)
+   Compiling engine-macros v0.1.0 (D:\dev\agent-game-engine\engine\macros)
+    Checking lz4-sys v1.11.1+lz4-1.10.0
+warning[E0602]: unknown lint: `clippy::missing_docs`
+  |
+  = help: a lint with a similar name exists in `rustc` lints: `missing_docs`
+  = note: requested on the command line with `-W clippy::missing_docs`
+  = note: `#[warn(unknown_lints)]` on by default
+
+   Compiling winit v0.29.15
+error: docs for function returning `Result` missing `# Errors` section
+   --> engine\profiling\src\config.rs:242:5
+    |
+242 |     pub fn from_file(path: &std::path::Path) -> Result<Self, ConfigError> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#missing_errors_doc
+    = note: `-D clippy::missing-errors-doc` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::missing_errors_doc)]`
+
+error: usage of wildcard import
+   --> engine\profiling\src\config.rs:455:9
+    |
+455 |     use super::*;
+    |         ^^^^^^^^ help: try: `super::{HashMap, Duration, format_duration, Deserialize, parse_duration}`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#wildcard_imports
+    = note: `-D clippy::wildcard-imports` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::wildcard_imports)]`
+
+error: variables can be used directly in the `format!` string
+   --> engine\profiling\src\config.rs:486:57
+    |
+486 |                       return Err(serde::de::Error::custom(format!(
+    |  _________________________________________________________^
+487 | |                         "Invalid duration format: {}",
+488 | |                         v
+489 | |                     )));
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#uninlined_format_args
+    = note: `-D clippy::uninlined-format-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::uninlined_format_args)]`
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> engine\profiling\src\config.rs:516:1
+    |
+516 | pub fn parse_duration(s: &str) -> Result<Duration, ConfigError> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#missing_errors_doc
+
+error: casting `f64` to `u64` may truncate the value
+   --> engine\profiling\src\config.rs:525:22
+    |
+525 |         let micros = (num * 1000.0) as u64;
+    |                      ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+    = note: `-D clippy::cast-possible-truncation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_possible_truncation)]`
+
+error: casting `f64` to `u64` may lose the sign of the value
+   --> engine\profiling\src\config.rs:525:22
+    |
+525 |         let micros = (num * 1000.0) as u64;
+    |                      ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+    = note: `-D clippy::cast-sign-loss` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_sign_loss)]`
+
+error: casting `f64` to `u64` may truncate the value
+   --> engine\profiling\src\config.rs:534:41
+    |
+534 |         return Ok(Duration::from_micros(num as u64));
+    |                                         ^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f64` to `u64` may lose the sign of the value
+   --> engine\profiling\src\config.rs:534:41
+    |
+534 |         return Ok(Duration::from_micros(num as u64));
+    |                                         ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `f64` to `u64` may truncate the value
+   --> engine\profiling\src\config.rs:542:22
+    |
+542 |         let micros = (num * 1_000_000.0) as u64;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f64` to `u64` may lose the sign of the value
+   --> engine\profiling\src\config.rs:542:22
+    |
+542 |         let micros = (num * 1_000_000.0) as u64;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `f64` to `u64` may truncate the value
+   --> engine\profiling\src\config.rs:548:22
+    |
+548 |         let micros = (num * 1000.0) as u64;
+    |                      ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f64` to `u64` may lose the sign of the value
+   --> engine\profiling\src\config.rs:548:22
+    |
+548 |         let micros = (num * 1000.0) as u64;
+    |                      ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> engine\profiling\src\config.rs:570:28
+    |
+570 |         format!("{:.1}ms", micros as f64 / 1000.0)
+    |                            ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+    = note: `-D clippy::cast-precision-loss` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_precision_loss)]`
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> engine\profiling\src\feedback_metrics.rs:180:9
+    |
+180 |         const FRAME_BUDGET_MS: f32 = 16.67;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#items_after_statements
+    = note: `-D clippy::items-after-statements` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_statements)]`
+
+error: variables can be used directly in the `format!` string
+   --> engine\profiling\src\feedback_metrics.rs:231:37
+    |
+231 |                 .unwrap_or_else(|e| format!(r#"{{"error": "Serialization failed: {}"}}"#, e))
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#uninlined_format_args
+help: change this to
+    |
+231 -                 .unwrap_or_else(|e| format!(r#"{{"error": "Serialization failed: {}"}}"#, e))
+231 +                 .unwrap_or_else(|e| format!(r#"{{"error": "Serialization failed: {e}"}}"#))
+    |
+
+error: casting `f32` to `usize` may truncate the value
+   --> engine\profiling\src\feedback_metrics.rs:308:17
+    |
+308 |     let index = ((frame_times.len() - 1) as f32 * 0.95).round() as usize;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f32` to `usize` may lose the sign of the value
+   --> engine\profiling\src\feedback_metrics.rs:308:17
+    |
+308 |     let index = ((frame_times.len() - 1) as f32 * 0.95).round() as usize;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `usize` to `f32` causes a loss of precision (`usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide)
+   --> engine\profiling\src\feedback_metrics.rs:308:18
+    |
+308 |     let index = ((frame_times.len() - 1) as f32 * 0.95).round() as usize;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: casting `u128` to `u64` may truncate the value
+   --> engine\profiling\src\profiler.rs:183:32
+    |
+183 |                 let start_us = scope.start_time.duration_since(frame_start_time).as_micros() as u64;
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+183 -                 let start_us = scope.start_time.duration_since(frame_start_time).as_micros() as u64;
+183 +                 let start_us = u64::try_from(scope.start_time.duration_since(frame_start_time).as_micros());
+    |
+
+error: casting `u128` to `u64` may truncate the value
+   --> engine\profiling\src\profiler.rs:184:35
+    |
+184 |                 let duration_us = duration.as_micros() as u64;
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+184 -                 let duration_us = duration.as_micros() as u64;
+184 +                 let duration_us = u64::try_from(duration.as_micros());
+    |
+
+error: casting `usize` to `f32` causes a loss of precision (`usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide)
+  --> engine\profiling\src\query.rs:91:27
+   |
+91 |         let float_index = (sorted_durations.len() - 1) as f32 * percentile;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: casting `f32` to `usize` may truncate the value
+  --> engine\profiling\src\query.rs:92:27
+   |
+92 |         let lower_index = float_index.floor() as usize;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f32` to `usize` may lose the sign of the value
+  --> engine\profiling\src\query.rs:92:27
+   |
+92 |         let lower_index = float_index.floor() as usize;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `f32` to `usize` may truncate the value
+  --> engine\profiling\src\query.rs:93:27
+   |
+93 |         let upper_index = float_index.ceil() as usize;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f32` to `usize` may lose the sign of the value
+  --> engine\profiling\src\query.rs:93:27
+   |
+93 |         let upper_index = float_index.ceil() as usize;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `u64` to `f32` causes a loss of precision (`u64` is 64 bits wide, but `f32`'s mantissa is only 23 bits wide)
+  --> engine\profiling\src\query.rs:99:31
+   |
+99 |             let lower_value = sorted_durations[lower_index] as f32;
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: casting `u64` to `f32` causes a loss of precision (`u64` is 64 bits wide, but `f32`'s mantissa is only 23 bits wide)
+   --> engine\profiling\src\query.rs:100:31
+    |
+100 |             let upper_value = sorted_durations[upper_index] as f32;
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: casting `usize` to `f32` causes a loss of precision (`usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide)
+   --> engine\profiling\src\query.rs:101:42
+    |
+101 |             let fraction = float_index - lower_index as f32;
+    |                                          ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: casting `f32` to `u64` may truncate the value
+   --> engine\profiling\src\query.rs:102:13
+    |
+102 |             (lower_value + (upper_value - lower_value) * fraction) as u64
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+
+error: casting `f32` to `u64` may lose the sign of the value
+   --> engine\profiling\src\query.rs:102:13
+    |
+102 |             (lower_value + (upper_value - lower_value) * fraction) as u64
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_sign_loss
+
+error: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> engine\profiling\src\query.rs:115:26
+    |
+115 |         let call_count = durations.len() as u32;
+    |                          ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+115 -         let call_count = durations.len() as u32;
+115 +         let call_count = u32::try_from(durations.len());
+    |
+
+error: casting `u64` to `f32` causes a loss of precision (`u64` is 64 bits wide, but `f32`'s mantissa is only 23 bits wide)
+   --> engine\profiling\src\query.rs:116:27
+    |
+116 |         let avg_time_us = total_time_us as f32 / call_count as f32;
+    |                           ^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: casting `u32` to `f32` causes a loss of precision (`u32` is 32 bits wide, but `f32`'s mantissa is only 23 bits wide)
+   --> engine\profiling\src\query.rs:116:50
+    |
+116 |         let avg_time_us = total_time_us as f32 / call_count as f32;
+    |                                                  ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#cast_precision_loss
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> engine\profiling\src\query.rs:251:5
+    |
+251 | /     pub fn scope(mut self, name: impl Into<String>) -> Self {
+252 | |         self.scope_filter = Some(name.into());
+253 | |         self
+254 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#return_self_not_must_use
+    = note: `-D clippy::return-self-not-must-use` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::return_self_not_must_use)]`
+
+error: `format!(..)` appended to existing `String`
+   --> engine\profiling\src\query.rs:397:13
+    |
+397 | /             json.push_str(&format!(
+398 | |                 r#"  {{"name": "{}", "cat": "{}", "ph": "X", "pid": 1, "tid": 1, "ts": {}, "dur": {}}}"#,
+399 | |                 event.name,
+400 | |                 event.category.as_str(),
+401 | |                 event.start_us,
+402 | |                 event.duration_us
+403 | |             ));
+    | |______________^
+    |
+    = help: consider using `write!` to avoid the extra allocation
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#format_push_string
+    = note: `-D clippy::format-push-string` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::format_push_string)]`
+
+error: this method could have a `#[must_use]` attribute
+  --> engine\profiling\src\backends\puffin_backend.rs:85:12
+   |
+85 |     pub fn new() -> Self {
+   |            ^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#must_use_candidate
+   = note: `-D clippy::must-use-candidate` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::must_use_candidate)]`
+help: add the attribute
+   |
+85 ~     #[must_use] 
+86 ~     pub fn new() -> Self {
+   |
+
+error: you should put bare URLs between `<`/`>` or make a proper Markdown link
+   --> engine\profiling\src\backends\puffin_backend.rs:125:24
+    |
+125 |     /// - Perfetto UI (https://ui.perfetto.dev/)
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^ help: try: `<https://ui.perfetto.dev>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#doc_markdown
+    = note: `-D clippy::doc-markdown` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+
+error: this method could have a `#[must_use]` attribute
+   --> engine\profiling\src\backends\puffin_backend.rs:147:12
+    |
+147 |     pub fn export_chrome_trace(&self) -> String {
+    |            ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#must_use_candidate
+help: add the attribute
+    |
+147 ~     #[must_use] 
+148 ~     pub fn export_chrome_trace(&self) -> String {
+    |
+
+error: you should put bare URLs between `<`/`>` or make a proper Markdown link
+  --> engine\profiling\src\backends\tracy_backend.rs:18:45
+   |
+18 | //! 2. Download Tracy profiler client from: https://github.com/wolfpld/tracy/releases
+   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `<https://github.com/wolfpld/tracy/releases>`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#doc_markdown
+
+error: this method could have a `#[must_use]` attribute
+  --> engine\profiling\src\backends\tracy_backend.rs:79:12
+   |
+79 |     pub fn new() -> Self {
+   |            ^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#must_use_candidate
+help: add the attribute
+   |
+79 ~     #[must_use] 
+80 ~     pub fn new() -> Self {
+   |
+
+error: docs for function which may panic missing `# Panics` section
+  --> engine\profiling\src\backends\tracy_backend.rs:86:5
+   |
+86 |     pub fn begin_frame(&mut self) {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> engine\profiling\src\backends\tracy_backend.rs:89:13
+   |
+89 | /             tracy_client::Client::running()
+90 | |                 .expect("Tracy client should be running")
+   | |_________________________________________________________^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#missing_panics_doc
+   = note: `-D clippy::missing-panics-doc` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::missing_panics_doc)]`
+
+error: used `expect()` on an `Option` value
+  --> engine\profiling\src\backends\tracy_backend.rs:89:13
+   |
+89 | /             tracy_client::Client::running()
+90 | |                 .expect("Tracy client should be running")
+   | |_________________________________________________________^
+   |
+   = note: if this value is `None`, it will panic
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#expect_used
+   = note: `-D clippy::expect-used` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::expect_used)]`
+
+error: this method could have a `#[must_use]` attribute
+   --> engine\profiling\src\backends\tracy_backend.rs:103:12
+    |
+103 |     pub fn frame_count(&self) -> u64 {
+    |            ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#must_use_candidate
+help: add the attribute
+    |
+103 ~     #[must_use] 
+104 ~     pub fn frame_count(&self) -> u64 {
+    |
+
+error: you should put bare URLs between `<`/`>` or make a proper Markdown link
+ --> engine\profiling\src\export\chrome_trace.rs:6:20
+  |
+6 | //! - Perfetto UI (https://ui.perfetto.dev/)
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^ help: try: `<https://ui.perfetto.dev>`
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#doc_markdown
+
+error: you should put bare URLs between `<`/`>` or make a proper Markdown link
+  --> engine\profiling\src\export\chrome_trace.rs:12:5
+   |
+12 | //! https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `<https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview>`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#doc_markdown
+
+error: variables can be used directly in the `format!` string
+  --> engine\profiling\src\export\chrome_trace.rs:65:46
+   |
+65 |             json.insert_str(json.len() - 1, &format!(r#","dur":{}"#, dur));
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#uninlined_format_args
+help: change this to
+   |
+65 -             json.insert_str(json.len() - 1, &format!(r#","dur":{}"#, dur));
+65 +             json.insert_str(json.len() - 1, &format!(r#","dur":{dur}"#));
+   |
+
+For more information about this error, try `rustc --explain E0602`.
+   Compiling engine-math v0.1.0 (D:\dev\agent-game-engine\engine\math)
+warning: `silmaril-profiling` (lib) generated 1 warning
+error: could not compile `silmaril-profiling` (lib) due to 46 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...

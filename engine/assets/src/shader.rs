@@ -5,6 +5,7 @@
 //! - Build tools for shader compilation
 //! - Asset cooker for shader processing
 
+use crate::validation::{compute_hash, AssetValidator, ValidationError};
 use engine_core::{EngineError, ErrorCode, ErrorSeverity};
 use engine_macros::define_error;
 use tracing::{info, instrument, warn};
@@ -41,6 +42,7 @@ impl ShaderStage {
     }
 
     /// Parse from string
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "vertex" | "vert" | "vs" => Some(ShaderStage::Vertex),
@@ -244,6 +246,140 @@ impl ShaderData {
     /// Check if this is a SPIR-V shader
     pub fn is_spirv(&self) -> bool {
         self.source.is_spirv()
+    }
+}
+
+// ============================================================================
+// Validation Implementation
+// ============================================================================
+
+impl AssetValidator for ShaderData {
+    /// Validate shader format (GLSL syntax or SPIR-V magic)
+    fn validate_format(data: &[u8]) -> Result<(), ValidationError> {
+        if data.is_empty() {
+            return Err(ValidationError::emptydata());
+        }
+
+        // Check if it's SPIR-V (binary format)
+        if data.len() >= 4 {
+            let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+            if magic == 0x07230203 {
+                // SPIR-V binary - validate minimum size
+                if data.len() < 20 {
+                    return Err(ValidationError::invaliddimensions(
+                        "SPIR-V binary too small (< 20 bytes)".to_string(),
+                    ));
+                }
+                return Ok(());
+            }
+        }
+
+        // Otherwise assume it's GLSL text
+        let text = std::str::from_utf8(data).map_err(|_| {
+            ValidationError::invaliddimensions("Shader data is not valid UTF-8".to_string())
+        })?;
+
+        // Check for basic GLSL structure
+        if text.trim().is_empty() {
+            return Err(ValidationError::emptydata());
+        }
+
+        // Check for version directive (warning if missing, not error)
+        if !text.contains("#version") {
+            // This is acceptable but unusual
+        }
+
+        Ok(())
+    }
+
+    /// Validate shader data integrity
+    fn validate_data(&self) -> Result<(), ValidationError> {
+        match &self.source {
+            ShaderSource::Glsl(glsl) => {
+                // Validate GLSL is non-empty
+                if glsl.trim().is_empty() {
+                    return Err(ValidationError::emptydata());
+                }
+
+                // Check entry point is non-empty
+                if self.entry_point.is_empty() {
+                    return Err(ValidationError::invaliddimensions(
+                        "Entry point cannot be empty".to_string(),
+                    ));
+                }
+
+                // Check for reasonable size (< 1MB)
+                const MAX_GLSL_SIZE: usize = 1024 * 1024;
+                if glsl.len() > MAX_GLSL_SIZE {
+                    return Err(ValidationError::invaliddimensions(format!(
+                        "GLSL source too large: {} bytes (max {})",
+                        glsl.len(),
+                        MAX_GLSL_SIZE
+                    )));
+                }
+            }
+            ShaderSource::Spirv(spirv) => {
+                // Validate SPIR-V is non-empty
+                if spirv.is_empty() {
+                    return Err(ValidationError::emptydata());
+                }
+
+                // Validate magic number
+                if spirv[0] != 0x07230203 {
+                    return Err(ValidationError::invalidmagic(
+                        "0x07230203".to_string(),
+                        format!("0x{:08X}", spirv[0]),
+                    ));
+                }
+
+                // Validate minimum header size (5 words)
+                if spirv.len() < 5 {
+                    return Err(ValidationError::invaliddimensions(
+                        "SPIR-V binary too small (< 5 words)".to_string(),
+                    ));
+                }
+
+                // Check entry point is non-empty
+                if self.entry_point.is_empty() {
+                    return Err(ValidationError::invaliddimensions(
+                        "Entry point cannot be empty".to_string(),
+                    ));
+                }
+
+                // Check for reasonable size (< 10MB)
+                const MAX_SPIRV_SIZE: usize = 10 * 1024 * 1024 / 4; // 10MB in u32 words
+                if spirv.len() > MAX_SPIRV_SIZE {
+                    return Err(ValidationError::invaliddimensions(format!(
+                        "SPIR-V binary too large: {} words (max {})",
+                        spirv.len(),
+                        MAX_SPIRV_SIZE
+                    )));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate checksum
+    fn validate_checksum(&self, expected: &[u8; 32]) -> Result<(), ValidationError> {
+        let actual = self.compute_checksum();
+        if &actual != expected {
+            return Err(ValidationError::checksummismatch(*expected, actual));
+        }
+        Ok(())
+    }
+
+    /// Compute Blake3 checksum of shader data
+    fn compute_checksum(&self) -> [u8; 32] {
+        match &self.source {
+            ShaderSource::Glsl(glsl) => compute_hash(glsl.as_bytes()),
+            ShaderSource::Spirv(spirv) => {
+                // Convert SPIR-V to bytes for hashing
+                let bytes: Vec<u8> = spirv.iter().flat_map(|word| word.to_le_bytes()).collect();
+                compute_hash(&bytes)
+            }
+        }
     }
 }
 
@@ -498,5 +634,133 @@ mod tests {
         let result = ShaderData::load_spirv_file(file.path(), ShaderStage::Vertex, None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ShaderError::InvalidSpirv { .. }));
+    }
+
+    // ============================================================================
+    // Validation Tests
+    // ============================================================================
+
+    use crate::validation::{AssetValidator, ValidationError};
+
+    #[test]
+    fn test_valid_glsl_shader_passes_validation() {
+        let source = "#version 450\nvoid main() { gl_Position = vec4(0.0); }".to_string();
+        let shader = ShaderData::from_glsl(ShaderStage::Vertex, source, None).unwrap();
+        let report = shader.validate_all();
+        assert!(report.is_valid());
+    }
+
+    #[test]
+    fn test_valid_spirv_shader_passes_validation() {
+        let spirv = vec![0x07230203, 0x00010000, 0x00000000, 0x00000001, 0x00000000];
+        let shader = ShaderData::from_spirv(ShaderStage::Fragment, spirv, None).unwrap();
+        let report = shader.validate_all();
+        assert!(report.is_valid());
+    }
+
+    #[test]
+    fn test_validate_format_valid_glsl() {
+        let glsl = b"#version 450\nvoid main() {}";
+        assert!(ShaderData::validate_format(glsl).is_ok());
+    }
+
+    #[test]
+    fn test_validate_format_valid_spirv() {
+        let spirv = vec![0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00];
+        assert!(ShaderData::validate_format(&spirv).is_ok());
+    }
+
+    #[test]
+    fn test_validate_format_empty_data() {
+        let result = ShaderData::validate_format(&[]);
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::EmptyData {}) => {}
+            _ => panic!("Expected EmptyData error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_format_spirv_too_small() {
+        let spirv = vec![0x03, 0x02, 0x23, 0x07]; // Only 4 bytes
+        let result = ShaderData::validate_format(&spirv);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_data_empty_glsl() {
+        let source = "   \n\t  ".to_string(); // Whitespace only
+                                              // This should fail at creation time
+        let result = ShaderData::from_glsl(ShaderStage::Vertex, source, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_data_spirv_invalid_magic() {
+        let spirv = vec![0xDEADBEEF, 0x00010000, 0x00000000, 0x00000001, 0x00000000];
+        let result = ShaderData::from_spirv(ShaderStage::Vertex, spirv, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_data_spirv_too_small() {
+        // Create with valid magic but then manually reduce size for testing
+        let mut shader = ShaderData {
+            stage: ShaderStage::Vertex,
+            source: ShaderSource::Spirv(vec![0x07230203, 0x00010000]), // Only 2 words
+            entry_point: "main".to_string(),
+        };
+
+        let result = shader.validate_data();
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::InvalidDimensions { .. }) => {}
+            _ => panic!("Expected InvalidDimensions error"),
+        }
+    }
+
+    #[test]
+    fn test_checksum_validation_glsl() {
+        let source = "#version 450\nvoid main() {}".to_string();
+        let shader = ShaderData::from_glsl(ShaderStage::Vertex, source, None).unwrap();
+        let checksum = shader.compute_checksum();
+        assert!(shader.validate_checksum(&checksum).is_ok());
+    }
+
+    #[test]
+    fn test_checksum_validation_spirv() {
+        let spirv = vec![0x07230203, 0x00010000, 0x00000000, 0x00000001, 0x00000000];
+        let shader = ShaderData::from_spirv(ShaderStage::Fragment, spirv, None).unwrap();
+        let checksum = shader.compute_checksum();
+        assert!(shader.validate_checksum(&checksum).is_ok());
+    }
+
+    #[test]
+    fn test_checksum_validation_fails() {
+        let source = "#version 450\nvoid main() {}".to_string();
+        let shader = ShaderData::from_glsl(ShaderStage::Vertex, source, None).unwrap();
+        let wrong_checksum = [0u8; 32];
+        let result = shader.validate_checksum(&wrong_checksum);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_checksum_deterministic() {
+        let source = "#version 450\nvoid main() {}".to_string();
+        let shader = ShaderData::from_glsl(ShaderStage::Vertex, source, None).unwrap();
+        let hash1 = shader.compute_checksum();
+        let hash2 = shader.compute_checksum();
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_checksum_different_for_different_shaders() {
+        let source1 = "#version 450\nvoid main() {}".to_string();
+        let shader1 = ShaderData::from_glsl(ShaderStage::Vertex, source1, None).unwrap();
+
+        let source2 = "#version 450\nvoid other() {}".to_string();
+        let shader2 = ShaderData::from_glsl(ShaderStage::Vertex, source2, None).unwrap();
+
+        assert_ne!(shader1.compute_checksum(), shader2.compute_checksum());
     }
 }

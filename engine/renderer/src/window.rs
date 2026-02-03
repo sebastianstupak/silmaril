@@ -221,12 +221,6 @@ impl Window {
             .expect("Failed to get display handle")
             .as_raw()
     }
-
-    /// Get reference to winit window (for surface creation)
-    #[allow(dead_code)]
-    pub(crate) fn winit_window(&self) -> &WinitWindow {
-        &self.winit_window
-    }
 }
 
 #[cfg(test)]

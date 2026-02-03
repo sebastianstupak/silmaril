@@ -1,0 +1,160 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage
+          cache-all-crates: true
+
+      - name: Install Vulkan dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libvulkan-dev \
+            vulkan-validationlayers \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev
+
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov \
+            --workspace \
+            --all-features \
+            --lcov \
+            --output-path coverage.lcov \
+            --ignore-filename-regex '(tests?|benches?|examples?)/.*\.rs$' \
+            -- --test-threads=1
+        env:
+          RUST_LOG: warn
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Generate HTML coverage report
+        run: |
+          cargo llvm-cov report --html --output-dir coverage-html
+
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-html/
+          retention-days: 30
+
+      - name: Check coverage thresholds
+        run: |
+          # Extract overall coverage percentage
+          COVERAGE=$(cargo llvm-cov report --summary-only | grep -oP 'TOTAL.*\K[0-9]+\.[0-9]+(?=%)')
+          echo "Overall coverage: ${COVERAGE}%"
+
+          # Check if coverage meets minimum threshold
+          THRESHOLD=75.0
+          if (( $(echo "$COVERAGE >= $THRESHOLD" | bc -l) )); then
+            echo "✓ Coverage meets threshold (${THRESHOLD}%)"
+          else
+            echo "✗ Coverage below threshold (${THRESHOLD}%)"
+            exit 1
+          fi
+
+  coverage-per-module:
+    name: Per-Module Coverage
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        module:
+          - engine/core
+          - engine/math
+          - engine/assets
+          - engine/renderer
+          - engine/networking
+          - engine/physics
+          - engine/audio
+          - engine/interest
+          - engine/auth
+          - engine/auto-update
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage-${{ matrix.module }}
+
+      - name: Install Vulkan dependencies
+        if: matrix.module == 'engine/renderer'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libvulkan-dev \
+            vulkan-validationlayers \
+            libxcb1-dev
+
+      - name: Generate module coverage
+        run: |
+          cd ${{ matrix.module }}
+          cargo llvm-cov \
+            --all-features \
+            --lcov \
+            --output-path coverage.lcov \
+            --ignore-filename-regex '(tests?|benches?)/.*\.rs$'
+        env:
+          RUST_LOG: warn
+
+      - name: Report module coverage
+        run: |
+          cd ${{ matrix.module }}
+          COVERAGE=$(cargo llvm-cov report --summary-only | grep -oP 'TOTAL.*\K[0-9]+\.[0-9]+(?=%)')
+          echo "Module coverage: ${COVERAGE}%"
+          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+        id: module_coverage
+
+      - name: Upload module coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.module }}
+          path: ${{ matrix.module }}/coverage.lcov
+          retention-days: 7

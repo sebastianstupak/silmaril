@@ -19,6 +19,7 @@ pub mod audio;
 pub mod font;
 #[cfg(feature = "hot-reload")]
 pub mod hot_reload;
+pub mod loader;
 pub mod manager;
 pub mod material;
 pub mod memory;
@@ -36,6 +37,9 @@ pub use font::{FontData, FontError, FontMetrics, FontStyle, FontWeight};
 pub use handle::{AssetHandle, RefType};
 #[cfg(feature = "hot-reload")]
 pub use hot_reload::{HotReloadEvent, HotReloader};
+#[cfg(feature = "async")]
+pub use loader::StreamingHandle;
+pub use loader::{EnhancedLoader, LoadStrategy};
 pub use manager::{AssetError, AssetLoader, AssetManager, AssetType};
 pub use material::{MaterialData, MaterialError};
 pub use memory::{LruCache, MemoryBudget, MemoryStats};
