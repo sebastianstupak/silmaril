@@ -46,7 +46,7 @@ define_error! {
         DeviceLost { reason: String } = ErrorCode::DeviceLost, ErrorSeverity::Critical,
         InvalidMeshData { reason: String } = ErrorCode::InvalidMeshData, ErrorSeverity::Error,
         AssetNotFound { asset_id: String } = ErrorCode::AssetLoadFailed, ErrorSeverity::Error,
-        NotImplemented { feature: String } = ErrorCode::InvalidOperation, ErrorSeverity::Error,
+        NotImplemented { feature: String } = ErrorCode::InvalidFormat, ErrorSeverity::Error,
     }
 }
 

@@ -5,10 +5,12 @@
 use engine_core::ecs::World;
 use engine_core::math::Transform;
 use engine_core::serialization::{
-    ChecksumAlgorithm, CompressedData, CompressionAlgorithm, Format, OptimizedDelta,
-    RecoveryOptions, RecoveryStrategy, Serializable, ValidatedWorldState, VersionedWorldState,
-    WorldState, WorldStateValidator,
+    ChecksumAlgorithm, Format, RecoveryOptions, RecoveryStrategy, Serializable,
+    ValidatedWorldState, VersionedWorldState, WorldState, WorldStateValidator,
 };
+
+#[cfg(feature = "compression")]
+use engine_core::serialization::{CompressedData, CompressionAlgorithm, OptimizedDelta};
 
 /// Real-world scenario: MMO player save file
 ///

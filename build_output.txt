@@ -1,0 +1,74 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\client\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   D:\dev\agent-game-engine\engine\binaries\server\Cargo.toml
+workspace: D:\dev\agent-game-engine\Cargo.toml
+warning: engine-math@0.1.0: engine-math: For optimal SIMD performance, compile with RUSTFLAGS="-C target-cpu=native"
+   Compiling engine-core v0.1.0 (D:\dev\agent-game-engine\engine\core)
+   Compiling engine-assets v0.1.0 (D:\dev\agent-game-engine\engine\assets)
+error: unused import: `AssetId`
+ --> engine\assets\src\async_loader.rs:7:38
+  |
+7 | use crate::{AssetError, AssetHandle, AssetId, AssetLoader, AssetManager};
+  |                                      ^^^^^^^
+  |
+  = note: `-D unused-imports` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: unused import: `parking_lot::RwLock`
+ --> engine\assets\src\async_loader.rs:8:5
+  |
+8 | use parking_lot::RwLock;
+  |     ^^^^^^^^^^^^^^^^^^^
+
+error: unused import: `mpsc`
+  --> engine\assets\src\async_loader.rs:12:19
+   |
+12 | use tokio::sync::{mpsc, oneshot};
+   |                   ^^^^
+
+error[E0277]: `dyn StdError` cannot be sent between threads safely
+   --> engine\assets\src\manager.rs:177:21
+    |
+177 |         let asset = tokio::task::spawn_blocking(move || T::parse(&data))
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `dyn StdError` cannot be sent between threads safely
+    |
+    = help: the trait `Send` is not implemented for `dyn StdError`
+    = note: required for `Unique<dyn StdError>` to implement `Send`
+note: required because it appears within the type `Box<dyn StdError>`
+   --> /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234\library\alloc\src\boxed.rs:231:12
+note: required because it appears within the type `Result<<T as AssetLoader>::Asset, Box<dyn StdError>>`
+   --> /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234\library\core\src\result.rs:557:10
+note: required by a bound in `spawn_blocking`
+   --> C:\Users\sebas\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tokio-1.49.0\src\task\blocking.rs:208:12
+    |
+205 |     pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
+    |            -------------- required by a bound in this function
+...
+208 |         R: Send + 'static,
+    |            ^^^^ required by this bound in `spawn_blocking`
+
+error[E0277]: `dyn StdError` cannot be sent between threads safely
+   --> engine\assets\src\async_loader.rs:238:31
+    |
+238 |             let asset = match tokio::task::spawn_blocking(move || T::parse(&data)).await {
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `dyn StdError` cannot be sent between threads safely
+    |
+    = help: the trait `Send` is not implemented for `dyn StdError`
+    = note: required for `Unique<dyn StdError>` to implement `Send`
+note: required because it appears within the type `Box<dyn StdError>`
+   --> /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234\library\alloc\src\boxed.rs:231:12
+note: required because it appears within the type `Result<<T as AssetLoader>::Asset, Box<dyn StdError>>`
+   --> /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234\library\core\src\result.rs:557:10
+note: required by a bound in `spawn_blocking`
+   --> C:\Users\sebas\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tokio-1.49.0\src\task\blocking.rs:208:12
+    |
+205 |     pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
+    |            -------------- required by a bound in this function
+...
+208 |         R: Send + 'static,
+    |            ^^^^ required by this bound in `spawn_blocking`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `engine-assets` (lib) due to 5 previous errors
