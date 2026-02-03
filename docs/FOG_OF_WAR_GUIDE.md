@@ -385,9 +385,9 @@ The fog system integrates with the engine's profiling infrastructure:
 
 ```rust
 #[cfg(feature = "profiling")]
-agent_game_engine_profiling::profile_scope!(
+silmaril_profiling::profile_scope!(
     "fog_calculate_for_player",
-    agent_game_engine_profiling::ProfileCategory::Networking
+    silmaril_profiling::ProfileCategory::Networking
 );
 ```
 

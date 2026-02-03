@@ -4,7 +4,7 @@ Practical benchmarks measuring real-world game scenarios that can be compared ag
 
 ## Overview
 
-This benchmark suite provides objective performance comparisons between Agent Game Engine and industry-leading game engines. All scenarios are designed to reflect real-world game development workloads.
+This benchmark suite provides objective performance comparisons between Silmaril and industry-leading game engines. All scenarios are designed to reflect real-world game development workloads.
 
 ## Benchmark Scenarios
 
@@ -190,7 +190,7 @@ See [`industry_comparison.yaml`](./industry_comparison.yaml) for detailed perfor
 
 ### Expected Performance Multipliers
 
-Approximate comparison vs Agent Game Engine (lower is better):
+Approximate comparison vs Silmaril (lower is better):
 
 | Engine | Frame Time | Server Tick | Serialization | Spatial Query |
 |--------|-----------|-------------|---------------|---------------|

@@ -67,7 +67,7 @@ examples/moba/
 **File:** `examples/moba/shared/src/champions.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -573,7 +573,7 @@ impl MobaMap {
 **File:** `examples/moba/server/src/game/minions.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use moba_shared::champions::*;
 use glam::Vec3;
 
@@ -804,7 +804,7 @@ fn attack(world: &mut World, attacker: Entity, target: Entity) {
 **File:** `examples/moba/client/src/ui/abilities.rs`
 
 ```rust
-use agent_game_engine_rendering::ui::*;
+use silmaril_rendering::ui::*;
 use moba_shared::champions::*;
 
 pub struct AbilityBar {

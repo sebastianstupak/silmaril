@@ -1,12 +1,12 @@
 ---
 name: build
-description: Build client and/or server binaries for agent-game-engine
+description: Build client and/or server binaries for silmaril
 trigger: /build
 ---
 
 # Build Client/Server Binaries
 
-Builds the agent-game-engine client and/or server binaries with proper feature flags.
+Builds the silmaril client and/or server binaries with proper feature flags.
 
 ## Instructions
 

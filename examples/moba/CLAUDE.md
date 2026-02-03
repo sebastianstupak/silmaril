@@ -1,7 +1,7 @@
 # MOBA Example
 
 ## Overview
-This example demonstrates a Multiplayer Online Battle Arena (MOBA) game built with the Agent Game Engine. It showcases real-time multiplayer combat, team coordination, advanced AI behaviors, lane mechanics, and competitive gameplay systems.
+This example demonstrates a Multiplayer Online Battle Arena (MOBA) game built with the Silmaril. It showcases real-time multiplayer combat, team coordination, advanced AI behaviors, lane mechanics, and competitive gameplay systems.
 
 ## What This Demonstrates
 - Real-time multiplayer combat (5v5 or similar)

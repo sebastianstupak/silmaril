@@ -1,6 +1,6 @@
 # TLS Troubleshooting Guide
 
-Common issues and solutions for TLS implementation in agent-game-engine.
+Common issues and solutions for TLS implementation in silmaril.
 
 ## Quick Diagnostic Checklist
 

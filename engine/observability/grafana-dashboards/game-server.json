@@ -2,7 +2,7 @@
   "dashboard": {
     "id": null,
     "uid": "game-server",
-    "title": "Agent Game Engine - Server Metrics",
+    "title": "Silmaril - Server Metrics",
     "tags": ["game", "server", "performance"],
     "timezone": "browser",
     "schemaVersion": 16,

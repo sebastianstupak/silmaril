@@ -44,7 +44,7 @@ use std::any::TypeId;
 use tracing::{debug, info};
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 use crate::ecs::dependency_graph::{DependencyGraph, SystemNode};
 
@@ -310,10 +310,8 @@ impl Schedule {
 
                 #[cfg(feature = "profiling")]
                 {
-                    let _scope = agent_game_engine_profiling::ProfileScope::new(
-                        system.name(),
-                        ProfileCategory::ECS,
-                    );
+                    let _scope =
+                        silmaril_profiling::ProfileScope::new(system.name(), ProfileCategory::ECS);
                     system.run(world);
                 }
 

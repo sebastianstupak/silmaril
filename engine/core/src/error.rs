@@ -1,4 +1,4 @@
-//! Error infrastructure for the agent game engine.
+//! Error infrastructure for the Silmaril.
 //!
 //! This module provides the foundation for structured error handling across the entire engine.
 //! All engine errors implement the `EngineError` trait, which provides:
@@ -19,6 +19,7 @@
 //! - 1700-1799: LOD
 //! - 1800-1899: Interest Management
 //! - 1900-1999: Auto-update
+//! - 2000-2099: Template System
 
 use std::fmt;
 
@@ -262,6 +263,22 @@ pub enum ErrorCode {
     UpdateDownloadFailed = 1901,
     /// Update installation failed
     UpdateInstallFailed = 1902,
+
+    // Template System (2000-2099)
+    /// Template file not found
+    TemplateNotFound = 2000,
+    /// Template file already exists
+    TemplateAlreadyExists = 2001,
+    /// Invalid YAML syntax in template
+    TemplateInvalidYaml = 2002,
+    /// Unknown component type in template
+    TemplateUnknownComponent = 2003,
+    /// Circular reference detected in templates
+    TemplateCircularReference = 2004,
+    /// I/O error while accessing template file
+    TemplateIo = 2005,
+    /// Template serialization error
+    TemplateSerialization = 2006,
 }
 
 impl ErrorCode {
@@ -279,6 +296,7 @@ impl ErrorCode {
             1700..=1799 => "LOD",
             1800..=1899 => "Interest Management",
             1900..=1999 => "Auto-update",
+            2000..=2099 => "Template System",
             _ => "Unknown",
         }
     }

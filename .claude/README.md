@@ -1,6 +1,6 @@
 # Claude Code Configuration
 
-> **Complete guide to using Claude Code with the Agent Game Engine project**
+> **Complete guide to using Claude Code with the Silmaril project**
 >
 > This document covers the new config.json structure, custom prompts, git hooks, agents, and best practices for working with this codebase.
 
@@ -35,11 +35,11 @@ This project uses Claude Code's advanced features to streamline development:
 ### What's New
 
 This configuration adds:
-- **D:\dev\agent-game-engine\.claude\config.json** - Main configuration file
-- **D:\dev\agent-game-engine\.claude\prompts\phase-guide.md** - Phase-aware development guide
-- **D:\dev\agent-game-engine\.claude\prompts\code-review.md** - Comprehensive review checklist
-- **D:\dev\agent-game-engine\.claude\hooks\pre-commit.sh** - Quality checks before commit
-- **D:\dev\agent-game-engine\.claude\hooks\post-test.sh** - Test metrics and coverage reporting
+- **D:\dev\silmaril\.claude\config.json** - Main configuration file
+- **D:\dev\silmaril\.claude\prompts\phase-guide.md** - Phase-aware development guide
+- **D:\dev\silmaril\.claude\prompts\code-review.md** - Comprehensive review checklist
+- **D:\dev\silmaril\.claude\hooks\pre-commit.sh** - Quality checks before commit
+- **D:\dev\silmaril\.claude\hooks\post-test.sh** - Test metrics and coverage reporting
 
 ### Directory Structure
 
@@ -80,7 +80,7 @@ Main configuration file defining:
 - **Performance targets**
 - **Documentation standards**
 
-**Location:** `D:\dev\agent-game-engine\.claude\config.json`
+**Location:** `D:\dev\silmaril\.claude\config.json`
 
 **Key sections:**
 ```json
@@ -333,7 +333,7 @@ The config.json defines four specialized agent roles:
 
 ```bash
 # Start Claude Code in the project root
-cd D:\dev\agent-game-engine
+cd D:\dev\silmaril
 claude
 
 # Or specify a specific model
@@ -744,7 +744,7 @@ Show me examples of custom ECS components
 cargo test --all-features
 
 # Specific module
-cargo test --package agent-game-engine-core
+cargo test --package silmaril-core
 
 # With output
 cargo test -- --nocapture

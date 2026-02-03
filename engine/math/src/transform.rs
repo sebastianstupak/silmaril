@@ -184,6 +184,21 @@ impl Transform {
         self.rebuild_affine();
     }
 
+    /// Convert transform to 4x4 homogeneous transformation matrix.
+    ///
+    /// Returns a Mat4 that can be used for rendering (MVP calculations).
+    /// This is optimized using the internal Affine3A representation.
+    #[inline]
+    pub fn to_matrix(&self) -> glam::Mat4 {
+        glam::Mat4::from(self.affine)
+    }
+
+    /// Alias for to_matrix() (convenience method for rendering)
+    #[inline]
+    pub fn matrix(&self) -> glam::Mat4 {
+        self.to_matrix()
+    }
+
     /// Look at a target position (rotate to face target).
     ///
     /// The forward direction will point towards the target.

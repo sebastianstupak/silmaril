@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document provides comprehensive guidance for benchmarking the agent-game-engine ECS against industry standards. We compare against:
+This document provides comprehensive guidance for benchmarking the silmaril ECS against industry standards. We compare against:
 
 - **Bevy ECS** (Rust, archetype-based, production-ready)
 - **hecs** (Rust, minimalist, high-performance)

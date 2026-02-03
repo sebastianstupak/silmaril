@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# agent-game-engine = { path = "../../../" }
+# silmaril = { path = "../../../" }
 moba-shared = { path = "../shared" }
 serde.workspace = true
 tokio.workspace = true

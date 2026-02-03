@@ -52,7 +52,7 @@ impl VulkanInstance {
 
         // Application info
         let app_name_cstr = CString::new(app_name).unwrap();
-        let engine_name_cstr = CString::new("Agent Game Engine").unwrap();
+        let engine_name_cstr = CString::new("Silmaril").unwrap();
 
         let app_info = vk::ApplicationInfo::builder()
             .application_name(&app_name_cstr)

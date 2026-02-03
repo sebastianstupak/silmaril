@@ -1,6 +1,6 @@
 {
   "$schema": "https://claude.ai/schemas/config.json",
-  "name": "Agent Game Engine",
+  "name": "Silmaril",
   "version": "0.1.0",
   "description": "Production-grade game engine optimized for AI agents with visual feedback loops, server-authoritative multiplayer, and cross-platform support",
 

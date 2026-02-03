@@ -22,11 +22,11 @@
       "Bash(cargo run:*)",
       "Bash(echo:*)",
       "Bash(cargo:*)",
-      "Bash(timeout 120 bash -c 'while [ ! -f \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\ba32647.output\"\" ] || grep -q \"\"Compiling\\\\|Building\"\" \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\ba32647.output\"\" 2>/dev/null; do sleep 2; done')",
-      "Bash(test -d \"D:\\\\dev\\\\agent-game-engine\\\\engine\\\\core\\\\src\\\\serialization\")",
+      "Bash(timeout 120 bash -c 'while [ ! -f \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-silmaril\\\\tasks\\\\ba32647.output\"\" ] || grep -q \"\"Compiling\\\\|Building\"\" \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-silmaril\\\\tasks\\\\ba32647.output\"\" 2>/dev/null; do sleep 2; done')",
+      "Bash(test -d \"D:\\\\dev\\\\silmaril\\\\engine\\\\core\\\\src\\\\serialization\")",
       "Bash(git status:*)",
       "Bash(find:*)",
-      "Bash(timeout 60 bash -c 'while ! grep -q \"\"test result:\"\" \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-agent-game-engine\\\\tasks\\\\ba0ac1b.output\"\" 2>/dev/null; do sleep 2; done':*)",
+      "Bash(timeout 60 bash -c 'while ! grep -q \"\"test result:\"\" \"\"C:\\\\Users\\\\sebas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--dev-silmaril\\\\tasks\\\\ba0ac1b.output\"\" 2>/dev/null; do sleep 2; done':*)",
       "Bash(git push:*)",
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
@@ -47,7 +47,7 @@
       "Bash(where:*)",
       "Bash(bash:*)",
       "Bash(timeout 30 cat:*)",
-      "Bash(D:devagent-game-enginetargetreleasedepsvulkan_benches-8aabdaa73978e971.exe --bench)",
+      "Bash(D:devsilmariltargetreleasedepsvulkan_benches-8aabdaa73978e971.exe --bench)",
       "Bash(./vulkan_benches-8aabdaa73978e971.exe:*)",
       "Bash(cd:*)",
       "Bash(powershell \"tasklist | Select-String -Pattern ''cargo|rust''\")",
@@ -64,7 +64,7 @@
       "Bash(1)",
       "Bash(git rm:*)",
       "Bash(rustup target:*)",
-      "Bash(chmod +x \"D:\\\\dev\\\\agent-game-engine\\\\scripts\\\\build_all_tiers.sh\")",
+      "Bash(chmod +x \"D:\\\\dev\\\\silmaril\\\\scripts\\\\build_all_tiers.sh\")",
       "Bash(chmod:*)",
       "Bash(wasm-pack build:*)",
       "Bash(git reset:*)",
@@ -103,7 +103,14 @@
       "Bash(timeout 15 tail:*)",
       "Bash(for file in certificates/acme.rs certificates/manager.rs certificates/selfsigned.rs config.rs tcp.rs udp.rs)",
       "Bash(do sed -i '/#\\\\[cfg\\(feature = \"\"backtrace\"\"\\)\\\\]/d; /backtrace: std::backtrace::Backtrace::capture\\(\\),/d' \"$file\")",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(Select-String -Pattern \"error\" -Context 0,2)",
+      "Bash(pgrep:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:dimforge.com)",
+      "Bash(cloc:*)",
+      "Bash(timeout 10 cat:*)",
+      "Bash(Select-String -Pattern \"error\" -Context 2,2)"
     ]
   }
 }

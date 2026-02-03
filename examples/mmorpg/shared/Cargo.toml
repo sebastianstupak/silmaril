@@ -4,7 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# agent-game-engine = { path = "../../../" }
+engine-core.workspace = true
+engine-networking.workspace = true
 serde.workspace = true
-
-# Add shared dependencies for protocol, entities, etc.
+bincode.workspace = true
+tracing.workspace = true

@@ -1,6 +1,6 @@
 # Turn-Based Strategy Example
 
-A turn-based strategy game demonstrating the Agent Game Engine's state management and AI capabilities.
+A turn-based strategy game demonstrating the Silmaril's state management and AI capabilities.
 
 ## Quick Start
 

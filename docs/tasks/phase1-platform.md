@@ -149,7 +149,7 @@ pub struct WindowConfig {
 impl Default for WindowConfig {
     fn default() -> Self {
         Self {
-            title: "Agent Game Engine".to_string(),
+            title: "Silmaril".to_string(),
             width: 1280,
             height: 720,
             fullscreen: false,

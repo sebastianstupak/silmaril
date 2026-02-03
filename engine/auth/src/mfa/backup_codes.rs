@@ -6,6 +6,7 @@ use crate::error::AuthError;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use tracing::{debug, info};
 
@@ -26,11 +27,13 @@ pub struct BackupCode {
 
 impl BackupCode {
     /// Create a new backup code from plaintext.
+    #[must_use]
     pub fn new(code: &str) -> Self {
         Self { hash: hash_backup_code(code), used: false }
     }
 
     /// Verify a plaintext code against this backup code.
+    #[must_use]
     pub fn verify(&self, code: &str) -> bool {
         if self.used {
             return false;
@@ -75,7 +78,7 @@ impl BackupCodeManager {
     ///
     /// # Returns
     ///
-    /// Tuple of (plaintext_codes, hashed_backup_codes)
+    /// Tuple of (`plaintext_codes`, `hashed_backup_codes`)
     pub fn generate_codes() -> (Vec<String>, Vec<BackupCode>) {
         let mut plaintext_codes = Vec::with_capacity(BACKUP_CODE_COUNT);
         let mut backup_codes = Vec::with_capacity(BACKUP_CODE_COUNT);
@@ -118,11 +121,13 @@ impl BackupCodeManager {
     }
 
     /// Check how many unused backup codes remain.
+    #[must_use]
     pub fn unused_count(backup_codes: &[BackupCode]) -> usize {
         backup_codes.iter().filter(|c| !c.used).count()
     }
 
     /// Check if backup codes are running low (< 3 remaining).
+    #[must_use]
     pub fn is_low(backup_codes: &[BackupCode]) -> bool {
         Self::unused_count(backup_codes) < 3
     }
@@ -130,6 +135,7 @@ impl BackupCodeManager {
     /// Format backup codes for display (grouped with dashes).
     ///
     /// Example: ABCD-EFGH
+    #[must_use]
     pub fn format_codes_for_display(codes: &[String]) -> Vec<String> {
         codes
             .iter()

@@ -3,10 +3,31 @@
 //! Provides configuration structures for TLS/DTLS with strong security defaults.
 
 use super::error::{TlsError, TlsResult};
-use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
+use rustls::{
+    client::ServerCertVerified, client::ServerCertVerifier, Certificate, ClientConfig, PrivateKey,
+    RootCertStore, ServerConfig,
+};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::SystemTime;
 use tracing::{debug, info, warn};
+
+/// Dangerous certificate verifier that accepts all certificates (for testing only)
+struct NoCertificateVerification;
+
+impl ServerCertVerifier for NoCertificateVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &Certificate,
+        _intermediates: &[Certificate],
+        _server_name: &rustls::ServerName,
+        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _ocsp_response: &[u8],
+        _now: SystemTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        Ok(ServerCertVerified::assertion())
+    }
+}
 
 /// TLS protocol version
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -166,7 +187,7 @@ impl TlsClientConfigBuilder {
         }
 
         // Build configuration
-        let config = ClientConfig::builder()
+        let builder = ClientConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
             .with_protocol_versions(&[&rustls::version::TLS13])
@@ -174,15 +195,19 @@ impl TlsClientConfigBuilder {
                 reason: format!("Failed to set protocol version: {}", e),
                 #[cfg(feature = "backtrace")]
                 backtrace: std::backtrace::Backtrace::capture(),
-            })?
-            .with_root_certificates(root_store);
+            })?;
 
-        // Configure client authentication (mutual TLS)
-        let config =
+        // Choose verifier and build config based on verification mode
+        let config = if matches!(self.verification, CertificateVerification::Disabled) {
+            // Use dangerous verifier that accepts all certificates
+            let dangerous =
+                builder.with_custom_certificate_verifier(Arc::new(NoCertificateVerification));
+
+            // Configure client authentication (mutual TLS)
             if let (Some(cert_path), Some(key_path)) = (&self.client_cert, &self.client_key) {
                 let certs = load_certificates(cert_path)?;
                 let key = load_private_key(key_path)?;
-                config.with_client_auth_cert(certs, key).map_err(|e| {
+                dangerous.with_client_auth_cert(certs, key).map_err(|e| {
                     TlsError::InvalidCertificate {
                         reason: format!("Failed to set client certificate: {}", e),
                         #[cfg(feature = "backtrace")]
@@ -190,8 +215,27 @@ impl TlsClientConfigBuilder {
                     }
                 })?
             } else {
-                config.with_no_client_auth()
-            };
+                dangerous.with_no_client_auth()
+            }
+        } else {
+            // Use standard verification
+            let standard = builder.with_root_certificates(root_store);
+
+            // Configure client authentication (mutual TLS)
+            if let (Some(cert_path), Some(key_path)) = (&self.client_cert, &self.client_key) {
+                let certs = load_certificates(cert_path)?;
+                let key = load_private_key(key_path)?;
+                standard.with_client_auth_cert(certs, key).map_err(|e| {
+                    TlsError::InvalidCertificate {
+                        reason: format!("Failed to set client certificate: {}", e),
+                        #[cfg(feature = "backtrace")]
+                        backtrace: std::backtrace::Backtrace::capture(),
+                    }
+                })?
+            } else {
+                standard.with_no_client_auth()
+            }
+        };
 
         // Enable session resumption
         if !self.enable_session_resumption {

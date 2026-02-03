@@ -309,9 +309,9 @@ mod tests {
         let server = UdpServer::bind("127.0.0.1:0").await.unwrap();
         let server_addr = server.local_addr();
 
-        let server_for_task = UdpServer::bind(&server_addr.to_string()).await.unwrap();
+        // Spawn server task with the original server
         tokio::spawn(async move {
-            server_for_task.run_echo_server().await.ok();
+            server.run_echo_server().await.ok();
         });
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;

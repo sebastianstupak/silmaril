@@ -1,6 +1,6 @@
 # ECS Architecture
 
-> **Entity Component System design for agent-game-engine**
+> **Entity Component System design for silmaril**
 >
 > High-performance, cache-friendly ECS optimized for AI agent workflows
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The agent-game-engine uses a custom ECS implementation optimized for:
+The silmaril uses a custom ECS implementation optimized for:
 - **Cache efficiency** - Sparse-set storage with dense iteration
 - **Query performance** - Macro-generated queries with zero overhead
 - **Type safety** - Compile-time component registration

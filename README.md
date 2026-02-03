@@ -1,10 +1,10 @@
-# Agent Game Engine
+# Silmaril
 
 **A fully automatable game engine optimized for AI agent workflows**
 
-[![CI Status](https://img.shields.io/github/workflow/status/your-org/agent-game-engine/CI)](https://github.com/your-org/agent-game-engine/actions)
-[![Benchmark Status](https://img.shields.io/github/workflow/status/your-org/agent-game-engine/Benchmark%20Regression?label=benchmarks)](https://github.com/your-org/agent-game-engine/actions/workflows/benchmark-regression.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/your-org/agent-game-engine)](https://codecov.io/gh/your-org/agent-game-engine)
+[![CI Status](https://img.shields.io/github/workflow/status/your-org/silmaril/CI)](https://github.com/your-org/silmaril/actions)
+[![Benchmark Status](https://img.shields.io/github/workflow/status/your-org/silmaril/Benchmark%20Regression?label=benchmarks)](https://github.com/your-org/silmaril/actions/workflows/benchmark-regression.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/your-org/silmaril)](https://codecov.io/gh/your-org/silmaril)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-orange)](https://www.rust-lang.org/)
 
@@ -12,7 +12,7 @@
 
 ## 🎯 **What is This?**
 
-Agent Game Engine is a **data-driven, server-authoritative game engine** designed for AI agents to build games autonomously. Unlike traditional engines (Unity, Unreal), this engine provides:
+Silmaril is a **data-driven, server-authoritative game engine** designed for AI agents to build games autonomously. Unlike traditional engines (Unity, Unreal), this engine provides:
 
 - **Complete visual feedback loops**: Render → Capture → Analyze → Iterate
 - **Data-driven everything**: Scenes, ECS, configs all inspectable/modifiable
@@ -68,8 +68,8 @@ See [PERFORMANCE.md](PERFORMANCE.md) for full comparison with Unity, Unreal, id 
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/agent-game-engine.git
-cd agent-game-engine
+git clone https://github.com/your-org/silmaril.git
+cd silmaril
 
 # Build engine
 cd engine
@@ -206,19 +206,19 @@ Comprehensive benchmark suite for performance validation and regression detectio
 
 ```bash
 # Run all benchmarks
-just bench-all
+cargo xtask bench all
 
 # Run specific benchmark suites
-just bench-ecs          # ECS operations
-just bench-physics      # Physics simulation
-just bench-renderer     # Rendering pipeline
-just bench-compare      # Industry comparison
+cargo xtask bench ecs       # ECS operations
+cargo xtask bench physics   # Physics simulation
+cargo xtask bench renderer  # Rendering pipeline
+cargo xtask bench compare   # Industry comparison
 
 # Compare with baseline
-just bench-baseline
+cargo xtask bench baseline
 
 # View benchmark report
-just bench-report
+cargo xtask bench report
 ```
 
 ### Benchmark Categories
@@ -253,7 +253,7 @@ Benchmarks run automatically on:
 - **Every merge to main**: Baseline update
 - **Weekly**: Full benchmark suite across all platforms
 
-[![Benchmark Status](https://img.shields.io/github/workflow/status/your-org/agent-game-engine/Benchmark%20CI?label=benchmarks)](https://github.com/your-org/agent-game-engine/actions/workflows/benchmark-ci.yml)
+[![Benchmark Status](https://img.shields.io/github/workflow/status/your-org/silmaril/Benchmark%20CI?label=benchmarks)](https://github.com/your-org/silmaril/actions/workflows/benchmark-ci.yml)
 
 ### Regression Detection
 
@@ -338,7 +338,7 @@ For maximum performance, compile with native CPU optimizations to enable AVX2, F
 RUSTFLAGS="-C target-cpu=native" cargo build --release
 
 # Run benchmarks with native features
-RUSTFLAGS="-C target-cpu=native" cargo bench
+RUSTFLAGS="-C target-cpu=native" cargo xtask bench all
 ```
 
 **Expected Performance Gains:**
@@ -411,7 +411,7 @@ To measure actual performance gain:
 
 ```bash
 # Compare PGO vs non-PGO performance
-./scripts/compare_pgo_performance.sh
+cargo xtask pgo compare
 
 # View detailed reports
 open target/criterion/report/index.html
@@ -459,7 +459,7 @@ Same as above! The engine is designed for both AI and human developers.
 ## 📦 **Project Structure**
 
 ```
-agent-game-engine/
+silmaril/
 ├── CLAUDE.md              # AI agent guide (START HERE)
 ├── ROADMAP.md             # Implementation plan
 ├── README.md              # This file
@@ -519,8 +519,8 @@ Inspired by:
 
 ## 📞 **Contact**
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/agent-game-engine/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/agent-game-engine/discussions)
+- **Issues**: [GitHub Issues](https://github.com/your-org/silmaril/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/silmaril/discussions)
 - **Documentation**: [docs/](docs/)
 
 ---

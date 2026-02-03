@@ -18,7 +18,7 @@ use engine_auto_update::{
 };
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::{error, info, warn, Level};
+use tracing::{info, warn, Level};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -207,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn find_files(dir: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+fn find_files(dir: &Path, _pattern: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files = Vec::new();
 
     fn visit_dir(dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {

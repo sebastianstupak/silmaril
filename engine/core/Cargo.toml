@@ -22,7 +22,7 @@ engine-math = { path = "../math", features = ["serde", "simd"] }
 glam = "0.29"
 
 # Optional profiling support
-agent-game-engine-profiling = { path = "../profiling", optional = true }
+silmaril-profiling = { path = "../profiling", optional = true }
 puffin = { version = "0.19", optional = true }
 
 # Platform abstractions
@@ -43,8 +43,8 @@ core-foundation = "0.9"
 default = []
 window = ["winit", "raw-window-handle"]
 backtrace = []
-profiling = ["agent-game-engine-profiling/profiling-puffin", "puffin"]
-metrics = ["agent-game-engine-profiling/metrics"]
+profiling = ["silmaril-profiling/profiling-puffin", "puffin"]
+metrics = ["silmaril-profiling/metrics"]
 compression = ["lz4", "zstd"]  # Optional compression support
 
 [build-dependencies]
@@ -100,6 +100,10 @@ name = "world_benches"
 harness = false
 
 [[bench]]
+name = "ecs_scalability"
+harness = false
+
+[[bench]]
 name = "spatial_benches"
 harness = false
 
@@ -128,6 +132,10 @@ name = "change_detection"
 harness = false
 
 [[bench]]
+name = "large_scale_ecs_benches"
+harness = false
+
+[[bench]]
 name = "ecs_performance"
 harness = false
 
@@ -153,4 +161,8 @@ harness = false
 
 [[bench]]
 name = "serialization_scenarios"
+harness = false
+
+[[bench]]
+name = "input_benches"
 harness = false

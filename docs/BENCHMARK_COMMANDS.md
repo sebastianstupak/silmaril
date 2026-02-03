@@ -10,10 +10,10 @@
 
 ```bash
 # Show quick threshold reference in terminal
-just benchmark-thresholds
+cargo xtask bench thresholds
 
 # Generate full comparison report (auto-parses results!)
-just benchmark-report
+cargo xtask bench report
 
 # View the generated report
 cat BENCHMARK_COMPARISON.md
@@ -25,37 +25,37 @@ cat BENCHMARK_COMPARISON.md
 
 ```bash
 # ECS (Entity Component System)
-just benchmark-ecs
+cargo xtask bench ecs
 
 # Serialization
-just benchmark-serialization
+cargo xtask bench serialization
 
 # Physics
-just benchmark-physics
+cargo xtask bench physics
 
 # Renderer
-just benchmark-renderer
+cargo xtask bench renderer
 
 # Math operations
-just benchmark-math
+cargo xtask bench math
 
 # Allocators
-just benchmark-allocators
+cargo xtask bench allocators
 
 # Spatial data structures
-just benchmark-spatial
+cargo xtask bench spatial
 
 # Profiling overhead
-just benchmark-profiling
+cargo xtask bench profiling
 
 # Asset loading
-just benchmark-assets
+cargo xtask bench assets
 
 # Platform-specific
-just benchmark-platform
+cargo xtask bench platform
 
 # Network (when implemented)
-just benchmark-network
+cargo xtask bench network
 ```
 
 ---
@@ -64,37 +64,37 @@ just benchmark-network
 
 ```bash
 # ECS tests
-just test-ecs
+cargo xtask test ecs
 
 # Serialization tests
-just test-serialization
+cargo xtask test serialization
 
 # Physics tests
-just test-physics
+cargo xtask test physics
 
 # Renderer tests
-just test-renderer
+cargo xtask test renderer
 
 # Math tests
-just test-math
+cargo xtask test math
 
 # Networking tests
-just test-networking
+cargo xtask test networking
 
 # Profiling tests
-just test-profiling
+cargo xtask test profiling
 
 # All tests
-just test
+cargo xtask test all
 
 # Verbose output
-just test-verbose
+cargo xtask test verbose
 
 # Client code only
-just test-client
+cargo xtask test client
 
 # Server code only
-just test-server
+cargo xtask test server
 ```
 
 ---
@@ -103,19 +103,19 @@ just test-server
 
 ```bash
 # Run all benchmarks (comprehensive)
-just benchmark-all
+cargo xtask bench all
 
 # Quick smoke test (fast, for CI)
-just benchmark-smoke
+cargo xtask bench smoke
 
 # Dev benchmarks (fast iteration)
-just dev-benchmark
+cargo xtask dev benchmark
 
 # With profiling enabled
-just benchmark-profile
+cargo xtask bench profile
 
 # All platforms
-just benchmark-all-platforms
+cargo xtask bench all-platforms
 ```
 
 ---
@@ -124,16 +124,16 @@ just benchmark-all-platforms
 
 ```bash
 # Save current performance as baseline
-just benchmark-save-baseline
+cargo xtask bench save-baseline
 
 # Update specific baseline
-just benchmark-update-baseline baseline_name="my-baseline"
+cargo xtask bench update-baseline --name my-baseline
 
 # Compare with saved baseline
-just benchmark-compare-baseline
+cargo xtask bench compare-baseline
 
 # Compare with threshold (20% regression fails)
-just benchmark-compare-baseline baseline_name="main" threshold="20"
+cargo xtask bench compare-baseline --name main --threshold 20
 ```
 
 ---
@@ -142,7 +142,7 @@ just benchmark-compare-baseline baseline_name="main" threshold="20"
 
 ### Quick Reference (Terminal)
 ```bash
-just benchmark-thresholds
+cargo xtask bench thresholds
 ```
 
 **Output:**
@@ -154,19 +154,19 @@ FRAME TIME:
   120 FPS:  8.33ms (Competitive/VR)
 
 ECS PERFORMANCE:
-  agent-game-engine: 10M entities/sec (target)
+  silmaril: 10M entities/sec (target)
   Unity DOTS:        2.25M entities/sec
   Bevy v0.16:        3x improvement
 
 SERIALIZATION (1000 entities):
-  agent-game-engine: 99.3μs (50x faster than 5ms target!)
+  silmaril: 99.3μs (50x faster than 5ms target!)
   bincode:           2962 MB/s serialize
 ...
 ```
 
 ### Full Comparison Report (Auto-Generated!)
 ```bash
-just benchmark-report
+cargo xtask bench report
 ```
 
 **What it does:**
@@ -186,7 +186,7 @@ Parsing benchmark results from: target/criterion
 
 ### View Report in Browser
 ```bash
-just benchmark-view
+cargo xtask bench view
 ```
 Opens the Criterion HTML report in your browser.
 
@@ -198,65 +198,65 @@ Opens the Criterion HTML report in your browser.
 
 ```bash
 # Quick test
-just test-ecs
+cargo xtask test ecs
 
 # Quick benchmark
-just benchmark-smoke
+cargo xtask bench smoke
 
 # Check thresholds
-just benchmark-thresholds
+cargo xtask bench thresholds
 ```
 
 ### Before Commit
 
 ```bash
 # Run all tests
-just test
+cargo xtask test all
 
 # Run all benchmarks
-just benchmark-all
+cargo xtask bench all
 
 # Generate comparison report
-just benchmark-report
+cargo xtask bench report
 
 # Compare with baseline (fail if >20% regression)
-just benchmark-compare-baseline threshold="20"
+cargo xtask bench compare-baseline --threshold 20
 ```
 
 ### Performance Investigation
 
 ```bash
 # Run specific feature benchmark
-just benchmark-ecs
+cargo xtask bench ecs
 
 # Run with profiling
-just benchmark-profile
+cargo xtask bench profile
 
 # Check thresholds
-just benchmark-thresholds
+cargo xtask bench thresholds
 
 # Generate full report
-just benchmark-report
+cargo xtask bench report
 
 # View detailed results
-just benchmark-view
+cargo xtask bench view
 ```
 
 ### Release Preparation
 
 ```bash
 # Save new baseline
-just benchmark-save-baseline
+cargo xtask bench save-baseline
 
 # Run comprehensive benchmarks
-just benchmark-all-platforms
+cargo xtask bench all-platforms
 
 # Generate comparison report
-just benchmark-report
+cargo xtask bench report
 
 # Review results
 cat BENCHMARK_COMPARISON.md
-just benchmark-view
+cargo xtask bench view
 ```
 
 ---
@@ -267,7 +267,7 @@ just benchmark-view
 ```
 target/criterion/
 ├── report/
-│   └── index.html          # Open with: just benchmark-view
+│   └── index.html          # Open with: cargo xtask bench view
 ├── ecs_comprehensive/
 ├── serialization/
 └── ...
@@ -275,14 +275,33 @@ target/criterion/
 
 ### Industry Comparison
 ```
-BENCHMARK_COMPARISON.md      # Generated by: just benchmark-report
+BENCHMARK_COMPARISON.md      # Generated by: cargo xtask bench report
 benchmark_thresholds.yaml    # Industry data source
+docs/benchmarks/             # Historical benchmark reports
+├── game-engine-comparison-2026-02-02.md  # Latest comprehensive comparison
+└── ...
 ```
+
+### Latest Comparison Report
+**Location:** `docs/benchmarks/game-engine-comparison-2026-02-02.md`
+
+**Summary:**
+- ✅ All systems meet AAA performance targets
+- ✅ Serialization: 9-220x faster than competitors
+- ✅ ECS: 6.2M entities/sec (comparable to Bevy, Unity DOTS)
+- ✅ Spatial queries: 298M queries/sec
+- ✅ Server tick (10K entities): 1.79ms (89% headroom)
+
+**Compared Against:**
+- Unity (GameObject + DOTS ECS)
+- Unreal Engine 5 (Actor + Mass Entity)
+- Godot 4 (Node/Scene tree)
+- Bevy (Rust ECS)
 
 ### Test Results
 ```
 Standard cargo test output
-Use --nocapture for verbose: just test-verbose
+Use --nocapture for verbose: cargo xtask test verbose
 ```
 
 ---
@@ -306,35 +325,35 @@ All industry thresholds sourced from:
 
 | Command | Description |
 |---------|-------------|
-| `benchmark-ecs` | Run ECS benchmarks |
-| `benchmark-serialization` | Run serialization benchmarks |
-| `benchmark-physics` | Run physics benchmarks |
-| `benchmark-renderer` | Run renderer benchmarks |
-| `benchmark-math` | Run math benchmarks |
-| `benchmark-allocators` | Run allocator benchmarks |
-| `benchmark-spatial` | Run spatial structure benchmarks |
-| `benchmark-profiling` | Run profiling overhead benchmarks |
-| `benchmark-all` | Run all benchmarks |
-| `benchmark-smoke` | Quick smoke test |
-| `benchmark-thresholds` | Show industry thresholds |
-| `benchmark-report` | Generate comparison report |
-| `benchmark-view` | Open report in browser |
+| `cargo xtask bench ecs` | Run ECS benchmarks |
+| `cargo xtask bench serialization` | Run serialization benchmarks |
+| `cargo xtask bench physics` | Run physics benchmarks |
+| `cargo xtask bench renderer` | Run renderer benchmarks |
+| `cargo xtask bench math` | Run math benchmarks |
+| `cargo xtask bench allocators` | Run allocator benchmarks |
+| `cargo xtask bench spatial` | Run spatial structure benchmarks |
+| `cargo xtask bench profiling` | Run profiling overhead benchmarks |
+| `cargo xtask bench all` | Run all benchmarks |
+| `cargo xtask bench smoke` | Quick smoke test |
+| `cargo xtask bench thresholds` | Show industry thresholds |
+| `cargo xtask bench report` | Generate comparison report |
+| `cargo xtask bench view` | Open report in browser |
 
 ### Test Commands
 
 | Command | Description |
 |---------|-------------|
-| `test-ecs` | Test ECS |
-| `test-serialization` | Test serialization |
-| `test-physics` | Test physics |
-| `test-renderer` | Test renderer |
-| `test-math` | Test math |
-| `test-networking` | Test networking |
-| `test-profiling` | Test profiling |
-| `test` | Run all tests |
-| `test-verbose` | Verbose test output |
-| `test-client` | Client tests only |
-| `test-server` | Server tests only |
+| `cargo xtask test ecs` | Test ECS |
+| `cargo xtask test serialization` | Test serialization |
+| `cargo xtask test physics` | Test physics |
+| `cargo xtask test renderer` | Test renderer |
+| `cargo xtask test math` | Test math |
+| `cargo xtask test networking` | Test networking |
+| `cargo xtask test profiling` | Test profiling |
+| `cargo xtask test all` | Run all tests |
+| `cargo xtask test verbose` | Verbose test output |
+| `cargo xtask test client` | Client tests only |
+| `cargo xtask test server` | Server tests only |
 
 ---
 
@@ -342,7 +361,7 @@ All industry thresholds sourced from:
 
 ### Automatic Report Generation
 
-The `benchmark-report` command now automatically parses Criterion results!
+The `cargo xtask bench report` command now automatically parses Criterion results!
 
 **No manual editing needed:**
 - ✅ Reads JSON data from `target/criterion/`
@@ -352,17 +371,17 @@ The `benchmark-report` command now automatically parses Criterion results!
 
 **Workflow:**
 ```bash
-just benchmark-ecs          # Run benchmarks
-just benchmark-report       # Auto-parse results
-cat BENCHMARK_COMPARISON.md # View comparison
+cargo xtask bench ecs        # Run benchmarks
+cargo xtask bench report     # Auto-parse results
+cat BENCHMARK_COMPARISON.md  # View comparison
 ```
 
 ### Command Naming Convention
 
-All commands use dash syntax:
-- ✅ `benchmark-ecs` (correct)
-- ❌ `bench-ecs` (old, removed)
-- ❌ `benchmark:ecs` (not supported by justfile)
+All commands use space-separated subcommands:
+- ✅ `cargo xtask bench ecs` (correct)
+- ✅ `cargo xtask bench all` (run all benchmarks)
+- ✅ `cargo xtask bench baseline` (compare with baseline)
 
 ### Windows Compatibility
 

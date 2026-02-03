@@ -18,11 +18,14 @@ use std::env;
 use std::path::PathBuf;
 use tokio::time::{timeout, Duration};
 
-/// Helper to create test certificates
+/// Helper to create test certificates (unique per invocation)
 async fn setup_test_certs() -> (PathBuf, PathBuf) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     let temp_dir = env::temp_dir();
-    let cert_path = temp_dir.join(format!("test_cert_{}.pem", std::process::id()));
-    let key_path = temp_dir.join(format!("test_key_{}.pem", std::process::id()));
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let cert_path = temp_dir.join(format!("test_cert_{}_{}.pem", std::process::id(), timestamp));
+    let key_path = temp_dir.join(format!("test_key_{}_{}.pem", std::process::id(), timestamp));
 
     let config = SelfSignedConfig::new("localhost")
         .add_san("127.0.0.1")

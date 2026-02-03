@@ -14,6 +14,7 @@
 pub mod error;
 pub mod filesystem;
 mod info;
+pub mod input;
 pub mod threading;
 pub mod time;
 
@@ -21,5 +22,9 @@ pub mod time;
 pub use error::PlatformError;
 pub use filesystem::{create_filesystem_backend, FileSystemBackend};
 pub use info::PlatformInfo;
+pub use input::{
+    create_input_backend, GamepadAxis, GamepadButton, GamepadId, InputActions, InputBackend,
+    InputEvent, InputManager, InputState, InputSystem, KeyCode, MouseButton,
+};
 pub use threading::{create_threading_backend, ThreadPriority, ThreadingBackend};
 pub use time::{create_time_backend, TimeBackend};

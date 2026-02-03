@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-This directory contains CI/CD workflows for the agent-game-engine project.
+This directory contains CI/CD workflows for the silmaril project.
 
 ## Workflows Overview
 

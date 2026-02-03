@@ -18,9 +18,10 @@ define_error! {
 }
 
 /// Font style enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum FontStyle {
     /// Normal/Regular style
+    #[default]
     Normal,
     /// Italic style
     Italic,
@@ -28,14 +29,8 @@ pub enum FontStyle {
     Oblique,
 }
 
-impl Default for FontStyle {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
 /// Font weight enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum FontWeight {
     /// Thin weight (100)
     Thin,
@@ -44,6 +39,7 @@ pub enum FontWeight {
     /// Light weight (300)
     Light,
     /// Normal/Regular weight (400)
+    #[default]
     Normal,
     /// Medium weight (500)
     Medium,
@@ -55,12 +51,6 @@ pub enum FontWeight {
     ExtraBold,
     /// Black weight (900)
     Black,
-}
-
-impl Default for FontWeight {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl FontWeight {

@@ -1,7 +1,7 @@
 # Physics Test Case Comparison Matrix
 
 **Date:** 2026-02-02
-**Comparison:** Agent Game Engine vs Unity PhysX vs Unreal Chaos
+**Comparison:** Silmaril vs Unity PhysX vs Unreal Chaos
 
 ---
 

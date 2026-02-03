@@ -144,10 +144,8 @@ pub struct PhysicsWorld {
 impl PhysicsWorld {
     /// Create a new physics world with configuration
     pub fn new(config: PhysicsConfig) -> Self {
-        let mut integration_params = IntegrationParameters {
-            dt: config.timestep(),
-            ..Default::default()
-        };
+        let mut integration_params =
+            IntegrationParameters { dt: config.timestep(), ..Default::default() };
 
         // Configure based on mode
         if let PhysicsMode::Deterministic { .. } = config.mode {

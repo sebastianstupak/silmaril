@@ -11,8 +11,8 @@
 ### **Clone and Setup**
 
 ```bash
-git clone https://github.com/your-org/agent-game-engine.git
-cd agent-game-engine
+git clone https://github.com/your-org/silmaril.git
+cd silmaril
 
 # Install Rust (if needed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -116,8 +116,7 @@ cargo install flamegraph
 # Code coverage
 cargo install cargo-tarpaulin
 
-# Just command runner (if not installed)
-cargo install just
+# Note: No need to install 'just' - we use cargo xtask (built-in)
 ```
 
 #### **Python Dependencies for Dev Scripts**
@@ -189,19 +188,19 @@ Add to your shell profile (`.bashrc`, `.zshrc`, etc.) for persistence.
 
 ### **1. Start Dev Environment**
 
-The engine provides a comprehensive `just dev` workflow system with multiple development modes:
+The engine provides a comprehensive `cargo xtask dev` workflow system with multiple development modes:
 
 #### **Basic Development**
 
 ```bash
 # Full development environment (client + server with auto-reload)
-just dev
+cargo xtask dev full
 
 # Client only
-just dev-client
+cargo xtask dev client
 
 # Server only
-just dev-server
+cargo xtask dev server
 ```
 
 **Features:**
@@ -214,45 +213,45 @@ just dev-server
 
 ```bash
 # With live log streaming (pretty formatted, color-coded)
-just dev-logs-live
+cargo xtask dev logs
 
 # With profiler attached (Puffin)
-just dev-profiler
+cargo xtask dev profiler
 
 # With debugger ready (full debug symbols)
-just dev-debug
+cargo xtask dev debug
 
 # In release mode (optimized but debuggable)
-just dev-release
+cargo xtask dev release
 
 # With Vulkan validation layers (slower, catches bugs)
-just dev-validation
+cargo xtask dev validation
 
 # Headless mode (no rendering, for testing)
-just dev-headless
+cargo xtask dev headless
 ```
 
 #### **Multiplayer Testing**
 
 ```bash
 # Run multiple clients for local multiplayer testing
-just dev-multi 3  # Spawns 3 clients + 1 server
+cargo xtask dev multi 3  # Spawns 3 clients + 1 server
 ```
 
 #### **Utility Commands**
 
 ```bash
 # Check environment status
-just dev-status
+cargo xtask dev status
 
 # Stop all dev processes
-just dev-stop-all
+cargo xtask dev stop
 
 # Clean and reset environment
-just dev-clean
+cargo xtask dev clean
 
 # Quick benchmarks
-just dev-benchmark
+cargo xtask bench smoke
 ```
 
 #### **Hot-Reload**
@@ -263,8 +262,8 @@ When `cargo-watch` is installed, code changes automatically trigger rebuild and 
 # Install cargo-watch
 cargo install cargo-watch
 
-# Now just dev will auto-reload on changes
-just dev
+# Now cargo xtask dev will auto-reload on changes
+cargo xtask dev full
 ```
 
 **Edit code → Auto rebuild → Auto restart**
@@ -313,7 +312,7 @@ cargo test --doc
 cargo test test_name
 
 # Benchmarks (if performance-sensitive code)
-cargo bench
+cargo xtask bench all
 
 # All platforms (local)
 ./scripts/test-all-platforms.sh
@@ -334,7 +333,7 @@ cargo install flamegraph
 cargo flamegraph --bin client
 
 # Benchmarks with criterion
-cargo bench --bench ecs_benchmark
+cargo xtask bench ecs
 # Results in target/criterion/
 ```
 
@@ -484,8 +483,8 @@ kill $SERVER_PID $CLIENT_PID
 
 ```bash
 RUST_LOG=trace cargo run
-RUST_LOG=agent_game_engine=debug cargo run
-RUST_LOG=agent_game_engine_networking=trace cargo run
+RUST_LOG=silmaril=debug cargo run
+RUST_LOG=silmaril_networking=trace cargo run
 ```
 
 ### **Vulkan Validation**
@@ -530,12 +529,12 @@ fn expensive_function() {
 
 ```bash
 # Run benchmarks
-cargo bench
+cargo xtask bench all
 
 # Compare with baseline
-cargo bench -- --save-baseline main
+cargo xtask bench save-baseline main
 git checkout feat/optimization
-cargo bench -- --baseline main
+cargo xtask bench baseline
 ```
 
 ### **Profiling Tools**
@@ -544,7 +543,7 @@ cargo bench -- --baseline main
 |------|----------|---------|
 | **Tracy** | Real-time profiling | `cargo build --features profiling` |
 | **Flamegraph** | CPU profiling | `cargo flamegraph` |
-| **Criterion** | Benchmarking | `cargo bench` |
+| **Criterion** | Benchmarking | `cargo xtask bench all` |
 | **Valgrind** | Memory leaks | `valgrind ./target/debug/client` |
 | **heaptrack** | Heap profiling | `heaptrack ./target/debug/client` |
 
@@ -670,7 +669,7 @@ pub fn create_platform_feature() -> Box<dyn MyPlatformFeature> {
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let world = World::new();
 /// let entity = world.spawn();
@@ -732,7 +731,7 @@ cargo clippy --fix --workspace
 cargo test --all-features
 
 # Check benchmarks
-cargo bench
+cargo xtask bench all
 ```
 
 ---

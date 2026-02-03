@@ -330,7 +330,7 @@ git push -u origin feat/{feature-name}
 gh browse
 
 # Or manually navigate to:
-# https://github.com/{org}/agent-game-engine/compare/main...feat/{feature-name}
+# https://github.com/{org}/silmaril/compare/main...feat/{feature-name}
 
 # Fill in PR template
 ```

@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "xtask",
+    "engine/cli",
     "engine/core",
     "engine/math",
     "engine/build-utils",
@@ -17,8 +19,10 @@ members = [
     "engine/macros",
     "engine/shared",
     "engine/auth",
+    "engine/templating",
     "engine/binaries/client",
     "engine/binaries/server",
+    "examples/singleplayer",
 ]
 exclude = [
     "wasm-demo",  # Separate WASM demo project with its own build process
@@ -28,8 +32,8 @@ exclude = [
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-authors = ["Agent Game Engine Team"]
-repository = "https://github.com/yourusername/agent-game-engine"
+authors = ["Silmaril Team"]
+repository = "https://github.com/yourusername/silmaril"
 
 [workspace.dependencies]
 # Core

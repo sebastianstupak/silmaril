@@ -125,15 +125,15 @@ All scripts are cross-platform and tested on:
 - Python 3.7+
 - psutil (for process management)
 
-## Integration with Just
+## Integration with Cargo XTask
 
-These scripts are integrated into the justfile workflow:
+These scripts are integrated into the cargo xtask workflow:
 
 ```bash
-# Use via just commands
-just dev              # Uses orchestrator.py
-just dev-status       # Uses process-manager.py and port-checker.py
-just dev-logs-live    # Uses log-formatter.py
+# Use via cargo xtask commands
+cargo xtask dev full         # Uses orchestrator.py
+cargo xtask dev status       # Uses process-manager.py and port-checker.py
+cargo xtask dev logs         # Uses log-formatter.py
 ```
 
 ## Error Handling

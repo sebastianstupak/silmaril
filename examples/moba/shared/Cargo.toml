@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# agent-game-engine = { path = "../../../" }
+# silmaril = { path = "../../../" }
 serde.workspace = true
 
 # Add shared dependencies for heroes, abilities, protocol, etc.

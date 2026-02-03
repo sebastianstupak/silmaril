@@ -340,9 +340,14 @@ mod tests {
     use std::env;
 
     async fn setup_test_certificates() -> (String, String) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
         let temp_dir = env::temp_dir();
-        let cert_path = temp_dir.join("test_tls_cert.pem");
-        let key_path = temp_dir.join("test_tls_key.pem");
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let cert_path =
+            temp_dir.join(format!("test_tls_cert_{}_{}.pem", std::process::id(), timestamp));
+        let key_path =
+            temp_dir.join(format!("test_tls_key_{}_{}.pem", std::process::id(), timestamp));
 
         let config = SelfSignedConfig::new("localhost").add_san("127.0.0.1").validity_days(1);
 
@@ -398,9 +403,8 @@ mod tests {
         assert_eq!(response, message);
 
         // Clean up
-        let temp_dir = env::temp_dir();
-        std::fs::remove_file(temp_dir.join("test_tls_cert.pem")).ok();
-        std::fs::remove_file(temp_dir.join("test_tls_key.pem")).ok();
+        std::fs::remove_file(&cert_path).ok();
+        std::fs::remove_file(&key_path).ok();
     }
 
     #[tokio::test]
@@ -446,8 +450,7 @@ mod tests {
         }
 
         // Clean up
-        let temp_dir = env::temp_dir();
-        std::fs::remove_file(temp_dir.join("test_tls_cert.pem")).ok();
-        std::fs::remove_file(temp_dir.join("test_tls_key.pem")).ok();
+        std::fs::remove_file(&cert_path).ok();
+        std::fs::remove_file(&key_path).ok();
     }
 }

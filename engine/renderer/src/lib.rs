@@ -40,7 +40,9 @@
 #![warn(clippy::print_stdout)]
 #![warn(clippy::print_stderr)]
 
+pub mod agentic_debug;
 pub mod buffer;
+pub mod capture;
 pub mod command;
 pub mod context;
 pub mod debug;
@@ -60,6 +62,10 @@ pub mod window;
 
 // Re-export commonly used types
 pub use buffer::{GpuBuffer, GpuMesh, IndexBuffer, VertexBuffer};
+pub use capture::{
+    CaptureConfig, CaptureFormat, CaptureManager, CaptureMetrics, FrameEncoder, FrameReadback,
+    MetricsTracker,
+};
 pub use command::{CommandBuffer, CommandError, CommandPool};
 pub use context::{QueueFamilies, VulkanContext};
 pub use depth::DepthBuffer;

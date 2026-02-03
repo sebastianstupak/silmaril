@@ -7,6 +7,7 @@ pub mod steam;
 
 use crate::error::AuthError;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 
 /// OAuth provider type.
@@ -22,6 +23,7 @@ pub enum OAuthProvider {
 
 impl OAuthProvider {
     /// Get provider name as string.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Steam => "steam",
@@ -76,6 +78,7 @@ pub struct OAuthState {
 
 impl OAuthState {
     /// Create a new OAuth state.
+    #[must_use]
     pub fn new(provider: OAuthProvider, redirect_uri: String) -> Self {
         Self {
             token: uuid::Uuid::new_v4().to_string(),
@@ -86,6 +89,7 @@ impl OAuthState {
     }
 
     /// Check if state has expired.
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         chrono::Utc::now() > self.expires_at
     }

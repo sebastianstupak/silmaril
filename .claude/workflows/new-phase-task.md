@@ -281,7 +281,7 @@ fn test_component_add_get() {
 
 **Run tests (they will fail):**
 ```bash
-cargo test --package agent-game-engine-core
+cargo test --package silmaril-core
 ```
 
 ---
@@ -313,10 +313,10 @@ impl EntityAllocator {
 **Build incrementally:**
 ```bash
 # Build after each major change
-cargo build --package agent-game-engine-core
+cargo build --package silmaril-core
 
 # Run tests frequently
-cargo test --package agent-game-engine-core
+cargo test --package silmaril-core
 ```
 
 ---
@@ -335,7 +335,7 @@ cargo clippy --workspace -- -D warnings
 cargo test --workspace
 
 # Benchmarks
-cargo bench --package agent-game-engine-core
+cargo bench --package silmaril-core
 
 # Docs
 cargo doc --no-deps --open
@@ -347,7 +347,7 @@ cargo doc --no-deps --open
 
 **Run benchmarks:**
 ```bash
-cargo bench --package agent-game-engine-core
+cargo bench --package silmaril-core
 ```
 
 **Check against targets:**
@@ -380,7 +380,7 @@ cat target/criterion/{benchmark_name}/report/index.html
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::ecs::*;
+/// use silmaril::ecs::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn();
@@ -393,7 +393,7 @@ pub struct Entity {
 
 **Build and review docs:**
 ```bash
-cargo doc --package agent-game-engine-core --no-deps --open
+cargo doc --package silmaril-core --no-deps --open
 ```
 
 ---

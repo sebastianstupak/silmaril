@@ -110,8 +110,11 @@ mod tests {
 
         // Should have reasonable precision even on loaded systems
         let diff = t2 - t1;
-        assert!(diff < 1_000_000, // Less than 1 millisecond overhead (relaxed for CI)
-            "Time query overhead too high: {}ns", diff);
+        assert!(
+            diff < 1_000_000, // Less than 1 millisecond overhead (relaxed for CI)
+            "Time query overhead too high: {}ns",
+            diff
+        );
     }
 
     #[test]

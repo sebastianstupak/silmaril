@@ -22,7 +22,7 @@
 //! # Example
 //! ```rust,no_run
 //! #[cfg(feature = "profiling-tracy")]
-//! use agent_game_engine_profiling::{TracyBackend, profile_scope};
+//! use silmaril_profiling::{TracyBackend, profile_scope};
 //!
 //! #[cfg(feature = "profiling-tracy")]
 //! {

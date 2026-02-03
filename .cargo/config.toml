@@ -74,8 +74,9 @@ opt-level = 1
 # Benchmark Configuration
 # =============================================================================
 
-# Alias for running benchmarks
+# Alias for running benchmarks and xtask
 [alias]
+xtask = "run --package xtask --"
 bench-all = "bench --workspace"
 bench-core = "bench -p engine-core"
 bench-renderer = "bench -p engine-renderer"

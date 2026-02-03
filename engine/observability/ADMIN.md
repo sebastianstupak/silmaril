@@ -1,6 +1,6 @@
 # Admin Telnet Console Guide
 
-Remote administration interface for Agent Game Engine servers.
+Remote administration interface for Silmaril servers.
 
 ## Quick Start
 

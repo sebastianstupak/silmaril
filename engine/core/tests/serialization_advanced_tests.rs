@@ -353,7 +353,7 @@ fn test_serialization_performance_regression() {
         world.add(e, Transform::default());
         world.add(e, Health::new(i as f32, 100.0));
         world.add(e, Velocity::new(i as f32, 0.0, 0.0));
-        world.add(e, MeshRenderer::new(i as u64, i as u64 + 1000));
+        world.add(e, MeshRenderer::new(i as u64));
     }
 
     let snapshot = WorldState::snapshot(&world);
@@ -423,13 +423,13 @@ fn test_mixed_component_types_serialization() {
     world.add(e3, Velocity::new(1.0, 2.0, 3.0));
 
     let e4 = world.spawn();
-    world.add(e4, MeshRenderer::new(1, 2));
+    world.add(e4, MeshRenderer::new(1));
 
     let e5 = world.spawn();
     world.add(e5, Transform::default());
     world.add(e5, Health::new(75.0, 100.0));
     world.add(e5, Velocity::new(5.0, 6.0, 7.0));
-    world.add(e5, MeshRenderer::new(3, 4));
+    world.add(e5, MeshRenderer::new(3));
 
     let snapshot = WorldState::snapshot(&world);
     let bytes = snapshot.serialize(Format::Bincode).unwrap();

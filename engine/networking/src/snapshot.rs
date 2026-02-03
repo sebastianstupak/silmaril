@@ -8,7 +8,7 @@ use engine_core::ecs::{Entity, World};
 use engine_core::serialization::{Format, Serializable, SerializationError, WorldState};
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::profile_scope;
+use silmaril_profiling::profile_scope;
 
 /// Network snapshot of world state
 ///

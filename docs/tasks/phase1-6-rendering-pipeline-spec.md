@@ -759,7 +759,7 @@ image = "0.25" # For screenshot verification
 
 ### **Functional Requirements:**
 - ✅ Window opens at 1280x720 resolution
-- ✅ Window title displays "Agent Game Engine"
+- ✅ Window title displays "Silmaril"
 - ✅ Clear color renders correctly (RGB values match exactly)
 - ✅ Window can be resized without crashes
 - ✅ Window can be closed cleanly

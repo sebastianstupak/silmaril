@@ -50,6 +50,7 @@ impl From<std::io::Error> for TcpError {
 pub type TcpResult<T> = Result<T, TcpError>;
 
 /// TCP connection wrapper
+#[derive(Debug)]
 pub struct TcpConnection {
     stream: Arc<Mutex<TcpStream>>,
     peer_addr: std::net::SocketAddr,

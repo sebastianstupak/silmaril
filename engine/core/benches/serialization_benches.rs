@@ -43,8 +43,7 @@ fn create_world_state_with_entities(count: usize) -> WorldState {
 
         // Add MeshRenderer to 1/3 of entities
         if i % 3 == 0 {
-            components
-                .push(ComponentData::MeshRenderer(MeshRenderer::new(i as u64, i as u64 + 1000)));
+            components.push(ComponentData::MeshRenderer(MeshRenderer::new(i as u64)));
         }
 
         state.entities.push(engine_core::serialization::EntityMetadata {
@@ -264,7 +263,7 @@ fn bench_component_serialization(c: &mut Criterion) {
     let transform = ComponentData::Transform(Transform::default());
     let health = ComponentData::Health(Health::new(75.0, 100.0));
     let velocity = ComponentData::Velocity(Velocity::new(1.0, 2.0, 3.0));
-    let mesh_renderer = ComponentData::MeshRenderer(MeshRenderer::new(123, 456));
+    let mesh_renderer = ComponentData::MeshRenderer(MeshRenderer::new(123));
 
     group.bench_function("transform", |b| {
         b.iter(|| {

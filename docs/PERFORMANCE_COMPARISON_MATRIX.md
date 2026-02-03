@@ -1,4 +1,4 @@
-# Performance Comparison Matrix: agent-game-engine vs Industry
+# Performance Comparison Matrix: silmaril vs Industry
 
 **Date:** 2026-02-01
 **Version:** Phase 1.6 Rendering + Phase 3.1A Physics + ECS Events
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Agent Game Engine delivers **AAA-tier performance** competitive with engines developed by teams with 100+ engineers and budgets in the tens of millions:
+Silmaril delivers **AAA-tier performance** competitive with engines developed by teams with 100+ engineers and budgets in the tens of millions:
 
 ### 🏆 **Overall Performance Ranking**
 
@@ -317,7 +317,7 @@ Total Overhead:         ~142 KB (~142 bytes/entity)
 - **GC pauses:** 1-5ms spikes (can cause frame drops)
 - **Draw calls:** 1,000-2,000/frame (before SRP Batcher)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **3.6x - 7.2x faster** at sync creation
 - ✅ We're **590x - 1,180x faster** at framebuffers
 - ✅ **No GC pauses** (Rust ownership vs C# GC)
@@ -346,7 +346,7 @@ Total Overhead:         ~142 KB (~142 bytes/entity)
 - **Draw calls:** 10,000+/frame (Nanite mesh shaders)
 - **Lumen RT overhead:** ~1.2ms difference (software vs hardware RT on 7900XTX)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **1.4x - 2.9x faster** at sync creation
 - ✅ We're **118x - 354x faster** at framebuffers
 - ✅ **Simpler architecture** (Rust ownership vs UE smart pointers)
@@ -376,7 +376,7 @@ Total Overhead:         ~142 KB (~142 bytes/entity)
 - **Framebuffer:** ~1-5 µs (cached/optimized)
 - **Draw calls:** 5,000-15,000/frame (aggressive batching)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **competitive** on sync (30µs within 20-40µs range)
 - ✅ We're **comparable** on framebuffer (0.67µs vs 1-5µs)
 - ❌ id Tech has **years of optimization** (decades of engine development)
@@ -401,7 +401,7 @@ Total Overhead:         ~142 KB (~142 bytes/entity)
 - **Sync objects:** ~25-50 µs (estimated)
 - **Framebuffer:** ~2-8 µs (estimated)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **competitive** on sync (30µs within 25-50µs range)
 - ✅ We're **faster** on framebuffer (0.67µs vs 2-8µs)
 - ❌ Frostbite has **destruction** (physics-based Levolution)
@@ -426,7 +426,7 @@ Total Overhead:         ~142 KB (~142 bytes/entity)
 - **Sync objects:** ~30-70 µs (estimated)
 - **Framebuffer:** ~50-200 µs (estimated)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **competitive to faster** on all metrics
 - ❌ Source 2 has **mature VR tooling** (Valve expertise)
 - ❌ Source 2 has **SteamVR integration** (first-party support)
@@ -468,7 +468,7 @@ Based on [research](https://mropert.github.io/2026/01/29/benchmarking_vulkan/), 
 
 ---
 
-## Why agent-game-engine is Fast
+## Why silmaril is Fast
 
 ### Technical Factors
 
@@ -639,7 +639,7 @@ Based on [Vulkan documentation](https://docs.vulkan.org/tutorial/latest/03_Drawi
 
 ### Performance Rating: ⭐⭐⭐⭐⭐ AAA-Tier
 
-Agent Game Engine delivers **world-class performance** competitive with engines built by teams 100x larger with budgets in the tens of millions:
+Silmaril delivers **world-class performance** competitive with engines built by teams 100x larger with budgets in the tens of millions:
 
 ### 🏆 **Measured Performance Highlights**
 

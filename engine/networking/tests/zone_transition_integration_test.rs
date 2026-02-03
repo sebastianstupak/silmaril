@@ -2,10 +2,9 @@
 //!
 //! Tests for entity migration, seamless transitions, and zone management.
 
-use engine_core::ecs::{Entity, World};
+use engine_core::ecs::Entity;
 use engine_networking::{
-    deserialize_server_message, serialize_server_message, EntityState, SerializationFormat,
-    ServerMessage,
+    serialize_server_message, EntityState, SerializationFormat, ServerMessage,
 };
 use std::collections::HashMap;
 
@@ -315,7 +314,7 @@ fn test_partial_batch_failure() {
 
 #[test]
 fn test_state_serialization_for_handoff() {
-    let entity = Entity::new(42, 0);
+    let _entity = Entity::new(42, 0);
     let state = create_entity_state(42);
 
     // Serialize entity state
@@ -449,9 +448,12 @@ fn test_connection_handoff_latency() {
     // Measure handoff latency
     let start = std::time::Instant::now();
 
-    // Serialize player state
+    // Serialize player state and get coordinates before migration
     let state = manager.zones.get(&ZoneId(1)).unwrap().entities.get(&player).unwrap();
-    let serialized = bincode::serialize(state).unwrap();
+    let _serialized = bincode::serialize(state).unwrap();
+    let state_x = state.x;
+    let state_y = state.y;
+    let state_z = state.z;
 
     // Perform migration
     manager.migrate_entity(player, ZoneId(1), ZoneId(2)).unwrap();
@@ -460,9 +462,9 @@ fn test_connection_handoff_latency() {
     let msg = ServerMessage::EntitySpawned {
         entity: player,
         prefab_id: 1,
-        x: state.x,
-        y: state.y,
-        z: state.z,
+        x: state_x,
+        y: state_y,
+        z: state_z,
     };
     let _msg_framed = serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
 
@@ -494,7 +496,7 @@ fn test_cross_zone_message_broadcast() {
     // Serialize once, broadcast to neighbors
     let framed = serialize_server_message(&msg, SerializationFormat::Bincode).unwrap();
 
-    for neighbor in &zone1_neighbors {
+    for _neighbor in &zone1_neighbors {
         // In real implementation, send to neighbor zone
         assert!(framed.total_size() > 0);
     }

@@ -1,6 +1,6 @@
 # Code Review Checklist
 
-> Comprehensive code review protocol for agent-game-engine
+> Comprehensive code review protocol for silmaril
 
 ---
 
@@ -119,7 +119,7 @@ fn parse() -> Result<Config, String> { }
 **Required fix:**
 ```rust
 // ✅ CORRECT
-use agent_game_engine_core::error::{define_error, ErrorCode, ErrorSeverity};
+use silmaril_core::error::{define_error, ErrorCode, ErrorSeverity};
 
 define_error! {
     pub enum LoadError {
@@ -228,7 +228,7 @@ pub fn spawn(&mut self) -> Result<Entity, WorldError> { }
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn()?;

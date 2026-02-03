@@ -11,11 +11,11 @@ Add profiling to your crate:
 ```toml
 # Cargo.toml
 [dependencies]
-agent-game-engine-profiling = { path = "../profiling" }
+silmaril-profiling = { path = "../profiling" }
 
 [features]
 # Development mode (recommended for dev builds)
-dev = ["agent-game-engine-profiling/profiling-puffin"]
+dev = ["silmaril-profiling/profiling-puffin"]
 ```
 
 ---
@@ -25,7 +25,7 @@ dev = ["agent-game-engine-profiling/profiling-puffin"]
 ### **Step 1: Initialize Profiler**
 
 ```rust
-use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+use silmaril_profiling::{Profiler, ProfilerConfig};
 
 fn main() {
     // Create profiler with dev defaults
@@ -39,7 +39,7 @@ fn main() {
 ### **Step 2: Profile Your Game Loop**
 
 ```rust
-use agent_game_engine_profiling::ProfileCategory;
+use silmaril_profiling::ProfileCategory;
 
 fn game_loop(profiler: Profiler) {
     loop {
@@ -114,7 +114,7 @@ puffin_viewer
 Then in your code:
 
 ```rust
-use agent_game_engine_profiling::backends::PuffinBackend;
+use silmaril_profiling::backends::PuffinBackend;
 
 let mut backend = PuffinBackend::new();
 
@@ -138,7 +138,7 @@ Connect to `localhost:8585` in the Puffin viewer for live profiling.
 Get structured metrics for AI training:
 
 ```rust
-use agent_game_engine_profiling::AgentFeedbackMetrics;
+use silmaril_profiling::AgentFeedbackMetrics;
 
 // Get comprehensive metrics
 let metrics: AgentFeedbackMetrics = profiler.get_agent_metrics(world);
@@ -326,7 +326,7 @@ std::fs::write("trace.json", trace)?;  // Blocks!
 ## 🧪 **Example: Complete Game Loop**
 
 ```rust
-use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
 use std::time::Duration;
 
 fn main() {

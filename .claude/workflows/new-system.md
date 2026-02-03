@@ -59,8 +59,8 @@ use tracing::{debug, instrument};
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::ecs::*;
-/// use agent_game_engine::systems::*;
+/// use silmaril::ecs::*;
+/// use silmaril::systems::*;
 ///
 /// let mut world = World::new();
 /// // Setup world...
@@ -100,7 +100,7 @@ pub fn server_only_system(world: &mut World, delta_time: f32) {
 
 **Validation:**
 ```bash
-cargo build --package agent-game-engine-{crate}
+cargo build --package silmaril-{crate}
 ```
 
 ---
@@ -209,7 +209,7 @@ mod tests {
 
 **Run tests:**
 ```bash
-cargo test --package agent-game-engine-{crate} my_system
+cargo test --package silmaril-{crate} my_system
 ```
 
 ---
@@ -268,7 +268,7 @@ pub enum RunCriteria {
 
 **Validation:**
 ```bash
-cargo build --package agent-game-engine-core
+cargo build --package silmaril-core
 ```
 
 ---
@@ -316,8 +316,8 @@ Render:
 
 **Template:**
 ```rust
-use agent_game_engine_core::*;
-use agent_game_engine_{crate}::*;
+use silmaril_core::*;
+use silmaril_{crate}::*;
 
 #[test]
 fn test_my_system_with_other_systems() {
@@ -359,7 +359,7 @@ fn test_my_system_order() {
 
 **Run integration tests:**
 ```bash
-cargo test --package agent-game-engine-{crate} --tests
+cargo test --package silmaril-{crate} --tests
 ```
 
 ---
@@ -371,8 +371,8 @@ cargo test --package agent-game-engine-{crate} --tests
 **Template:**
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use agent_game_engine_core::*;
-use agent_game_engine_{crate}::*;
+use silmaril_core::*;
+use silmaril_{crate}::*;
 
 fn bench_my_system(c: &mut Criterion) {
     let mut world = World::new();
@@ -397,7 +397,7 @@ criterion_main!(benches);
 
 **Run benchmarks:**
 ```bash
-cargo bench --package agent-game-engine-{crate}
+cargo bench --package silmaril-{crate}
 ```
 
 **Performance targets:**
@@ -442,7 +442,7 @@ cargo bench --package agent-game-engine-{crate}
 ///
 /// Basic usage:
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn();
@@ -454,7 +454,7 @@ cargo bench --package agent-game-engine-{crate}
 ///
 /// With multiple entities:
 /// ```
-/// # use agent_game_engine::*;
+/// # use silmaril::*;
 /// let mut app = App::new();
 ///
 /// for i in 0..100 {
@@ -478,7 +478,7 @@ pub fn my_system(world: &mut World, delta_time: f32) {
 
 **Build docs:**
 ```bash
-cargo doc --package agent-game-engine-{crate} --no-deps --open
+cargo doc --package silmaril-{crate} --no-deps --open
 ```
 
 ---
@@ -580,16 +580,16 @@ cargo fmt --check
 cargo clippy --workspace -- -D warnings
 
 # Unit tests
-cargo test --package agent-game-engine-{crate} --lib
+cargo test --package silmaril-{crate} --lib
 
 # Integration tests
-cargo test --package agent-game-engine-{crate} --tests
+cargo test --package silmaril-{crate} --tests
 
 # Doc tests
-cargo test --package agent-game-engine-{crate} --doc
+cargo test --package silmaril-{crate} --doc
 
 # Benchmarks
-cargo bench --package agent-game-engine-{crate}
+cargo bench --package silmaril-{crate}
 
 # Build docs
 cargo doc --no-deps

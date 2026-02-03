@@ -767,7 +767,7 @@ rate = log(error_i / error_0) / i
 
 ---
 
-## 6. Recommendations for Agent Game Engine
+## 6. Recommendations for Silmaril
 
 ### 6.1 Primary Solver Choice
 
@@ -1118,7 +1118,7 @@ Modern constraint solvers represent a balance between **performance** (16ms budg
 - **Direct solvers** (LDL) for stability in difficult scenarios
 - **XPBD** as the cutting-edge alternative for next-gen features
 
-For **agent-game-engine**, the recommended path is **TGS with LDL preconditioning**, providing AAA-quality physics while maintaining reasonable implementation complexity. Warm starting and sub-stepping are non-negotiable for production quality.
+For **silmaril**, the recommended path is **TGS with LDL preconditioning**, providing AAA-quality physics while maintaining reasonable implementation complexity. Warm starting and sub-stepping are non-negotiable for production quality.
 
 The 2024-2026 research landscape shows continued refinement of these techniques, with improvements in **parallelism** (Unity's 64-phase solver), **determinism** (Box2D cross-platform), and **innovation** (XPBD multi-layer solver). These advances make it an excellent time to implement a modern constraint solver.
 

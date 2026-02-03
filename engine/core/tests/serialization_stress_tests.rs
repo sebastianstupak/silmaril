@@ -260,7 +260,7 @@ fn test_memory_usage_10k_entities() {
         world.add(e, Transform::default());
         world.add(e, Health::new(100.0, 100.0));
         world.add(e, Velocity::new(i as f32, i as f32, i as f32));
-        world.add(e, MeshRenderer::new(i as u64, i as u64));
+        world.add(e, MeshRenderer::new(i as u64));
     }
 
     let snapshot = WorldState::snapshot(&world);

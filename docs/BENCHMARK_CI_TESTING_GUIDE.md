@@ -29,34 +29,34 @@ Before testing, ensure:
 
 ## 🧪 Phase 1: Local Testing
 
-### 1.1 Verify Justfile Commands
+### 1.1 Verify XTask Commands
 
-Test all new justfile targets:
+Test all xtask benchmark commands:
 
 ```bash
 # Quick smoke test (should complete in <1 min)
-just bench-smoke
+cargo xtask bench all-smoke
 # ✅ Expected: Benchmarks run successfully, no errors
 
 # Run all benchmarks (may take 5-10 min)
-just bench-all
+cargo xtask bench all-all
 # ✅ Expected: All benchmarks complete, results saved
 
 # View report
-just bench-report
+cargo xtask bench all-report
 # ✅ Expected: Browser opens with HTML report
 
 # Run specific suites
-just bench-ecs
-just bench-physics
-just bench-math
+cargo xtask bench all-ecs
+cargo xtask bench all-physics
+cargo xtask bench all-math
 # ✅ Expected: Each suite runs without errors
 ```
 
 **Verification**:
-- [ ] `just bench-smoke` completes in <1 minute
-- [ ] `just bench-all` completes without errors
-- [ ] `just bench-report` opens browser
+- [ ] `cargo xtask bench all-smoke` completes in <1 minute
+- [ ] `cargo xtask bench all-all` completes without errors
+- [ ] `cargo xtask bench all-report` opens browser
 - [ ] Individual suite commands work
 
 ### 1.2 Test Baseline Scripts
@@ -77,7 +77,7 @@ ls -la benchmarks/baselines/$(uname -s)-$(uname -m)/main/
 # ✅ Expected: criterion/ directory and baseline-info.json
 
 # Run benchmarks again
-just bench-all
+cargo xtask bench all-all
 
 # Compare with baseline
 ./scripts/compare_with_baseline.sh main
@@ -139,7 +139,7 @@ git commit -m "test: Verify benchmark CI integration"
 git push origin test/benchmark-ci-integration
 
 # 4. Create PR on GitHub
-# Navigate to: https://github.com/your-org/agent-game-engine/compare
+# Navigate to: https://github.com/your-org/silmaril/compare
 ```
 
 **Expected Workflow Execution**:
@@ -279,10 +279,10 @@ Check that benchmarks meet performance targets:
 
 ```bash
 # Run all benchmarks
-just bench-all
+cargo xtask bench all-all
 
 # Review results
-just bench-report
+cargo xtask bench all-report
 ```
 
 For each category, verify:
@@ -296,7 +296,7 @@ For each category, verify:
 | Transform SIMD | < 100ns | [ ] |
 
 **If targets not met**:
-1. Profile with `just bench-profile`
+1. Profile with `cargo xtask bench all-profile`
 2. Optimize hot paths
 3. Re-run benchmarks
 4. Update baseline when improved
@@ -305,7 +305,7 @@ For each category, verify:
 
 ```bash
 # Run industry comparison benchmarks
-just bench-compare
+cargo xtask bench all-compare
 
 # Check results against targets in benchmarks/industry_comparison.yaml
 ```
@@ -340,9 +340,9 @@ Test code examples in documentation:
 
 ```bash
 # Try commands from README.md
-just bench-all
-just bench-baseline
-just bench-report
+cargo xtask bench all-all
+cargo xtask bench all-baseline
+cargo xtask bench all-report
 
 # Try commands from CONTRIBUTING.md
 # ... verify each example ...
@@ -430,7 +430,7 @@ cargo check --benches
 Before declaring testing complete:
 
 ### Local Testing
-- [ ] All justfile commands tested
+- [ ] All xtask commands tested
 - [ ] Baseline creation works
 - [ ] Baseline comparison works
 - [ ] Regression detection works

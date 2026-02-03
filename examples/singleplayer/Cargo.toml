@@ -4,9 +4,23 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Add agent-game-engine dependency here
-# agent-game-engine = { path = "../../" }
+# Engine dependencies
+engine-core = { path = "../../engine/core" }
+engine-math = { path = "../../engine/math", features = ["serde"] }
+engine-audio = { path = "../../engine/audio" }
 
-# Common game development dependencies
-# bevy = "0.12"
-# or similar ECS/game framework
+# Core utilities
+glam = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Audio file generation for test assets
+hound = "3.5"
+
+[[bin]]
+name = "singleplayer"
+path = "src/main.rs"
+
+[[bin]]
+name = "generate-audio-assets"
+path = "src/bin/generate_audio_assets.rs"

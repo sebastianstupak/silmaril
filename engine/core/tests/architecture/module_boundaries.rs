@@ -69,7 +69,7 @@ fn test_component_independence() {
     // All these components should be usable without platform dependencies
     let _transform = Transform::default();
     let _health = Health::new(100.0, 100.0);
-    let _mesh = MeshRenderer::new(0, 0);
+    let _mesh = MeshRenderer::new(0);
 
     // The fact that this compiles and runs means components don't require platform code
 }

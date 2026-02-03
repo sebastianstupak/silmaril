@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Entity metadata for serialization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

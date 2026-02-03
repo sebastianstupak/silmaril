@@ -1,6 +1,6 @@
 # Level of Detail (LOD) System
 
-> **LOD system for agent-game-engine**
+> **LOD system for silmaril**
 >
 > Adaptive quality management for rendering and networking optimization
 

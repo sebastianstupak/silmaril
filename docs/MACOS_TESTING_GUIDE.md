@@ -24,8 +24,8 @@ This guide provides instructions for testing the macOS platform optimizations on
 ### 1. Clone and Build
 
 ```bash
-git clone https://github.com/your-org/agent-game-engine.git
-cd agent-game-engine
+git clone https://github.com/your-org/silmaril.git
+cd silmaril
 
 # Build the core library
 cargo build -p engine-core --lib --release

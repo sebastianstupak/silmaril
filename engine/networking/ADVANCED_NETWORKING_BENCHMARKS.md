@@ -370,6 +370,6 @@ Add these benchmarks to CI pipeline:
 
 ## Related Documentation
 
-- [D:/dev/agent-game-engine/docs/networking.md](../../docs/networking.md) - Network architecture
-- [D:/dev/agent-game-engine/docs/benchmarking.md](../../docs/benchmarking.md) - Benchmarking guide
-- [D:/dev/agent-game-engine/NETWORKING_AAA_FINAL_REPORT.md](../../NETWORKING_AAA_FINAL_REPORT.md) - Complete networking report
+- [D:/dev/silmaril/docs/networking.md](../../docs/networking.md) - Network architecture
+- [D:/dev/silmaril/docs/benchmarking.md](../../docs/benchmarking.md) - Benchmarking guide
+- [D:/dev/silmaril/NETWORKING_AAA_FINAL_REPORT.md](../../NETWORKING_AAA_FINAL_REPORT.md) - Complete networking report

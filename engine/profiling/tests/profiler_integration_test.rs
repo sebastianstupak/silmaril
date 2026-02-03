@@ -1,6 +1,6 @@
 //! Integration test for basic profiler functionality
 
-use agent_game_engine_profiling::{ProfileCategory, Profiler, ProfilerConfig};
+use silmaril_profiling::{ProfileCategory, Profiler, ProfilerConfig};
 use std::thread;
 use std::time::Duration;
 

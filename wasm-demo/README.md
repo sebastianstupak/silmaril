@@ -1,6 +1,6 @@
 # WASM SIMD Performance Demo
 
-This demo showcases the performance benefits of SIMD (Single Instruction, Multiple Data) operations in WebAssembly for the Agent Game Engine's math library.
+This demo showcases the performance benefits of SIMD (Single Instruction, Multiple Data) operations in WebAssembly for the Silmaril's math library.
 
 ## What It Does
 
@@ -184,4 +184,4 @@ Uses `wide` crate for portable SIMD:
 - [WebAssembly SIMD Proposal](https://github.com/WebAssembly/simd)
 - [wasm-pack Documentation](https://rustwasm.github.io/wasm-pack/)
 - [wide Crate](https://docs.rs/wide/)
-- [Agent Game Engine](https://github.com/your-org/agent-game-engine)
+- [Silmaril](https://github.com/your-org/silmaril)

@@ -1,7 +1,7 @@
 # Turn-Based Strategy Example
 
 ## Overview
-This example demonstrates a turn-based strategy game built with the Agent Game Engine. It showcases turn-based game logic, state management, AI decision-making, and strategic gameplay mechanics.
+This example demonstrates a turn-based strategy game built with the Silmaril. It showcases turn-based game logic, state management, AI decision-making, and strategic gameplay mechanics.
 
 ## What This Demonstrates
 - Turn-based game loop and state management

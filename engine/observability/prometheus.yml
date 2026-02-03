@@ -1,4 +1,4 @@
-# Prometheus configuration for Agent Game Engine
+# Prometheus configuration for Silmaril
 
 global:
   scrape_interval: 15s     # Scrape metrics every 15 seconds

@@ -3,7 +3,7 @@
 //! Implements IP-based rate limiting to prevent:
 //! - Brute force attacks
 //! - Credential stuffing
-//! - DoS attacks
+//! - `DoS` attacks
 //!
 //! Uses the `governor` crate for high-performance rate limiting.
 
@@ -13,15 +13,16 @@ use governor::{
     state::{InMemoryState, NotKeyed},
     Quota, RateLimiter as GovernorRateLimiter,
 };
-use nonzero_ext::nonzero;
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
 
-/// Default rate limit: 5 attempts per 15 minutes per IP.
+/// Default maximum attempts before rate limiting.
 pub const DEFAULT_MAX_ATTEMPTS: u32 = 5;
+/// Default time window in minutes for rate limiting.
 pub const DEFAULT_WINDOW_MINUTES: u64 = 15;
 
 /// Rate limiter for authentication attempts.
@@ -35,6 +36,7 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     /// Create a new rate limiter with default settings (5 attempts/15min).
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(DEFAULT_MAX_ATTEMPTS, DEFAULT_WINDOW_MINUTES)
     }
@@ -45,6 +47,7 @@ impl RateLimiter {
     ///
     /// * `max_attempts` - Maximum number of attempts allowed
     /// * `window_minutes` - Time window in minutes
+    #[must_use]
     pub fn with_config(max_attempts: u32, window_minutes: u64) -> Self {
         let quota = Quota::with_period(Duration::from_secs(window_minutes * 60))
             .expect("Invalid rate limit configuration")
@@ -63,33 +66,32 @@ impl RateLimiter {
     ///
     /// Returns [`AuthError::RateLimitExceeded`] if rate limit is exceeded.
     pub fn check(&self, identifier: &str) -> Result<(), AuthError> {
-        match self.limiter.check() {
-            Ok(_) => {
-                debug!(identifier = identifier, "Rate limit check passed");
-                Ok(())
-            }
-            Err(_) => {
-                warn!(
-                    identifier = identifier,
-                    max_attempts = self.max_attempts,
-                    window_minutes = self.window_duration.as_secs() / 60,
-                    "Rate limit exceeded"
-                );
-                Err(AuthError::RateLimitExceeded {
-                    retry_after_secs: self.window_duration.as_secs(),
-                    #[cfg(feature = "backtrace")]
-                    backtrace: Backtrace::capture(),
-                })
-            }
+        if let Ok(()) = self.limiter.check() {
+            debug!(identifier = identifier, "Rate limit check passed");
+            Ok(())
+        } else {
+            warn!(
+                identifier = identifier,
+                max_attempts = self.max_attempts,
+                window_minutes = self.window_duration.as_secs() / 60,
+                "Rate limit exceeded"
+            );
+            Err(AuthError::RateLimitExceeded {
+                retry_after_secs: self.window_duration.as_secs(),
+                #[cfg(feature = "backtrace")]
+                backtrace: Backtrace::capture(),
+            })
         }
     }
 
     /// Get the maximum number of attempts allowed.
+    #[must_use]
     pub fn max_attempts(&self) -> u32 {
         self.max_attempts
     }
 
     /// Get the time window duration.
+    #[must_use]
     pub fn window_duration(&self) -> Duration {
         self.window_duration
     }
@@ -113,11 +115,13 @@ pub struct IpRateLimiter {
 
 impl IpRateLimiter {
     /// Create a new IP-based rate limiter with default settings.
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(DEFAULT_MAX_ATTEMPTS, DEFAULT_WINDOW_MINUTES)
     }
 
     /// Create a new IP-based rate limiter with custom configuration.
+    #[must_use]
     pub fn with_config(max_attempts: u32, window_minutes: u64) -> Self {
         Self {
             limiters: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
@@ -167,6 +171,7 @@ impl IpRateLimiter {
     }
 
     /// Get the number of IPs currently being tracked.
+    #[must_use]
     pub fn tracked_ips(&self) -> usize {
         let limiters = self.limiters.read().unwrap();
         limiters.len()

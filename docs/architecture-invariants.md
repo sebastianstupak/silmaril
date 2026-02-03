@@ -1,6 +1,6 @@
 # Architecture Invariants
 
-> **Architectural principles and enforcement mechanisms for agent-game-engine**
+> **Architectural principles and enforcement mechanisms for silmaril**
 >
 > This document codifies the invariants that MUST hold across the entire codebase and explains how they are enforced at compile-time and runtime.
 

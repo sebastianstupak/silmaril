@@ -666,7 +666,7 @@ CMD ["/app/server"]
 #!/bin/bash
 set -e
 
-echo "🚀 Starting Agent Game Engine Development Environment"
+echo "🚀 Starting Silmaril Development Environment"
 echo ""
 
 # Check Docker is running
@@ -900,7 +900,7 @@ async fn handle_connection(socket: TcpStream) -> Result<(), std::io::Error> {
     let mut reader = BufReader::new(reader);
     let mut line = String::new();
 
-    writer.write_all(b"Agent Game Engine Admin Console\n").await?;
+    writer.write_all(b"Silmaril Admin Console\n").await?;
     writer.write_all(b"Type 'help' for commands\n\n").await?;
 
     loop {

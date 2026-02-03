@@ -132,7 +132,7 @@ impl AggregateMetrics {
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+/// use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
 ///
 /// # #[cfg(feature = "metrics")]
 /// # {
@@ -171,7 +171,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());
@@ -193,7 +193,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());
@@ -215,7 +215,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());
@@ -239,7 +239,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());
@@ -260,7 +260,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());
@@ -293,7 +293,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());
@@ -366,7 +366,7 @@ impl<'a> QueryBuilder<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+    /// # use silmaril_profiling::{Profiler, ProfilerConfig};
     /// # #[cfg(feature = "metrics")]
     /// # {
     /// # let profiler = Profiler::new(ProfilerConfig::default());

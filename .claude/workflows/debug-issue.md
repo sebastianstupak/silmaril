@@ -56,10 +56,10 @@ cargo run --bin {client|server}
 RUST_LOG=trace cargo run
 
 # Trace specific module
-RUST_LOG=agent_game_engine_ecs=trace cargo run
+RUST_LOG=silmaril_ecs=trace cargo run
 
 # Multiple modules
-RUST_LOG=agent_game_engine_ecs=trace,agent_game_engine_renderer=debug cargo run
+RUST_LOG=silmaril_ecs=trace,silmaril_renderer=debug cargo run
 
 # Trace with file locations
 RUST_LOG=trace RUST_LOG_STYLE=always cargo run

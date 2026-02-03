@@ -9,11 +9,11 @@ repository.workspace = true
 [dependencies]
 engine-core = { path = "../core" }
 glam = "0.25"
-agent-game-engine-profiling = { path = "../profiling", optional = true }
+silmaril-profiling = { path = "../profiling", optional = true }
 tracing = { version = "0.1", optional = true }
 
 [features]
-profiling = ["agent-game-engine-profiling", "engine-core/profiling", "tracing"]
+profiling = ["silmaril-profiling", "engine-core/profiling", "tracing"]
 
 [dev-dependencies]
 criterion = "0.5"

@@ -60,7 +60,7 @@ fn test_world_state_with_components() {
         world.add(entity, Health::new(100.0 - (i as f32 * 10.0), 100.0));
 
         if i % 3 == 0 {
-            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 100));
+            world.add(entity, MeshRenderer::new(i as u64));
         }
     }
 
@@ -188,7 +188,7 @@ fn test_world_snapshot_restore_yaml() {
         world.add(entity, Health::new(100.0 - (i as f32 * 5.0), 100.0));
 
         if i % 2 == 0 {
-            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 1000));
+            world.add(entity, MeshRenderer::new(i as u64));
         }
     }
 
@@ -246,7 +246,7 @@ fn test_world_snapshot_restore_bincode() {
         world.add(entity, Health::new(100.0 - (i as f32 % 100.0), 100.0));
 
         if i % 3 == 0 {
-            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 5000));
+            world.add(entity, MeshRenderer::new(i as u64));
         }
     }
 
@@ -302,7 +302,7 @@ fn test_large_world_serialization() {
         world.add(entity, Health::new(100.0 - (i as f32 % 100.0), 100.0));
 
         if i % 4 == 0 {
-            world.add(entity, MeshRenderer::new(i as u64, i as u64 + 10000));
+            world.add(entity, MeshRenderer::new(i as u64));
         }
     }
 

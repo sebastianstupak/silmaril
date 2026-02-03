@@ -99,7 +99,7 @@ impl ProfilerState {
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+/// use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
 ///
 /// # #[cfg(feature = "metrics")]
 /// # {
@@ -246,7 +246,7 @@ impl Profiler {
     /// # Examples
     ///
     /// ```rust
-    /// use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+    /// use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
     ///
     /// # #[cfg(feature = "metrics")]
     /// # {
@@ -325,7 +325,7 @@ impl Profiler {
     /// # Examples
     ///
     /// ```rust
-    /// use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory};
+    /// use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory};
     ///
     /// # #[cfg(feature = "metrics")]
     /// # {

@@ -107,9 +107,9 @@ impl SpatialGrid {
     /// Build a spatial grid from all entities with Aabb components.
     pub fn build(world: &crate::ecs::World, config: SpatialGridConfig) -> Self {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "spatial_grid_build",
-            agent_game_engine_profiling::ProfileCategory::Physics
+            silmaril_profiling::ProfileCategory::Physics
         );
 
         let storage = match world.get_storage::<Aabb>() {
@@ -189,9 +189,9 @@ impl SpatialGrid {
     /// O(k) where k is the number of cells intersected for larger radii.
     pub fn query_radius(&self, center: Vec3, radius: f32) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "spatial_grid_query_radius",
-            agent_game_engine_profiling::ProfileCategory::Physics
+            silmaril_profiling::ProfileCategory::Physics
         );
 
         let mut results = Vec::new();
@@ -228,9 +228,9 @@ impl SpatialGrid {
     /// Find all entities within an AABB.
     pub fn query_aabb(&self, aabb: &Aabb) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "spatial_grid_query_aabb",
-            agent_game_engine_profiling::ProfileCategory::Physics
+            silmaril_profiling::ProfileCategory::Physics
         );
 
         let mut results = Vec::new();

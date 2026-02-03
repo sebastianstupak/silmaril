@@ -1,6 +1,6 @@
 # Physics Architecture
 
-> **Physics simulation for agent-game-engine**
+> **Physics simulation for silmaril**
 >
 > Rapier-based 3D physics with SIMD optimization for high-performance simulation
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The agent-game-engine integrates Rapier3D for physics simulation:
+The silmaril integrates Rapier3D for physics simulation:
 - **Rigid body dynamics** - Realistic movement and collisions
 - **Collision detection** - Broad-phase and narrow-phase optimization
 - **SIMD acceleration** - AVX2/NEON optimized integration

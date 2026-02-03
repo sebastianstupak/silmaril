@@ -25,7 +25,7 @@
 ### 2. Create Project
 
 1. Click "New Project"
-2. Name: `agent-game-engine`
+2. Name: `silmaril`
 3. Visibility: Public (for open source) or Private
 4. Click "Create"
 
@@ -80,7 +80,7 @@ bencher-tracking:
         BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
       run: |
         bencher run \
-          --project agent-game-engine \
+          --project silmaril \
           --adapter criterion \
           --testbed ubuntu-latest \
           --branch ${{ github.head_ref || github.ref_name }} \
@@ -166,7 +166,7 @@ Configure regression detection:
 
 ### Dashboard
 
-Go to https://bencher.dev/agent-game-engine
+Go to https://bencher.dev/silmaril
 
 **What you'll see:**
 - **Benchmarks**: All tracked benchmarks
@@ -189,17 +189,17 @@ Query results from command line:
 
 ```bash
 # View latest results
-bencher perf --project agent-game-engine --branch main
+bencher perf --project silmaril --branch main
 
 # Compare branches
 bencher perf \
-  --project agent-game-engine \
+  --project silmaril \
   --branch main \
   --compare feature/my-feature
 
 # View specific benchmark
 bencher perf \
-  --project agent-game-engine \
+  --project silmaril \
   --branch main \
   --benchmark profiling_overhead
 ```
@@ -229,7 +229,7 @@ Then configure Bencher to track it:
 
 ```bash
 bencher run \
-  --project agent-game-engine \
+  --project silmaril \
   --adapter criterion \
   --measure memory_mb \
   "cargo bench custom_metric"
@@ -249,7 +249,7 @@ bencher run \
 bencher project list
 
 # Verify API token works
-bencher project view --project agent-game-engine
+bencher project view --project silmaril
 ```
 
 ### "No benchmarks found"

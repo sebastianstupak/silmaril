@@ -688,7 +688,7 @@ Client:
 
 ---
 
-## 9. Recommended Implementation for Agent Game Engine
+## 9. Recommended Implementation for Silmaril
 
 ### 9.1 Algorithm Choice: XPBD
 

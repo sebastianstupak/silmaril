@@ -6,10 +6,128 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+device_benchmarks = []  # Enable benchmarks requiring actual audio files on device
+
 [dependencies]
-kira = "0.8"
 engine-core = { path = "../core" }
-glam = "0.25"
+glam = { version = "0.29", features = ["serde"] }
+thiserror = "1.0"
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+mint = "0.5"
+
+# Desktop audio backend (Windows, Linux, macOS)
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
+kira = { version = "0.8", features = ["symphonia"] }
+
+# Android audio backend
+[target.'cfg(target_os = "android")'.dependencies]
+oboe = { version = "0.6", features = ["java-interface"] }
+jni = "0.21"
+ndk-context = "0.1"
+hound = "3.5"  # WAV decoding
+lewton = "0.10"  # Vorbis/OGG decoding
+minimp3 = "0.5"  # MP3 decoding
+
+# iOS audio backend (Core Audio/AVFoundation)
+[target.'cfg(target_os = "ios")'.dependencies]
+objc = "0.2"
+objc-foundation = "0.1"
+core-foundation = "0.9"
+block = "0.1"
+hound = "3.5"  # WAV decoding
+lewton = "0.10"  # Vorbis/OGG decoding
+minimp3 = "0.5"  # MP3 decoding
+
+# WASM audio backend (Web Audio API)
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "AudioContext",
+    "AudioDestinationNode",
+    "AudioBuffer",
+    "AudioBufferSourceNode",
+    "GainNode",
+    "PannerNode",
+    "AudioListener",
+    "AudioNode",
+    "BaseAudioContext",
+    "HtmlAudioElement",
+    "MediaElementAudioSourceNode",
+    "Window",
+    "Document",
+    "Blob",
+    "Response",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+] }
 
 [dev-dependencies]
 criterion = "0.5"
+tokio-test = "0.4"
+proptest = "1.4"
+serde_json = "1.0"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[[bench]]
+name = "audio_benches"
+harness = false
+
+[[bench]]
+name = "effects_benches"
+harness = false
+
+[[bench]]
+name = "ios_backend_benches"
+harness = false
+
+[[bench]]
+name = "android_audio_benches"
+harness = false
+
+[[bench]]
+name = "spatial_audio_benches"
+harness = false
+
+[[bench]]
+name = "web_backend_benches"
+harness = false
+
+[[bench]]
+name = "performance_regression"
+harness = false
+
+[[bench]]
+name = "simd_batch_benches"
+harness = false
+
+[[bench]]
+name = "scalability_benches"
+harness = false
+
+[[bench]]
+name = "memory_benches"
+harness = false
+
+[[bench]]
+name = "cache_benches"
+harness = false
+
+[[bench]]
+name = "scenario_benches"
+harness = false
+
+[[bench]]
+name = "effect_chain_benches"
+harness = false
+
+[[bench]]
+name = "streaming_benches"
+harness = false

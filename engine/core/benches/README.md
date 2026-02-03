@@ -1,6 +1,6 @@
 # ECS Core Benchmarks
 
-This directory contains comprehensive benchmarks for the agent-game-engine ECS system.
+This directory contains comprehensive benchmarks for the silmaril ECS system.
 
 ## Available Benchmarks
 

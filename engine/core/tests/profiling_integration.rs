@@ -121,7 +121,7 @@ mod with_profiling {
     #[cfg(feature = "metrics")]
     #[test]
     fn test_profiler_frame_metrics() {
-        use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+        use silmaril_profiling::{Profiler, ProfilerConfig};
 
         let profiler = Profiler::new(ProfilerConfig::default());
 
@@ -203,7 +203,7 @@ fn test_profiling_feature_flag_consistency() {
     #[cfg(feature = "profiling")]
     {
         // When profiling is enabled, we should be able to use the profiling crate
-        use agent_game_engine_profiling::ProfileCategory;
+        use silmaril_profiling::ProfileCategory;
         let _category = ProfileCategory::ECS;
     }
 

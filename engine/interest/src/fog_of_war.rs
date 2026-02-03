@@ -341,9 +341,9 @@ impl FogOfWar {
     /// Update fog system from world state
     pub fn update_from_world(&mut self, world: &World) {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "fog_update_from_world",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         // Update entity positions
@@ -389,9 +389,9 @@ impl FogOfWar {
     /// Update entity position
     pub fn update_entity_position(&mut self, entity: Entity, old_pos: Vec3, new_pos: Vec3) {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "fog_update_entity_position",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         self.entity_positions.insert(entity, new_pos);
@@ -434,9 +434,9 @@ impl FogOfWar {
     /// Returns true if line of sight is clear.
     pub fn check_line_of_sight(&self, from: Vec3, to: Vec3) -> bool {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "fog_check_line_of_sight",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         Self::check_line_of_sight_static(from, to, &self.obstacles)
@@ -470,9 +470,9 @@ impl FogOfWar {
     /// Calculate fog visibility for a player
     pub fn calculate_fog_for_player(&mut self, _player_id: u64, team_id: TeamId) -> FogResult {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "fog_calculate_for_player",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         let mut result = FogResult::new();
@@ -482,7 +482,7 @@ impl FogOfWar {
             .team_fog
             .get(&team_id)
             .map(|state| state.team_members.iter().copied().collect())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
 
         // Get old visible set
         let old_visible = self

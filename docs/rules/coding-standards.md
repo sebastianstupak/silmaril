@@ -188,7 +188,7 @@ mod network_client;
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn();
@@ -357,7 +357,7 @@ fn process_input(input: &PlayerInput) -> Result<(), ValidationError> {
 
 ```toml
 [package]
-name = "agent-game-engine-renderer"
+name = "silmaril-renderer"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
@@ -366,7 +366,7 @@ license = "Apache-2.0"
 # Group by category, alphabetical within group
 
 # Core
-agent-game-engine-core = { path = "../core" }
+silmaril-core = { path = "../core" }
 
 # Graphics
 ash = "0.38"

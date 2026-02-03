@@ -1,5 +1,5 @@
 [package]
-name = "agent-game-engine-profiling"
+name = "silmaril-profiling"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -43,7 +43,7 @@ config = ["serde", "serde_json", "serde_yaml"]
 backtrace = []
 
 [lib]
-name = "agent_game_engine_profiling"
+name = "silmaril_profiling"
 path = "src/lib.rs"
 
 [[bench]]

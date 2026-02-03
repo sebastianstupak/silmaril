@@ -41,7 +41,7 @@ impl TotpManager {
     /// # Arguments
     ///
     /// * `issuer` - The service name (e.g., "Silmaril")
-    #[must_use] 
+    #[must_use]
     pub fn new(issuer: String) -> Self {
         Self { issuer }
     }

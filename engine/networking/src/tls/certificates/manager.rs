@@ -45,11 +45,15 @@ pub struct CertificateInfo {
 impl CertificateInfo {
     /// Check if certificate needs renewal
     pub fn needs_renewal(&self, renewal_threshold_days: u32) -> bool {
-        matches!(self.status, CertificateStatus::ExpiringSoon | CertificateStatus::Expired)
-            || self
-                .days_until_expiration
-                .map(|days| days <= renewal_threshold_days as i64)
-                .unwrap_or(true)
+        // Check if already expired
+        if matches!(self.status, CertificateStatus::Expired) {
+            return true;
+        }
+
+        // Check days until expiration against threshold
+        self.days_until_expiration
+            .map(|days| days <= renewal_threshold_days as i64)
+            .unwrap_or(true)
     }
 
     /// Check if certificate is valid

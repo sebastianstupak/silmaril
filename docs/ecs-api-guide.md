@@ -1,6 +1,6 @@
 # ECS API Guide
 
-> **Complete API reference for the agent-game-engine Entity Component System**
+> **Complete API reference for the silmaril Entity Component System**
 >
 > Production-ready, high-performance ECS with sparse-set storage and change detection
 
@@ -22,7 +22,7 @@
 
 ## Overview
 
-The agent-game-engine ECS provides a high-performance, cache-friendly architecture for managing game entities and their data. Key features:
+The silmaril ECS provides a high-performance, cache-friendly architecture for managing game entities and their data. Key features:
 
 - **Sparse-set storage**: O(1) insert/remove/lookup with cache-friendly iteration
 - **Type-safe queries**: Compile-time validated component access
@@ -880,7 +880,7 @@ struct Inventory {
 **DO:**
 ```rust
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 fn expensive_system(world: &mut World) {
     #[cfg(feature = "profiling")]

@@ -1,7 +1,7 @@
 # Destruction and Fracture Simulation Research (2024-2026)
 
 > **Research Date:** 2026-02-02
-> **Target:** Multiplayer-ready destruction systems for agent-game-engine
+> **Target:** Multiplayer-ready destruction systems for silmaril
 > **Focus:** Practical implementation with network synchronization
 
 ---
@@ -269,7 +269,7 @@ Embark Studios' revolutionary **server-side destruction** system. This is the ne
 - Server-side physics simulation at scale
 - Client-side interpolation/extrapolation for responsiveness
 
-**Implications for agent-game-engine:**
+**Implications for silmaril:**
 - Server-authoritative architecture aligns with our goals
 - Requires robust networking layer
 - Consider hybrid: critical destruction server-side, cosmetic debris client-side
@@ -381,7 +381,7 @@ Embark Studios' revolutionary **server-side destruction** system. This is the ne
 - **Alternative:** Artist-authored for guaranteed solvability
 - **Network:** Lockstep deterministic simulation (inputs only)
 
-### 3.3 Hybrid Approach (Recommended for agent-game-engine)
+### 3.3 Hybrid Approach (Recommended for silmaril)
 
 **Combine strengths of multiple techniques:**
 
@@ -640,7 +640,7 @@ Embark Studios' revolutionary **server-side destruction** system. This is the ne
 
 ---
 
-### 5.3 Hybrid Approach (Recommended for agent-game-engine)
+### 5.3 Hybrid Approach (Recommended for silmaril)
 
 **Architecture:**
 
@@ -842,7 +842,7 @@ Embark Studios' revolutionary **server-side destruction** system. This is the ne
 
 ---
 
-## 8. Implementation Recommendations for agent-game-engine
+## 8. Implementation Recommendations for silmaril
 
 ### 8.1 Proposed Architecture
 
@@ -892,7 +892,7 @@ Embark Studios' revolutionary **server-side destruction** system. This is the ne
 - **Custom implementation:** Only if you need extreme control (not recommended)
 
 **Physics Engine:**
-- **Rapier** (Rust-native): Already chosen for agent-game-engine, supports convex shapes well
+- **Rapier** (Rust-native): Already chosen for silmaril, supports convex shapes well
 - **Ensure deterministic mode** (if using lockstep networking): Fixed timestep, reproducible RNG
 
 **Convex Decomposition:**
@@ -902,10 +902,10 @@ Embark Studios' revolutionary **server-side destruction** system. This is the ne
 **Networking:**
 - Server-authoritative triggers
 - Hybrid deterministic fragments (seeded) with optional corrections
-- Use existing agent-game-engine networking crate (TCP for triggers, UDP for corrections if needed)
+- Use existing silmaril networking crate (TCP for triggers, UDP for corrections if needed)
 
 **Memory Management:**
-- Use agent-game-engine's **arena** or **pool** allocators for debris (already implemented)
+- Use silmaril's **arena** or **pool** allocators for debris (already implemented)
 - Pre-allocate pool at startup: 2,000 fragments × 1 KB = ~2 MB
 - Monitor pool usage, expand if needed (or fail gracefully)
 
@@ -1087,7 +1087,7 @@ Before merging destruction system:
 
 1. **Server-side destruction** (The Finals approach) is the new gold standard for multiplayer synchronization
 2. **Pre-fractured assets** remain most reliable for performance, but limit variety
-3. **Hybrid approach** (pre-computed patterns + deterministic seeds) offers best balance for agent-game-engine
+3. **Hybrid approach** (pre-computed patterns + deterministic seeds) offers best balance for silmaril
 4. **Object pooling** is mandatory for debris management (avoid fragmentation)
 5. **Convex decomposition** is critical for collision performance
 6. **LOD + cleanup** are essential for sustained destruction without performance collapse
@@ -1096,7 +1096,7 @@ Before merging destruction system:
 
 ---
 
-### 9.2 Recommended Implementation Path for agent-game-engine
+### 9.2 Recommended Implementation Path for silmaril
 
 **Immediate (Phase 1 - 2-3 weeks):**
 - Pre-fractured asset system with runtime swap
@@ -1134,5 +1134,5 @@ Complete source list with hyperlinks provided throughout document.
 
 **Document Version:** 1.0
 **Last Updated:** 2026-02-02
-**Maintained By:** agent-game-engine AI Research Agent
+**Maintained By:** silmaril AI Research Agent
 

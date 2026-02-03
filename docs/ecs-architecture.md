@@ -1,6 +1,6 @@
 # ECS Architecture Guide
 
-> **Deep dive into the agent-game-engine ECS internals**
+> **Deep dive into the silmaril ECS internals**
 >
 > For contributors and advanced users who need to understand the implementation
 
@@ -22,7 +22,7 @@
 
 ## Architecture Overview
 
-The agent-game-engine ECS uses a **sparse-set architecture** with **change detection** and **compile-time query validation**.
+The silmaril ECS uses a **sparse-set architecture** with **change detection** and **compile-time query validation**.
 
 ### Design Principles
 
@@ -870,7 +870,7 @@ let component = unsafe { storage.get_unchecked_fast(entity) };
 
 ## Conclusion
 
-The agent-game-engine ECS architecture provides:
+The silmaril ECS architecture provides:
 
 ✅ **Cache efficiency** through sparse-set storage
 ✅ **Type safety** with compile-time query validation

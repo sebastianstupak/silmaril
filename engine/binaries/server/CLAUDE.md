@@ -121,13 +121,13 @@ Use the provided build scripts:
 
 ```bash
 # Build Docker image
-docker build -f engine/binaries/server/Dockerfile -t agent-game-engine-server .
+docker build -f engine/binaries/server/Dockerfile -t silmaril-server .
 
 # Run in container
 docker run -it --rm \
   -p 7777:7777 \
   -p 7778:7778/udp \
-  agent-game-engine-server
+  silmaril-server
 ```
 
 ## Platform-Specific Considerations
@@ -160,7 +160,7 @@ The server is designed to run in containers:
 version: '3.8'
 services:
   server:
-    image: agent-game-engine-server
+    image: silmaril-server
     ports:
       - "7777:7777"
       - "7778:7778/udp"
@@ -191,7 +191,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: agent-game-engine-server:latest
+        image: silmaril-server:latest
         ports:
         - containerPort: 7777
           protocol: TCP
@@ -273,7 +273,7 @@ Structured logging with tracing:
 RUST_LOG=debug cargo run --bin server
 
 # Production (JSON for log aggregation)
-RUST_LOG=info,agent_game_engine=debug cargo run --bin server
+RUST_LOG=info,silmaril=debug cargo run --bin server
 ```
 
 ### Health Checks
@@ -345,10 +345,10 @@ Multiple server instances with:
 
 ## Related Documentation
 
-- [D:\dev\agent-game-engine\docs\architecture.md](../../docs/architecture.md) - Overall system architecture
-- [D:\dev\agent-game-engine\docs\tasks\phase2-proc-macros.md](../../docs/tasks/phase2-proc-macros.md) - Server/client code splitting with macros
-- [D:\dev\agent-game-engine\docs\tasks\phase2-server-tick.md](../../docs/tasks/phase2-server-tick.md) - Server tick loop implementation
-- [D:\dev\agent-game-engine\docs\tasks\phase2-state-sync.md](../../docs/tasks/phase2-state-sync.md) - State synchronization
-- [D:\dev\agent-game-engine\docs\tasks\phase2-tcp-connection.md](../../docs/tasks/phase2-tcp-connection.md) - TCP networking
-- [D:\dev\agent-game-engine\docs\tasks\phase2-udp-packets.md](../../docs/tasks/phase2-udp-packets.md) - UDP networking
-- [D:\dev\agent-game-engine\docs\performance-targets.md](../../docs/performance-targets.md) - Performance benchmarks
+- [D:\dev\silmaril\docs\architecture.md](../../docs/architecture.md) - Overall system architecture
+- [D:\dev\silmaril\docs\tasks\phase2-proc-macros.md](../../docs/tasks/phase2-proc-macros.md) - Server/client code splitting with macros
+- [D:\dev\silmaril\docs\tasks\phase2-server-tick.md](../../docs/tasks/phase2-server-tick.md) - Server tick loop implementation
+- [D:\dev\silmaril\docs\tasks\phase2-state-sync.md](../../docs/tasks/phase2-state-sync.md) - State synchronization
+- [D:\dev\silmaril\docs\tasks\phase2-tcp-connection.md](../../docs/tasks/phase2-tcp-connection.md) - TCP networking
+- [D:\dev\silmaril\docs\tasks\phase2-udp-packets.md](../../docs/tasks/phase2-udp-packets.md) - UDP networking
+- [D:\dev\silmaril\docs\performance-targets.md](../../docs/performance-targets.md) - Performance benchmarks

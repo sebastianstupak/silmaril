@@ -241,9 +241,7 @@ impl ReplayRecorder {
 
         // Serialize to bincode (compact binary format)
         let bytes = bincode::serialize(&replay_file).map_err(|e| {
-            DeterministicError::ReplayFailed {
-                reason: format!("Serialization failed: {}", e),
-            }
+            DeterministicError::ReplayFailed { reason: format!("Serialization failed: {}", e) }
         })?;
 
         let size_bytes = bytes.len();
@@ -282,10 +280,9 @@ impl ReplayRecorder {
         })?;
 
         // Deserialize
-        let replay_file: ReplayFile =
-            bincode::deserialize(&bytes).map_err(|e| DeterministicError::ReplayFailed {
-                reason: format!("Deserialization failed: {}", e),
-            })?;
+        let replay_file: ReplayFile = bincode::deserialize(&bytes).map_err(|e| {
+            DeterministicError::ReplayFailed { reason: format!("Deserialization failed: {}", e) }
+        })?;
 
         // Version check
         if replay_file.version != REPLAY_FILE_VERSION {
@@ -691,8 +688,7 @@ mod tests {
         recorder.save_to_file(&temp_path).expect("Failed to save replay");
 
         // Load from file
-        let loaded =
-            ReplayRecorder::load_from_file(&temp_path).expect("Failed to load replay");
+        let loaded = ReplayRecorder::load_from_file(&temp_path).expect("Failed to load replay");
 
         // Verify loaded data matches original
         assert_eq!(loaded.frames().len(), recorder.frames().len());
@@ -771,12 +767,7 @@ mod tests {
         // Add multiple entities
         for i in 0..10 {
             let rb = crate::components::RigidBody::dynamic(1.0);
-            world.add_rigidbody(
-                i,
-                &rb,
-                Vec3::new(i as f32, 10.0, 0.0),
-                Quat::IDENTITY,
-            );
+            world.add_rigidbody(i, &rb, Vec3::new(i as f32, 10.0, 0.0), Quat::IDENTITY);
         }
 
         recorder.record_initial_snapshot(&world);
@@ -792,11 +783,7 @@ mod tests {
 
         // Check file size is reasonable (< 1MB for this test)
         let metadata = std::fs::metadata(&temp_path).expect("Failed to get metadata");
-        assert!(
-            metadata.len() < 1024 * 1024,
-            "File size {} exceeds 1MB",
-            metadata.len()
-        );
+        assert!(metadata.len() < 1024 * 1024, "File size {} exceeds 1MB", metadata.len());
 
         // Cleanup
         std::fs::remove_file(&temp_path).ok();

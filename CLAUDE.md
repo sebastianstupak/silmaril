@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Agent Development Guide
 
-> **Primary reference for AI agents working on agent-game-engine**
+> **Primary reference for AI agents working on silmaril**
 >
 > This document contains critical rules, architectural decisions, and development practices that MUST be followed when contributing code.
 
@@ -37,7 +37,7 @@ Build a **fully automatable game engine** optimized for AI agent workflows with:
 
 - **Profiling & Observability** → [docs/profiling.md](docs/profiling.md)
 - **Performance** → [docs/performance-targets.md](docs/performance-targets.md)
-- **Benchmarking** → [docs/benchmarking.md](docs/benchmarking.md) ⚠️ **NEW - USE `just benchmark:*` COMMANDS**
+- **Benchmarking** → [docs/benchmarking.md](docs/benchmarking.md) ⚠️ **NEW - USE `cargo xtask bench` COMMANDS**
 - **Architecture** → [docs/architecture.md](docs/architecture.md)
 - **Dev Workflow** → [docs/development-workflow.md](docs/development-workflow.md)
 
@@ -81,7 +81,7 @@ fn load_asset(path: &str) -> Result<Asset, Box<dyn Error>> { }
 fn init() -> anyhow::Result<()> { }
 
 // ✅ CORRECT
-use agent_game_engine_core::define_error;
+use silmaril_core::define_error;
 
 define_error! {
     pub enum AssetError {
@@ -133,7 +133,7 @@ fn create_window(backend: &dyn WindowBackend) -> Result<Window, WindowError> {
 ### **4. Client/Server Split - Use Macros**
 
 ```rust
-use agent_game_engine_macros::{client_only, server_only};
+use silmaril_macros::{client_only, server_only};
 
 // ❌ FORBIDDEN - Manual cfg attributes scattered everywhere
 #[cfg(feature = "client")]
@@ -583,7 +583,7 @@ examples/                   ← Root level ONLY (full game demos)
 ### **Repository Structure**
 
 ```
-agent-game-engine/
+silmaril/
 ├── CLAUDE.md                    ← YOU ARE HERE
 ├── ROADMAP.md                   ← Implementation plan
 ├── LICENSE                      ← Apache-2.0
@@ -659,27 +659,27 @@ agent-game-engine/
 
 ```bash
 # Quick checks (recommended)
-just check                     # Format + clippy + test
+cargo xtask check              # Format + clippy + test
 
 # Or run individually
-just fmt-check                 # Format
-just clippy                    # Lints
-just test                      # All tests
+cargo xtask fmt                # Format
+cargo xtask clippy             # Lints
+cargo xtask test all           # All tests
 
 # Test specific features
-just test:serialization        # Test serialization
-just test:ecs                  # Test ECS
-just test:physics              # Test physics
+cargo xtask test serialization # Test serialization
+cargo xtask test ecs           # Test ECS
+cargo xtask test physics       # Test physics
 
 # Benchmarks (if changed performance-sensitive code)
-just benchmark:serialization   # Benchmark serialization
-just benchmark:ecs             # Benchmark ECS
-just benchmark:all             # All benchmarks
+cargo xtask bench serialization # Benchmark serialization
+cargo xtask bench ecs          # Benchmark ECS
+cargo xtask bench all          # All benchmarks
 ```
 
 **See:**
 - [docs/development-workflow.md](docs/development-workflow.md)
-- [docs/rules/justfile-commands.md](docs/rules/justfile-commands.md)
+- [docs/rules/xtask-commands.md](docs/rules/xtask-commands.md)
 
 ---
 
@@ -889,7 +889,7 @@ pub fn create_platform() -> Box<dyn PlatformBackend> {
 
 ```bash
 RUST_LOG=trace cargo run
-RUST_LOG=agent_game_engine=debug cargo run
+RUST_LOG=silmaril=debug cargo run
 ```
 
 ### **Use Tracy Profiler**
@@ -911,10 +911,10 @@ VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d cargo run
 
 ```bash
 # Server
-RUST_LOG=agent_game_engine_networking=trace cargo run --bin server
+RUST_LOG=silmaril_networking=trace cargo run --bin server
 
 # Client
-RUST_LOG=agent_game_engine_networking=trace cargo run --bin client
+RUST_LOG=silmaril_networking=trace cargo run --bin client
 ```
 
 ---

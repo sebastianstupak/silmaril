@@ -1,6 +1,6 @@
 # Claude Code Skills Reference
 
-> **Comprehensive guide to creating and using skills in the Agent Game Engine project**
+> **Comprehensive guide to creating and using skills in the Silmaril project**
 
 ---
 

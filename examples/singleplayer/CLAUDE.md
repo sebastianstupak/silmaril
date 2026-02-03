@@ -1,7 +1,7 @@
 # Singleplayer Example Game
 
 ## Overview
-This example demonstrates a complete singleplayer game built with the Agent Game Engine. It showcases core ECS patterns, agent behaviors, and game loop mechanics in a simple, focused context.
+This example demonstrates a complete singleplayer game built with the Silmaril. It showcases core ECS patterns, agent behaviors, and game loop mechanics in a simple, focused context.
 
 ## What This Demonstrates
 - Basic ECS architecture with components, systems, and entities

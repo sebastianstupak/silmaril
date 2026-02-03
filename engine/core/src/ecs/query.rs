@@ -19,7 +19,7 @@ use std::any::TypeId;
 use std::marker::PhantomData;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Prefetch a memory location for reading
 ///

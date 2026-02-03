@@ -46,7 +46,12 @@ impl Default for SelfSignedConfig {
 impl SelfSignedConfig {
     /// Create a new self-signed certificate configuration
     pub fn new(common_name: impl Into<String>) -> Self {
-        Self { common_name: common_name.into(), ..Default::default() }
+        let cn = common_name.into();
+        Self {
+            sans: vec![cn.clone()], // Auto-add common name as first SAN
+            common_name: cn,
+            ..Default::default()
+        }
     }
 
     /// Add a subject alternative name
@@ -107,7 +112,7 @@ pub fn generate_self_signed_cert(config: &SelfSignedConfig) -> TlsResult<(String
 
     params.distinguished_name = dn;
 
-    // Set subject alternative names
+    // Set subject alternative names (common_name is already included in the list)
     params.subject_alt_names = config
         .sans
         .iter()

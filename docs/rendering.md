@@ -1,6 +1,6 @@
 # Rendering Architecture
 
-> **Vulkan-based rendering system for agent-game-engine**
+> **Vulkan-based rendering system for silmaril**
 >
 > Low-level Vulkan renderer optimized for AI agent visual feedback loops
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The agent-game-engine uses Vulkan via the Ash crate for:
+The silmaril uses Vulkan via the Ash crate for:
 - **Cross-platform rendering** - Windows, Linux, macOS (via MoltenVK)
 - **Low-level control** - Direct GPU access for optimization
 - **Headless rendering** - Offscreen rendering for AI agents
@@ -44,7 +44,7 @@ use engine_renderer::{VulkanContext, ContextConfig};
 
 pub fn init_renderer(window: &Window) -> Result<VulkanContext, RendererError> {
     let config = ContextConfig {
-        app_name: "Agent Game Engine",
+        app_name: "Silmaril",
         enable_validation: cfg!(debug_assertions),
         prefer_discrete_gpu: true,
     };

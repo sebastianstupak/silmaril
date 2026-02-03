@@ -1,6 +1,6 @@
 # Interest Management
 
-> **Interest management system for agent-game-engine**
+> **Interest management system for silmaril**
 >
 > Network optimization through spatial awareness and visibility culling
 

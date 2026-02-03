@@ -29,6 +29,25 @@ See the main [justfile](../justfile) for all available recipes.
 
 ## 📋 Command Reference
 
+### Test Coverage and Validation
+
+```bash
+# Generate coverage report
+./scripts/coverage.sh              # Linux/macOS
+.\scripts\coverage.ps1             # Windows
+
+# Run all benchmarks
+./scripts/benchmark_all.sh         # Linux/macOS
+.\scripts\benchmark_all.ps1        # Windows
+
+# Quick mode for CI
+./scripts/benchmark_all.sh --quick
+
+# Validate performance targets
+./scripts/check_performance_targets.sh    # Linux/macOS
+.\scripts\check_performance_targets.ps1   # Windows
+```
+
 ### Benchmark Management
 
 ```bash
@@ -109,6 +128,93 @@ just setup-hooks
 
 ---
 
+## 🧪 Test Coverage Scripts
+
+### coverage.sh / coverage.ps1
+
+Generate comprehensive test coverage reports using cargo-llvm-cov.
+
+**Usage (Linux/macOS):**
+```bash
+./scripts/coverage.sh
+```
+
+**Usage (Windows):**
+```powershell
+.\scripts\coverage.ps1
+```
+
+**Features:**
+- Automatic cargo-llvm-cov installation
+- HTML coverage reports
+- LCOV format for CI integration
+- Per-module coverage breakdown
+- Coverage target validation (80% overall)
+
+**Output:**
+- `coverage.lcov` - LCOV format for CI
+- `coverage-html/index.html` - Interactive HTML report
+
+### benchmark_all.sh / benchmark_all.ps1
+
+Run comprehensive benchmark suite across all engine modules.
+
+**Usage (Linux/macOS):**
+```bash
+./scripts/benchmark_all.sh [--save-baseline] [--compare-baseline] [--quick]
+```
+
+**Usage (Windows):**
+```powershell
+.\scripts\benchmark_all.ps1 [-SaveBaseline] [-CompareBaseline] [-Quick]
+```
+
+**Options:**
+- `--save-baseline` / `-SaveBaseline`: Save results as new baseline
+- `--compare-baseline` / `-CompareBaseline`: Compare with existing baseline
+- `--baseline-name NAME` / `-BaselineName NAME`: Custom baseline name (default: "baseline")
+- `--quick` / `-Quick`: Reduced sample size for faster runs
+
+**Output:**
+- `benchmark-results/benchmark-TIMESTAMP.txt` - Results file
+- `benchmark-results/baseline-NAME.txt` - Baseline snapshots
+
+### check_performance_targets.sh / check_performance_targets.ps1
+
+Validate that benchmarks meet performance targets defined in `benchmark_thresholds.yaml`.
+
+**Usage (Linux/macOS):**
+```bash
+./scripts/check_performance_targets.sh
+```
+
+**Usage (Windows):**
+```powershell
+.\scripts\check_performance_targets.ps1 [-Verbose]
+```
+
+**Features:**
+- Automated performance regression detection
+- Configurable thresholds per module
+- CI-friendly exit codes (fail if targets not met)
+- Clear pass/fail reporting
+
+**Thresholds file:** `benchmark_thresholds.yaml`
+
+```yaml
+ecs:
+  entity_spawn: 1000          # ns per entity
+  world_update: 16000         # µs (60 FPS target)
+
+serialization:
+  bincode_roundtrip: 10000    # µs
+
+physics:
+  step_100_bodies: 2000       # µs per step
+```
+
+---
+
 ## 🐍 Python Scripts
 
 These Python scripts are used by the justfile recipes and can be run directly:
@@ -172,32 +278,32 @@ python scripts/check_benchmark_regression.py \
 
 ## 🔄 Migration from Shell Scripts
 
-All `.sh` and `.ps1` scripts have been converted to `just` recipes:
+All `.sh` and `.ps1` scripts have been converted to `cargo xtask` commands:
 
-| Old Script | New Just Recipe |
-|------------|----------------|
-| `benchmark_all_platforms.sh` | `just bench-all-platforms` |
-| `update_benchmark_baseline.sh` | `just bench-update-baseline` |
-| `compare_with_baseline.sh` | `just bench-compare-baseline` |
-| `benchmark_tiers.sh` | `just benchmark-tiers` |
-| `build_all_tiers.sh` | `just build-all-tiers` |
-| `build_pgo_instrumented.sh` | `just pgo-build-instrumented` |
-| `build_pgo_optimized.sh` | `just pgo-build-optimized` |
-| `run_pgo_workload.sh` | `just pgo-run-workload` |
-| `compare_pgo_performance.sh` | `just pgo-compare` |
-| `test_pgo_workflow.sh` | `just pgo-test` |
-| `setup-hooks.sh` | `just setup-hooks` |
-| `verify_build_tiers.sh` | `just verify-build-tiers` |
-| `validate_component_get_optimization.sh` | `just validate-component-optimization` |
-| `verify_physics_optimization.sh` | `just verify-physics-optimization` |
+| Old Script | New XTask Command |
+|------------|-------------------|
+| `benchmark_all_platforms.sh` | `cargo xtask bench all-platforms` |
+| `update_benchmark_baseline.sh` | `cargo xtask bench update-baseline` |
+| `compare_with_baseline.sh` | `cargo xtask bench baseline` |
+| `benchmark_tiers.sh` | `cargo xtask bench tiers` |
+| `build_all_tiers.sh` | `cargo xtask build tiers` |
+| `build_pgo_instrumented.sh` | `cargo xtask pgo build-instrumented` |
+| `build_pgo_optimized.sh` | `cargo xtask pgo build-optimized` |
+| `run_pgo_workload.sh` | `cargo xtask pgo run-workload` |
+| `compare_pgo_performance.sh` | `cargo xtask pgo compare` |
+| `test_pgo_workflow.sh` | `cargo xtask pgo test` |
+| `setup-hooks.sh` | `cargo xtask setup hooks` |
+| `verify_build_tiers.sh` | `cargo xtask verify build-tiers` |
+| `validate_component_get_optimization.sh` | `cargo xtask verify component-optimization` |
+| `verify_physics_optimization.sh` | `cargo xtask verify physics-optimization` |
 | `test_linux_optimizations.sh` | (Linux-specific, kept as-is) |
 
-**Benefits of `just`:**
+**Benefits of `cargo xtask`:**
 - ✅ True cross-platform support (Windows, Linux, macOS)
+- ✅ No external dependencies (just cargo)
 - ✅ Python scripts for complex logic (no shell-specific syntax)
 - ✅ Consistent command interface
-- ✅ Parameterizable recipes
-- ✅ Built-in help system (`just --list`)
+- ✅ Built-in help system (`cargo xtask --help`)
 - ✅ No need for separate `.sh` and `.ps1` versions
 
 ---
@@ -336,9 +442,9 @@ chmod +x justfile
 ### Benchmark regression check fails
 This is expected! It means performance regressed.
 - Review the regressions
-- Profile with: `just bench-profile`
+- Profile with: `cargo xtask bench profile`
 - Optimize hot paths
-- Re-run: `just bench-compare-baseline`
+- Re-run: `cargo xtask bench baseline`
 
 ---
 

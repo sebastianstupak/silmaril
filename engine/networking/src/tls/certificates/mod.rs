@@ -8,4 +8,6 @@ pub mod selfsigned;
 
 pub use acme::{AcmeClient, AcmeConfig};
 pub use manager::{CertificateInfo, CertificateManager, CertificateStatus};
-pub use selfsigned::{generate_self_signed_cert, SelfSignedConfig};
+pub use selfsigned::{
+    generate_and_save_self_signed_cert, generate_self_signed_cert, SelfSignedConfig,
+};

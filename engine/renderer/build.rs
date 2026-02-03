@@ -25,13 +25,9 @@ fn main() {
     engine_build_utils::check_no_print_statements(&print_config);
 
     // Check that error types use define_error! macro
+    // All error types in renderer must use define_error! for consistency
     let error_config = ErrorCheckConfig::default().skip_files(vec![
-        "error.rs".to_string(),
-        "snapshot.rs".to_string(), // Simple validation errors for debug infra
-        "events.rs".to_string(),   // Simple event errors for debug infra
-        "exporters.rs".to_string(), // Simple export errors for debug infra
-        "query.rs".to_string(),    // Simple query errors for debug infra
-        "capture.rs".to_string(),  // Simple capture errors for debug infra
+        "error.rs".to_string(), // Defines error codes themselves
     ]);
     engine_build_utils::check_error_types_use_macro(&error_config);
 

@@ -11,7 +11,7 @@ use crate::ecs::{Entity, World};
 use rustc_hash::FxHashMap;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 impl WorldState {
     /// Create snapshot with pre-allocated capacity

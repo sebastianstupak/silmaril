@@ -1,6 +1,6 @@
 # Claude Code Agents Reference
 
-> **Complete guide to using and creating agents in the Agent Game Engine project**
+> **Complete guide to using and creating agents in the Silmaril project**
 
 ---
 

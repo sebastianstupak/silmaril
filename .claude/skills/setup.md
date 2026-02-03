@@ -6,7 +6,7 @@ trigger: /setup
 
 # Project Setup
 
-Performs first-time setup and verification for agent-game-engine development environment.
+Performs first-time setup and verification for silmaril development environment.
 
 ## Instructions
 
@@ -210,7 +210,7 @@ To start development:
 For development workflow, see:
   docs/development-workflow.md (when created)
 
-All systems ready for agent-game-engine development!
+All systems ready for silmaril development!
 ```
 
 If issues found:

@@ -4,10 +4,9 @@ use crate::error::UpdateError;
 use crate::version::Version;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Maximum number of backups to keep.
 const MAX_BACKUPS: usize = 2;

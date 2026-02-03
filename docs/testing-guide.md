@@ -1,6 +1,6 @@
 # Testing Guide
 
-> **Comprehensive guide to writing, organizing, and running tests for the Agent Game Engine**
+> **Comprehensive guide to writing, organizing, and running tests for the Silmaril**
 >
 > Last Updated: 2026-02-01
 
@@ -25,7 +25,7 @@
 
 ## Overview
 
-The Agent Game Engine uses a comprehensive testing strategy that includes:
+The Silmaril uses a comprehensive testing strategy that includes:
 
 - **Unit Tests**: Fast, isolated tests for individual functions and methods
 - **Integration Tests**: Tests for multiple components working together
@@ -63,7 +63,7 @@ The Agent Game Engine uses a comprehensive testing strategy that includes:
 ### Directory Structure
 
 ```
-agent-game-engine/
+silmaril/
 ├── engine/
 │   ├── core/
 │   │   ├── src/

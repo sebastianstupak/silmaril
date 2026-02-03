@@ -1,6 +1,6 @@
 # MOBA Example
 
-A Multiplayer Online Battle Arena game demonstrating the Agent Game Engine's real-time multiplayer and competitive features.
+A Multiplayer Online Battle Arena game demonstrating the Silmaril's real-time multiplayer and competitive features.
 
 ## Quick Start
 

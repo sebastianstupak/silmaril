@@ -373,7 +373,7 @@ impl Default for ServerConfig {
 **File:** `engine/core/src/systems/server.rs`
 
 ```rust
-use agent_game_engine_macros::server_only;
+use silmaril_macros::server_only;
 
 /// Physics system (server-only, authoritative)
 #[server_only]
@@ -441,12 +441,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,agent_game_engine=debug".into()),
+                .unwrap_or_else(|_| "info,silmaril=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Agent Game Engine Server starting...");
+    tracing::info!("Silmaril Server starting...");
 
     // Load config
     let config = ServerConfig::default();
@@ -653,7 +653,7 @@ RUST_LOG=debug cargo run --bin server --features server
 
 # Production (with systemd)
 [Unit]
-Description=Agent Game Engine Server
+Description=Silmaril Server
 After=network.target
 
 [Service]

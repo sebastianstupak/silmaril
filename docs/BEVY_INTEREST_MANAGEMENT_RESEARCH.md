@@ -4,7 +4,7 @@
 >
 > **Date:** 2026-02-01
 > **Status:** Complete
-> **Purpose:** Inform agent-game-engine benchmarking and competitive analysis
+> **Purpose:** Inform silmaril benchmarking and competitive analysis
 
 ---
 
@@ -143,11 +143,11 @@ The Bevy RFC #19 for networked replication was **closed in April 2024** because:
 
 ---
 
-## Comparison Points for agent-game-engine
+## Comparison Points for silmaril
 
 ### Performance Targets
 
-| Metric | Bevy (Lightyear) | agent-game-engine Target |
+| Metric | Bevy (Lightyear) | silmaril Target |
 |--------|------------------|--------------------------|
 | Spatial query (1000 entities) | <50 µs | <100 µs ✅ |
 | Interest update (100 clients) | ~5 ms (estimated) | <5 ms ✅ |
@@ -155,7 +155,7 @@ The Bevy RFC #19 for networked replication was **closed in April 2024** because:
 | Max documented scale | 100-200 players | 1000+ players 🎯 |
 | CPU overhead | Unknown | <1% per client 🎯 |
 
-### Competitive Advantages for agent-game-engine
+### Competitive Advantages for silmaril
 
 1. **Published 1000+ player benchmarks** - Bevy lacks this
 2. **Built-in profiling** - Bevy requires external tools
@@ -189,7 +189,7 @@ The Bevy RFC #19 for networked replication was **closed in April 2024** because:
 
 ---
 
-## Recommendations for agent-game-engine
+## Recommendations for silmaril
 
 ### 1. Adopt KD-Tree Base (Similar to bevy_spatial)
 ```rust
@@ -261,7 +261,7 @@ Bevy's approach demonstrates that **70-98% bandwidth reduction is achievable** w
 3. Combined approaches exceed 95% reduction
 4. Scale beyond 200 players is largely undocumented
 
-**agent-game-engine Opportunity:**
+**silmaril Opportunity:**
 - Exceed Bevy with published 1000+ player benchmarks
 - Provide integrated solution (not plugin-dependent)
 - Comprehensive documentation in one place

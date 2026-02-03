@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Update channel type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Channel {
     /// Stable release channel
+    #[default]
     Stable,
     /// Beta testing channel
     Beta,
@@ -53,12 +54,6 @@ impl Channel {
 impl fmt::Display for Channel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
-    }
-}
-
-impl Default for Channel {
-    fn default() -> Self {
-        Channel::Stable
     }
 }
 

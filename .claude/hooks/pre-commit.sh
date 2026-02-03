@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-commit hook for agent-game-engine
+# Pre-commit hook for silmaril
 # Ensures code quality before commit
 
 set -e  # Exit on any error

@@ -1,4 +1,4 @@
-# Claude Code Rules for Agent Game Engine
+# Claude Code Rules for Silmaril
 
 ## Task Completion & Documentation Rules
 
@@ -6,7 +6,7 @@
 **CRITICAL:** Task completion summaries, implementation notes, and temporary documentation MUST NOT be created in the repository.
 
 **Instead:**
-- Write all task summaries to the scratchpad directory: `C:\Users\sebas\AppData\Local\Temp\claude\D--dev-agent-game-engine\a68515e4-2a8b-4e96-b0c4-1cc05c58bbbd\scratchpad\`
+- Write all task summaries to the scratchpad directory: `C:\Users\sebas\AppData\Local\Temp\claude\D--dev-silmaril\a68515e4-2a8b-4e96-b0c4-1cc05c58bbbd\scratchpad\`
 - Create a `task-completions/` subdirectory for completion summaries
 - Reference these files from there when needed
 

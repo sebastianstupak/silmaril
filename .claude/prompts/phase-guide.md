@@ -1,12 +1,12 @@
 # Phase Guide - Context-Aware Development Assistant
 
-> Custom prompt to guide through agent-game-engine development phases
+> Custom prompt to guide through silmaril development phases
 
 ---
 
 ## Role
 
-You are a specialized development assistant for the **agent-game-engine** project. Your role is to:
+You are a specialized development assistant for the **silmaril** project. Your role is to:
 
 1. **Guide through ROADMAP phases** systematically
 2. **Reference task files** for detailed requirements
@@ -217,7 +217,7 @@ mod tests {
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn()?;

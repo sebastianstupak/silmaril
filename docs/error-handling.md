@@ -20,7 +20,7 @@
 
 ```rust
 // engine/core/src/error.rs
-use agent_game_engine_core::define_error;
+use silmaril_core::define_error;
 
 define_error! {
     pub enum RendererError {

@@ -11,6 +11,7 @@ use crate::error::AuthError;
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
@@ -89,7 +90,7 @@ impl JwtManager {
     ///
     /// * `private_key_pem` - RSA private key in PEM format (for signing)
     /// * `public_key_pem` - RSA public key in PEM format (for verification)
-    /// * `issuer` - Token issuer identifier (e.g., "agent-game-engine")
+    /// * `issuer` - Token issuer identifier (e.g., "silmaril")
     ///
     /// # Errors
     ///
@@ -101,7 +102,7 @@ impl JwtManager {
     ) -> Result<Self, AuthError> {
         let encoding_key = EncodingKey::from_rsa_pem(private_key_pem).map_err(|e| {
             AuthError::TokenGenerationFailed {
-                reason: format!("Failed to load private key: {}", e),
+                reason: format!("Failed to load private key: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             }
@@ -109,7 +110,7 @@ impl JwtManager {
 
         let decoding_key = DecodingKey::from_rsa_pem(public_key_pem).map_err(|e| {
             AuthError::TokenValidationFailed {
-                reason: format!("Failed to load public key: {}", e),
+                reason: format!("Failed to load public key: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             }
@@ -152,7 +153,7 @@ impl JwtManager {
         let access_token =
             encode(&Header::new(Algorithm::RS256), &access_claims, &self.encoding_key).map_err(
                 |e| AuthError::TokenGenerationFailed {
-                    reason: format!("Failed to encode access token: {}", e),
+                    reason: format!("Failed to encode access token: {e}"),
                     #[cfg(feature = "backtrace")]
                     backtrace: Backtrace::capture(),
                 },
@@ -172,7 +173,7 @@ impl JwtManager {
         let refresh_token =
             encode(&Header::new(Algorithm::RS256), &refresh_claims, &self.encoding_key).map_err(
                 |e| AuthError::TokenGenerationFailed {
-                    reason: format!("Failed to encode refresh token: {}", e),
+                    reason: format!("Failed to encode refresh token: {e}"),
                     #[cfg(feature = "backtrace")]
                     backtrace: Backtrace::capture(),
                 },
@@ -215,7 +216,7 @@ impl JwtManager {
                     }
                 } else {
                     AuthError::TokenValidationFailed {
-                        reason: format!("Token validation failed: {}", e),
+                        reason: format!("Token validation failed: {e}"),
                         #[cfg(feature = "backtrace")]
                         backtrace: Backtrace::capture(),
                     }
@@ -263,7 +264,7 @@ impl JwtManager {
                     }
                 } else {
                     AuthError::TokenValidationFailed {
-                        reason: format!("Token validation failed: {}", e),
+                        reason: format!("Token validation failed: {e}"),
                         #[cfg(feature = "backtrace")]
                         backtrace: Backtrace::capture(),
                     }
@@ -301,6 +302,7 @@ impl JwtManager {
     }
 
     /// Check if a token is revoked.
+    #[must_use]
     pub fn is_revoked(&self, token_id: &str) -> bool {
         let revoked = self.revoked_tokens.read().unwrap();
         revoked.contains(token_id)

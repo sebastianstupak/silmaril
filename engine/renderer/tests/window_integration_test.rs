@@ -98,7 +98,7 @@ fn test_window_functionality() {
 fn test_window_config_default() {
     let config = WindowConfig::default();
 
-    assert_eq!(config.title, "Agent Game Engine");
+    assert_eq!(config.title, "Silmaril");
     assert_eq!(config.width, 1280);
     assert_eq!(config.height, 720);
     assert!(config.resizable);

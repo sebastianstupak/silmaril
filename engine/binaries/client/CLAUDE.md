@@ -109,13 +109,13 @@ Use the provided build scripts:
 
 ```bash
 # Build Docker image
-docker build -f engine/binaries/client/Dockerfile -t agent-game-engine-client .
+docker build -f engine/binaries/client/Dockerfile -t silmaril-client .
 
 # Run in container
 docker run -it --rm \
   -e DISPLAY=$DISPLAY \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
-  agent-game-engine-client
+  silmaril-client
 ```
 
 ## Platform-Specific Considerations
@@ -224,11 +224,11 @@ if let Some(frame) = client.capture_frame() {
 
 ## Related Documentation
 
-- [D:\dev\agent-game-engine\docs\architecture.md](../../docs/architecture.md) - Overall system architecture
-- [D:\dev\agent-game-engine\docs\tasks\phase2-proc-macros.md](../../docs/tasks/phase2-proc-macros.md) - Client/server code splitting with macros
-- [D:\dev\agent-game-engine\docs\tasks\phase2-client-prediction.md](../../docs/tasks/phase2-client-prediction.md) - Client-side prediction and reconciliation
-- [D:\dev\agent-game-engine\docs\tasks\phase1-vulkan-context.md](../../docs/tasks/phase1-vulkan-context.md) - Vulkan rendering setup
-- [D:\dev\agent-game-engine\docs\tasks\phase1-basic-rendering.md](../../docs/tasks/phase1-basic-rendering.md) - Basic rendering pipeline
-- [D:\dev\agent-game-engine\docs\tasks\phase1-mesh-rendering.md](../../docs/tasks/phase1-mesh-rendering.md) - Mesh rendering
-- [D:\dev\agent-game-engine\docs\tasks\phase1-frame-capture.md](../../docs/tasks/phase1-frame-capture.md) - Frame capture for agents
-- [D:\dev\agent-game-engine\docs\platform-abstraction.md](../../docs/platform-abstraction.md) - Cross-platform support
+- [D:\dev\silmaril\docs\architecture.md](../../docs/architecture.md) - Overall system architecture
+- [D:\dev\silmaril\docs\tasks\phase2-proc-macros.md](../../docs/tasks/phase2-proc-macros.md) - Client/server code splitting with macros
+- [D:\dev\silmaril\docs\tasks\phase2-client-prediction.md](../../docs/tasks/phase2-client-prediction.md) - Client-side prediction and reconciliation
+- [D:\dev\silmaril\docs\tasks\phase1-vulkan-context.md](../../docs/tasks/phase1-vulkan-context.md) - Vulkan rendering setup
+- [D:\dev\silmaril\docs\tasks\phase1-basic-rendering.md](../../docs/tasks/phase1-basic-rendering.md) - Basic rendering pipeline
+- [D:\dev\silmaril\docs\tasks\phase1-mesh-rendering.md](../../docs/tasks/phase1-mesh-rendering.md) - Mesh rendering
+- [D:\dev\silmaril\docs\tasks\phase1-frame-capture.md](../../docs/tasks/phase1-frame-capture.md) - Frame capture for agents
+- [D:\dev\silmaril\docs\platform-abstraction.md](../../docs/platform-abstraction.md) - Cross-platform support

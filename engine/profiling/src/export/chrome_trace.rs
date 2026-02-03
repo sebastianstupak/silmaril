@@ -93,7 +93,7 @@ fn escape_json(s: &str) -> String {
 /// ```rust
 /// # #[cfg(feature = "profiling-puffin")]
 /// # {
-/// use agent_game_engine_profiling::export::chrome_trace::export_puffin_to_chrome_trace;
+/// use silmaril_profiling::export::chrome_trace::export_puffin_to_chrome_trace;
 ///
 /// // This would be called from PuffinBackend with actual frame data
 /// let frames: Vec<puffin::FrameData> = vec![];

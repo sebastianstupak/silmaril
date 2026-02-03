@@ -1,6 +1,6 @@
 # Prometheus Metrics Guide
 
-Complete guide for monitoring Agent Game Engine with Prometheus and Grafana.
+Complete guide for monitoring Silmaril with Prometheus and Grafana.
 
 ## Quick Start
 
@@ -43,8 +43,8 @@ async fn main() {
 ### 3. Start Prometheus + Grafana
 
 ```bash
-# Using justfile
-just prod
+# Using cargo xtask
+cargo xtask docker prod
 
 # Or manually
 docker-compose up -d

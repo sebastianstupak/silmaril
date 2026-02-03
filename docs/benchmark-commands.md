@@ -2,7 +2,7 @@
 
 > Quick reference for running all benchmark suites
 >
-> **Note:** just doesn't support colons in recipe names, so we use hyphens instead
+> **Note:** Using `cargo xtask` for all build and benchmark commands
 
 ---
 
@@ -10,13 +10,13 @@
 
 ```bash
 # Run all networking benchmarks (recommended)
-just bench-network
+cargo xtask bench all-network
 
 # Run all ECS benchmarks
-just bench-ecs
+cargo xtask bench all-ecs
 
 # Run all benchmarks
-just bench
+cargo xtask bench all
 ```
 
 ---
@@ -25,7 +25,7 @@ just bench
 
 ### Networking Benchmarks
 ```bash
-just bench-network              # All networking benchmarks (~10-15 min)
+cargo xtask bench all-network              # All networking benchmarks (~10-15 min)
 ```
 
 This runs:
@@ -37,7 +37,7 @@ This runs:
 
 ### ECS Benchmarks
 ```bash
-just bench-ecs                  # All ECS benchmarks (~5-10 min)
+cargo xtask bench all-ecs                  # All ECS benchmarks (~5-10 min)
 ```
 
 Includes:
@@ -50,22 +50,22 @@ Includes:
 
 ### Physics Benchmarks
 ```bash
-just bench-physics              # Physics integration (~2-3 min)
+cargo xtask bench all-physics              # Physics integration (~2-3 min)
 ```
 
 ### Rendering Benchmarks
 ```bash
-just bench-renderer             # Vulkan rendering (~2-3 min)
+cargo xtask bench all-renderer             # Vulkan rendering (~2-3 min)
 ```
 
 ### Math/SIMD Benchmarks
 ```bash
-just bench-math                 # Math and SIMD operations (~2-3 min)
+cargo xtask bench all-math                 # Math and SIMD operations (~2-3 min)
 ```
 
 ### Profiling Overhead Benchmarks
 ```bash
-just bench-profiling            # Profiling overhead (~1-2 min)
+cargo xtask bench all-profiling            # Profiling overhead (~1-2 min)
 ```
 
 ---
@@ -74,14 +74,14 @@ just bench-profiling            # Profiling overhead (~1-2 min)
 
 ### Quick Smoke Test
 ```bash
-just bench-smoke                # Fast validation (<1 min)
+cargo xtask bench all-smoke                # Fast validation (<1 min)
 ```
 
 Runs a subset of benchmarks with reduced sample size for quick validation.
 
 ### Benchmark Report
 ```bash
-just bench-report               # Open HTML report in browser
+cargo xtask bench all-report               # Open HTML report in browser
 ```
 
 Opens the Criterion HTML report showing:
@@ -93,13 +93,13 @@ Opens the Criterion HTML report showing:
 ### Baseline Management
 ```bash
 # Save current performance as baseline
-just bench-save-baseline
+cargo xtask bench all-save-baseline
 
 # Compare against baseline
-just bench-baseline
+cargo xtask bench all-baseline
 
 # Run all benchmarks and save baseline
-just bench-all
+cargo xtask bench all-all
 ```
 
 ---
@@ -161,10 +161,10 @@ For CI/CD pipelines:
 
 ```bash
 # Quick smoke test (fast, for every commit)
-just bench-smoke
+cargo xtask bench all-smoke
 
 # Full benchmark suite (nightly)
-just bench-all
+cargo xtask bench all-all
 ```
 
 ---
@@ -172,7 +172,7 @@ just bench-all
 ## Troubleshooting
 
 ### Benchmarks take too long
-Use `just bench-smoke` for quick validation (< 1 min)
+Use `cargo xtask bench all-smoke` for quick validation (< 1 min)
 
 ### Want to run specific scenarios
 Use cargo bench directly:
@@ -183,12 +183,12 @@ cargo bench --package engine-networking --bench integration_benches -- mmorpg
 ### Need to compare performance
 ```bash
 # Run and save baseline
-just bench-save-baseline
+cargo xtask bench all-save-baseline
 
 # Make changes...
 
 # Compare against baseline
-just bench-baseline
+cargo xtask bench all-baseline
 ```
 
 ---

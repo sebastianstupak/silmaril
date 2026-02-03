@@ -33,10 +33,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-agent-game-engine-core = { path = "../../engine/core" }
-agent-game-engine-macros = { path = "../../engine/macros" }
-agent-game-engine-platform = { path = "../../engine/platform" }
-agent-game-engine-rendering = { path = "../../engine/rendering" }
+silmaril-core = { path = "../../engine/core" }
+silmaril-macros = { path = "../../engine/macros" }
+silmaril-platform = { path = "../../engine/platform" }
+silmaril-rendering = { path = "../../engine/rendering" }
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -77,7 +77,7 @@ examples/singleplayer/
 **File:** `examples/singleplayer/src/components.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::{Vec2, Vec3};
 
 /// Player-controlled character
@@ -235,8 +235,8 @@ pub struct Lifetime {
 
 ```rust
 use crate::components::*;
-use agent_game_engine_core::prelude::*;
-use agent_game_engine_platform::input::Input;
+use silmaril_core::prelude::*;
+use silmaril_platform::input::Input;
 use glam::Vec2;
 
 /// Player input and movement
@@ -359,7 +359,7 @@ pub fn player_shooting_system(
 
 ```rust
 use crate::components::*;
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::Vec2;
 
 /// Simple AI for enemies
@@ -505,7 +505,7 @@ pub fn enemy_shooting_system(world: &mut World) {
 
 ```rust
 use crate::components::*;
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::Vec2;
 
 /// Simple circle-circle collision detection
@@ -658,9 +658,9 @@ pub fn death_system(world: &mut World) {
 mod components;
 mod systems;
 
-use agent_game_engine_core::prelude::*;
-use agent_game_engine_platform::{Platform, WindowConfig, Input};
-use agent_game_engine_rendering::Renderer;
+use silmaril_core::prelude::*;
+use silmaril_platform::{Platform, WindowConfig, Input};
+use silmaril_rendering::Renderer;
 use components::*;
 use systems::*;
 use anyhow::Result;
@@ -920,7 +920,7 @@ fn check_game_over(world: &World) -> bool {
 ```markdown
 # Singleplayer Example Game
 
-A complete singleplayer game demonstrating the Agent Game Engine's core features.
+A complete singleplayer game demonstrating the Silmaril's core features.
 
 ## Features
 

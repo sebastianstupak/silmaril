@@ -1,6 +1,6 @@
 //! AAA Benchmark Suite - Industry Comparison
 //!
-//! This benchmark suite compares agent-game-engine's interest management against
+//! This benchmark suite compares silmaril's interest management against
 //! industry standards and documented performance from other engines:
 //!
 //! - Unity DOTS NetCode: 1700 players documented max

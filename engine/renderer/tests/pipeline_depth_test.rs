@@ -310,7 +310,7 @@ fn test_multiple_pipelines_same_render_pass() {
     let render_pass = RenderPass::new(device, config).expect("Failed to create render pass");
 
     // Create multiple pipelines with same render pass
-    let _pipeline1 =
+    let pipeline1 =
         GraphicsPipeline::new_mesh_pipeline(device, &render_pass, extent, config.depth_format)
             .expect("Failed to create pipeline 1");
 

@@ -4,7 +4,7 @@
 //! a realistic usage scenario.
 
 #[cfg(feature = "metrics")]
-use agent_game_engine_profiling::{ProfileCategory, Profiler, ProfilerConfig};
+use silmaril_profiling::{ProfileCategory, Profiler, ProfilerConfig};
 #[cfg(feature = "metrics")]
 use std::thread;
 #[cfg(feature = "metrics")]
@@ -193,8 +193,8 @@ fn test_concurrent_scopes() {
 #[test]
 fn test_disabled_profiling_compiles() {
     // This test verifies that profiling macros compile when features are disabled
-    agent_game_engine_profiling::profile_scope!("test");
-    agent_game_engine_profiling::profile_scope!("test", ProfileCategory::ECS);
+    silmaril_profiling::profile_scope!("test");
+    silmaril_profiling::profile_scope!("test", ProfileCategory::ECS);
 
     // Should not panic or do anything
 }

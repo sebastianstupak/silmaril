@@ -65,6 +65,7 @@ mockito = "1.2"
 default = []
 backtrace = ["engine-core/backtrace"]
 profiling = ["engine-core/profiling"]
+test-utils = []
 
 [[bench]]
 name = "auth_bench"

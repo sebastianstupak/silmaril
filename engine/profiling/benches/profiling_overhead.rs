@@ -9,7 +9,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 #[cfg(feature = "metrics")]
-use agent_game_engine_profiling::{ProfileCategory, Profiler, ProfilerConfig};
+use silmaril_profiling::{ProfileCategory, Profiler, ProfilerConfig};
 
 /// Baseline: No profiling at all (control group).
 fn baseline_no_profiling(c: &mut Criterion) {
@@ -32,7 +32,7 @@ fn baseline_no_profiling(c: &mut Criterion) {
 fn profiling_disabled_overhead(c: &mut Criterion) {
     c.bench_function("profiling_disabled_overhead", |b| {
         b.iter(|| {
-            agent_game_engine_profiling::profile_scope!("test_scope");
+            silmaril_profiling::profile_scope!("test_scope");
 
             // Simulate some work
             let mut sum = 0u64;

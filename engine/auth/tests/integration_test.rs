@@ -215,7 +215,7 @@ async fn test_concurrent_sessions() {
         .create_session(user_id.clone(), "192.168.1.101".to_string(), "Device2".to_string())
         .unwrap();
 
-    let session3 = session_store
+    let _session3 = session_store
         .create_session(user_id.clone(), "192.168.1.102".to_string(), "Device3".to_string())
         .unwrap();
 
@@ -231,7 +231,7 @@ async fn test_concurrent_sessions() {
     session_store.delete_session(&session1.id);
 
     // Now 4th session should succeed
-    let session4 = session_store
+    let _session4 = session_store
         .create_session(user_id.clone(), "192.168.1.103".to_string(), "Device4".to_string())
         .unwrap();
 

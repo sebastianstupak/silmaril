@@ -78,14 +78,13 @@ pub mod version;
 use channels::{Channel, ChannelSubscription};
 use downloader::{DownloadConfig, Downloader};
 use error::UpdateError;
-use manifest::{ManifestIndex, UpdateManifest};
-use patcher::{apply_patch, create_patch};
-use progress::{MultiFileProgressTracker, ProgressTracker};
+use manifest::ManifestIndex;
+use patcher::apply_patch;
+use progress::ProgressTracker;
 use rollback::{RollbackManager, VersionHistory};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tempfile::TempDir;
 use tracing::{debug, error, info, warn};
 use version::Version;
 
@@ -402,8 +401,9 @@ impl UpdateManager {
         }
 
         // Update version history
+        let installed_version = manifest.version;
         self.version_history.add_backup(backup);
-        self.version_history.current_version = manifest.version;
+        self.version_history.current_version = installed_version;
 
         // Cleanup old backups
         self.rollback_manager.cleanup_old_backups(2)?;
@@ -412,7 +412,7 @@ impl UpdateManager {
         self.pending_update = None;
 
         info!(
-            version = %manifest.version,
+            version = %installed_version,
             "Update installed successfully"
         );
 

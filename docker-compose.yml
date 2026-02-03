@@ -10,7 +10,7 @@ services:
     build:
       context: .
       dockerfile: engine/binaries/server/Dockerfile
-    image: agent-game-engine-server:latest
+    image: silmaril-server:latest
     container_name: agent-game-server
     ports:
       - "7777:7777/tcp"  # Game traffic (TCP)

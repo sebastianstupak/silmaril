@@ -43,7 +43,7 @@ use std::ptr::NonNull;
 use std::slice;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Default chunk size: 64KB
 const DEFAULT_CHUNK_SIZE: usize = 64 * 1024;

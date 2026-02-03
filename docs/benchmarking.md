@@ -21,23 +21,23 @@ Both are integrated into CI for automated regression detection.
 
 **Run all benchmarks:**
 ```bash
-cargo bench --features profiling-puffin
+cargo xtask bench all
 ```
 
 **Run specific benchmark:**
 ```bash
-cargo bench --features profiling-puffin -- profiling_overhead
+cargo xtask bench profiling
 ```
 
 **Run with baseline comparison:**
 ```bash
 # Save current state as baseline
-cargo bench --features profiling-puffin -- --save-baseline main
+cargo xtask bench save-baseline main
 
 # Make code changes...
 
 # Compare against baseline
-cargo bench --features profiling-puffin -- --baseline main
+cargo xtask bench baseline
 ```
 
 **View results:**
@@ -54,7 +54,7 @@ open target/criterion/report/index.html
 
 **Run benchmarks:**
 ```bash
-cargo bench --bench iai_benchmarks --features profiling-puffin
+cargo xtask bench iai
 ```
 
 **Results location:**
@@ -138,7 +138,7 @@ The `.github/workflows/benchmark-regression.yml` workflow runs automatically on:
 
 3. **Run locally:**
    ```bash
-   cargo bench --bench my_bench
+   cargo xtask bench my_bench
    ```
 
 ### Adding Iai-callgrind Benchmark
@@ -175,7 +175,7 @@ The `.github/workflows/benchmark-regression.yml` workflow runs automatically on:
 
 4. **Run locally (Linux only):**
    ```bash
-   cargo bench --bench iai_my_bench
+   cargo xtask bench iai_my_bench
    ```
 
 ---
@@ -223,7 +223,7 @@ Target performance for critical paths:
 **Fix:**
 ```bash
 # List all benchmark targets
-cargo bench --features profiling-puffin --no-run
+cargo xtask bench list
 
 # Check Cargo.toml [[bench]] sections
 ```
@@ -248,7 +248,7 @@ brew install valgrind
 **Fix:**
 ```bash
 # Save a baseline first
-cargo bench --features profiling-puffin -- --save-baseline main
+cargo xtask bench save-baseline main
 ```
 
 ### CI shows regressions but local doesn't
@@ -269,7 +269,7 @@ For long-term benchmark tracking and historical analysis, integrate with [benche
 ### Setup
 
 1. **Create Bencher account:** https://bencher.dev
-2. **Create project:** "agent-game-engine"
+2. **Create project:** "silmaril"
 3. **Get API token:** Settings → API Tokens
 4. **Add to GitHub Secrets:** `BENCHER_API_TOKEN`
 
@@ -285,7 +285,7 @@ bencher-tracking:
 
 ### View Results
 
-- **Dashboard:** https://bencher.dev/agent-game-engine
+- **Dashboard:** https://bencher.dev/silmaril
 - **PR Comments:** Bencher automatically comments on PRs with benchmark comparisons
 - **Historical Charts:** Track performance over time
 

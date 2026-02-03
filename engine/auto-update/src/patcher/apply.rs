@@ -38,12 +38,21 @@ pub fn apply_patch<P: AsRef<Path>>(
     })?;
 
     // Apply patch using qbsdiff
-    let new_data = qbsdiff::bspatch(&old_data, &patch_data).map_err(|e| {
-        UpdateError::patchfailed(
-            patch_file.display().to_string(),
-            format!("Failed to apply patch: {}", e),
-        )
-    })?;
+    let mut new_data = Vec::new();
+    qbsdiff::Bspatch::new(&patch_data)
+        .map_err(|e| {
+            UpdateError::patchfailed(
+                patch_file.display().to_string(),
+                format!("Failed to parse patch: {}", e),
+            )
+        })?
+        .apply(&old_data, &mut new_data)
+        .map_err(|e| {
+            UpdateError::patchfailed(
+                patch_file.display().to_string(),
+                format!("Failed to apply patch: {}", e),
+            )
+        })?;
 
     // Write new file
     let mut file = std::fs::File::create(new_file)

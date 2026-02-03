@@ -1,4 +1,4 @@
-# cargo-deny configuration for agent-game-engine
+# cargo-deny configuration for silmaril
 # Enforces architectural rules at dependency level
 # Run with: cargo deny check
 #

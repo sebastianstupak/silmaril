@@ -52,7 +52,7 @@ use std::marker::PhantomData;
 use std::ptr::{self, NonNull};
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Pool allocator for fixed-size objects
 ///

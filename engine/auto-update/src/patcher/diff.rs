@@ -30,12 +30,15 @@ pub fn create_patch<P: AsRef<Path>>(
         .map_err(|e| UpdateError::ioerror(new_file.display().to_string(), e.to_string()))?;
 
     // Create patch using qbsdiff
-    let patch_data = qbsdiff::bsdiff(&old_data, &new_data).map_err(|e| {
-        UpdateError::patchfailed(
-            patch_file.display().to_string(),
-            format!("Failed to create patch: {}", e),
-        )
-    })?;
+    let mut patch_data = Vec::new();
+    qbsdiff::Bsdiff::new(&old_data, &new_data)
+        .compare(std::io::Cursor::new(&mut patch_data))
+        .map_err(|e| {
+            UpdateError::patchfailed(
+                patch_file.display().to_string(),
+                format!("Failed to create patch: {}", e),
+            )
+        })?;
 
     // Compress patch with zstd
     let compressed = zstd::encode_all(&patch_data[..], 3).map_err(|e| {
@@ -52,7 +55,7 @@ pub fn create_patch<P: AsRef<Path>>(
     file.write_all(&compressed)
         .map_err(|e| UpdateError::ioerror(patch_file.display().to_string(), e.to_string()))?;
 
-    let compression_ratio = if patch_data.len() > 0 {
+    let compression_ratio = if !patch_data.is_empty() {
         compressed.len() as f64 / patch_data.len() as f64
     } else {
         1.0

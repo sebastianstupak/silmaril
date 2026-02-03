@@ -232,7 +232,7 @@ impl AssetValidator for AudioData {
         }
 
         // For PCM16, validate data size is even (2 bytes per sample)
-        if self.format == AudioFormat::PCM16 && self.data.len() % 2 != 0 {
+        if self.format == AudioFormat::PCM16 && !self.data.len().is_multiple_of(2) {
             return Err(ValidationError::invaliddimensions(format!(
                 "PCM16 data size must be even, got {}",
                 self.data.len()

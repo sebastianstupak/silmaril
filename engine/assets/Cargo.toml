@@ -10,6 +10,8 @@ repository.workspace = true
 default = []
 backtrace = ["engine-core/backtrace"]
 fbx-support = ["fbxcel-dom"]
+hot-reload = ["notify"]
+async = ["tokio"]
 
 [dependencies]
 glam = { version = "0.25", features = ["serde"] }
@@ -27,6 +29,9 @@ lewton = "0.10"
 image = "0.25"
 ddsfile = "0.5"
 ttf-parser = "0.24"
+notify = { version = "6.1", optional = true }
+tokio = { version = "1.35", features = ["fs", "rt", "sync", "time"], optional = true }
+linked-hash-map = "0.5"
 engine-core = { path = "../core" }
 engine-macros = { path = "../macros" }
 
@@ -55,9 +60,10 @@ harness = false
 name = "shader_benches"
 harness = false
 
-[[bench]]
-name = "procedural_benches"
-harness = false
+# Disabled: procedural module not yet enabled in lib.rs
+# [[bench]]
+# name = "procedural_benches"
+# harness = false
 
 [[bench]]
 name = "font_benches"
@@ -65,4 +71,8 @@ harness = false
 
 [[bench]]
 name = "validation_benches"
+harness = false
+
+[[bench]]
+name = "manager_benches"
 harness = false

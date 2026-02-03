@@ -2,7 +2,8 @@
 
 use crate::error::AuthError;
 use crate::oauth::OAuthProfile;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use tracing::{debug, info};
 use url::Url;
@@ -14,11 +15,16 @@ const DISCORD_API_BASE: &str = "https://discord.com/api/v10";
 
 /// Discord token response.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TokenResponse {
     access_token: String,
+    #[allow(dead_code)]
     token_type: String,
+    #[allow(dead_code)]
     expires_in: u64,
+    #[allow(dead_code)]
     refresh_token: String,
+    #[allow(dead_code)]
     scope: String,
 }
 
@@ -42,7 +48,8 @@ pub struct DiscordAuth {
 impl DiscordAuth {
     /// Create a new Discord auth client.
     ///
-    /// Get credentials from https://discord.com/developers/applications
+    /// Get credentials from <https://discord.com/developers/applications>
+    #[must_use]
     pub fn new(client_id: String, client_secret: String, redirect_uri: String) -> Self {
         Self { client_id, client_secret, redirect_uri }
     }
@@ -55,7 +62,7 @@ impl DiscordAuth {
     pub fn get_authorization_url(&self, state: &str) -> Result<String, AuthError> {
         let mut url = Url::parse(DISCORD_OAUTH_URL).map_err(|e| AuthError::OAuthProviderError {
             provider: "discord".to_string(),
-            error: format!("Failed to parse Discord URL: {}", e),
+            error: format!("Failed to parse Discord URL: {e}"),
             #[cfg(feature = "backtrace")]
             backtrace: Backtrace::capture(),
         })?;
@@ -86,7 +93,7 @@ impl DiscordAuth {
         let response = client.post(DISCORD_TOKEN_URL).form(&params).send().await.map_err(|e| {
             AuthError::OAuthTokenExchangeFailed {
                 provider: "discord".to_string(),
-                reason: format!("Token exchange failed: {}", e),
+                reason: format!("Token exchange failed: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             }
@@ -95,7 +102,7 @@ impl DiscordAuth {
         let token_data: TokenResponse =
             response.json().await.map_err(|e| AuthError::OAuthTokenExchangeFailed {
                 provider: "discord".to_string(),
-                reason: format!("Failed to parse token response: {}", e),
+                reason: format!("Failed to parse token response: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             })?;
@@ -107,12 +114,12 @@ impl DiscordAuth {
     /// Get user profile using access token.
     pub async fn get_user_profile(&self, access_token: &str) -> Result<OAuthProfile, AuthError> {
         let client = reqwest::Client::new();
-        let url = format!("{}/users/@me", DISCORD_API_BASE);
+        let url = format!("{DISCORD_API_BASE}/users/@me");
 
         let response = client.get(&url).bearer_auth(access_token).send().await.map_err(|e| {
             AuthError::OAuthProviderError {
                 provider: "discord".to_string(),
-                error: format!("Failed to fetch profile: {}", e),
+                error: format!("Failed to fetch profile: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             }
@@ -121,7 +128,7 @@ impl DiscordAuth {
         let user: UserResponse =
             response.json().await.map_err(|e| AuthError::OAuthProviderError {
                 provider: "discord".to_string(),
-                error: format!("Failed to parse user response: {}", e),
+                error: format!("Failed to parse user response: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             })?;

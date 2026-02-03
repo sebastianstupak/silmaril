@@ -1,12 +1,12 @@
 ---
 name: test
-description: Run comprehensive test suite for agent-game-engine
+description: Run comprehensive test suite for silmaril
 trigger: /test
 ---
 
 # Comprehensive Test Runner
 
-Runs the complete test suite for the agent-game-engine project with detailed reporting.
+Runs the complete test suite for the silmaril project with detailed reporting.
 
 ## Instructions
 

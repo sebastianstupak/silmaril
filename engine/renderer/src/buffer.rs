@@ -105,7 +105,7 @@ impl GpuBuffer {
     /// # Safety
     /// Buffer must be CPU-visible (MemoryLocation::CpuToGpu)
     pub fn upload<T: Copy>(&mut self, data: &[T]) -> Result<(), RendererError> {
-        let data_size = (std::mem::size_of::<T>() * data.len()) as u64;
+        let data_size = std::mem::size_of_val(data) as u64;
         if data_size > self.size {
             return Err(RendererError::memoryallocationfailed(
                 data_size,
@@ -165,7 +165,7 @@ impl VertexBuffer {
         context: &VulkanContext,
         vertices: &[T],
     ) -> Result<Self, RendererError> {
-        let size = (std::mem::size_of::<T>() * vertices.len()) as u64;
+        let size = std::mem::size_of_val(vertices) as u64;
         let usage = vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST;
 
         let mut buffer = GpuBuffer::new(context, size, usage, MemoryLocation::CpuToGpu)?;
@@ -196,7 +196,7 @@ pub struct IndexBuffer {
 impl IndexBuffer {
     /// Create an index buffer from data
     pub fn from_data(context: &VulkanContext, indices: &[u32]) -> Result<Self, RendererError> {
-        let size = (std::mem::size_of::<u32>() * indices.len()) as u64;
+        let size = std::mem::size_of_val(indices) as u64;
         let usage = vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST;
 
         let mut buffer = GpuBuffer::new(context, size, usage, MemoryLocation::CpuToGpu)?;

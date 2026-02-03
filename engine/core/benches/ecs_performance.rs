@@ -1,6 +1,6 @@
 //! Comprehensive ECS Performance Benchmarks
 //!
-//! Compares agent-game-engine ECS performance against industry standards:
+//! Compares silmaril ECS performance against industry standards:
 //! - Bevy ECS (Rust, archetype-based)
 //! - hecs (Rust, minimalist)
 //! - EnTT (C++, reference: 0.8ns/entity iteration, 4.9ns/entity creation)

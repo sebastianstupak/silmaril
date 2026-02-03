@@ -4,7 +4,7 @@
 >
 > **Date:** 2026-02-01
 > **Status:** Complete
-> **Purpose:** Inform agent-game-engine benchmarking and competitive analysis
+> **Purpose:** Inform silmaril benchmarking and competitive analysis
 
 ---
 
@@ -314,9 +314,9 @@ UpdateRate = 60;  // 60 Hz for responsive gameplay
 
 ---
 
-## Comparison to agent-game-engine
+## Comparison to silmaril
 
-| Metric | Unity DOTS | agent-game-engine Target |
+| Metric | Unity DOTS | silmaril Target |
 |--------|-----------|--------------------------|
 | Visibility (1K entities) | ~0.8 ms | <1 ms ✅ |
 | Bandwidth reduction | 60-80% | 80-95% 🎯 |
@@ -327,7 +327,7 @@ UpdateRate = 60;  // 60 Hz for responsive gameplay
 
 ---
 
-## Recommendations for agent-game-engine
+## Recommendations for silmaril
 
 ### 1. Implement Spatial Partitioning
 
@@ -424,7 +424,7 @@ Unity's DOTS NetCode demonstrates **128-1700 player scalability** with 60-80% ba
 3. Combined techniques achieve 75-85% reduction
 4. 1000+ players is feasible with proper configuration
 
-**agent-game-engine Opportunity:**
+**silmaril Opportunity:**
 - Match or exceed DOTS NetCode performance
 - Provide simpler configuration than Unity
 - Better documentation and profiling tools

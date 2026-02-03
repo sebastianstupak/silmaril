@@ -1,6 +1,6 @@
-# Contributing to Agent Game Engine
+# Contributing to Silmaril
 
-> **Welcome! We're excited to have you contribute to the Agent Game Engine project.**
+> **Welcome! We're excited to have you contribute to the Silmaril project.**
 
 This guide will help you understand our development workflow, coding standards, and contribution process.
 
@@ -38,8 +38,8 @@ Before contributing, ensure you have:
 
 1. **Fork and clone the repository:**
    ```bash
-   git clone https://github.com/your-username/agent-game-engine.git
-   cd agent-game-engine
+   git clone https://github.com/your-username/silmaril.git
+   cd silmaril
    ```
 
 2. **Install development dependencies:**
@@ -124,7 +124,7 @@ cargo clippy -- -D warnings
 cargo test
 
 # Run specific test suite
-cargo test --package agent-game-engine-core
+cargo test --package silmaril-core
 
 # Run integration tests
 cargo test --test '*'
@@ -243,7 +243,7 @@ All public APIs must have rustdoc documentation:
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn();
@@ -457,7 +457,7 @@ All code must be thoroughly tested. See our [testing strategy](./testing-strateg
 2. **Integration Tests** - Test component interactions
    ```rust
    // tests/integration_test.rs
-   use agent_game_engine::*;
+   use silmaril::*;
 
    #[test]
    fn test_full_game_loop() {
@@ -524,7 +524,7 @@ Add benchmarks for:
 ```rust
 // benches/my_feature_benches.rs
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use agent_game_engine::*;
+use silmaril::*;
 
 fn bench_my_feature(c: &mut Criterion) {
     let mut group = c.benchmark_group("my_feature");
@@ -571,16 +571,16 @@ See [docs/performance-targets.md](performance-targets.md) for complete targets.
 
 ```bash
 # Run all benchmarks
-just bench-all
+cargo xtask bench all
 
 # Run specific suite
-just bench-ecs
+cargo xtask bench ecs
 
 # Compare with baseline
-just bench-baseline
+cargo xtask bench baseline
 
 # Run with profiling
-just bench-profile
+cargo xtask bench profile
 ```
 
 #### Regression Detection
@@ -595,9 +595,9 @@ CI/CD automatically detects performance regressions on every PR:
 If your PR triggers a regression:
 
 1. **Review the benchmark results** in the PR comment
-2. **Profile the code** with `just bench-profile`
+2. **Profile the code** with `cargo xtask bench profile`
 3. **Optimize** the hot paths identified
-4. **Re-run benchmarks** with `just bench-baseline`
+4. **Re-run benchmarks** with `cargo xtask bench baseline`
 5. **Document** any intentional performance trade-offs
 
 #### Baseline Updates
@@ -698,7 +698,7 @@ All public APIs require rustdoc comments:
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::*;
+/// use silmaril::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn();
@@ -735,7 +735,7 @@ Add examples for significant features:
 
 ```rust
 // examples/pbr_rendering.rs
-use agent_game_engine::*;
+use silmaril::*;
 
 fn main() {
     // Demonstrate feature usage
@@ -909,7 +909,7 @@ cargo bench
 
 ---
 
-**Thank you for contributing to Agent Game Engine!**
+**Thank you for contributing to Silmaril!**
 
 We appreciate your time and effort in making this project better.
 

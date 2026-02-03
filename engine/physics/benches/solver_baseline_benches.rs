@@ -58,15 +58,11 @@ fn bench_chain_stability(c: &mut Criterion) {
     for chain_length in [10, 20, 50].iter() {
         let mut world = create_hanging_chain(*chain_length);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(chain_length),
-            chain_length,
-            |b, _| {
-                b.iter(|| {
-                    world.step(black_box(1.0 / 60.0));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(chain_length), chain_length, |b, _| {
+            b.iter(|| {
+                world.step(black_box(1.0 / 60.0));
+            });
+        });
     }
 
     group.finish();
@@ -80,15 +76,11 @@ fn bench_stack_stability(c: &mut Criterion) {
     for stack_height in [5, 10, 20].iter() {
         let mut world = create_box_stack(*stack_height);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(stack_height),
-            stack_height,
-            |b, _| {
-                b.iter(|| {
-                    world.step(black_box(1.0 / 60.0));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(stack_height), stack_height, |b, _| {
+            b.iter(|| {
+                world.step(black_box(1.0 / 60.0));
+            });
+        });
     }
 
     group.finish();
@@ -107,15 +99,11 @@ fn bench_iteration_scaling(c: &mut Criterion) {
         // Rebuild chain with custom config
         copy_world_structure(&base_world, &mut world);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(iterations),
-            iterations,
-            |b, _| {
-                b.iter(|| {
-                    world.step(black_box(1.0 / 60.0));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(iterations), iterations, |b, _| {
+            b.iter(|| {
+                world.step(black_box(1.0 / 60.0));
+            });
+        });
     }
 
     group.finish();

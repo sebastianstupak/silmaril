@@ -123,14 +123,22 @@ impl ChunkStreamingManager {
         let mut loaded_bytes = 0;
 
         while let Some(priority_item) = self.priority_queue.pop() {
-            if loaded_bytes >= budget_bytes {
-                self.priority_queue.push(priority_item);
-                break;
-            }
-
+            // Check if the chunk exists and get its size BEFORE loading
             if let Some(chunk) = self.chunks.get(&priority_item.coord) {
                 if !chunk.loaded {
-                    loaded_bytes += chunk.size_bytes();
+                    let chunk_size = chunk.size_bytes();
+
+                    // Check if loading this chunk would exceed budget
+                    // Allow loading at least one chunk per frame (loaded_bytes == 0)
+                    // to handle cases where chunks are larger than per-frame budget
+                    if loaded_bytes > 0 && loaded_bytes + chunk_size > budget_bytes {
+                        // Put the item back and stop - budget would be exceeded
+                        self.priority_queue.push(priority_item);
+                        break;
+                    }
+
+                    // Load the chunk and update bytes counter
+                    loaded_bytes += chunk_size;
                     let _ = self.load_chunk(priority_item.coord);
                 }
             }
@@ -677,7 +685,8 @@ fn test_multi_client_streaming() {
 
 #[test]
 fn test_streaming_bandwidth_per_client() {
-    let mut manager = create_test_world(50, 100);
+    // Use 1KB chunks instead of 100KB to test bandwidth enforcement properly
+    let mut manager = create_test_world(50, 1);
 
     // Target: <500KB/s per client
     let bandwidth_per_second = 500 * 1024;
@@ -698,8 +707,17 @@ fn test_streaming_bandwidth_per_client() {
         total_loaded += loaded;
     }
 
-    // Should not exceed bandwidth target
-    assert!(total_loaded <= bandwidth_per_second * 2); // Allow some overhead
+    // Should stay within reasonable range of bandwidth target
+    // Allow 20% overhead for per-frame granularity (can't split chunks)
+    assert!(
+        total_loaded <= bandwidth_per_second + bandwidth_per_second / 5,
+        "Bandwidth exceeded: loaded {} bytes, expected ~{} bytes (500KB/s)",
+        total_loaded,
+        bandwidth_per_second
+    );
+
+    // Should have loaded something
+    assert!(total_loaded > 0, "Should have loaded some chunks");
 }
 
 #[test]

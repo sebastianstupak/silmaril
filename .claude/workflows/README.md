@@ -6,7 +6,7 @@
 
 ## Overview
 
-This directory contains workflow templates for automating common development tasks in the agent-game-engine project. Each workflow is designed to be followed by both AI agents and human developers.
+This directory contains workflow templates for automating common development tasks in the silmaril project. Each workflow is designed to be followed by both AI agents and human developers.
 
 ---
 

@@ -15,8 +15,9 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Algorithm, Argon2, Params, Version,
 };
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
-use tracing::{debug, info};
+use tracing::debug;
 
 /// OWASP-recommended Argon2id parameters (2025).
 ///
@@ -59,7 +60,7 @@ pub async fn hash_password(password: &str) -> Result<String, AuthError> {
 
         let params = Params::new(MEMORY_SIZE_KB, ITERATIONS, PARALLELISM, Some(OUTPUT_LEN))
             .map_err(|e| AuthError::PasswordHashFailed {
-                details: format!("Failed to create Argon2 params: {}", e),
+                details: format!("Failed to create Argon2 params: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             })?;
@@ -68,7 +69,7 @@ pub async fn hash_password(password: &str) -> Result<String, AuthError> {
 
         let password_hash = argon2.hash_password(password.as_bytes(), &salt).map_err(|e| {
             AuthError::PasswordHashFailed {
-                details: format!("Failed to hash password: {}", e),
+                details: format!("Failed to hash password: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             }
@@ -89,7 +90,7 @@ pub async fn hash_password(password: &str) -> Result<String, AuthError> {
     })
     .await
     .map_err(|e| AuthError::PasswordHashFailed {
-        details: format!("Task join error: {}", e),
+        details: format!("Task join error: {e}"),
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace::capture(),
     })?
@@ -126,7 +127,7 @@ pub async fn verify_password(password: &str, hash: &str) -> Result<bool, AuthErr
 
         let parsed_hash =
             PasswordHash::new(&hash).map_err(|e| AuthError::PasswordVerifyFailed {
-                details: format!("Failed to parse password hash: {}", e),
+                details: format!("Failed to parse password hash: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             })?;
@@ -145,7 +146,7 @@ pub async fn verify_password(password: &str, hash: &str) -> Result<bool, AuthErr
     })
     .await
     .map_err(|e| AuthError::PasswordVerifyFailed {
-        details: format!("Task join error: {}", e),
+        details: format!("Task join error: {e}"),
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace::capture(),
     })?
@@ -156,7 +157,7 @@ pub async fn verify_password(password: &str, hash: &str) -> Result<bool, AuthErr
 /// This is useful for upgrading hashes when security recommendations change.
 pub fn needs_rehash(hash: &str) -> Result<bool, AuthError> {
     let parsed_hash = PasswordHash::new(hash).map_err(|e| AuthError::PasswordVerifyFailed {
-        details: format!("Failed to parse password hash: {}", e),
+        details: format!("Failed to parse password hash: {e}"),
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace::capture(),
     })?;
@@ -255,7 +256,7 @@ mod tests {
     #[test]
     fn test_needs_rehash() {
         // This is a weak hash (low iterations) - should need rehash
-        let weak_hash = "$argon2id$v=19$m=4096,t=1,p=1$c29tZXNhbHQ$hash";
+        let _weak_hash = "$argon2id$v=19$m=4096,t=1,p=1$c29tZXNhbHQ$hash";
         // Note: This might fail to parse, but that's okay for this test
 
         // A proper current hash shouldn't need rehash

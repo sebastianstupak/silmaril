@@ -22,7 +22,7 @@ Implement procedural macros `#[client_only]`, `#[server_only]`, and `#[shared]` 
 
 ```toml
 [package]
-name = "agent_game_engine_macros"
+name = "silmaril_macros"
 version = "0.1.0"
 edition = "2021"
 
@@ -88,7 +88,7 @@ pub fn shared(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 ```toml
 [workspace.dependencies]
-agent_game_engine_macros = { path = "engine/macros" }
+silmaril_macros = { path = "engine/macros" }
 
 [features]
 default = []
@@ -105,9 +105,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-agent_game_engine_core = { path = "../../core", features = ["client"] }
-agent_game_engine_renderer = { path = "../../renderer", features = ["client"] }
-agent_game_engine_macros = { workspace = true }
+silmaril_core = { path = "../../core", features = ["client"] }
+silmaril_renderer = { path = "../../renderer", features = ["client"] }
+silmaril_macros = { workspace = true }
 
 [features]
 default = ["client"]
@@ -123,9 +123,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-agent_game_engine_core = { path = "../../core", features = ["server"] }
-agent_game_engine_networking = { path = "../../networking", features = ["server"] }
-agent_game_engine_macros = { workspace = true }
+silmaril_core = { path = "../../core", features = ["server"] }
+silmaril_networking = { path = "../../networking", features = ["server"] }
+silmaril_macros = { workspace = true }
 
 [features]
 default = ["server"]
@@ -189,7 +189,7 @@ pub fn client_only(_attr: TokenStream, item: TokenStream) -> TokenStream {
 **File:** `engine/core/src/systems/mod.rs`
 
 ```rust
-use agent_game_engine_macros::{client_only, server_only, shared};
+use silmaril_macros::{client_only, server_only, shared};
 
 /// Movement system (shared - runs on both client and server)
 #[shared]
@@ -224,7 +224,7 @@ pub fn physics_system(world: &mut World, physics: &mut PhysicsEngine) {
 Some components only exist on client or server:
 
 ```rust
-use agent_game_engine_macros::{client_only, server_only, shared};
+use silmaril_macros::{client_only, server_only, shared};
 
 /// Shared component (both client and server)
 #[derive(Component)]
@@ -356,7 +356,7 @@ fn test_shared_code_always_present() {
 ### **Example 1: Split Systems**
 
 ```rust
-use agent_game_engine_macros::{client_only, server_only};
+use silmaril_macros::{client_only, server_only};
 
 #[client_only]
 pub fn render_ui(world: &World) {

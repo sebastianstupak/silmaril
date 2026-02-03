@@ -6,6 +6,7 @@
 //! - Frame profiling
 //! - External profiler integration (Tracy, Puffin)
 //! - Performance validation
+//! - Prometheus metrics HTTP endpoint
 //!
 //! # Performance Budget Example
 //!
@@ -31,6 +32,29 @@
 //! // End frame - warnings logged if budgets exceeded
 //! profiler.end_frame();
 //! ```
+//!
+//! # Prometheus Metrics Example
+//!
+//! ```no_run
+//! use engine_observability::metrics::{MetricsRegistry, start_metrics_server};
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     // Start Prometheus metrics HTTP server
+//!     let metrics_handle = tokio::spawn(async {
+//!         start_metrics_server("0.0.0.0:9090").await.unwrap();
+//!     });
+//!
+//!     // Record metrics in your game loop
+//!     let registry = MetricsRegistry::new();
+//!     registry.record_frame_time(16.7); // 60 FPS
+//!     registry.set_entity_count(1000);
+//!     registry.set_connected_clients(50);
+//!
+//!     // Metrics are now available at http://0.0.0.0:9090/metrics
+//!     // Can be scraped by Prometheus, Grafana, etc.
+//! }
+//! ```
 
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
@@ -39,7 +63,8 @@ pub mod admin;
 pub mod budgets;
 pub mod metrics;
 
-use budgets::{BudgetTracker, BudgetViolation};
+// Re-export commonly used types
+pub use budgets::{BudgetTracker, BudgetViolation};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};

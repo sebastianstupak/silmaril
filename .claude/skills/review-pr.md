@@ -6,7 +6,7 @@ trigger: /review-pr
 
 # Pull Request Review
 
-Reviews a GitHub pull request against agent-game-engine coding standards and best practices.
+Reviews a GitHub pull request against silmaril coding standards and best practices.
 
 ## Instructions
 

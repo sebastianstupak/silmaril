@@ -46,8 +46,8 @@ use std::sync::Arc;
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::backends::PuffinBackend;
-/// use agent_game_engine_profiling::ProfileCategory;
+/// use silmaril_profiling::backends::PuffinBackend;
+/// use silmaril_profiling::ProfileCategory;
 ///
 /// # #[cfg(feature = "profiling-puffin")]
 /// # {
@@ -77,7 +77,7 @@ impl PuffinBackend {
     /// ```rust
     /// # #[cfg(feature = "profiling-puffin")]
     /// # {
-    /// use agent_game_engine_profiling::backends::PuffinBackend;
+    /// use silmaril_profiling::backends::PuffinBackend;
     ///
     /// let backend = PuffinBackend::new();
     /// # }
@@ -134,7 +134,7 @@ impl PuffinBackend {
     /// ```rust
     /// # #[cfg(feature = "profiling-puffin")]
     /// # {
-    /// use agent_game_engine_profiling::backends::PuffinBackend;
+    /// use silmaril_profiling::backends::PuffinBackend;
     ///
     /// let backend = PuffinBackend::new();
     /// // ... run some profiled code ...
@@ -184,7 +184,7 @@ impl PuffinBackend {
     /// ```rust
     /// # #[cfg(feature = "profiling-puffin")]
     /// # {
-    /// use agent_game_engine_profiling::backends::PuffinBackend;
+    /// use silmaril_profiling::backends::PuffinBackend;
     ///
     /// let mut backend = PuffinBackend::new();
     ///

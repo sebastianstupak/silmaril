@@ -10,6 +10,7 @@
 use crate::error::AuthError;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -51,6 +52,7 @@ pub struct Session {
 
 impl Session {
     /// Create a new session.
+    #[must_use]
     pub fn new(user_id: String, ip_address: String, user_agent: String) -> Self {
         let now = Utc::now();
         Self {
@@ -65,6 +67,7 @@ impl Session {
     }
 
     /// Check if session has exceeded idle timeout.
+    #[must_use]
     pub fn is_idle_expired(&self, idle_timeout_minutes: i64) -> bool {
         let now = Utc::now();
         let idle_duration = now - self.last_activity;
@@ -72,6 +75,7 @@ impl Session {
     }
 
     /// Check if session has exceeded absolute timeout.
+    #[must_use]
     pub fn is_absolutely_expired(&self, absolute_timeout_hours: i64) -> bool {
         let now = Utc::now();
         let absolute_duration = now - self.created_at;
@@ -98,6 +102,7 @@ pub struct SessionStore {
 
 impl SessionStore {
     /// Create a new session store with default timeouts.
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(
             DEFAULT_IDLE_TIMEOUT_MINUTES,
@@ -107,6 +112,7 @@ impl SessionStore {
     }
 
     /// Create a new session store with custom configuration.
+    #[must_use]
     pub fn with_config(
         idle_timeout_minutes: i64,
         absolute_timeout_hours: i64,
@@ -165,10 +171,7 @@ impl SessionStore {
         // Track user sessions
         {
             let mut user_sessions = self.user_sessions.write().unwrap();
-            user_sessions
-                .entry(user_id.clone())
-                .or_insert_with(Vec::new)
-                .push(session_id.clone());
+            user_sessions.entry(user_id.clone()).or_default().push(session_id.clone());
         }
 
         info!(
@@ -270,6 +273,7 @@ impl SessionStore {
     }
 
     /// Get all active sessions for a user.
+    #[must_use]
     pub fn get_user_sessions(&self, user_id: &str) -> Vec<Session> {
         let user_sessions = self.user_sessions.read().unwrap();
         let sessions = self.sessions.read().unwrap();
@@ -309,6 +313,7 @@ impl SessionStore {
     }
 
     /// Get total session count (for monitoring).
+    #[must_use]
     pub fn session_count(&self) -> usize {
         let sessions = self.sessions.read().unwrap();
         sessions.len()

@@ -1,6 +1,6 @@
-# Agent Game Engine - Examples
+# Silmaril - Examples
 
-This directory contains complete example games demonstrating different capabilities of the Agent Game Engine.
+This directory contains complete example games demonstrating different capabilities of the Silmaril.
 
 ## Available Examples
 

@@ -55,6 +55,7 @@ pub enum AuthEventType {
 
 impl AuthEventType {
     /// Check if this event type indicates a security threat.
+    #[must_use]
     pub fn is_threat(&self) -> bool {
         matches!(
             self,
@@ -91,6 +92,7 @@ pub struct AuditEvent {
 
 impl AuditEvent {
     /// Create a new audit event.
+    #[must_use]
     pub fn new(
         event_type: AuthEventType,
         user_id: Option<String>,
@@ -151,6 +153,7 @@ pub struct AuditLogger {
 
 impl AuditLogger {
     /// Create a new audit logger.
+    #[must_use]
     pub fn new() -> Self {
         Self { events: std::sync::Arc::new(std::sync::RwLock::new(Vec::new())) }
     }
@@ -217,7 +220,7 @@ impl AuditLogger {
             Some(username),
             ip_address,
             user_agent,
-            format!("Login failed: {}", reason),
+            format!("Login failed: {reason}"),
             false,
         );
         self.log_event(event);
@@ -286,7 +289,7 @@ impl AuditLogger {
             Some(username),
             ip_address,
             user_agent,
-            format!("Account locked: {}", reason),
+            format!("Account locked: {reason}"),
             true,
         );
         self.log_event(event);
@@ -307,12 +310,14 @@ impl AuditLogger {
     }
 
     /// Get all events (for testing/monitoring).
+    #[must_use]
     pub fn get_events(&self) -> Vec<AuditEvent> {
         let events = self.events.read().unwrap();
         events.clone()
     }
 
     /// Get events for a specific user.
+    #[must_use]
     pub fn get_user_events(&self, user_id: &str) -> Vec<AuditEvent> {
         let events = self.events.read().unwrap();
         events
@@ -323,18 +328,21 @@ impl AuditLogger {
     }
 
     /// Get events by type.
+    #[must_use]
     pub fn get_events_by_type(&self, event_type: AuthEventType) -> Vec<AuditEvent> {
         let events = self.events.read().unwrap();
         events.iter().filter(|e| e.event_type == event_type).cloned().collect()
     }
 
     /// Get threat events (failed logins, lockouts, etc.).
+    #[must_use]
     pub fn get_threat_events(&self) -> Vec<AuditEvent> {
         let events = self.events.read().unwrap();
         events.iter().filter(|e| e.event_type.is_threat()).cloned().collect()
     }
 
     /// Get events within a time range.
+    #[must_use]
     pub fn get_events_since(&self, since: DateTime<Utc>) -> Vec<AuditEvent> {
         let events = self.events.read().unwrap();
         events.iter().filter(|e| e.timestamp >= since).cloned().collect()
@@ -347,6 +355,7 @@ impl AuditLogger {
     }
 
     /// Get total event count.
+    #[must_use]
     pub fn event_count(&self) -> usize {
         let events = self.events.read().unwrap();
         events.len()

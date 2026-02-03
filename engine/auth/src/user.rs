@@ -2,16 +2,17 @@
 //!
 //! Defines the core User struct and validation logic for usernames, emails, and passwords.
 
-use crate::error::{AuthError, AuthErrorCode};
+use crate::error::AuthError;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use uuid::Uuid;
 
 /// User account model.
 ///
 /// This represents a user account in the authentication system. User data is designed
-/// to be serializable for storage in PostgreSQL using JSON columns or separate tables.
+/// to be serializable for storage in `PostgreSQL` using JSON columns or separate tables.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     /// Unique user ID
@@ -40,7 +41,7 @@ pub struct User {
     pub failed_login_attempts: u32,
     /// Account locked until (if locked)
     pub locked_until: Option<DateTime<Utc>>,
-    /// OAuth provider IDs (provider_name -> provider_user_id)
+    /// OAuth provider IDs (`provider_name` -> `provider_user_id`)
     pub oauth_providers: std::collections::HashMap<String, String>,
 }
 
@@ -74,6 +75,7 @@ impl User {
     }
 
     /// Check if account is locked.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         if let Some(locked_until) = self.locked_until {
             Utc::now() < locked_until
@@ -115,6 +117,7 @@ impl User {
     }
 
     /// Check if OAuth provider is linked.
+    #[must_use]
     pub fn has_oauth_provider(&self, provider: &str) -> bool {
         self.oauth_providers.contains_key(provider)
     }
@@ -150,7 +153,7 @@ pub fn validate_username(username: &str) -> Result<(), AuthError> {
     }
 
     // Must start with alphanumeric
-    if !username.chars().next().map_or(false, |c| c.is_alphanumeric()) {
+    if !username.chars().next().is_some_and(char::is_alphanumeric) {
         return Err(AuthError::InvalidUsername {
             username: username.to_string(),
             reason: "Username must start with an alphanumeric character".to_string(),
@@ -260,8 +263,8 @@ pub fn validate_password_strength(password: &str) -> Result<(), AuthError> {
         });
     }
 
-    let has_uppercase = password.chars().any(|c| c.is_uppercase());
-    let has_lowercase = password.chars().any(|c| c.is_lowercase());
+    let has_uppercase = password.chars().any(char::is_uppercase);
+    let has_lowercase = password.chars().any(char::is_lowercase);
     let has_digit = password.chars().any(|c| c.is_ascii_digit());
     let has_special = password.chars().any(|c| !c.is_alphanumeric() && !c.is_whitespace());
 

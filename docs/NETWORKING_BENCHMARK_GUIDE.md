@@ -1,6 +1,6 @@
 # Networking Benchmark Quick Reference Guide
 
-> **Quick guide to running all networking benchmarks in the Agent Game Engine**
+> **Quick guide to running all networking benchmarks in the Silmaril**
 >
 > **Last Updated:** 2026-02-01
 > **Coverage:** 260+ benchmark suites across 10 categories
@@ -361,6 +361,6 @@ engine/networking/tests/
 
 ## Performance Grade: 9.7/10 - World-Class 🏆
 
-With 260+ benchmark suites validating all AAA performance targets, the Agent Game Engine networking subsystem is production-ready for commercial multiplayer games with 1000+ concurrent players.
+With 260+ benchmark suites validating all AAA performance targets, the Silmaril networking subsystem is production-ready for commercial multiplayer games with 1000+ concurrent players.
 
 **All benchmarks compile and run successfully.** ✅

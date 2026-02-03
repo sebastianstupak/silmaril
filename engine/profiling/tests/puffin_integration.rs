@@ -5,7 +5,7 @@
 
 #![cfg(feature = "profiling-puffin")]
 
-use agent_game_engine_profiling::{backends::PuffinBackend, profile_scope, ProfileCategory};
+use silmaril_profiling::{backends::PuffinBackend, profile_scope, ProfileCategory};
 use std::thread;
 use std::time::Duration;
 

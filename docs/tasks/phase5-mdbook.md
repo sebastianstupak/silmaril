@@ -27,12 +27,12 @@ Create comprehensive documentation using mdBook that covers user guides, API ref
 
 ```toml
 [book]
-title = "Agent Game Engine Documentation"
-authors = ["Agent Game Engine Contributors"]
+title = "Silmaril Documentation"
+authors = ["Silmaril Contributors"]
 language = "en"
 multilingual = false
 src = "src"
-description = "Comprehensive documentation for the Agent Game Engine"
+description = "Comprehensive documentation for the Silmaril"
 
 [build]
 build-dir = "book"
@@ -41,8 +41,8 @@ create-missing = true
 [output.html]
 default-theme = "navy"
 preferred-dark-theme = "navy"
-git-repository-url = "https://github.com/yourusername/agent-game-engine"
-edit-url-template = "https://github.com/yourusername/agent-game-engine/edit/main/docs/book/{path}"
+git-repository-url = "https://github.com/yourusername/silmaril"
+edit-url-template = "https://github.com/yourusername/silmaril/edit/main/docs/book/{path}"
 
 [output.html.search]
 enable = true
@@ -183,11 +183,11 @@ assets_version = "2.0.0"
 ```markdown
 # Introduction
 
-Welcome to the **Agent Game Engine** documentation!
+Welcome to the **Silmaril** documentation!
 
-The Agent Game Engine is a high-performance, data-oriented game engine written in Rust. It's designed for building both singleplayer and multiplayer games with a focus on performance, scalability, and developer productivity.
+The Silmaril is a high-performance, data-oriented game engine written in Rust. It's designed for building both singleplayer and multiplayer games with a focus on performance, scalability, and developer productivity.
 
-## Why Agent Game Engine?
+## Why Silmaril?
 
 - **Blazing Fast**: Built with Rust and data-oriented design for maximum performance
 - **Multiplayer First**: Client-server networking with state synchronization built-in
@@ -255,7 +255,7 @@ Write once, deploy everywhere:
 
 ## What Can You Build?
 
-The Agent Game Engine is suitable for:
+The Silmaril is suitable for:
 
 - **Action Games**: Fast-paced combat with responsive controls
 - **RPGs**: Complex character systems and inventory management
@@ -265,9 +265,9 @@ The Agent Game Engine is suitable for:
 
 ## Getting Help
 
-- **Discord**: Join our [Discord server](https://discord.gg/agent-game-engine)
-- **GitHub**: Report issues on [GitHub](https://github.com/yourusername/agent-game-engine)
-- **Forum**: Ask questions on our [community forum](https://forum.agent-game-engine.dev)
+- **Discord**: Join our [Discord server](https://discord.gg/silmaril)
+- **GitHub**: Report issues on [GitHub](https://github.com/yourusername/silmaril)
+- **Forum**: Ask questions on our [community forum](https://forum.silmaril.dev)
 
 ## Next Steps
 
@@ -279,7 +279,7 @@ Ready to get started? Head over to the [Installation](./getting-started/installa
 ```markdown
 # Quick Start
 
-This guide will get you up and running with the Agent Game Engine in 10 minutes.
+This guide will get you up and running with the Silmaril in 10 minutes.
 
 ## Prerequisites
 
@@ -300,7 +300,7 @@ Edit `Cargo.toml`:
 
 ```toml
 [dependencies]
-agent-game-engine = "0.1"
+silmaril = "0.1"
 ```
 
 ## Write Your First Game
@@ -308,7 +308,7 @@ agent-game-engine = "0.1"
 Edit `src/main.rs`:
 
 ```rust
-use agent_game_engine::prelude::*;
+use silmaril::prelude::*;
 
 #[derive(Component)]
 struct Player;
@@ -407,7 +407,7 @@ vulkaninfo
 ```markdown
 # Entity Component System
 
-The Agent Game Engine uses an **Entity Component System (ECS)** architecture. This is a data-oriented design pattern that separates data (components) from logic (systems).
+The Silmaril uses an **Entity Component System (ECS)** architecture. This is a data-oriented design pattern that separates data (components) from logic (systems).
 
 ## Why ECS?
 
@@ -487,7 +487,7 @@ fn movement_system(world: &mut World, dt: f32) {
 Let's build a complete player movement system:
 
 ```rust
-use agent_game_engine::prelude::*;
+use silmaril::prelude::*;
 
 // 1. Define components
 #[derive(Component)]
@@ -678,7 +678,7 @@ In this tutorial, we'll build a complete singleplayer action game with:
 
 **Time:** ~2 hours
 **Difficulty:** Beginner
-**Code:** [examples/singleplayer](https://github.com/yourusername/agent-game-engine/tree/main/examples/singleplayer)
+**Code:** [examples/singleplayer](https://github.com/yourusername/silmaril/tree/main/examples/singleplayer)
 
 ## Prerequisites
 
@@ -699,7 +699,7 @@ Add dependencies to `Cargo.toml`:
 
 ```toml
 [dependencies]
-agent-game-engine = "0.1"
+silmaril = "0.1"
 glam = "0.24"
 rand = "0.8"
 ```
@@ -709,7 +709,7 @@ rand = "0.8"
 Create `src/components.rs`:
 
 ```rust
-use agent_game_engine::prelude::*;
+use silmaril::prelude::*;
 use glam::Vec3;
 
 #[derive(Component)]
@@ -746,7 +746,7 @@ Create `src/systems/player.rs`:
 
 ```rust
 use crate::components::*;
-use agent_game_engine::prelude::*;
+use silmaril::prelude::*;
 
 pub fn player_movement_system(
     world: &mut World,

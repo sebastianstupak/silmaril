@@ -46,7 +46,7 @@ use std::ptr::NonNull;
 use std::slice;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Default frame allocator size: 1MB
 const DEFAULT_FRAME_SIZE: usize = 1024 * 1024;

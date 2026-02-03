@@ -25,13 +25,17 @@ parking_lot = "0.12"
 hex = "0.4"
 # For differential patching - using qbsdiff which is a pure Rust implementation
 qbsdiff = "1.4"
+clap = { version = "4.4", features = ["derive"] }
+tracing-subscriber = "0.3"
+
+[features]
+default = []
+backtrace = ["engine-core/backtrace"]
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 mockito = "1.2"
 tokio-test = "0.4"
-clap = { version = "4.4", features = ["derive"] }
-tracing-subscriber = "0.3"
 
 [[bin]]
 name = "generate_patch"

@@ -321,8 +321,8 @@ impl TextureData {
         } else {
             // Compressed format
             let (block_w, block_h) = format.block_dimensions();
-            let blocks_x = (width + block_w - 1) / block_w;
-            let blocks_y = (height + block_h - 1) / block_h;
+            let blocks_x = width.div_ceil(block_w);
+            let blocks_y = height.div_ceil(block_h);
             blocks_x as usize * blocks_y as usize * format.block_size()
         }
     }

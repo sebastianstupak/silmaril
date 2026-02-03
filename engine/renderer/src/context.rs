@@ -360,7 +360,7 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
 
     // Application info
     let app_name_cstr = CString::new(app_name).unwrap();
-    let engine_name = CString::new("Agent Game Engine").unwrap();
+    let engine_name = CString::new("Silmaril").unwrap();
 
     let app_info = vk::ApplicationInfo::default()
         .application_name(&app_name_cstr)

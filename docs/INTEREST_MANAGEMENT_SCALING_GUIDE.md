@@ -744,10 +744,10 @@ spec:
 - [AWS Auto Scaling Guide](https://docs.aws.amazon.com/autoscaling/)
 - [Kubernetes HPA](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - [MMO Server Architecture (GDC)](https://gdcvault.com/)
-- [agent-game-engine Benchmarks](./INTEREST_MANAGEMENT_AAA_COMPARISON.md)
+- [silmaril Benchmarks](./INTEREST_MANAGEMENT_AAA_COMPARISON.md)
 
 ---
 
 **Last Updated:** 2026-02-02
 **Version:** 1.0
-**Maintained By:** agent-game-engine team
+**Maintained By:** silmaril team

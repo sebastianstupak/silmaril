@@ -5,7 +5,7 @@ use crate::progress::ProgressTracker;
 use crate::verifier::verify_file_hash;
 use futures_util::StreamExt;
 use reqwest::Client;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::{File, OpenOptions};
@@ -174,7 +174,7 @@ impl Downloader {
 
             // Apply bandwidth throttling if configured
             if self.config.max_speed > 0 {
-                let elapsed = tracker.as_ref().map(|t| t.get_progress().speed).unwrap_or(0.0);
+                let elapsed = progress.as_ref().map(|t| t.get_progress().speed).unwrap_or(0.0);
                 if elapsed > self.config.max_speed as f64 {
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }

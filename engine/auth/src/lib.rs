@@ -1,4 +1,4 @@
-//! Authentication system for Agent Game Engine.
+//! Authentication system for Silmaril.
 //!
 //! Production-grade authentication with AAA game studio quality standards.
 //!
@@ -65,7 +65,7 @@
 //! # Architecture
 //!
 //! The auth system is designed for easy integration with:
-//! - PostgreSQL (user storage)
+//! - `PostgreSQL` (user storage)
 //! - Redis (session storage, token revocation)
 //! - Logging infrastructure (tracing)
 //! - Game server architecture
@@ -87,7 +87,7 @@ pub mod session;
 pub mod user;
 
 // Re-export commonly used types
-pub use audit::{AuditEvent, AuditEventType, AuditLogger};
+pub use audit::{AuditEvent, AuditLogger, AuthEventType};
 pub use error::{AuthError, AuthErrorCode};
 pub use jwt::{AccessTokenClaims, JwtManager, RefreshTokenClaims, TokenPair};
 pub use mfa::{BackupCode, BackupCodeManager, TotpManager, TotpSetup};

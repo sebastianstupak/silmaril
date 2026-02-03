@@ -11,7 +11,7 @@ use std::any::TypeId;
 use std::collections::HashMap;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// World container - owns all entities and components
 ///

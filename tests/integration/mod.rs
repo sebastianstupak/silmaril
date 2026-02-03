@@ -64,7 +64,7 @@ impl Default for IntegrationTestConfig {
 /// Creates a temporary directory for test files
 pub fn create_temp_test_dir(test_name: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
-    path.push("agent-game-engine-tests");
+    path.push("silmaril-tests");
     path.push(test_name);
 
     if path.exists() {

@@ -1,7 +1,7 @@
 # Authentication System Security Audit
 
 **Date:** 2026-02-02
-**System:** Agent Game Engine Authentication (`engine-auth`)
+**System:** Silmaril Authentication (`engine-auth`)
 **Version:** 0.1.0
 **Auditor:** Claude Sonnet 4.5
 

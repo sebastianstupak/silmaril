@@ -2,7 +2,7 @@
 
 > **Complete guide to building optimized binaries for different CPU capabilities**
 
-This document explains the agent-game-engine's multi-tier build system, which creates optimized binaries for different CPU feature sets to maximize performance while maintaining broad compatibility.
+This document explains the silmaril's multi-tier build system, which creates optimized binaries for different CPU feature sets to maximize performance while maintaining broad compatibility.
 
 ---
 

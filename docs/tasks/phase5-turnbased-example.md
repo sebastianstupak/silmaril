@@ -33,10 +33,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-agent-game-engine-core = { path = "../../engine/core" }
-agent-game-engine-macros = { path = "../../engine/macros" }
-agent-game-engine-platform = { path = "../../engine/platform" }
-agent-game-engine-rendering = { path = "../../engine/rendering" }
+silmaril-core = { path = "../../engine/core" }
+silmaril-macros = { path = "../../engine/macros" }
+silmaril-platform = { path = "../../engine/platform" }
+silmaril-rendering = { path = "../../engine/rendering" }
 glam = "0.24"
 anyhow = "1.0"
 tracing = "0.1"
@@ -370,7 +370,7 @@ impl Tile {
 **File:** `examples/turnbased/src/components.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::IVec2;
 
 /// Tactical unit
@@ -582,7 +582,7 @@ pub struct UnitSprite {
 
 ```rust
 use crate::components::*;
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 
 /// Game phase
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -872,7 +872,7 @@ fn execute_ability(
 use crate::components::*;
 use crate::grid::Grid;
 use crate::systems::turn::*;
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::IVec2;
 
 /// Minimax AI for tactical decisions
@@ -1026,9 +1026,9 @@ mod ai;
 mod systems;
 mod ui;
 
-use agent_game_engine_core::prelude::*;
-use agent_game_engine_platform::{Platform, WindowConfig, Input};
-use agent_game_engine_rendering::Renderer;
+use silmaril_core::prelude::*;
+use silmaril_platform::{Platform, WindowConfig, Input};
+use silmaril_rendering::Renderer;
 use components::*;
 use grid::*;
 use systems::turn::*;

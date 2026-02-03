@@ -5,7 +5,7 @@
 
 #![cfg(feature = "profiling-tracy")]
 
-use agent_game_engine_profiling::{profile_scope, ProfileCategory, TracyBackend};
+use silmaril_profiling::{profile_scope, ProfileCategory, TracyBackend};
 
 #[test]
 fn test_tracy_backend_creation() {

@@ -53,7 +53,7 @@ Tracy.exe
 ### Instrument Your Code
 
 ```rust
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 fn game_loop() {
     profile_scope!("game_loop");
@@ -76,7 +76,7 @@ fn physics_update() {
 ### Frame Markers
 
 ```rust
-use agent_game_engine_profiling::TracyBackend;
+use silmaril_profiling::TracyBackend;
 
 let mut backend = TracyBackend::new();
 
@@ -269,7 +269,7 @@ Vulkan/DX12 timeline (future):
 
 ```rust
 // Import
-use agent_game_engine_profiling::{profile_scope, ProfileCategory, TracyBackend};
+use silmaril_profiling::{profile_scope, ProfileCategory, TracyBackend};
 
 // Frame markers
 let mut backend = TracyBackend::new();

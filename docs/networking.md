@@ -1,6 +1,6 @@
 # Networking Architecture
 
-> **Client-server networking for agent-game-engine**
+> **Client-server networking for silmaril**
 >
 > Server-authoritative multiplayer with client-side prediction, optimized for AI agents
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The agent-game-engine uses a hybrid TCP+UDP networking architecture:
+The silmaril uses a hybrid TCP+UDP networking architecture:
 - **TCP** - Reliable critical data (login, chat, commands)
 - **UDP** - Unreliable fast data (positions, rotations, actions)
 - **Server-authoritative** - Anti-cheat and consistency
@@ -22,7 +22,7 @@ The agent-game-engine uses a hybrid TCP+UDP networking architecture:
 Code is separated at compile-time using feature flags:
 
 ```rust
-use agent_game_engine_macros::{client_only, server_only, shared, server_authoritative};
+use silmaril_macros::{client_only, server_only, shared, server_authoritative};
 
 #[client_only]
 fn render_health_bars(world: &World, renderer: &mut Renderer) {

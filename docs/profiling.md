@@ -6,7 +6,7 @@
 
 ## 🎯 **Overview**
 
-The agent-game-engine profiling system provides three tiers of observability:
+The silmaril profiling system provides three tiers of observability:
 1. **Lightweight metrics** (always available in dev)
 2. **Deep CPU profiling** (opt-in via feature flag)
 3. **GPU profiling** (Phase 4, advanced)
@@ -277,7 +277,7 @@ pub struct AgentFeedbackMetrics {
 ### **Example AI Training Loop**
 
 ```rust
-use agent_game_engine::{Engine, profiling::AgentFeedbackMetrics};
+use silmaril::{Engine, profiling::AgentFeedbackMetrics};
 
 fn main() {
     let mut engine = Engine::new();
@@ -852,7 +852,7 @@ tracy
 #### **Basic Profiling**
 
 ```rust
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 fn game_loop() {
     profile_scope!("game_loop");
@@ -896,7 +896,7 @@ pub fn compose(&self, other: &Transform) -> Transform {
 Use Tracy backend for frame management:
 
 ```rust
-use agent_game_engine_profiling::TracyBackend;
+use silmaril_profiling::TracyBackend;
 
 let mut backend = TracyBackend::new();
 
@@ -947,7 +947,7 @@ Use Tracy for development, metrics for production:
 
 ```rust
 #[cfg(feature = "profiling-tracy")]
-use agent_game_engine_profiling::profile_scope;
+use silmaril_profiling::profile_scope;
 
 #[cfg(not(feature = "profiling-tracy"))]
 macro_rules! profile_scope {

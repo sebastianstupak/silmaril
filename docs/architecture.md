@@ -1,6 +1,6 @@
 # Architecture Overview
 
-> **Complete system architecture for agent-game-engine**
+> **Complete system architecture for silmaril**
 >
 > ⚠️ **MUST READ** when working on any system-level code
 

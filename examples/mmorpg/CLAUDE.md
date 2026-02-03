@@ -1,7 +1,7 @@
 # MMORPG Example
 
 ## Overview
-This example demonstrates a massively multiplayer online RPG built with the Agent Game Engine. It showcases advanced networking, server architecture, client-server communication, and scalable multiplayer game design.
+This example demonstrates a massively multiplayer online RPG built with the Silmaril. It showcases advanced networking, server architecture, client-server communication, and scalable multiplayer game design.
 
 ## What This Demonstrates
 - Client-server architecture for MMORPGs

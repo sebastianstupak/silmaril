@@ -216,6 +216,7 @@ fn setup_mmo_world(player_count: usize, npc_count: usize) -> World {
     world.register::<NetworkId>();
     world.register::<MoveSpeed>();
     world.register::<Team>();
+    world.register::<Armor>();
 
     // Spawn players
     for i in 0..player_count {
@@ -548,7 +549,7 @@ fn bench_comprehensive_comparison(c: &mut Criterion) {
         });
     }
 
-    // Server tick simulation at 10K entities
+    // Server tick simulation at 10K entities (uses setup_mmo_world which registers all components)
     {
         let mut world = setup_mmo_world(1000, 9000);
         let dt = 1.0 / 60.0;

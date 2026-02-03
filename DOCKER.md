@@ -1,36 +1,33 @@
 # Docker Deployment Guide
 
-Complete guide for running Agent Game Engine in Docker containers.
+Complete guide for running Silmaril in Docker containers.
 
 ## Quick Start
 
 ### Development (with hot-reload)
 
 ```bash
-# Install just if you haven't already
-cargo install just
-
-# Start development environment
-just dev
+# Start development environment (no installation required)
+cargo xtask docker dev
 
 # View logs
-just dev-logs
+cargo xtask docker logs
 
 # Stop
-just dev-stop
+cargo xtask docker stop
 ```
 
 ### Production
 
 ```bash
 # Start production environment
-just prod
+cargo xtask docker prod
 
 # View logs
-just prod-logs
+cargo xtask docker prod-logs
 
 # Stop
-just prod-stop
+cargo xtask docker prod-stop
 ```
 
 ## Architecture
@@ -60,8 +57,8 @@ just prod-stop
 - Resource limits configured
 
 **Images:**
-- `agent-game-engine-server:latest` - Production server (~40MB)
-- `agent-game-engine-client:latest` - Production client (~60MB)
+- `silmaril-server:latest` - Production server (~40MB)
+- `silmaril-client:latest` - Production client (~60MB)
 
 **Ports:**
 - `7777/tcp` - Game server (TCP)
@@ -151,7 +148,7 @@ The production images are optimized for minimal size:
 ### Verify Image Sizes
 
 ```bash
-just docker-sizes
+cargo xtask docker sizes
 
 # Or manually
 docker images | grep agent-game
@@ -165,7 +162,7 @@ docker images | grep agent-game
 ```bash
 # In docker-compose.dev.yml
 environment:
-  - RUST_LOG=info,agent_game_engine=debug
+  - RUST_LOG=info,silmaril=debug
   - RUST_BACKTRACE=1
 ```
 
@@ -267,7 +264,7 @@ docker ps
 
 ```bash
 # Check logs
-just dev-logs
+cargo xtask docker logs
 # or
 docker-compose -f docker-compose.dev.yml logs server
 
@@ -297,7 +294,7 @@ docker-compose -f docker-compose.dev.yml restart server
 
 ```bash
 # Check actual size
-docker images agent-game-engine-server:latest
+docker images silmaril-server:latest
 
 # If >50MB for server:
 # 1. Verify release-server profile is used
@@ -305,7 +302,7 @@ docker images agent-game-engine-server:latest
 # 3. Ensure multi-stage build is working
 
 # Inspect layers
-docker history agent-game-engine-server:latest
+docker history silmaril-server:latest
 ```
 
 ### Network issues
@@ -392,9 +389,9 @@ Both production images run as non-root user:
 
 - name: Push to registry
   run: |
-    docker tag agent-game-engine-server:latest \
-      ghcr.io/yourorg/agent-game-engine-server:${{ github.sha }}
-    docker push ghcr.io/yourorg/agent-game-engine-server:${{ github.sha }}
+    docker tag silmaril-server:latest \
+      ghcr.io/yourorg/silmaril-server:${{ github.sha }}
+    docker push ghcr.io/yourorg/silmaril-server:${{ github.sha }}
 ```
 
 ### GitLab CI
@@ -410,7 +407,7 @@ build:docker:
 
 ## Further Reading
 
-- [justfile](justfile) - All available commands
+- [xtask/README.md](xtask/README.md) - All available commands
 - [docker-compose.dev.yml](docker-compose.dev.yml) - Development configuration
 - [docker-compose.yml](docker-compose.yml) - Production configuration
 - [ROADMAP.md](ROADMAP.md) - Upcoming Docker features

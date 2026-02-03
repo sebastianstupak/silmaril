@@ -115,7 +115,7 @@ impl FrameCaptureData {
 
         // Validate depth values are in [0.0, 1.0]
         for (i, &depth) in self.depth_buffer.iter().enumerate() {
-            if !depth.is_finite() || depth < 0.0 || depth > 1.0 {
+            if !depth.is_finite() || !(0.0..=1.0).contains(&depth) {
                 return Err(CaptureError::invalidframedata(format!(
                     "Invalid depth value at index {}: {}",
                     i, depth
@@ -363,10 +363,10 @@ impl RenderingDebugger {
             let act_a = actual.color_buffer[idx + 3];
 
             // Calculate per-channel deltas
-            let delta_r = (exp_r as i16 - act_r as i16).abs() as u8;
-            let delta_g = (exp_g as i16 - act_g as i16).abs() as u8;
-            let delta_b = (exp_b as i16 - act_b as i16).abs() as u8;
-            let delta_a = (exp_a as i16 - act_a as i16).abs() as u8;
+            let delta_r = (exp_r as i16 - act_r as i16).unsigned_abs() as u8;
+            let delta_g = (exp_g as i16 - act_g as i16).unsigned_abs() as u8;
+            let delta_b = (exp_b as i16 - act_b as i16).unsigned_abs() as u8;
+            let delta_a = (exp_a as i16 - act_a as i16).unsigned_abs() as u8;
 
             // Maximum delta across all channels
             let pixel_delta = delta_r.max(delta_g).max(delta_b).max(delta_a);

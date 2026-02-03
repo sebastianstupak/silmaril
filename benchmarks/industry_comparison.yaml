@@ -216,9 +216,9 @@ bevy:
       Highly efficient thanks to Rust performance.
 
 # ============================================================
-# Agent Game Engine (Expected Performance)
+# Silmaril (Expected Performance)
 # ============================================================
-agent_game_engine:
+silmaril:
   version: "0.1.0"
   notes: |
     Performance targets based on Phase 0-2 optimizations.
@@ -309,10 +309,10 @@ methodology:
     Unreal: UE documentation, GDC talks, Mass Entity samples
     Godot: Official docs, community benchmarks, GitHub discussions
     Bevy: Official benchmarks, bevy_ecs performance tests
-    Agent Game Engine: Internal criterion benchmarks
+    Silmaril: Internal criterion benchmarks
 
 # ============================================================
-# Performance Multipliers (vs Agent Game Engine)
+# Performance Multipliers (vs Silmaril)
 # ============================================================
 # These are approximate comparisons - actual results vary by workload
 expected_multipliers:
@@ -354,11 +354,11 @@ disclaimers:
     - Build settings and optimizations
     - Asset complexity and count
   - |
-    Unity and Unreal offer many more features than Agent Game Engine.
+    Unity and Unreal offer many more features than Silmaril.
     Performance should be evaluated in context of feature completeness.
   - |
     Bevy is the closest competitor in terms of architecture and performance.
-    Agent Game Engine targets similar or better performance with additional
+    Silmaril targets similar or better performance with additional
     features for AI agent automation.
   - |
     All data is approximate and subject to change.

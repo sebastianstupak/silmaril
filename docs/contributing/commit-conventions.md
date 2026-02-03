@@ -1,6 +1,6 @@
 # Commit Conventions
 
-> **Git commit message guidelines for the Agent Game Engine project**
+> **Git commit message guidelines for the Silmaril project**
 >
 > These conventions ensure a clean, searchable commit history and enable automated tooling.
 

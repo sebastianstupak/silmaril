@@ -1,6 +1,6 @@
 # TLS Setup Guide
 
-Complete guide for setting up TLS encryption in the agent-game-engine.
+Complete guide for setting up TLS encryption in the silmaril.
 
 ## Table of Contents
 

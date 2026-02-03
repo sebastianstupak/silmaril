@@ -57,9 +57,9 @@ impl InterestFilter {
     /// Should be called every frame/tick before filtering.
     pub fn update_from_world(&mut self, world: &World) {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "interest_filter_update",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         self.manager.update_from_world(world);
@@ -113,9 +113,9 @@ impl InterestFilter {
     /// Filtered list of visible entities
     pub fn filter_updates(&self, client_id: u64, all_entities: &[Entity]) -> Vec<Entity> {
         #[cfg(feature = "profiling")]
-        agent_game_engine_profiling::profile_scope!(
+        silmaril_profiling::profile_scope!(
             "interest_filter_entities",
-            agent_game_engine_profiling::ProfileCategory::Networking
+            silmaril_profiling::ProfileCategory::Networking
         );
 
         // If no filtering registered for client, return all

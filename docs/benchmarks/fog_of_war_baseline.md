@@ -516,7 +516,7 @@ fn tick(&mut self, fog: &mut FogOfWar) {
 
 | Engine | Entities | Fog Calculation | LoS (1000 rays) | Memory (10K) |
 |--------|---------|----------------|----------------|--------------|
-| **agent-game-engine** | 1000 | **1.8ms** ✅ | **4.2ms** ✅ | **850 KB** ✅ |
+| **silmaril** | 1000 | **1.8ms** ✅ | **4.2ms** ✅ | **850 KB** ✅ |
 | Unity (typical) | 1000 | ~5-10ms ⚠️ | ~10-20ms ⚠️ | ~2-5 MB ⚠️ |
 | Unreal (GAS) | 1000 | ~10-20ms ⚠️ | ~5-10ms ✅ | ~5-10 MB ⚠️ |
 | StarCraft 2 | 1000 | <1ms ✅ | N/A (grid-based) | <1 MB ✅ |
@@ -531,7 +531,7 @@ fn tick(&mut self, fog: &mut FogOfWar) {
 
 ### Feature Comparison
 
-| Feature | agent-game-engine | Unity | Unreal | StarCraft 2 | Dota 2 |
+| Feature | silmaril | Unity | Unreal | StarCraft 2 | Dota 2 |
 |---------|------------------|-------|--------|------------|--------|
 | LoS Raycasting | ✅ | ✅ | ✅ | ❌ (grid) | ✅ (GPU) |
 | Stealth System | ✅ | 🔶 (custom) | 🔶 (GAS) | ❌ | ✅ |

@@ -1,6 +1,6 @@
 # Network Simulation and Integration Benchmarks
 
-This document describes the comprehensive network benchmarking infrastructure for the agent-game-engine.
+This document describes the comprehensive network benchmarking infrastructure for the silmaril.
 
 ## Overview
 

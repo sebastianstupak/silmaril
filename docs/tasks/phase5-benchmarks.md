@@ -27,7 +27,7 @@ Create a comprehensive benchmark suite to measure and track performance across a
 
 ```toml
 [package]
-name = "agent-game-engine-benchmarks"
+name = "silmaril-benchmarks"
 version = "0.1.0"
 edition = "2021"
 
@@ -52,9 +52,9 @@ name = "serialization"
 harness = false
 
 [dependencies]
-agent-game-engine-core = { path = "../engine/core" }
-agent-game-engine-networking = { path = "../engine/networking" }
-agent-game-engine-rendering = { path = "../engine/rendering" }
+silmaril-core = { path = "../engine/core" }
+silmaril-networking = { path = "../engine/networking" }
+silmaril-rendering = { path = "../engine/rendering" }
 criterion = { version = "0.5", features = ["html_reports"] }
 rand = "0.8"
 glam = "0.24"
@@ -87,7 +87,7 @@ benches/
 
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::Vec3;
 use rand::Rng;
 
@@ -386,7 +386,7 @@ criterion_main!(benches);
 
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use agent_game_engine_networking::*;
+use silmaril_networking::*;
 
 /// Benchmark packet serialization
 fn bench_packet_serialize(c: &mut Criterion) {
@@ -522,7 +522,7 @@ criterion_main!(benches);
 
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Component, Serialize, Deserialize, Clone)]
@@ -761,7 +761,7 @@ jobs:
 ```markdown
 # Performance Benchmarks
 
-This directory contains comprehensive benchmarks for the Agent Game Engine.
+This directory contains comprehensive benchmarks for the Silmaril.
 
 ## Running Benchmarks
 
@@ -778,7 +778,7 @@ cargo bench --bench ecs
 
 ## Benchmark Results
 
-Latest results: [GitHub Pages](https://yourusername.github.io/agent-game-engine/benchmarks/)
+Latest results: [GitHub Pages](https://yourusername.github.io/silmaril/benchmarks/)
 
 ### ECS Performance
 

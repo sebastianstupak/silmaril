@@ -33,7 +33,7 @@ use crate::ecs::Component;
 /// # Examples
 ///
 /// ```
-/// use agent_game_engine::ecs::*;
+/// use silmaril::ecs::*;
 ///
 /// let component = MyComponent {
 ///     field1: 100.0,
@@ -61,7 +61,7 @@ impl Default for MyComponent {
 
 **Validation:**
 ```bash
-cargo build --package agent-game-engine-core
+cargo build --package silmaril-core
 ```
 
 ---
@@ -113,7 +113,7 @@ impl From<MyComponent> for ComponentData {
 
 **Validation:**
 ```bash
-cargo build --package agent-game-engine-core
+cargo build --package silmaril-core
 ```
 
 ---
@@ -144,7 +144,7 @@ impl World {
 
 **Validation:**
 ```bash
-cargo test --package agent-game-engine-core --lib world
+cargo test --package silmaril-core --lib world
 ```
 
 ---
@@ -233,7 +233,7 @@ mod tests {
 
 **Run tests:**
 ```bash
-cargo test --package agent-game-engine-core my_component
+cargo test --package silmaril-core my_component
 ```
 
 ---
@@ -244,7 +244,7 @@ cargo test --package agent-game-engine-core my_component
 
 **Template:**
 ```rust
-use agent_game_engine_core::ecs::*;
+use silmaril_core::ecs::*;
 
 #[test]
 fn test_my_component_with_other_components() {
@@ -285,7 +285,7 @@ fn test_my_component_despawn() {
 
 **Run integration tests:**
 ```bash
-cargo test --package agent-game-engine-core --tests
+cargo test --package silmaril-core --tests
 ```
 
 ---
@@ -307,7 +307,7 @@ cargo test --package agent-game-engine-core --tests
 ///
 /// Basic usage:
 /// ```
-/// use agent_game_engine::ecs::*;
+/// use silmaril::ecs::*;
 ///
 /// let mut world = World::new();
 /// let entity = world.spawn();
@@ -320,7 +320,7 @@ cargo test --package agent-game-engine-core --tests
 ///
 /// With other components:
 /// ```
-/// # use agent_game_engine::ecs::*;
+/// # use silmaril::ecs::*;
 /// let mut world = World::new();
 /// let entity = world.spawn();
 ///
@@ -346,7 +346,7 @@ pub struct MyComponent {
 
 **Build docs:**
 ```bash
-cargo doc --package agent-game-engine-core --no-deps --open
+cargo doc --package silmaril-core --no-deps --open
 ```
 
 ---
@@ -391,7 +391,7 @@ cargo test --workspace --all-features
 cargo doc --no-deps
 
 # Benchmarks (if performance-critical)
-cargo bench --package agent-game-engine-core
+cargo bench --package silmaril-core
 ```
 
 ---

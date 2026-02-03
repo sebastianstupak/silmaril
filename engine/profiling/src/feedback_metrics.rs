@@ -18,8 +18,8 @@ use std::collections::HashMap;
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::{Profiler, ProfilerConfig};
-/// use agent_game_engine_profiling::AgentFeedbackMetrics;
+/// use silmaril_profiling::{Profiler, ProfilerConfig};
+/// use silmaril_profiling::AgentFeedbackMetrics;
 ///
 /// # #[cfg(all(feature = "metrics", feature = "config"))]
 /// # {
@@ -150,8 +150,8 @@ impl AgentFeedbackMetrics {
     /// # Examples
     ///
     /// ```rust
-    /// use agent_game_engine_profiling::{Profiler, ProfilerConfig};
-    /// use agent_game_engine_profiling::AgentFeedbackMetrics;
+    /// use silmaril_profiling::{Profiler, ProfilerConfig};
+    /// use silmaril_profiling::AgentFeedbackMetrics;
     ///
     /// # #[cfg(feature = "metrics")]
     /// # {
@@ -212,8 +212,8 @@ impl AgentFeedbackMetrics {
     /// # Examples
     ///
     /// ```rust
-    /// use agent_game_engine_profiling::{Profiler, ProfilerConfig};
-    /// use agent_game_engine_profiling::AgentFeedbackMetrics;
+    /// use silmaril_profiling::{Profiler, ProfilerConfig};
+    /// use silmaril_profiling::AgentFeedbackMetrics;
     ///
     /// # #[cfg(feature = "metrics")]
     /// # {
@@ -319,7 +319,7 @@ impl Profiler {
     /// # Examples
     ///
     /// ```rust
-    /// use agent_game_engine_profiling::{Profiler, ProfilerConfig};
+    /// use silmaril_profiling::{Profiler, ProfilerConfig};
     ///
     /// # #[cfg(feature = "metrics")]
     /// # {

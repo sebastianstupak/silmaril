@@ -101,7 +101,7 @@ In real-world usage with diverse framebuffer configurations, expect ~5-20 µs (s
 
 | Engine | Sync Objects | Framebuffer | Render Pass | Offscreen Target | Command Pool |
 |--------|--------------|-------------|-------------|------------------|--------------|
-| **agent-game-engine** | **27.7 µs** ✅ | **0.848 µs** ✅ | ❌ (crashed) | ❌ (crashed) | ❌ (crashed) |
+| **silmaril** | **27.7 µs** ✅ | **0.848 µs** ✅ | ❌ (crashed) | ❌ (crashed) | ❌ (crashed) |
 | **Unity (2022+)** | ~100-200 µs | ~500-1000 µs | ~200-500 µs | ~5-15 ms | ~50-150 µs |
 | **Unreal (5.3+)** | ~40-80 µs | ~100-300 µs | ~50-200 µs | ~3-10 ms | ~30-100 µs |
 | **id Tech 7** | ~20-40 µs | ~1-5 µs | ~10-30 µs | ~1-5 ms | ~10-50 µs |
@@ -121,7 +121,7 @@ In real-world usage with diverse framebuffer configurations, expect ~5-20 µs (s
    - Faster than id Tech (1.2x - 5.9x faster) - **best-in-class**
    - Faster than Frostbite (2.4x - 9.4x faster)
 
-**Why agent-game-engine performs so well:**
+**Why silmaril performs so well:**
 
 | Factor | Impact | Explanation |
 |--------|--------|-------------|
@@ -228,7 +228,7 @@ Compiler: rustc (LLVM-based), bench profile (optimized + debuginfo)
 
 ---
 
-## Comparison: Unity vs Unreal vs agent-game-engine
+## Comparison: Unity vs Unreal vs silmaril
 
 ### Unity (2022 LTS)
 
@@ -244,7 +244,7 @@ Compiler: rustc (LLVM-based), bench profile (optimized + debuginfo)
 - **Typical frame budget:** 16.67ms (60 FPS) or 33ms (30 FPS)
 - **Draw calls:** 1,000-2,000 per frame (before SRP Batcher)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **3.6x - 7.2x faster** at sync objects
 - ✅ We're **590x - 1,180x faster** at framebuffers (likely C# overhead)
 - ✅ No GC pauses (Unity has 1-5ms GC spikes)
@@ -266,7 +266,7 @@ Compiler: rustc (LLVM-based), bench profile (optimized + debuginfo)
 - **Typical frame budget:** 16.67ms (60 FPS) for high-end, 33ms (30 FPS) for cinematic
 - **Draw calls:** 10,000+ per frame (Nanite reduces this via mesh shaders)
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **1.4x - 2.9x faster** at sync objects
 - ✅ We're **118x - 354x faster** at framebuffers
 - ✅ No render graph overhead (direct command buffer recording)
@@ -297,7 +297,7 @@ Compiler: rustc (LLVM-based), bench profile (optimized + debuginfo)
 - **Frame budget:** 16.67ms (60 FPS) or 33ms (30 FPS cinematic)
 - **Draw calls:** 3,000-10,000 per frame
 
-**vs agent-game-engine:**
+**vs silmaril:**
 - ✅ We're **competitive** with sync objects (27.7µs is within id Tech range)
 - ✅ We're **faster** than Frostbite framebuffers (0.848µs vs 2-8µs)
 - ✅ We're **faster** than id Tech framebuffers (0.848µs vs 1-5µs) - **best-in-class**

@@ -62,7 +62,7 @@ mod tests {
 
 ```rust
 // engine/renderer/tests/vulkan_init.rs
-use agent_game_engine_renderer::*;
+use silmaril_renderer::*;
 
 #[test]
 fn test_vulkan_initialization() {

@@ -1,22 +1,18 @@
 # Development Workflow Quick Start
 
-> **Fast reference for the `just dev` workflow system**
+> **Fast reference for the `cargo xtask dev` workflow system**
 
 ---
 
 ## Installation
 
-### 1. Install Just (Command Runner)
-
-```bash
-cargo install just
-```
-
-### 2. Install Cargo Watch (Auto-Reload)
+### 1. Install Cargo Watch (Auto-Reload)
 
 ```bash
 cargo install cargo-watch
 ```
+
+**Note:** No need to install `just` - the engine uses `cargo xtask` which is built-in.
 
 ### 3. Install Python Dependencies
 
@@ -32,55 +28,55 @@ pip install -r scripts/dev/requirements.txt
 
 ```bash
 # Start full dev environment (client + server)
-just dev
+cargo xtask dev full
 
 # Client only
-just dev-client
+cargo xtask dev full-client
 
 # Server only
-just dev-server
+cargo xtask dev full-server
 ```
 
 ### Enhanced Modes
 
 ```bash
 # Pretty log formatting
-just dev-logs-live
+cargo xtask dev full-logs-live
 
 # With profiler (Puffin)
-just dev-profiler
+cargo xtask dev full-profiler
 
 # Debug mode (full symbols)
-just dev-debug
+cargo xtask dev full-debug
 
 # Release mode (fast)
-just dev-release
+cargo xtask dev full-release
 
 # With validation layers
-just dev-validation
+cargo xtask dev full-validation
 ```
 
 ### Multiplayer Testing
 
 ```bash
 # Run 3 clients + 1 server
-just dev-multi 3
+cargo xtask dev full-multi 3
 ```
 
 ### Utilities
 
 ```bash
 # Check status
-just dev-status
+cargo xtask dev full-status
 
 # Stop all processes
-just dev-stop-all
+cargo xtask dev full-stop-all
 
 # Clean everything
-just dev-clean
+cargo xtask dev full-clean
 
 # Quick benchmarks
-just dev-benchmark
+cargo xtask dev full-benchmark
 ```
 
 ---
@@ -120,62 +116,62 @@ Press `Ctrl+C` to:
 
 ## Development Modes Explained
 
-### `just dev`
+### `cargo xtask dev full`
 **Full development environment**
 - Runs both client and server
 - Auto-reload enabled
 - Best for general development
 
-### `just dev-client`
+### `cargo xtask dev full-client`
 **Client development**
 - Only runs client
 - Useful for UI/rendering work
 - Connect to separate server
 
-### `just dev-server`
+### `cargo xtask dev full-server`
 **Server development**
 - Only runs server
 - Useful for game logic work
 - Test with separate client
 
-### `just dev-logs-live`
+### `cargo xtask dev full-logs-live`
 **Log analysis**
 - Pretty-printed logs
 - Color-coded by level (ERROR=red, WARN=yellow, INFO=green)
 - Filter by module
 
-### `just dev-profiler`
+### `cargo xtask dev full-profiler`
 **Performance profiling**
 - Puffin profiler enabled
 - Connect viewer to localhost:8585
 - Real-time performance metrics
 
-### `just dev-debug`
+### `cargo xtask dev full-debug`
 **Debugging**
 - Full debug symbols
 - Ready for debugger attachment
 - Shows debugger instructions
 
-### `just dev-release`
+### `cargo xtask dev full-release`
 **Performance testing**
 - Optimized build
 - Still allows profiling
 - Faster than dev builds
 
-### `just dev-validation`
+### `cargo xtask dev full-validation`
 **Bug hunting**
 - Vulkan validation layers
 - Extra error checking
 - Memory leak detection
 - Slower but catches issues early
 
-### `just dev-headless`
+### `cargo xtask dev full-headless`
 **CI/Testing**
 - No window/renderer
 - Faster startup
 - Good for automated testing
 
-### `just dev-multi <count>`
+### `cargo xtask dev full-multi <count>`
 **Multiplayer testing**
 - Spawns N clients + 1 server
 - Each on different port
@@ -189,7 +185,7 @@ Press `Ctrl+C` to:
 
 ```bash
 # Check which ports are in use
-just dev-status
+cargo xtask dev full-status
 
 # The error will show which process is using the port
 ```
@@ -215,10 +211,10 @@ cargo install cargo-watch
 
 ```bash
 # Force stop all
-just dev-stop-all
+cargo xtask dev full-stop-all
 
 # Clean stale entries
-just dev-clean
+cargo xtask dev full-clean
 ```
 
 ### Python Script Errors
@@ -241,23 +237,23 @@ python --version
 
 ```bash
 # Set log level
-RUST_LOG=debug just dev
-RUST_LOG=trace just dev-server
-RUST_LOG=info,agent_game_engine_networking=debug just dev
+RUST_LOG=debug cargo xtask dev full
+RUST_LOG=trace cargo xtask dev full-server
+RUST_LOG=info,silmaril_networking=debug cargo xtask dev full
 ```
 
 ### Profiling
 
 ```bash
 # Enable profiling
-ENGINE_PROFILE=1 just dev
+ENGINE_PROFILE=1 cargo xtask dev full
 ```
 
 ### Validation
 
 ```bash
 # Enable Vulkan validation
-VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation just dev-client
+VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation cargo xtask dev full-client
 ```
 
 ---
@@ -311,7 +307,7 @@ VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation just dev-client
     {
       "label": "Dev Environment",
       "type": "shell",
-      "command": "just dev",
+      "command": "cargo xtask dev full",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -321,13 +317,13 @@ VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation just dev-client
     {
       "label": "Dev Client Only",
       "type": "shell",
-      "command": "just dev-client",
+      "command": "cargo xtask dev full-client",
       "problemMatcher": []
     },
     {
       "label": "Dev Server Only",
       "type": "shell",
-      "command": "just dev-server",
+      "command": "cargo xtask dev full-server",
       "problemMatcher": []
     }
   ]
@@ -340,7 +336,7 @@ Recommended terminal setup:
 
 **Terminal 1:**
 ```bash
-just dev  # Main dev environment
+cargo xtask dev full  # Main dev environment
 ```
 
 **Terminal 2:**
@@ -396,7 +392,7 @@ export CARGO_BUILD_JOBS=$(sysctl -n hw.ncpu)  # macOS
 ### 1. Always Check Status First
 
 ```bash
-just dev-status  # Check before starting
+cargo xtask dev full-status  # Check before starting
 ```
 
 ### 2. Use Auto-Reload
@@ -410,14 +406,14 @@ Press `Ctrl+C` instead of killing processes manually.
 ### 4. Clean Regularly
 
 ```bash
-just dev-clean  # Weekly cleanup
+cargo xtask dev full-clean  # Weekly cleanup
 ```
 
 ### 5. Check Ports
 
 If dev won't start, check port availability:
 ```bash
-just dev-status
+cargo xtask dev full-status
 ```
 
 ---

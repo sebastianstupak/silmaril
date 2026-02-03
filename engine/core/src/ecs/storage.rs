@@ -34,7 +34,7 @@ use super::{Component, Entity};
 use std::any::Any;
 
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 /// Type-erased component storage trait
 ///

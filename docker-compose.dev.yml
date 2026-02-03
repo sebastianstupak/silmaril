@@ -23,7 +23,7 @@ services:
       - "7777:7777/tcp"  # Game traffic (TCP)
       - "7778:7778/udp"  # Game traffic (UDP)
     environment:
-      - RUST_LOG=info,agent_game_engine=debug
+      - RUST_LOG=info,silmaril=debug
       - RUST_BACKTRACE=1
     networks:
       - game-network

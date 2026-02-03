@@ -338,7 +338,7 @@ We've successfully:
 
 **The physics engine is now COMPETITIVE WITH AAA GAME ENGINES!** 🎉🏆
 
-The agent game engine now has a production-ready physics system that:
+The Silmaril now has a production-ready physics system that:
 - Performs as well as Unity PhysX and Unreal Chaos
 - Has 100% test coverage
 - Works on client/server/standalone via configuration

@@ -3,7 +3,7 @@
 //! Verifies end-to-end functionality of the feedback metrics system.
 
 #[cfg(feature = "metrics")]
-use agent_game_engine_profiling::{ProfileCategory, Profiler, ProfilerConfig};
+use silmaril_profiling::{ProfileCategory, Profiler, ProfilerConfig};
 
 #[cfg(feature = "metrics")]
 use std::thread;
@@ -85,7 +85,7 @@ fn test_full_metrics_pipeline() {
 #[test]
 #[cfg(all(feature = "metrics", feature = "serde"))]
 fn test_json_deserialization() {
-    use agent_game_engine_profiling::AgentFeedbackMetrics;
+    use silmaril_profiling::AgentFeedbackMetrics;
 
     // Create profiler and generate metrics
     let profiler = Profiler::new(ProfilerConfig::default());

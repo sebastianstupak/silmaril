@@ -1980,7 +1980,7 @@ fn smooth_input(raw: Input, dt: f32) -> Input {
    - Small team? → Simcade (4-6)
    - Large team with expert? → Simulation (7-10)
 
-**Recommendation for Agent Game Engine:**
+**Recommendation for Silmaril:**
 Start at **Simcade (5-6)** with:
 - Pacejka tire model (simplified)
 - Spring-damper suspension + ARB
@@ -2212,7 +2212,7 @@ Modern vehicle physics for games has matured significantly by 2024-2025, with cl
 
 The key to successful implementation is **choosing the right position on the arcade-simulation spectrum** based on your audience, platform, and resources. A well-executed simcade implementation (complexity 6/10) satisfies most racing games, with room to scale down (arcade) or up (simulation) as needed.
 
-For the Agent Game Engine, I recommend:
+For the Silmaril, I recommend:
 1. Start with **Phase 1-4** (foundation through drivetrain) for a solid simcade base
 2. Implement **Phase 6** (optimization) early to validate performance targets
 3. Add **Phase 7** (networking) before public testing

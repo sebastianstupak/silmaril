@@ -1,6 +1,6 @@
 # Profiling Documentation Index
 
-> **Complete guide to profiling documentation for agent-game-engine**
+> **Complete guide to profiling documentation for silmaril**
 
 ---
 

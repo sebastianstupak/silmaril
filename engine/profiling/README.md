@@ -126,7 +126,7 @@ cargo build --features metrics
 The easiest way to visualize profiling data in real-time:
 
 ```rust
-use agent_game_engine_profiling::backends::PuffinBackend;
+use silmaril_profiling::backends::PuffinBackend;
 
 // Initialize Puffin backend
 let mut backend = PuffinBackend::new();
@@ -175,7 +175,7 @@ The Puffin viewer provides:
 Export profiling data for offline analysis:
 
 ```rust
-use agent_game_engine_profiling::backends::PuffinBackend;
+use silmaril_profiling::backends::PuffinBackend;
 
 let backend = PuffinBackend::new();
 
@@ -420,7 +420,7 @@ cargo build --release --features profiling-tracy
 ### **Example**
 
 ```rust
-use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+use silmaril_profiling::{profile_scope, ProfileCategory};
 
 // Hot path - only ~10ns overhead per call
 fn process_entity() {

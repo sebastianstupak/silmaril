@@ -23,6 +23,21 @@ name = "aaa_plus_stress_tests"
 path = "tests/aaa_plus_stress_tests.rs"
 harness = true
 
+[[test]]
+name = "audio_ecs_integration"
+path = "tests/audio_ecs_integration.rs"
+harness = true
+
+[[test]]
+name = "serialization_property_tests"
+path = "tests/serialization_property_tests.rs"
+harness = true
+
+[[test]]
+name = "asset_rendering_integration"
+path = "tests/asset_rendering_integration.rs"
+harness = true
+
 [[bench]]
 name = "integration_bench"
 path = "benches/integration_bench.rs"
@@ -38,12 +53,22 @@ name = "prediction_benches"
 path = "benches/prediction_benches.rs"
 harness = false
 
+[[bench]]
+name = "audio_ecs_bench"
+path = "benches/audio_ecs_bench.rs"
+harness = false
+
 [dependencies]
 engine-core = { path = "../core" }
 engine-math = { path = "../math" }
 engine-physics = { path = "../physics" }
+engine-audio = { path = "../audio" }
+engine-assets = { path = "../assets" }
+engine-renderer = { path = "../renderer" }
+glam = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-proptest = "1.4"
+proptest = { workspace = true }
 bincode = "1.3"
+rand = { version = "0.8", features = ["small_rng"] }

@@ -1,11 +1,11 @@
 [package]
-name = "agent_game_engine_server"
+name = "silmaril_server"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Server binary for Agent Game Engine"
+description = "Server binary for Silmaril"
 
 [[bin]]
 name = "server"
@@ -15,6 +15,7 @@ path = "src/main.rs"
 # Core engine
 engine-core = { path = "../../core" }
 engine-networking = { path = "../../networking" }
+engine-observability = { path = "../../observability", features = ["metrics"] }
 
 # Macros
 engine-macros = { path = "../../macros" }

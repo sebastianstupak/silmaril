@@ -8,7 +8,7 @@
 
 ## 🎯 **Objective**
 
-Create a multiplayer online RPG example that showcases the engine's networking, state synchronization, and server architecture. This demonstrates how to build massively multiplayer games with the Agent Game Engine.
+Create a multiplayer online RPG example that showcases the engine's networking, state synchronization, and server architecture. This demonstrates how to build massively multiplayer games with the Silmaril.
 
 **Game Concept:**
 - **Genre:** Online multiplayer RPG
@@ -71,9 +71,9 @@ examples/mmorpg/
 members = ["server", "client", "shared"]
 
 [workspace.dependencies]
-agent-game-engine-core = { path = "../../engine/core" }
-agent-game-engine-networking = { path = "../../engine/networking" }
-agent-game-engine-macros = { path = "../../engine/macros" }
+silmaril-core = { path = "../../engine/core" }
+silmaril-networking = { path = "../../engine/networking" }
+silmaril-macros = { path = "../../engine/macros" }
 glam = "0.24"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
@@ -88,7 +88,7 @@ anyhow = "1.0"
 **File:** `examples/mmorpg/shared/src/components.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
+use silmaril_core::prelude::*;
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
@@ -338,8 +338,8 @@ pub enum NpcType {
 **File:** `examples/mmorpg/server/src/server.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
-use agent_game_engine_networking::server::*;
+use silmaril_core::prelude::*;
+use silmaril_networking::server::*;
 use mmorpg_shared::components::*;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -780,10 +780,10 @@ pub struct WorldState {
 **File:** `examples/mmorpg/client/src/client.rs`
 
 ```rust
-use agent_game_engine_core::prelude::*;
-use agent_game_engine_networking::client::*;
-use agent_game_engine_platform::{Platform, Input};
-use agent_game_engine_rendering::Renderer;
+use silmaril_core::prelude::*;
+use silmaril_networking::client::*;
+use silmaril_platform::{Platform, Input};
+use silmaril_rendering::Renderer;
 use mmorpg_shared::components::*;
 use std::collections::VecDeque;
 use anyhow::Result;
@@ -1083,8 +1083,8 @@ async fn main() -> Result<()> {
 mod client;
 
 use client::*;
-use agent_game_engine_platform::{Platform, WindowConfig};
-use agent_game_engine_rendering::Renderer;
+use silmaril_platform::{Platform, WindowConfig};
+use silmaril_rendering::Renderer;
 use anyhow::Result;
 use std::time::Instant;
 

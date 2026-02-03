@@ -1,17 +1,18 @@
-//! Steam OpenID authentication.
+//! Steam `OpenID` authentication.
 //!
-//! Steam uses OpenID 2.0 for authentication (not OAuth 2.0).
+//! Steam uses `OpenID` 2.0 for authentication (not OAuth 2.0).
 
 use crate::error::AuthError;
 use crate::oauth::OAuthProfile;
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use tracing::{debug, info};
 use url::Url;
 
-/// Steam OpenID endpoint.
+/// Steam `OpenID` endpoint.
 const STEAM_OPENID_URL: &str = "https://steamcommunity.com/openid/login";
 
-/// Steam OpenID identifier.
+/// Steam `OpenID` identifier.
 const STEAM_OPENID_NS: &str = "http://specs.openid.net/auth/2.0";
 
 /// Steam API base URL for user profiles.
@@ -32,20 +33,21 @@ impl SteamAuth {
     ///
     /// # Arguments
     ///
-    /// * `realm` - Your website's URL (e.g., "https://yourgame.com")
-    /// * `return_url` - Callback URL (e.g., "https://yourgame.com/auth/steam/callback")
-    /// * `api_key` - Steam API key from https://steamcommunity.com/dev/apikey
+    /// * `realm` - Your website's URL (e.g., "<https://yourgame.com>")
+    /// * `return_url` - Callback URL (e.g., "<https://yourgame.com/auth/steam/callback>")
+    /// * `api_key` - Steam API key from <https://steamcommunity.com/dev/apikey>
+    #[must_use]
     pub fn new(realm: String, return_url: String, api_key: String) -> Self {
         Self { realm, return_url, api_key }
     }
 
-    /// Generate the Steam OpenID login URL.
+    /// Generate the Steam `OpenID` login URL.
     ///
     /// Redirect the user to this URL to start authentication.
     pub fn get_login_url(&self) -> Result<String, AuthError> {
         let mut url = Url::parse(STEAM_OPENID_URL).map_err(|e| AuthError::OAuthProviderError {
             provider: "steam".to_string(),
-            error: format!("Failed to parse Steam URL: {}", e),
+            error: format!("Failed to parse Steam URL: {e}"),
             #[cfg(feature = "backtrace")]
             backtrace: Backtrace::capture(),
         })?;
@@ -62,7 +64,7 @@ impl SteamAuth {
         Ok(url.to_string())
     }
 
-    /// Verify the Steam OpenID response and extract Steam ID.
+    /// Verify the Steam `OpenID` response and extract Steam ID.
     ///
     /// Call this when the user returns from Steam.
     ///
@@ -132,7 +134,7 @@ impl SteamAuth {
         let response =
             client.get(&url).send().await.map_err(|e| AuthError::OAuthProviderError {
                 provider: "steam".to_string(),
-                error: format!("Failed to fetch profile: {}", e),
+                error: format!("Failed to fetch profile: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             })?;
@@ -140,7 +142,7 @@ impl SteamAuth {
         let data: serde_json::Value =
             response.json().await.map_err(|e| AuthError::OAuthProviderError {
                 provider: "steam".to_string(),
-                error: format!("Failed to parse response: {}", e),
+                error: format!("Failed to parse response: {e}"),
                 #[cfg(feature = "backtrace")]
                 backtrace: Backtrace::capture(),
             })?;

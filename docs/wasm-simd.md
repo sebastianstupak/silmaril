@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document describes the WASM SIMD implementation for the agent-game-engine math library. WebAssembly SIMD (v128 instructions) enables parallel processing of 4 float32 values simultaneously in the browser, significantly improving physics and math performance.
+This document describes the WASM SIMD implementation for the silmaril math library. WebAssembly SIMD (v128 instructions) enables parallel processing of 4 float32 values simultaneously in the browser, significantly improving physics and math performance.
 
 ## Implementation Summary
 

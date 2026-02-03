@@ -1,6 +1,6 @@
 ---
 name: bench
-description: Run performance benchmarks for agent-game-engine
+description: Run performance benchmarks for silmaril
 trigger: /bench
 ---
 
@@ -23,13 +23,13 @@ Runs Criterion benchmarks to measure and compare performance of critical code pa
    If user specifies a particular area:
    ```bash
    # ECS benchmarks only
-   cargo bench -p agent-game-engine-core -- ecs
+   cargo bench -p silmaril-core -- ecs
 
    # Networking benchmarks
-   cargo bench -p agent-game-engine-networking
+   cargo bench -p silmaril-networking
 
    # Rendering benchmarks
-   cargo bench -p agent-game-engine-renderer
+   cargo bench -p silmaril-renderer
    ```
 
 3. **Compare Against Baseline**

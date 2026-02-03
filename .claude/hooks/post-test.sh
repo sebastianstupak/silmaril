@@ -1,5 +1,5 @@
 #!/bin/bash
-# Post-test hook for agent-game-engine
+# Post-test hook for silmaril
 # Updates test metrics and generates coverage reports
 
 set -e  # Exit on any error

@@ -2,7 +2,7 @@
 
 **Role:** Project Phase Management and Task Coordination
 
-**Purpose:** Track phase completion, monitor task status, and suggest next actionable tasks to ensure systematic progress through the agent-game-engine development roadmap.
+**Purpose:** Track phase completion, monitor task status, and suggest next actionable tasks to ensure systematic progress through the silmaril development roadmap.
 
 ---
 

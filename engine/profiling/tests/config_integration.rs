@@ -4,7 +4,7 @@
 //! with the proper priority: env vars > config file > defaults.
 
 #[cfg(feature = "config")]
-use agent_game_engine_profiling::{parse_duration, ProfileFormat, ProfilerConfig};
+use silmaril_profiling::{parse_duration, ProfileFormat, ProfilerConfig};
 #[cfg(feature = "config")]
 use std::io::Write;
 #[cfg(feature = "config")]

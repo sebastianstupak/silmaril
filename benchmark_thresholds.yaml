@@ -74,10 +74,10 @@ ecs:
       description: "Mass Entity used in Matrix Awakens demo for massive crowd simulations"
       notes: "Community reports 75K-100K+ entities feasible with proper optimization"
 
-    agent_game_engine_target:
+    silmaril_target:
       value: 10000000
       unit: "entities/sec"
-      source: "agent-game-engine Phase 1.1-1.2 target"
+      source: "silmaril Phase 1.1-1.2 target"
       description: "Target: 10M entities/sec query iteration"
       notes: "4.4x faster than Unity DOTS throughput target"
 
@@ -107,10 +107,10 @@ ecs:
 
   # Component Operations
   component_operations:
-    agent_game_engine_target:
+    silmaril_target:
       value: 1
       unit: "μs"
-      source: "agent-game-engine performance target"
+      source: "silmaril performance target"
       description: "Component add/remove operations target"
 
     rust_ecs_insert:
@@ -142,18 +142,18 @@ serialization:
       source_url: "https://github.com/djkoloski/rust_serialization_benchmark"
       description: "Mesh dataset with triangle arrays, vertices, normals"
 
-    agent_game_engine_target:
+    silmaril_target:
       value: 5
       unit: "ms"
       entity_count: 1000
-      source: "agent-game-engine Phase 1.3 target"
+      source: "silmaril Phase 1.3 target"
       description: "Serialize 1000 entities with multiple components"
 
-    agent_game_engine_actual:
+    silmaril_actual:
       value: 0.0993
       unit: "ms"
       entity_count: 1000
-      source: "agent-game-engine Phase 1.3 benchmark (2026-02-01)"
+      source: "silmaril Phase 1.3 benchmark (2026-02-01)"
       description: "✅ ACTUAL: 99.3µs (50x faster than target!)"
       throughput: 10000000
       throughput_unit: "entities/sec"
@@ -263,10 +263,10 @@ physics:
       notes: "PhysX and Rapier have close single-threaded performance"
 
   integration_simd:
-    agent_game_engine_target:
+    silmaril_target:
       value: 8
       unit: "bodies/iteration (AVX2)"
-      source: "agent-game-engine SIMD physics"
+      source: "silmaril SIMD physics"
       description: "8-wide SIMD integration for position/velocity"
 
 # ================================================
@@ -309,7 +309,7 @@ networking:
       description: "MMOs use lower tick rates: WoW 4Hz, FFXIV 3Hz"
       notes: "FFXIV slidecasting and animation delays due to low tick rate"
 
-  agent_game_engine_targets:
+  silmaril_targets:
     competitive_fps_target:
       value: 60
       unit: "ticks/sec"
@@ -369,23 +369,23 @@ memory:
       source: "HotS 4K High Performance Settings"
       description: "3840x2160, high performance mode"
 
-  agent_game_engine_targets:
+  silmaril_targets:
     client_baseline:
       value: 2048
       unit: "MB"
-      source: "agent-game-engine target"
+      source: "silmaril target"
       description: "Client memory budget (baseline)"
 
     client_critical:
       value: 4096
       unit: "MB"
-      source: "agent-game-engine target"
+      source: "silmaril target"
       description: "Critical threshold (must not exceed)"
 
     server_per_1000_players:
       value: 8192
       unit: "MB"
-      source: "agent-game-engine MMO target"
+      source: "silmaril MMO target"
       description: "Server memory for 1000 concurrent players"
 
     server_critical:
@@ -420,7 +420,7 @@ assets:
       source_url: "https://link.springer.com/article/10.1007/s00371-021-02152-z"
       description: "Fixed load time to limit streaming rate and reduce stuttering"
 
-  agent_game_engine_targets:
+  silmaril_targets:
     texture_loading:
       value: 100
       unit: "MB/sec"
@@ -436,10 +436,10 @@ assets:
 # ================================================
 profiling:
   runtime_overhead:
-    agent_game_engine_target:
+    silmaril_target:
       value: 1
       unit: "%"
-      source: "agent-game-engine profiling infrastructure"
+      source: "silmaril profiling infrastructure"
       description: "Profiling overhead in instrumented builds"
 
     tracy_reference:
@@ -452,7 +452,7 @@ profiling:
 # COMPARISON SUMMARY
 # ================================================
 comparison_summary:
-  agent_game_engine_wins:
+  silmaril_wins:
     - feature: "Serialization"
       target: "5ms for 1000 entities"
       actual: "0.0993ms (99.3µs)"

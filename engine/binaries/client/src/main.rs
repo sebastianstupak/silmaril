@@ -6,12 +6,12 @@ fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,agent_game_engine=debug".into()),
+                .unwrap_or_else(|_| "info,silmaril=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Agent Game Engine Client starting...");
+    tracing::info!("Silmaril Client starting...");
 
     // TODO: Load configuration
     // let config = ClientConfig::from_file("client_config.toml")?;

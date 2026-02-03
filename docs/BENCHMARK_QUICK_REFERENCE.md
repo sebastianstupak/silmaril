@@ -8,13 +8,13 @@ Quick reference for running and managing benchmarks.
 
 ```bash
 # Run all benchmarks
-just bench-all
+cargo xtask bench all-all
 
 # Compare with baseline
-just bench-baseline
+cargo xtask bench all-baseline
 
 # View results
-just bench-report
+cargo xtask bench all-report
 ```
 
 ---
@@ -25,30 +25,30 @@ just bench-report
 
 | Command | Description | Use When |
 |---------|-------------|----------|
-| `just bench` | Run all benchmarks (standard) | Regular benchmark run |
-| `just bench-all` | Run all + save baseline | Before creating PR |
-| `just bench-smoke` | Quick smoke test (fast) | Verifying benchmarks compile |
-| `just bench-profile` | Run with profiling | Investigating performance |
+| `cargo xtask bench all` | Run all benchmarks (standard) | Regular benchmark run |
+| `cargo xtask bench all-all` | Run all + save baseline | Before creating PR |
+| `cargo xtask bench all-smoke` | Quick smoke test (fast) | Verifying benchmarks compile |
+| `cargo xtask bench all-profile` | Run with profiling | Investigating performance |
 
 ### Specific Suites
 
 | Command | Description | Crate |
 |---------|-------------|-------|
-| `just bench-ecs` | ECS benchmarks | engine-core |
-| `just bench-physics` | Physics benchmarks | engine-physics |
-| `just bench-renderer` | Renderer benchmarks | engine-renderer |
-| `just bench-math` | Math benchmarks | engine-math |
-| `just bench-profiling` | Profiling overhead | engine-profiling |
-| `just bench-platform` | Platform-specific | engine-core |
-| `just bench-compare` | Industry comparison | engine-core |
+| `cargo xtask bench all-ecs` | ECS benchmarks | engine-core |
+| `cargo xtask bench all-physics` | Physics benchmarks | engine-physics |
+| `cargo xtask bench all-renderer` | Renderer benchmarks | engine-renderer |
+| `cargo xtask bench all-math` | Math benchmarks | engine-math |
+| `cargo xtask bench all-profiling` | Profiling overhead | engine-profiling |
+| `cargo xtask bench all-platform` | Platform-specific | engine-core |
+| `cargo xtask bench all-compare` | Industry comparison | engine-core |
 
 ### Baseline Management
 
 | Command | Description | Use When |
 |---------|-------------|----------|
-| `just bench-baseline` | Compare with saved baseline | After changes to check regression |
-| `just bench-save-baseline` | Save current as main baseline | After performance improvement |
-| `just bench-report` | Open HTML report | Viewing detailed results |
+| `cargo xtask bench all-baseline` | Compare with saved baseline | After changes to check regression |
+| `cargo xtask bench all-save-baseline` | Save current as main baseline | After performance improvement |
+| `cargo xtask bench all-report` | Open HTML report | Viewing detailed results |
 
 ---
 
@@ -124,8 +124,8 @@ See [docs/performance-targets.md](performance-targets.md) for complete list.
 
 ```bash
 # Generate and open report
-just bench-all
-just bench-report
+cargo xtask bench all-all
+cargo xtask bench all-report
 ```
 
 Or manually:
@@ -162,8 +162,8 @@ Change vs baseline:
 
 ```bash
 # Run benchmarks with comparison
-just bench-all
-just bench-baseline
+cargo xtask bench all-all
+cargo xtask bench all-baseline
 
 # Or use script for detailed report
 ./scripts/compare_with_baseline.sh main
@@ -186,26 +186,26 @@ On every PR:
 
 ```bash
 # 1. Run benchmarks
-just bench-all
+cargo xtask bench all-all
 
 # 2. Compare with baseline
-just bench-baseline
+cargo xtask bench all-baseline
 
 # 3. If no regressions, commit
 git add .
 git commit -m "feat: Add new feature"
 
 # 4. If regressions, profile and optimize
-just bench-profile
+cargo xtask bench all-profile
 # ... optimize code ...
-just bench-baseline
+cargo xtask bench all-baseline
 ```
 
 ### After Performance Improvement
 
 ```bash
 # 1. Verify improvement
-just bench-baseline
+cargo xtask bench all-baseline
 
 # 2. Update baseline
 ./scripts/update_benchmark_baseline.sh main
@@ -273,4 +273,4 @@ ls -la benchmarks/baselines/
 
 ---
 
-**Tip**: Run `just` with no arguments to see all available commands!
+**Tip**: Run `cargo xtask --help` to see all available commands!

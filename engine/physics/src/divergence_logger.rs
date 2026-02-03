@@ -210,10 +210,7 @@ impl DivergenceLogger {
                 };
 
                 // Store divergence
-                self.divergences_by_entity
-                    .entry(entity_id)
-                    .or_default()
-                    .push(record.clone());
+                self.divergences_by_entity.entry(entity_id).or_default().push(record.clone());
 
                 // Log if enabled
                 if self.log_enabled {

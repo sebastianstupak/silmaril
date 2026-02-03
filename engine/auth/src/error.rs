@@ -4,6 +4,7 @@
 //! and severity levels.
 
 use engine_core::error::{ErrorCode, ErrorSeverity};
+#[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::fmt;
 
@@ -87,7 +88,8 @@ pub enum AuthErrorCode {
 }
 
 impl AuthErrorCode {
-    /// Convert to engine ErrorCode
+    /// Convert to engine `ErrorCode`
+    #[must_use]
     pub fn to_engine_code(self) -> ErrorCode {
         // Auth errors are in the networking range (1400-1499)
         // We map our auth codes to a subset
@@ -131,130 +133,195 @@ impl AuthErrorCode {
 #[derive(Debug)]
 pub enum AuthError {
     // User/Password errors
+    /// Invalid username format
     InvalidUsername {
+        /// The invalid username
         username: String,
+        /// Reason for invalidity
         reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Invalid email format
     InvalidEmail {
+        /// The invalid email
         email: String,
+        /// Reason for invalidity
         reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Password does not meet strength requirements
     WeakPassword {
+        /// Reason password is weak
         reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Password hashing operation failed
     PasswordHashFailed {
+        /// Error details
         details: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Password verification operation failed
     PasswordVerifyFailed {
+        /// Error details
         details: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// User does not exist
     UserNotFound {
+        /// User identifier (username or email)
         identifier: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// User already exists
     UserAlreadyExists {
+        /// User identifier (username or email)
         identifier: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Invalid login credentials
     InvalidCredentials {
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
 
     // Token errors
+    /// JWT token generation failed
     TokenGenerationFailed {
+        /// Failure reason
         reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// JWT token validation failed
     TokenValidationFailed {
+        /// Failure reason
         reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// JWT token has expired
     TokenExpired {
+        /// When the token expired
         expired_at: chrono::DateTime<chrono::Utc>,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// JWT token has been revoked
     TokenRevoked {
+        /// Token identifier
         token_id: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
 
     // Session errors
+    /// Session does not exist
     SessionNotFound {
+        /// Session identifier
         session_id: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Session has expired
     SessionExpired {
+        /// Session identifier
         session_id: String,
+        /// When the session expired
         expired_at: chrono::DateTime<chrono::Utc>,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// User has reached maximum concurrent sessions
     MaxSessionsReached {
+        /// User identifier
         user_id: String,
+        /// Maximum allowed sessions
         max_sessions: usize,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
 
     // OAuth errors
+    /// OAuth provider returned an error
     OAuthProviderError {
+        /// OAuth provider name
         provider: String,
+        /// Error message from provider
         error: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// OAuth state parameter mismatch (possible CSRF attack)
     OAuthStateMismatch {
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// OAuth token exchange failed
     OAuthTokenExchangeFailed {
+        /// OAuth provider name
         provider: String,
+        /// Failure reason
         reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
 
     // MFA errors
+    /// Multi-factor authentication required
     MfaRequired {
+        /// User identifier
         user_id: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
-    TotpVerificationFailed {
+    /// MFA setup operation failed
+    MfaSetupFailed {
+        /// Failure reason
+        reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// TOTP verification failed
+    TotpVerificationFailed {
+        /// Error details
+        details: String,
+        #[cfg(feature = "backtrace")]
+        backtrace: Backtrace,
+    },
+    /// Backup code verification failed
     BackupCodeVerificationFailed {
+        #[cfg(feature = "backtrace")]
+        backtrace: Backtrace,
+    },
+    /// QR code generation failed
+    QrCodeGenerationFailed {
+        /// Failure reason
+        reason: String,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
 
     // Rate limiting
+    /// Rate limit exceeded
     RateLimitExceeded {
+        /// Seconds until retry allowed
         retry_after_secs: u64,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
     },
+    /// Account is locked due to failed login attempts
     AccountLocked {
+        /// User identifier
         user_id: String,
+        /// When the lock expires
         locked_until: chrono::DateTime<chrono::Utc>,
         #[cfg(feature = "backtrace")]
         backtrace: Backtrace,
@@ -263,6 +330,7 @@ pub enum AuthError {
 
 impl AuthError {
     /// Get the error code for this error.
+    #[must_use]
     pub fn code(&self) -> AuthErrorCode {
         match self {
             Self::InvalidUsername { .. } => AuthErrorCode::InvalidUsername,
@@ -284,16 +352,19 @@ impl AuthError {
             Self::OAuthStateMismatch { .. } => AuthErrorCode::OAuthStateMismatch,
             Self::OAuthTokenExchangeFailed { .. } => AuthErrorCode::OAuthTokenExchangeFailed,
             Self::MfaRequired { .. } => AuthErrorCode::MfaRequired,
+            Self::MfaSetupFailed { .. } => AuthErrorCode::MfaSetupFailed,
             Self::TotpVerificationFailed { .. } => AuthErrorCode::TotpVerificationFailed,
             Self::BackupCodeVerificationFailed { .. } => {
                 AuthErrorCode::BackupCodeVerificationFailed
             }
+            Self::QrCodeGenerationFailed { .. } => AuthErrorCode::QrCodeGenerationFailed,
             Self::RateLimitExceeded { .. } => AuthErrorCode::RateLimitExceeded,
             Self::AccountLocked { .. } => AuthErrorCode::AccountLocked,
         }
     }
 
     /// Get severity level for this error.
+    #[must_use]
     pub fn severity(&self) -> ErrorSeverity {
         match self {
             Self::WeakPassword { .. }
@@ -328,8 +399,10 @@ impl AuthError {
             | Self::OAuthStateMismatch { backtrace, .. }
             | Self::OAuthTokenExchangeFailed { backtrace, .. }
             | Self::MfaRequired { backtrace, .. }
+            | Self::MfaSetupFailed { backtrace, .. }
             | Self::TotpVerificationFailed { backtrace, .. }
             | Self::BackupCodeVerificationFailed { backtrace, .. }
+            | Self::QrCodeGenerationFailed { backtrace, .. }
             | Self::RateLimitExceeded { backtrace, .. }
             | Self::AccountLocked { backtrace, .. } => Some(backtrace),
         }
@@ -405,65 +478,69 @@ impl fmt::Display for AuthError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidUsername { username, reason, .. } => {
-                write!(f, "Invalid username '{}': {}", username, reason)
+                write!(f, "Invalid username '{username}': {reason}")
             }
             Self::InvalidEmail { email, reason, .. } => {
-                write!(f, "Invalid email '{}': {}", email, reason)
+                write!(f, "Invalid email '{email}': {reason}")
             }
-            Self::WeakPassword { reason, .. } => write!(f, "Weak password: {}", reason),
+            Self::WeakPassword { reason, .. } => write!(f, "Weak password: {reason}"),
             Self::PasswordHashFailed { details, .. } => {
-                write!(f, "Password hashing failed: {}", details)
+                write!(f, "Password hashing failed: {details}")
             }
             Self::PasswordVerifyFailed { details, .. } => {
-                write!(f, "Password verification failed: {}", details)
+                write!(f, "Password verification failed: {details}")
             }
-            Self::UserNotFound { identifier, .. } => write!(f, "User not found: {}", identifier),
+            Self::UserNotFound { identifier, .. } => write!(f, "User not found: {identifier}"),
             Self::UserAlreadyExists { identifier, .. } => {
-                write!(f, "User already exists: {}", identifier)
+                write!(f, "User already exists: {identifier}")
             }
             Self::InvalidCredentials { .. } => write!(f, "Invalid credentials"),
             Self::TokenGenerationFailed { reason, .. } => {
-                write!(f, "Token generation failed: {}", reason)
+                write!(f, "Token generation failed: {reason}")
             }
             Self::TokenValidationFailed { reason, .. } => {
-                write!(f, "Token validation failed: {}", reason)
+                write!(f, "Token validation failed: {reason}")
             }
             Self::TokenExpired { expired_at, .. } => {
-                write!(f, "Token expired at {}", expired_at)
+                write!(f, "Token expired at {expired_at}")
             }
-            Self::TokenRevoked { token_id, .. } => write!(f, "Token revoked: {}", token_id),
+            Self::TokenRevoked { token_id, .. } => write!(f, "Token revoked: {token_id}"),
             Self::SessionNotFound { session_id, .. } => {
-                write!(f, "Session not found: {}", session_id)
+                write!(f, "Session not found: {session_id}")
             }
             Self::SessionExpired { session_id, expired_at, .. } => {
-                write!(f, "Session {} expired at {}", session_id, expired_at)
+                write!(f, "Session {session_id} expired at {expired_at}")
             }
             Self::MaxSessionsReached { user_id, max_sessions, .. } => {
-                write!(
-                    f,
-                    "Maximum concurrent sessions ({}) reached for user {}",
-                    max_sessions, user_id
-                )
+                write!(f, "Maximum concurrent sessions ({max_sessions}) reached for user {user_id}")
             }
             Self::OAuthProviderError { provider, error, .. } => {
-                write!(f, "OAuth provider {} error: {}", provider, error)
+                write!(f, "OAuth provider {provider} error: {error}")
             }
             Self::OAuthStateMismatch { .. } => write!(f, "OAuth state mismatch"),
             Self::OAuthTokenExchangeFailed { provider, reason, .. } => {
-                write!(f, "OAuth token exchange failed for {}: {}", provider, reason)
+                write!(f, "OAuth token exchange failed for {provider}: {reason}")
             }
             Self::MfaRequired { user_id, .. } => {
-                write!(f, "MFA required for user {}", user_id)
+                write!(f, "MFA required for user {user_id}")
             }
-            Self::TotpVerificationFailed { .. } => write!(f, "TOTP verification failed"),
+            Self::MfaSetupFailed { reason, .. } => {
+                write!(f, "MFA setup failed: {reason}")
+            }
+            Self::TotpVerificationFailed { details, .. } => {
+                write!(f, "TOTP verification failed: {details}")
+            }
             Self::BackupCodeVerificationFailed { .. } => {
                 write!(f, "Backup code verification failed")
             }
+            Self::QrCodeGenerationFailed { reason, .. } => {
+                write!(f, "QR code generation failed: {reason}")
+            }
             Self::RateLimitExceeded { retry_after_secs, .. } => {
-                write!(f, "Rate limit exceeded, retry after {} seconds", retry_after_secs)
+                write!(f, "Rate limit exceeded, retry after {retry_after_secs} seconds")
             }
             Self::AccountLocked { user_id, locked_until, .. } => {
-                write!(f, "Account {} locked until {}", user_id, locked_until)
+                write!(f, "Account {user_id} locked until {locked_until}")
             }
         }
     }

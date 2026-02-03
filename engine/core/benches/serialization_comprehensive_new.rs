@@ -48,8 +48,7 @@ fn create_realistic_world_state(entity_count: usize) -> WorldState {
 
         // 30% have MeshRenderer
         if i % 10 < 3 {
-            components
-                .push(ComponentData::MeshRenderer(MeshRenderer::new(i as u64, i as u64 + 1000)));
+            components.push(ComponentData::MeshRenderer(MeshRenderer::new(i as u64)));
         }
 
         state.entities.push(engine_core::serialization::EntityMetadata {
@@ -118,7 +117,7 @@ fn bench_component_density(c: &mut Criterion) {
             ComponentData::Transform(Transform::default()),
             ComponentData::Health(Health::new(100.0, 100.0)),
             ComponentData::Velocity(Velocity::default()),
-            ComponentData::MeshRenderer(MeshRenderer::new(i as u64, i as u64)),
+            ComponentData::MeshRenderer(MeshRenderer::new(i as u64)),
         ];
 
         dense_state.entities.push(engine_core::serialization::EntityMetadata {

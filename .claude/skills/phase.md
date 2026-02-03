@@ -13,7 +13,7 @@ Shows the current phase status from ROADMAP.md, task completion, and suggests ne
 1. **Read ROADMAP.md**
    ```bash
    # Read the current roadmap
-   cat D:\dev\agent-game-engine\ROADMAP.md
+   cat D:\dev\silmaril\ROADMAP.md
    ```
 
 2. **Identify Current Phase**

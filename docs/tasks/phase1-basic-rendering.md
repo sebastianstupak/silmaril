@@ -437,7 +437,7 @@ impl Renderer {
     pub fn new(window: &dyn WindowBackend) -> Result<Self, RendererError> {
         // Create instance
         let required_extensions = window.required_vulkan_extensions();
-        let instance = VulkanInstance::new("Agent Game Engine", cfg!(debug_assertions), &required_extensions)?;
+        let instance = VulkanInstance::new("Silmaril", cfg!(debug_assertions), &required_extensions)?;
 
         // Create surface
         let surface_loader = ash::extensions::khr::Surface::new(instance.entry(), instance.instance());

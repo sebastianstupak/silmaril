@@ -10,7 +10,7 @@
 //! Loading from a configuration file:
 //!
 //! ```rust,ignore
-//! use agent_game_engine_profiling::ProfilerConfig;
+//! use silmaril_profiling::ProfilerConfig;
 //! use std::path::Path;
 //!
 //! let config = ProfilerConfig::from_file(Path::new("engine.config.yaml"))
@@ -20,7 +20,7 @@
 //! Loading from environment variables:
 //!
 //! ```rust
-//! use agent_game_engine_profiling::ProfilerConfig;
+//! use silmaril_profiling::ProfilerConfig;
 //!
 //! let config = ProfilerConfig::from_env();
 //! ```
@@ -28,7 +28,7 @@
 //! Merging environment overrides into a file-loaded config:
 //!
 //! ```rust,ignore
-//! use agent_game_engine_profiling::ProfilerConfig;
+//! use silmaril_profiling::ProfilerConfig;
 //! use std::path::Path;
 //!
 //! let mut config = ProfilerConfig::from_file(Path::new("config.yaml"))?;
@@ -233,7 +233,7 @@ impl ProfilerConfig {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use agent_game_engine_profiling::ProfilerConfig;
+    /// use silmaril_profiling::ProfilerConfig;
     /// use std::path::Path;
     ///
     /// let config = ProfilerConfig::from_file(Path::new("engine.config.yaml"))?;
@@ -274,7 +274,7 @@ impl ProfilerConfig {
     /// # Examples
     ///
     /// ```rust
-    /// use agent_game_engine_profiling::ProfilerConfig;
+    /// use silmaril_profiling::ProfilerConfig;
     ///
     /// let config = ProfilerConfig::from_env();
     /// ```
@@ -335,7 +335,7 @@ impl ProfilerConfig {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use agent_game_engine_profiling::ProfilerConfig;
+    /// use silmaril_profiling::ProfilerConfig;
     /// use std::path::Path;
     ///
     /// let mut config = ProfilerConfig::from_file(Path::new("config.yaml"))?;
@@ -505,7 +505,7 @@ mod budget_serde {
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::parse_duration;
+/// use silmaril_profiling::parse_duration;
 /// use std::time::Duration;
 ///
 /// assert_eq!(parse_duration("16ms").unwrap(), Duration::from_millis(16));
@@ -557,7 +557,7 @@ pub fn parse_duration(s: &str) -> Result<Duration, ConfigError> {
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::format_duration;
+/// use silmaril_profiling::format_duration;
 /// use std::time::Duration;
 ///
 /// assert_eq!(format_duration(&Duration::from_millis(16)), "16.0ms");

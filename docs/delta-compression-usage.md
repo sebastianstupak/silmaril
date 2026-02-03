@@ -225,7 +225,7 @@ struct DeltaMetrics {
 
 ```rust
 #[cfg(feature = "profiling")]
-use agent_game_engine_profiling::profile_scope;
+use silmaril_profiling::profile_scope;
 
 #[cfg(feature = "profiling")]
 profile_scope!("delta_computation");

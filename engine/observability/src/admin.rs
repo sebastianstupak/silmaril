@@ -194,7 +194,7 @@ async fn handle_client(
     command_tx: mpsc::UnboundedSender<(AdminCommand, mpsc::UnboundedSender<String>)>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Send welcome message
-    stream.write_all(b"\r\n=== Agent Game Engine Admin Console ===\r\n").await?;
+    stream.write_all(b"\r\n=== Silmaril Admin Console ===\r\n").await?;
     stream.write_all(b"Type 'help' for available commands\r\n\r\n").await?;
 
     let (reader, mut writer) = stream.into_split();

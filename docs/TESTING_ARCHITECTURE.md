@@ -7,7 +7,7 @@
 
 ## 🎯 Overview
 
-The Agent Game Engine uses a **3-tier test hierarchy** to ensure comprehensive coverage while maintaining clear separation of concerns:
+The Silmaril uses a **3-tier test hierarchy** to ensure comprehensive coverage while maintaining clear separation of concerns:
 
 1. **Unit Tests** - Test single crate in isolation
 2. **Cross-Crate Integration Tests** - Test interaction between multiple crates
@@ -160,7 +160,7 @@ engine/shared/benches/
 ## 📁 Directory Structure
 
 ```
-agent-game-engine/
+silmaril/
 ├── engine/
 │   ├── core/
 │   │   ├── src/           # Unit tests inline
@@ -601,6 +601,271 @@ kill $SERVER_PID $CLIENT1_PID $CLIENT2_PID
 - 🔒 Clear dependency boundaries
 - ⚙️ Parallel test execution
 - ✅ Production validation
+
+---
+
+## 🔊 Audio Testing Pyramid
+
+### Overview
+
+The audio system follows the same 3-tier testing hierarchy with comprehensive coverage of all audio features including 3D spatial audio, streaming, and ECS integration.
+
+### Tier 1: Audio Unit Tests
+
+**Location:** `engine/audio/tests/unit/`
+
+**Dependencies:** Audio crate only (no other engine crates)
+
+**Coverage:**
+- Component behavior (Sound, AudioListener)
+- Builder pattern validation
+- Volume clamping
+- Serialization
+- Property-based tests using proptest
+
+**Files:**
+```
+engine/audio/tests/unit/
+├── component_tests.rs          ✅ Sound and AudioListener components
+└── backend_trait_tests.rs      ✅ AudioBackend trait with mocks
+```
+
+**Example:**
+```rust
+// File: engine/audio/tests/unit/component_tests.rs
+use engine_audio::Sound;
+
+#[test]
+fn test_sound_volume_clamping() {
+    let sound = Sound::new("test.wav").with_volume(2.5);
+    assert_eq!(sound.volume, 1.0);  // Clamped to max
+
+    let sound = Sound::new("test.wav").with_volume(-0.5);
+    assert_eq!(sound.volume, 0.0);  // Clamped to min
+}
+```
+
+**Property Tests:**
+```rust
+proptest! {
+    #[test]
+    fn test_volume_always_clamped(volume in -10.0f32..10.0f32) {
+        let sound = Sound::new("test.wav").with_volume(volume);
+        prop_assert!(sound.volume >= 0.0 && sound.volume <= 1.0);
+    }
+}
+```
+
+---
+
+### Tier 2: Audio Cross-Crate Integration Tests
+
+**Location:** `engine/shared/tests/` ⚠️ **MANDATORY**
+
+**Dependencies:** engine-audio + engine-core
+
+**Coverage:**
+- AudioSystem + ECS World integration
+- Listener position updates from ECS
+- Emitter position synchronization
+- Transform rotation affecting listener orientation
+- Component lifecycle (despawn, remove)
+- Multiple listeners (only one active)
+- Mixed spatial/non-spatial sounds
+
+**Files:**
+```
+engine/shared/tests/
+└── audio_ecs_integration.rs    ✅ Audio + ECS integration
+```
+
+**Example:**
+```rust
+// File: engine/shared/tests/audio_ecs_integration.rs
+use engine_audio::{AudioSystem, AudioListener, Sound};
+use engine_core::ecs::World;
+use engine_core::math::Transform;
+
+#[test]
+fn test_listener_update_from_ecs() {
+    let mut world = World::new();
+    world.register::<Transform>();
+    world.register::<AudioListener>();
+
+    let camera = world.spawn();
+    world.add(camera, Transform::default());
+    world.add(camera, AudioListener::new());
+
+    let mut audio_system = AudioSystem::new().unwrap();
+    audio_system.update(&mut world);  // Syncs listener from ECS
+}
+```
+
+**Why Tier 2?** Uses both `engine-audio` AND `engine-core`, so it MUST be in `engine/shared/tests/`.
+
+---
+
+### Tier 3: Audio System Tests
+
+**Location:** `engine/audio/tests/scenarios/` (planned)
+
+**Coverage:**
+- MMO battle audio (100+ sounds, spatial audio)
+- Racing game audio (Doppler effect, high-speed)
+- Platformer audio (3D spatial, effects)
+- Music streaming stress test
+- Audio memory usage under load
+
+**Note:** Scenario tests require actual audio files and platform backends. These are integration scenarios that test the complete audio pipeline.
+
+---
+
+### Audio Benchmarks
+
+#### Tier 1: Single-Crate Benchmarks
+
+**Location:** `engine/audio/benches/`
+
+**Files:**
+```
+engine/audio/benches/
+└── audio_benches.rs            ✅ Audio engine performance
+```
+
+**Measures:**
+- Sound loading time
+- 2D playback latency
+- 3D spatialization overhead
+- Streaming performance
+- Listener transform updates
+
+---
+
+#### Tier 2: Cross-Crate Benchmarks
+
+**Location:** `engine/shared/benches/` ⚠️ **MANDATORY**
+
+**Files:**
+```
+engine/shared/benches/
+└── audio_ecs_bench.rs          ✅ Audio + ECS performance
+```
+
+**Measures:**
+- AudioSystem update performance (10, 50, 100, 500, 1000 entities)
+- Listener update overhead
+- Emitter position update scaling
+- Mixed spatial/non-spatial performance
+- World query overhead
+- Cleanup performance
+
+**Example:**
+```rust
+// File: engine/shared/benches/audio_ecs_bench.rs
+use criterion::{black_box, criterion_group, Criterion};
+use engine_audio::{AudioSystem, Sound};
+use engine_core::ecs::World;
+
+fn bench_audio_system_update(c: &mut Criterion) {
+    let mut group = c.benchmark_group("audio_system_update");
+
+    for count in [10, 50, 100, 500, 1000].iter() {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(count),
+            count,
+            |b, &count| {
+                let (mut world, mut audio) = setup_world(count);
+                b.iter(|| audio.update(black_box(&mut world)));
+            }
+        );
+    }
+}
+```
+
+**Why Tier 2?** Uses both `engine-audio` AND `engine-core`, so it MUST be in `engine/shared/benches/`.
+
+---
+
+### Performance Targets
+
+| Metric | Target | Critical |
+|--------|--------|----------|
+| AudioSystem update (100 entities) | < 100μs | < 200μs |
+| AudioSystem update (1000 entities) | < 500μs | < 1ms |
+| 3D sound playback latency | < 5ms | < 10ms |
+| Streaming music start time | < 50ms | < 100ms |
+| Concurrent sounds | 256+ | 128+ |
+| Memory per sound | < 1MB | < 2MB |
+
+---
+
+### Test Execution
+
+**Run all audio unit tests:**
+```bash
+cargo test --package engine-audio --lib
+cargo test --package engine-audio --test unit_tests
+```
+
+**Run audio integration tests:**
+```bash
+cargo test --package engine-shared-tests --test audio_ecs_integration
+```
+
+**Run audio benchmarks:**
+```bash
+# Single-crate benchmarks
+cargo bench --package engine-audio
+
+# Cross-crate benchmarks
+cargo bench --package engine-shared-tests --bench audio_ecs_bench
+```
+
+---
+
+### Coverage Summary
+
+**Unit Tests (Tier 1):**
+- ✅ Sound component builder pattern
+- ✅ Volume clamping (0.0 - 1.0)
+- ✅ Spatial/non-spatial configuration
+- ✅ AudioListener active state
+- ✅ Serialization (with instance_id skip)
+- ✅ Property-based tests (proptest)
+- ✅ AudioBackend trait (mock implementation)
+
+**Integration Tests (Tier 2):**
+- ✅ AudioSystem + World integration
+- ✅ Listener position from Transform + AudioListener
+- ✅ Emitter position synchronization
+- ✅ Transform rotation affecting listener
+- ✅ Multiple listeners (only one active)
+- ✅ Entity despawn handling
+- ✅ Component removal handling
+- ✅ Mixed spatial/non-spatial sounds
+- ✅ Scalability (100+ entities)
+
+**Benchmarks:**
+- ✅ AudioSystem update scaling (10-1000 entities)
+- ✅ Listener update overhead
+- ✅ Emitter position update performance
+- ✅ World query overhead
+- ✅ Cleanup performance
+
+---
+
+## 🎯 Audio Test Quality Checklist
+
+Before merging audio changes, verify:
+
+- [ ] All unit tests pass (`cargo test --package engine-audio`)
+- [ ] Integration tests pass (`cargo test --package engine-shared-tests --test audio_ecs_integration`)
+- [ ] Benchmarks show no regression (`cargo bench --package engine-audio`)
+- [ ] Cross-crate benchmarks show no regression (`cargo bench --package engine-shared-tests --bench audio_ecs_bench`)
+- [ ] Property tests pass with 1000+ iterations
+- [ ] No println!/dbg! in test code (use assert! or test output)
+- [ ] All tests properly located (unit in audio/, integration in shared/)
+- [ ] Performance targets met (see table above)
 
 ---
 

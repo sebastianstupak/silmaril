@@ -84,6 +84,18 @@ impl Framebuffer {
         Ok(Self { framebuffer, device: device.clone() })
     }
 
+    /// Create a Framebuffer wrapper from an existing handle
+    ///
+    /// Use this when creating framebuffers manually (e.g., with multiple attachments).
+    /// The device reference is required for proper cleanup.
+    ///
+    /// # Arguments
+    /// * `device` - Vulkan device (for cleanup on drop)
+    /// * `framebuffer` - Pre-created framebuffer handle
+    pub fn from_raw(device: &ash::Device, framebuffer: vk::Framebuffer) -> Self {
+        Self { framebuffer, device: device.clone() }
+    }
+
     /// Get the raw framebuffer handle
     #[inline]
     pub fn handle(&self) -> vk::Framebuffer {

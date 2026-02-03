@@ -1,4 +1,4 @@
-//! Profiling and observability infrastructure for the agent game engine.
+//! Profiling and observability infrastructure for the Silmaril.
 //!
 //! This crate provides a zero-cost profiling abstraction that can be compiled away
 //! completely when profiling features are disabled. When enabled, it provides:
@@ -21,7 +21,7 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use agent_game_engine_profiling::{Profiler, ProfilerConfig, ProfileCategory, profile_scope};
+//! use silmaril_profiling::{Profiler, ProfilerConfig, ProfileCategory, profile_scope};
 //!
 //! # #[cfg(feature = "metrics")]
 //! # {
@@ -47,7 +47,7 @@
 //! When profiling features are disabled, all profiling code compiles to nothing:
 //!
 //! ```rust
-//! use agent_game_engine_profiling::profile_scope;
+//! use silmaril_profiling::profile_scope;
 //!
 //! fn expensive_function() {
 //!     profile_scope!("expensive_work");
@@ -163,7 +163,7 @@ impl std::fmt::Display for ProfileCategory {
 /// # Examples
 ///
 /// ```rust
-/// use agent_game_engine_profiling::profile_scope;
+/// use silmaril_profiling::profile_scope;
 ///
 /// fn game_loop() {
 ///     profile_scope!("game_loop");
@@ -176,7 +176,7 @@ impl std::fmt::Display for ProfileCategory {
 /// With explicit category:
 ///
 /// ```rust
-/// use agent_game_engine_profiling::{profile_scope, ProfileCategory};
+/// use silmaril_profiling::{profile_scope, ProfileCategory};
 ///
 /// fn physics_update() {
 ///     profile_scope!("physics_step", ProfileCategory::Physics);

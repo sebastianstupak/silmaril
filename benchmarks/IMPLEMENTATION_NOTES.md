@@ -199,7 +199,7 @@ cat benchmarks/COMPARISON_REPORT.md
 ## Files Created
 
 ```
-agent-game-engine/
+silmaril/
 ├── engine/core/benches/
 │   └── game_engine_comparison.rs          # 707 lines, 18.6 KB
 ├── benchmarks/

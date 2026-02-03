@@ -472,7 +472,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: linux-build
-          path: target/release/agent-game-engine
+          path: target/release/silmaril
 
   test-macos:
     runs-on: macos-latest
@@ -521,7 +521,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: macos-build
-          path: target/release/agent-game-engine
+          path: target/release/silmaril
 
   create-release:
     needs: [test-windows, test-linux, test-macos]
@@ -533,18 +533,18 @@ jobs:
 
       - name: Create release archives
         run: |
-          cd windows-build && zip -r ../agent-game-engine-windows.zip . && cd ..
-          cd linux-build && tar czf ../agent-game-engine-linux.tar.gz . && cd ..
-          cd macos-build && tar czf ../agent-game-engine-macos.tar.gz . && cd ..
+          cd windows-build && zip -r ../silmaril-windows.zip . && cd ..
+          cd linux-build && tar czf ../silmaril-linux.tar.gz . && cd ..
+          cd macos-build && tar czf ../silmaril-macos.tar.gz . && cd ..
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v3
         with:
           name: release-packages
           path: |
-            agent-game-engine-windows.zip
-            agent-game-engine-linux.tar.gz
-            agent-game-engine-macos.tar.gz
+            silmaril-windows.zip
+            silmaril-linux.tar.gz
+            silmaril-macos.tar.gz
 ```
 
 ---
@@ -648,7 +648,7 @@ mod tests {
 ```markdown
 # Cross-Platform Support
 
-The Agent Game Engine supports Windows, Linux, and macOS.
+The Silmaril supports Windows, Linux, and macOS.
 
 ## Platform Requirements
 
@@ -696,8 +696,8 @@ cargo build --release
 
 ### File Paths
 - Windows: `C:\Users\...\AppData\Local\AgentGameEngine`
-- Linux: `~/.local/share/agent-game-engine`
-- macOS: `~/Library/Application Support/com.agent.game-engine`
+- Linux: `~/.local/share/silmaril`
+- macOS: `~/Library/Application Support/com.silmaril`
 
 ### Performance
 - Windows: Best performance on NVIDIA/AMD GPUs

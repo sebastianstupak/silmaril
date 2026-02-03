@@ -6,7 +6,7 @@
 //!
 //! # Test Organization
 //!
-//! The Agent Game Engine uses a 3-tier test hierarchy:
+//! The Silmaril uses a 3-tier test hierarchy:
 //!
 //! ## Tier 1: Unit Tests (in each crate)
 //! - Test single functions/modules in isolation
