@@ -204,7 +204,7 @@ impl InputActions {
 
     /// Bind a gamepad axis to an action.
     pub fn bind_axis(&mut self, action: impl Into<String>, axis: GamepadAxis) {
-        self.axis_bindings.entry(action.into()).or_insert_with(Vec::new).push(axis);
+        self.axis_bindings.entry(action.into()).or_default().push(axis);
     }
 
     /// Check if an action is currently active based on the input state.

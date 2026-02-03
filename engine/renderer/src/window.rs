@@ -202,6 +202,13 @@ impl Window {
         self.event_loop.take()
     }
 
+    /// Get reference to the underlying winit window
+    ///
+    /// Useful for calling winit-specific methods like request_redraw()
+    pub fn winit_window(&self) -> &WinitWindow {
+        &self.winit_window
+    }
+
     /// Get raw window handle for Vulkan surface creation
     pub fn raw_window_handle(&self) -> RawWindowHandle {
         self.winit_window.window_handle().expect("Failed to get window handle").as_raw()

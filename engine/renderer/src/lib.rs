@@ -82,5 +82,8 @@ pub use swapchain::Swapchain;
 pub use sync::{create_sync_objects, FrameResources, FrameSync, FrameSyncObjects, SyncError};
 pub use window::{Window, WindowConfig, WindowError, WindowEventType};
 
+// Re-export winit types for external use
+pub use winit::window::Window as WinitWindow;
+
 // Re-export from engine-assets for convenience
 pub use engine_assets::{MeshData, Vertex};

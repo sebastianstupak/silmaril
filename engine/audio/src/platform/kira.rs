@@ -390,7 +390,7 @@ impl KiraAudioBackend {
         let effect_track = self
             .effect_tracks
             .get(&instance_id)
-            .ok_or_else(|| AudioError::InvalidInstance(instance_id as u32))?;
+            .ok_or(AudioError::InvalidInstance(instance_id as u32))?;
 
         let mut builder = TrackBuilder::new();
 

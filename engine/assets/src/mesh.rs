@@ -705,11 +705,11 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, MeshError> {
             break;
         }
 
-        let value = if (b'A'..=b'Z').contains(&ch) {
+        let value = if ch.is_ascii_uppercase() {
             ch - b'A'
-        } else if (b'a'..=b'z').contains(&ch) {
+        } else if ch.is_ascii_lowercase() {
             ch - b'a' + 26
-        } else if (b'0'..=b'9').contains(&ch) {
+        } else if ch.is_ascii_digit() {
             ch - b'0' + 52
         } else if ch == b'+' {
             62
