@@ -194,6 +194,14 @@ impl Window {
         std::mem::take(&mut self.pending_events)
     }
 
+    /// Take ownership of the event loop for manual pumping
+    ///
+    /// This allows the application to pump events using winit 0.30's
+    /// pump_app_events() method for proper event handling.
+    pub fn take_event_loop(&mut self) -> Option<EventLoop<()>> {
+        self.event_loop.take()
+    }
+
     /// Get raw window handle for Vulkan surface creation
     pub fn raw_window_handle(&self) -> RawWindowHandle {
         self.winit_window.window_handle().expect("Failed to get window handle").as_raw()

@@ -82,6 +82,7 @@ impl PuffinBackend {
     /// let backend = PuffinBackend::new();
     /// # }
     /// ```
+    #[must_use] 
     pub fn new() -> Self {
         // Enable Puffin profiling
         puffin::set_scopes_on(true);
@@ -122,7 +123,7 @@ impl PuffinBackend {
     ///
     /// The Chrome Tracing format can be visualized in:
     /// - `chrome://tracing` in Chrome/Chromium browsers
-    /// - Perfetto UI (https://ui.perfetto.dev/)
+    /// - Perfetto UI (<https://ui.perfetto.dev>/)
     /// - Various profiling analysis tools
     ///
     /// # Returns
@@ -144,6 +145,7 @@ impl PuffinBackend {
     /// // Open chrome://tracing and load trace.json
     /// # }
     /// ```
+    #[must_use] 
     pub fn export_chrome_trace(&self) -> String {
         // For Phase 0.5.2, we implement a basic Chrome Trace exporter
         // The full implementation requires deep integration with Puffin's internal

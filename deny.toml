@@ -70,7 +70,7 @@ deny = [
     # BAN: anyhow in engine crates (examples/dev-tools can use it)
     # REASON: CLAUDE.md mandates custom error types via define_error! macro
     # See: docs/error-handling.md
-    { crate = "anyhow", wrappers = ["engine-core", "engine-renderer", "engine-networking", "engine-physics", "engine-audio", "engine-lod", "engine-interest", "engine-auto-update", "engine-observability", "engine-macros"] },
+    { crate = "anyhow", wrappers = ["engine-core", "engine-renderer", "engine-networking", "engine-physics", "engine-audio", "engine-lod", "engine-interest", "engine-auto-update", "engine-observability", "engine-macros", "xtask", "silm", "silmaril_client", "silmaril_server", "av1-grain", "av-scenechange", "rav1e", "ravif", "image"] },
     # BAN: openssl (use rustls instead for better cross-platform support)
     { crate = "openssl", reason = "Use rustls for better cross-platform support and security" },
     { crate = "openssl-sys", reason = "Use rustls for better cross-platform support and security" },

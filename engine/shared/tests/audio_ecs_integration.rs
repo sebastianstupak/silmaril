@@ -26,10 +26,7 @@ fn test_listener_update_from_ecs() {
 
     // Spawn camera with listener
     let camera = world.spawn();
-    world.add(
-        camera,
-        Transform::new(Vec3::new(10.0, 5.0, 3.0), Quat::IDENTITY, Vec3::ONE),
-    );
+    world.add(camera, Transform::new(Vec3::new(10.0, 5.0, 3.0), Quat::IDENTITY, Vec3::ONE));
     world.add(camera, AudioListener::new());
 
     let mut audio_system = AudioSystem::new().unwrap();
@@ -48,10 +45,7 @@ fn test_emitter_update_from_ecs() {
 
     // Spawn entity with sound
     let entity = world.spawn();
-    world.add(
-        entity,
-        Transform::new(Vec3::new(5.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE),
-    );
+    world.add(entity, Transform::new(Vec3::new(5.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE));
 
     let mut sound = Sound::new("test.wav").spatial_3d(100.0);
     sound.instance_id = Some(42); // Simulate playing sound
@@ -77,10 +71,7 @@ fn test_multiple_listeners_only_one_active() {
     world.add(camera1, AudioListener::new());
 
     let camera2 = world.spawn();
-    world.add(
-        camera2,
-        Transform::new(Vec3::new(100.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE),
-    );
+    world.add(camera2, Transform::new(Vec3::new(100.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE));
     world.add(camera2, AudioListener::new());
 
     let mut audio_system = AudioSystem::new().unwrap();
@@ -134,10 +125,7 @@ fn test_spatial_sound_position_sync() {
     world.register::<Sound>();
 
     let entity = world.spawn();
-    world.add(
-        entity,
-        Transform::new(Vec3::new(10.0, 5.0, 3.0), Quat::IDENTITY, Vec3::ONE),
-    );
+    world.add(entity, Transform::new(Vec3::new(10.0, 5.0, 3.0), Quat::IDENTITY, Vec3::ONE));
 
     let mut sound = Sound::new("test.wav").spatial_3d(100.0);
     sound.instance_id = Some(1); // Simulate playing
@@ -163,10 +151,7 @@ fn test_non_spatial_sound_ignores_position() {
     world.register::<Sound>();
 
     let entity = world.spawn();
-    world.add(
-        entity,
-        Transform::new(Vec3::new(100.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE),
-    );
+    world.add(entity, Transform::new(Vec3::new(100.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE));
 
     let mut sound = Sound::new("ui.wav").non_spatial();
     sound.instance_id = Some(1);
@@ -205,10 +190,7 @@ fn test_world_with_many_entities() {
     // Spawn many entities with sounds
     for i in 0..100 {
         let entity = world.spawn();
-        world.add(
-            entity,
-            Transform::new(Vec3::new(i as f32, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE),
-        );
+        world.add(entity, Transform::new(Vec3::new(i as f32, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE));
         world.add(entity, Sound::new("test.wav").spatial_3d(100.0));
     }
 

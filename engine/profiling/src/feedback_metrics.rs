@@ -177,6 +177,7 @@ impl AgentFeedbackMetrics {
             .collect();
 
         // Check if frame budget was met (assume 16.67ms budget for 60 FPS)
+        #[allow(clippy::items_after_statements)] // Const used only in this scope
         const FRAME_BUDGET_MS: f32 = 16.67;
         let is_frame_budget_met = latest.frame_time_ms <= FRAME_BUDGET_MS;
 
@@ -228,7 +229,7 @@ impl AgentFeedbackMetrics {
         #[cfg(feature = "serde")]
         {
             serde_json::to_string_pretty(self)
-                .unwrap_or_else(|e| format!(r#"{{"error": "Serialization failed: {}"}}"#, e))
+                .unwrap_or_else(|e| format!(r#"{{"error": "Serialization failed: {e}"}}"#))
         }
 
         #[cfg(not(feature = "serde"))]
@@ -304,6 +305,7 @@ fn calculate_p95(history: &[FrameMetrics]) -> f32 {
     frame_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     // Calculate 95th percentile index using nearest-rank method
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)] // Intentional: calculating percentile index
     // This matches the behavior expected by tests
     let index = ((frame_times.len() - 1) as f32 * 0.95).round() as usize;
 

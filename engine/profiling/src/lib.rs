@@ -1,3 +1,10 @@
+// Profiling crate uses intentional casts and string formatting for performance measurement
+// These are well-tested and intentional design choices
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::format_push_string)]
+
 //! Profiling and observability infrastructure for the Silmaril.
 //!
 //! This crate provides a zero-cost profiling abstraction that can be compiled away

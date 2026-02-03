@@ -15,7 +15,7 @@
 //!    ```bash
 //!    cargo build --features profiling-tracy
 //!    ```
-//! 2. Download Tracy profiler client from: https://github.com/wolfpld/tracy/releases
+//! 2. Download Tracy profiler client from: <https://github.com/wolfpld/tracy/releases>
 //! 3. Run your application with profiling enabled
 //! 4. Open Tracy client and connect to localhost
 //!
@@ -76,6 +76,7 @@ impl TracyBackend {
     /// Create a new Tracy backend.
     ///
     /// Tracy is automatically initialized on first use.
+    #[must_use] 
     pub fn new() -> Self {
         Self { frame_count: 0 }
     }
@@ -100,6 +101,7 @@ impl TracyBackend {
     }
 
     /// Get the current frame count.
+    #[must_use] 
     pub fn frame_count(&self) -> u64 {
         self.frame_count
     }

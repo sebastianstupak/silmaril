@@ -3,13 +3,13 @@
 //! Exports Puffin profiling data to Chrome Tracing JSON format, which can be
 //! visualized in:
 //! - `chrome://tracing` in Chrome/Chromium browsers
-//! - Perfetto UI (https://ui.perfetto.dev/)
+//! - Perfetto UI (<https://ui.perfetto.dev>/)
 //! - Various profiling analysis tools
 //!
 //! # Format Specification
 //!
 //! The Chrome Tracing format is documented at:
-//! https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview
+//! <https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview>
 //!
 //! # Event Types
 //!
@@ -62,7 +62,7 @@ impl ChromeTraceEvent {
 
         // Insert duration if present
         if let Some(dur) = self.dur {
-            json.insert_str(json.len() - 1, &format!(r#","dur":{}"#, dur));
+            json.insert_str(json.len() - 1, &format!(r#","dur":{dur}"#));
         }
 
         json

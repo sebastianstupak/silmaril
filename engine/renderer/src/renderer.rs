@@ -75,25 +75,20 @@ impl Renderer {
         })?;
         let (width, height) = window.size();
 
-        // 2. Create Vulkan entry
+        // 2. Create Vulkan context first (instance creation now includes surface extensions)
+        let context = VulkanContext::new(app_name, None, None)?;
+
+        // 3. Create Vulkan entry for surface creation
         let entry = unsafe {
             ash::Entry::load().map_err(|e| {
                 RendererError::instancecreationfailed(format!("Failed to load Vulkan: {:?}", e))
             })?
         };
 
-        // 3. Create temporary context to get instance for surface creation
-        let temp_context = VulkanContext::new(app_name, None, None)?;
-
-        // 4. Create surface using temporary context's instance
-        let surface = Surface::new(&entry, &temp_context.instance, &window).map_err(|e| {
+        // 4. Create surface using the context's instance
+        let surface = Surface::new(&entry, &context.instance, &window).map_err(|e| {
             RendererError::surfacecreationfailed(format!("Surface creation failed: {:?}", e))
         })?;
-
-        // 5. Create final Vulkan context with surface (this ensures proper device selection)
-        let context = VulkanContext::new(app_name, Some(surface.handle()), Some(surface.loader()))?;
-
-        // Temp context gets dropped here, but surface was created and is valid
 
         // 6. Create swapchain
         let swapchain =
@@ -289,6 +284,14 @@ impl Renderer {
     /// Get window mut reference
     pub fn window_mut(&mut self) -> &mut Window {
         &mut self.window
+    }
+
+    /// Take ownership of the event loop for manual event pumping
+    ///
+    /// This allows using winit 0.30's pump_app_events() for proper event handling.
+    /// After calling this, the window's event loop will be None.
+    pub fn take_event_loop(&mut self) -> Option<winit::event_loop::EventLoop<()>> {
+        self.window.take_event_loop()
     }
 
     /// Render meshes from ECS world

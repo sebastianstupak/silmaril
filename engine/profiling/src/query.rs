@@ -248,6 +248,7 @@ impl<'a> QueryBuilder<'a> {
     ///     .aggregate();
     /// # }
     /// ```
+    #[must_use]
     pub fn scope(mut self, name: impl Into<String>) -> Self {
         self.scope_filter = Some(name.into());
         self

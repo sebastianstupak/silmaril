@@ -369,11 +369,28 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
         .engine_version(vk::make_api_version(0, 0, 1, 0))
         .api_version(api_version);
 
-    // Required extensions (will be populated by window system)
-    #[cfg(any(debug_assertions, target_os = "macos"))]
+    // Required extensions - always include surface extensions for windowed rendering
     let mut extension_names = vec![];
-    #[cfg(not(any(debug_assertions, target_os = "macos")))]
-    let extension_names = vec![];
+
+    // Base surface extension (required for all windowed rendering)
+    extension_names.push(ash::khr::surface::NAME.as_ptr());
+
+    // Platform-specific surface extensions
+    #[cfg(target_os = "windows")]
+    extension_names.push(ash::khr::win32_surface::NAME.as_ptr());
+
+    #[cfg(all(target_os = "linux", not(target_os = "android")))]
+    {
+        // Try Wayland first, fall back to X11
+        extension_names.push(ash::khr::wayland_surface::NAME.as_ptr());
+        extension_names.push(ash::khr::xlib_surface::NAME.as_ptr());
+    }
+
+    #[cfg(target_os = "macos")]
+    extension_names.push(ash::ext::metal_surface::NAME.as_ptr());
+
+    #[cfg(target_os = "android")]
+    extension_names.push(ash::khr::android_surface::NAME.as_ptr());
 
     // Add debug utils extension in debug builds (unless disabled for benchmarks)
     #[cfg(debug_assertions)]
@@ -815,10 +832,11 @@ fn create_logical_device(
         .collect();
 
     // Required extensions
-    let mut extension_names = vec![];
-    if needs_swapchain {
-        extension_names.push(ash::khr::swapchain::NAME.as_ptr());
-    }
+    // Always enable swapchain for game engine (even if not immediately used)
+    #[cfg(target_os = "macos")]
+    let mut extension_names = vec![ash::khr::swapchain::NAME.as_ptr()];
+    #[cfg(not(target_os = "macos"))]
+    let extension_names = vec![ash::khr::swapchain::NAME.as_ptr()];
 
     // Add portability subset for macOS
     #[cfg(target_os = "macos")]

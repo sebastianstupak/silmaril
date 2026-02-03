@@ -110,7 +110,8 @@
       "WebFetch(domain:dimforge.com)",
       "Bash(cloc:*)",
       "Bash(timeout 10 cat:*)",
-      "Bash(Select-String -Pattern \"error\" -Context 2,2)"
+      "Bash(Select-String -Pattern \"error\" -Context 2,2)",
+      "Bash(python3:*)"
     ]
   }
 }
