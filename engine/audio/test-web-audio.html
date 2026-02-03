@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Audio Backend Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            display: none;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .stats {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Web Audio Backend Test</h1>
+        <p>Test the engine-audio Web Audio API backend implementation.</p>
+
+        <div class="test-section">
+            <h3>1. Initialize Audio Engine</h3>
+            <button id="init-btn">Initialize AudioContext</button>
+            <div id="init-status" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 2D Audio Playback</h3>
+            <p>Test non-spatial audio playback (UI sounds, menu effects)</p>
+            <div class="controls">
+                <button id="play-2d-btn" disabled>Play 2D Sound</button>
+                <button id="stop-2d-btn" disabled>Stop 2D Sound</button>
+            </div>
+            <label>Volume: <input type="range" id="volume-2d" min="0" max="100" value="80" disabled></label>
+            <div id="play-2d-status" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 3D Spatial Audio</h3>
+            <p>Test HRTF-based 3D audio positioning</p>
+            <div class="controls">
+                <button id="play-3d-btn" disabled>Play 3D Sound (Front)</button>
+                <button id="play-left-btn" disabled>Play 3D Sound (Left)</button>
+                <button id="play-right-btn" disabled>Play 3D Sound (Right)</button>
+                <button id="play-behind-btn" disabled>Play 3D Sound (Behind)</button>
+            </div>
+            <label>Position X: <input type="range" id="pos-x" min="-10" max="10" value="0" step="0.1" disabled></label>
+            <label>Position Y: <input type="range" id="pos-y" min="-10" max="10" value="0" step="0.1" disabled></label>
+            <label>Position Z: <input type="range" id="pos-z" min="-10" max="10" value="0" step="0.1" disabled></label>
+            <div id="play-3d-status" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Listener Controls</h3>
+            <p>Update listener (camera) position and orientation</p>
+            <div class="controls">
+                <button id="listener-forward-btn" disabled>Face Forward</button>
+                <button id="listener-left-btn" disabled>Face Left</button>
+                <button id="listener-right-btn" disabled>Face Right</button>
+                <button id="listener-back-btn" disabled>Face Back</button>
+            </div>
+            <div id="listener-status" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Streaming Audio</h3>
+            <p>Test HTMLAudioElement streaming for music</p>
+            <div class="controls">
+                <button id="stream-btn" disabled>Stream Music</button>
+                <button id="stop-stream-btn" disabled>Stop Stream</button>
+            </div>
+            <label>Stream Volume: <input type="range" id="volume-stream" min="0" max="100" value="50" disabled></label>
+            <div id="stream-status" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>6. Engine Statistics</h3>
+            <button id="stats-btn" disabled>Refresh Stats</button>
+            <div id="stats" class="stats"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // This is a manual test page - requires WASM compilation first
+        // Run: wasm-pack build --target web engine/audio
+
+        let audioContext = null;
+        let activeSources = new Map();
+        let nextInstanceId = 0;
+
+        // Helper to show status
+        function showStatus(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status ${type}`;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        // Initialize AudioContext
+        document.getElementById('init-btn').addEventListener('click', async () => {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                showStatus('init-status', 'AudioContext initialized successfully!', 'info');
+
+                // Enable all other buttons
+                document.querySelectorAll('button, input').forEach(el => {
+                    if (el.id !== 'init-btn') el.disabled = false;
+                });
+
+                document.getElementById('init-btn').disabled = true;
+                updateStats();
+            } catch (error) {
+                showStatus('init-status', `Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Play 2D sound
+        document.getElementById('play-2d-btn').addEventListener('click', async () => {
+            try {
+                const volume = document.getElementById('volume-2d').value / 100;
+
+                // Create oscillator (simple beep for testing)
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.frequency.value = 440; // A4 note
+                gainNode.gain.value = volume;
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.5);
+
+                const instanceId = nextInstanceId++;
+                activeSources.set(instanceId, { source: oscillator, gain: gainNode });
+
+                oscillator.onended = () => {
+                    activeSources.delete(instanceId);
+                    updateStats();
+                };
+
+                showStatus('play-2d-status', '2D sound playing', 'info');
+                updateStats();
+            } catch (error) {
+                showStatus('play-2d-status', `Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Play 3D sound at specific position
+        function play3DSound(x, y, z) {
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                const panner = audioContext.createPanner();
+
+                // Configure panner for 3D audio
+                panner.panningModel = 'HRTF';
+                panner.distanceModel = 'inverse';
+                panner.refDistance = 1;
+                panner.maxDistance = 50;
+                panner.rolloffFactor = 1;
+
+                panner.setPosition(x, y, z);
+
+                oscillator.frequency.value = 880; // A5 note
+                gainNode.gain.value = 0.8;
+
+                oscillator.connect(gainNode);
+                gainNode.connect(panner);
+                panner.connect(audioContext.destination);
+
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.5);
+
+                const instanceId = nextInstanceId++;
+                activeSources.set(instanceId, { source: oscillator, gain: gainNode, panner });
+
+                oscillator.onended = () => {
+                    activeSources.delete(instanceId);
+                    updateStats();
+                };
+
+                showStatus('play-3d-status', `3D sound at (${x}, ${y}, ${z})`, 'info');
+                updateStats();
+            } catch (error) {
+                showStatus('play-3d-status', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        document.getElementById('play-3d-btn').addEventListener('click', () => play3DSound(0, 0, -5));
+        document.getElementById('play-left-btn').addEventListener('click', () => play3DSound(-5, 0, 0));
+        document.getElementById('play-right-btn').addEventListener('click', () => play3DSound(5, 0, 0));
+        document.getElementById('play-behind-btn').addEventListener('click', () => play3DSound(0, 0, 5));
+
+        // Update listener orientation
+        function updateListener(forwardX, forwardY, forwardZ) {
+            try {
+                const listener = audioContext.listener;
+                listener.setPosition(0, 0, 0);
+                listener.setOrientation(forwardX, forwardY, forwardZ, 0, 1, 0);
+                showStatus('listener-status', `Facing (${forwardX}, ${forwardY}, ${forwardZ})`, 'info');
+            } catch (error) {
+                showStatus('listener-status', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        document.getElementById('listener-forward-btn').addEventListener('click', () => updateListener(0, 0, -1));
+        document.getElementById('listener-left-btn').addEventListener('click', () => updateListener(-1, 0, 0));
+        document.getElementById('listener-right-btn').addEventListener('click', () => updateListener(1, 0, 0));
+        document.getElementById('listener-back-btn').addEventListener('click', () => updateListener(0, 0, 1));
+
+        // Update statistics
+        function updateStats() {
+            const stats = document.getElementById('stats');
+            stats.innerHTML = `
+                <strong>AudioContext State:</strong> ${audioContext ? audioContext.state : 'Not initialized'}<br>
+                <strong>Sample Rate:</strong> ${audioContext ? audioContext.sampleRate : 'N/A'} Hz<br>
+                <strong>Current Time:</strong> ${audioContext ? audioContext.currentTime.toFixed(2) : 'N/A'} s<br>
+                <strong>Active Sounds:</strong> ${activeSources.size}<br>
+                <strong>Next Instance ID:</strong> ${nextInstanceId}
+            `;
+        }
+
+        document.getElementById('stats-btn').addEventListener('click', updateStats);
+
+        // Volume controls
+        document.getElementById('volume-2d').addEventListener('input', (e) => {
+            console.log('2D Volume:', e.target.value / 100);
+        });
+
+        document.getElementById('volume-stream').addEventListener('input', (e) => {
+            console.log('Stream Volume:', e.target.value / 100);
+        });
+
+        // Position controls
+        ['pos-x', 'pos-y', 'pos-z'].forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                const x = parseFloat(document.getElementById('pos-x').value);
+                const y = parseFloat(document.getElementById('pos-y').value);
+                const z = parseFloat(document.getElementById('pos-z').value);
+                console.log('Position:', x, y, z);
+            });
+        });
+
+        // Note: Streaming audio requires actual audio files
+        // This is just a placeholder
+        document.getElementById('stream-btn').addEventListener('click', () => {
+            showStatus('stream-status', 'Streaming requires audio file URL', 'info');
+        });
+    </script>
+</body>
+</html>
