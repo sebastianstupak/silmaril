@@ -21,7 +21,7 @@ rustls = { version = "0.21", features = ["dangerous_configuration"] }
 rustls-pemfile = "1.0"
 tokio-rustls = "0.24"
 webpki = "0.22"
-webpki-roots = "0.25"
+webpki-roots = "1.0"
 rcgen = "0.11"
 # ACME protocol for Let's Encrypt
 instant-acme = "0.3"
