@@ -13,7 +13,7 @@ engine-macros = { path = "../macros" }
 
 # Cryptography
 argon2 = { version = "0.5", features = ["std"] }
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 totp-rs = { version = "5", features = ["gen_secret", "qr"] }
 sha2 = "0.10"
 rand = "0.8"
