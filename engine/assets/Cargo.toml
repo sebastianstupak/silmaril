@@ -40,7 +40,7 @@ engine-core = { path = "../core" }
 engine-macros = { path = "../macros" }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 proptest = "1.4"
 tempfile = "3.8"
 tokio = { version = "1.35", features = ["fs", "rt", "rt-multi-thread", "sync", "time", "macros"] }

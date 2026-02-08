@@ -16,7 +16,7 @@ tracing = { version = "0.1", optional = true }
 profiling = ["silmaril-profiling", "engine-core/profiling", "tracing"]
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 
 [[bench]]
 name = "fog_of_war_bench"

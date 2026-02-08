@@ -62,7 +62,7 @@ flatbuffers = "24.3"
 
 # Testing
 proptest = "1.4"
-criterion = "0.5"
+criterion = "0.8"
 
 [profile.dev]
 opt-level = 1  # Faster debug builds
