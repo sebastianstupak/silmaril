@@ -58,6 +58,7 @@ $RECYCLE.BIN/
 
 # Profiling - General
 *.prof
+*.log
 perf.data*
 flamegraph.svg
 
@@ -195,9 +196,38 @@ tmp/
 temp/
 *.tmp
 
+# silm dev runtime directory (state files, not for git)
+.silmaril/
+
+# Temp output files dumped in root (build outputs, clippy runs, benchmark results)
+build_output.txt
+clippy_*.txt
+full_clippy.txt
+final_*.txt
+gpu_*.txt
+large_scale_*.txt
+*_output.txt
+*_comparison.txt
+*_baseline.txt
+VERIFICATION_SUMMARY.txt
+
+# Temp standalone source files
+verify_*.rs
+*_standalone.rs
+
+# Temp scripts in root
+test_build.bat
+test_loader.sh
+run_delta_benchmarks.ps1
+test.justfile
+
 # Env files
 .env
 .env.local
+
+# Git hooks are in .githooks/ — activate with:
+#   git config core.hooksPath .githooks
+!.githooks/
 
 # Coverage
 lcov.info
