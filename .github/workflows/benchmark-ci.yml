@@ -110,7 +110,7 @@ jobs:
           pip install pyyaml
 
           # Run regression check (20% threshold)
-          python scripts/check_benchmark_regression.py \
+          python benchmarks/check_regression.py \
             --baseline target/criterion-baseline \
             --current target/criterion \
             --threshold 20 \

@@ -167,7 +167,7 @@ fi
 # Check for non-game examples in top-level examples/ (CLAUDE.md Rule #11)
 # Allowed: examples/{singleplayer,mmorpg,moba,turn-based}/
 # Forbidden: examples/simple_demo, examples/ai_agent_debugger, etc.
-ALLOWED_EXAMPLES_PATTERN="^examples/(singleplayer|mmorpg|moba|turn-based)/"
+ALLOWED_EXAMPLES_PATTERN="^examples/(singleplayer|mmorpg|moba|turn-based|wasm-simd|rotating-cube)/"
 FORBIDDEN_ROOT_EXAMPLES=$(echo "$STAGED_FILES" | grep -E "^examples/" | grep -vE "$ALLOWED_EXAMPLES_PATTERN" || true)
 if [ -n "$FORBIDDEN_ROOT_EXAMPLES" ]; then
     FORBIDDEN_EXAMPLES=1

@@ -66,27 +66,9 @@ jobs:
             benchmark-baseline-
 
       - name: Run benchmarks
-        run: |
-          bash scripts/benchmark_all.sh --quick
+        run: cargo xtask bench smoke
         env:
           RUST_LOG: warn
-
-      - name: Parse benchmark results
-        run: |
-          # Create benchmark summary
-          RESULT_FILE=$(ls -t benchmark-results/benchmark-*.txt | head -1)
-          echo "Latest benchmark results: $RESULT_FILE"
-
-          # Extract key metrics
-          echo "## Benchmark Summary" > benchmark-summary.md
-          echo "" >> benchmark-summary.md
-          echo "Commit: ${{ github.sha }}" >> benchmark-summary.md
-          echo "Branch: ${{ github.ref_name }}" >> benchmark-summary.md
-          echo "Date: $(date)" >> benchmark-summary.md
-          echo "" >> benchmark-summary.md
-
-          # Add module summaries
-          grep -A 5 "Module:" "$RESULT_FILE" >> benchmark-summary.md || true
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
