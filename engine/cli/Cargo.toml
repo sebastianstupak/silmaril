@@ -44,6 +44,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Engine dependencies
 engine-templating = { path = "../templating" }
+engine-dev-tools-hot-reload = { path = "../dev-tools/hot-reload" }
 notify-debouncer-full = "0.3"
 
 [dev-dependencies]
