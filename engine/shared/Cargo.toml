@@ -130,6 +130,11 @@ path = "tests/hot_reload_live_tests.rs"
 harness = true
 required-features = ["hot-reload"]
 
+[[test]]
+name = "dev_state_handoff_test"
+path = "tests/dev_state_handoff_test.rs"
+harness = true
+
 [[bench]]
 name = "integration_bench"
 path = "benches/integration_bench.rs"
@@ -160,6 +165,7 @@ hot-reload = ["engine-assets/hot-reload"]
 
 [dependencies]
 engine-core = { path = "../core" }
+engine-dev-tools-hot-reload = { path = "../dev-tools/hot-reload" }
 engine-math = { path = "../math" }
 engine-physics = { path = "../physics" }
 engine-audio = { path = "../audio" }
