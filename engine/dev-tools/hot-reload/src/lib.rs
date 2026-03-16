@@ -4,6 +4,7 @@
 //! `silm dev` hot-reload workflow, enabling live asset and config reloading
 //! without restarting the game process.
 
+pub mod client;
 pub mod error;
 pub mod force_reload;
 pub mod handoff;
