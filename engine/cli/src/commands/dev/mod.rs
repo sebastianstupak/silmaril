@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
 pub mod output;
+pub mod process;
 pub mod watcher;
 // other modules will be added in later tasks:
 // pub mod orchestrator;
-// pub mod process;
 // pub mod reload_client;
 
 use anyhow::Result;

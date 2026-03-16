@@ -31,6 +31,9 @@ tokio = { workspace = true, features = ["full"] }
 # Logging
 tracing = { workspace = true }
 
+# Async trait support for ProcessKiller
+async-trait = "0.1"
+
 # UI
 colored = "2.0"
 walkdir = "2.4"
