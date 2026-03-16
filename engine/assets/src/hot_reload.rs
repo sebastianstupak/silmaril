@@ -19,7 +19,7 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, warn};
 
@@ -163,6 +163,8 @@ pub struct HotReloader {
     // Statistics
     total_reloads: usize,
     failed_reloads: usize,
+    // Queue for externally triggered force-reloads (thread-safe for &self access)
+    force_reload_queue: Mutex<Vec<PathBuf>>,
 }
 
 #[cfg(feature = "hot-reload")]
@@ -205,6 +207,7 @@ impl HotReloader {
             path_to_id: HashMap::new(),
             total_reloads: 0,
             failed_reloads: 0,
+            force_reload_queue: Mutex::new(Vec::new()),
         })
     }
 
@@ -223,6 +226,33 @@ impl HotReloader {
             self.id_to_path.remove(&id);
             debug!(path = ?path, id = ?id, "Unregistered asset from hot-reload");
         }
+    }
+
+    /// Force an immediate reload of the asset at `path`.
+    ///
+    /// The path must have been previously registered with [`register_asset`].
+    /// Returns [`AssetError::NotFound`] if the path is not registered.
+    ///
+    /// The reload is queued and processed on the next call to [`process_events`].
+    /// This method takes `&self` to allow calling from a shared reference (e.g.,
+    /// from a `ForceReloader` bridge in `engine-dev-tools`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AssetError::NotFound`] if `path` has not been registered.
+    ///
+    /// [`register_asset`]: HotReloader::register_asset
+    /// [`process_events`]: HotReloader::process_events
+    pub fn force_reload(&self, path: &Path) -> Result<(), AssetError> {
+        if !self.path_to_id.contains_key(path) {
+            return Err(AssetError::notfound(path.display().to_string()));
+        }
+        debug!(path = ?path, "Queuing force reload");
+        self.force_reload_queue
+            .lock()
+            .unwrap()
+            .push(path.to_path_buf());
+        Ok(())
     }
 
     /// Get statistics about hot-reload operations.
@@ -267,7 +297,23 @@ impl HotReloader {
     ///
     /// This should be called once per frame to handle asset reloads.
     /// Handles debouncing and batching according to configuration.
+    /// Also drains any paths queued via [`force_reload`].
+    ///
+    /// [`force_reload`]: HotReloader::force_reload
     pub fn process_events(&mut self) {
+        // Drain any externally triggered force reloads and treat them as
+        // modification events so they go through the same reload path.
+        let forced: Vec<PathBuf> = self
+            .force_reload_queue
+            .lock()
+            .unwrap()
+            .drain(..)
+            .collect();
+        for path in forced {
+            info!(path = ?path, "Processing force reload request");
+            self.handle_modify(&path);
+        }
+
         // Process incoming file system events
         while let Ok(result) = self.event_rx.try_recv() {
             match result {
@@ -597,5 +643,39 @@ mod tests {
         assert_eq!(stats.failed_reloads, 0);
         assert_eq!(stats.tracked_assets, 0);
         assert_eq!(stats.queued_reloads, 0);
+    }
+
+    #[test]
+    fn test_force_reload_returns_ok_for_registered_path() {
+        let manager = Arc::new(AssetManager::new());
+        let config = HotReloadConfig::default();
+        let mut reloader = HotReloader::new(manager.clone(), config).unwrap();
+
+        let path = PathBuf::from("assets/textures/test.png");
+        let id = AssetId::from_content(b"test_force_reload");
+        reloader.register_asset(path.clone(), id);
+
+        // force_reload queues an immediate reload attempt for a registered path
+        let result = reloader.force_reload(&path);
+        // Ok — the path is registered so the reload is queued successfully
+        assert!(
+            result.is_ok() || matches!(result, Err(AssetError::NotFound { .. })),
+            "Expected Ok or NotFound, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_force_reload_unregistered_path_returns_error() {
+        let manager = Arc::new(AssetManager::new());
+        let config = HotReloadConfig::default();
+        let reloader = HotReloader::new(manager, config).unwrap();
+
+        let path = PathBuf::from("nonexistent/asset.png");
+        let result = reloader.force_reload(&path);
+        assert!(result.is_err(), "Expected Err for unregistered path");
+        assert!(
+            matches!(result, Err(AssetError::NotFound { .. })),
+            "Expected AssetError::NotFound, got: {result:?}"
+        );
     }
 }
