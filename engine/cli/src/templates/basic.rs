@@ -67,6 +67,13 @@ description = "A game built with Silmaril"
 client = []
 server = []
 networking = []
+
+[dev]
+server_package = "{name}-server"
+client_package = "{name}-client"
+server_port = 7777
+dev_server_port = 9999
+dev_client_port = 9998
 "#,
             name = self.project_name
         );
@@ -407,6 +414,9 @@ license.workspace = true
 name = "server"
 path = "src/main.rs"
 
+[features]
+dev = ["engine-dev-tools-hot-reload/dev"]
+
 [dependencies]
 {name}-shared = {{ path = "../shared" }}
 silmaril-core = {{ workspace = true }}
@@ -415,6 +425,7 @@ tokio = {{ workspace = true }}
 tracing = {{ workspace = true }}
 tracing-subscriber = {{ workspace = true }}
 anyhow = {{ workspace = true }}
+engine-dev-tools-hot-reload = {{ path = "../../engine/dev-tools/hot-reload", optional = true }}
 "#,
             name = self.project_name
         );
@@ -430,13 +441,17 @@ anyhow = {{ workspace = true }}
 use tracing::{{info, Level}};
 use tracing_subscriber;
 
-fn main() -> anyhow::Result<()> {{
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {{
     // Initialize logging
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
 
     info!("{name} server starting...");
+
+    // Start dev reload server — no-op in release builds (dev feature off)
+    engine_dev_tools_hot_reload::server::DevReloadServer::start(None).await;
 
     // TODO: Initialize game server
     // - Load server config
@@ -447,7 +462,7 @@ fn main() -> anyhow::Result<()> {{
     info!("{name} server running on 0.0.0.0:7777");
 
     // Keep server running
-    std::thread::park();
+    std::future::pending::<()>().await;
 
     Ok(())
 }}
@@ -470,6 +485,9 @@ license.workspace = true
 name = "client"
 path = "src/main.rs"
 
+[features]
+dev = ["engine-dev-tools-hot-reload/dev"]
+
 [dependencies]
 {name}-shared = {{ path = "../shared" }}
 silmaril-core = {{ workspace = true }}
@@ -479,6 +497,7 @@ tokio = {{ workspace = true }}
 tracing = {{ workspace = true }}
 tracing-subscriber = {{ workspace = true }}
 anyhow = {{ workspace = true }}
+engine-dev-tools-hot-reload = {{ path = "../../engine/dev-tools/hot-reload", optional = true }}
 "#,
             name = self.project_name
         );
@@ -494,13 +513,17 @@ anyhow = {{ workspace = true }}
 use tracing::{{info, Level}};
 use tracing_subscriber;
 
-fn main() -> anyhow::Result<()> {{
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {{
     // Initialize logging
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
 
     info!("{name} client starting...");
+
+    // Start dev reload server — no-op in release builds (dev feature off)
+    engine_dev_tools_hot_reload::server::DevReloadServer::start(None).await;
 
     // TODO: Initialize game client
     // - Load client config
@@ -511,7 +534,7 @@ fn main() -> anyhow::Result<()> {{
     info!("{name} client running");
 
     // Keep client running
-    std::thread::park();
+    std::future::pending::<()>().await;
 
     Ok(())
 }}
@@ -751,5 +774,146 @@ pub fn run_cargo(args: &[&str]) -> Result<()> {
 }
 "#;
         TemplateFile::new("xtask/src/utils.rs", content)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_template(name: &str) -> BasicTemplate {
+        BasicTemplate::new(name.to_string(), false)
+    }
+
+    fn find_file<'a>(files: &'a [TemplateFile], path: &str) -> &'a TemplateFile {
+        files.iter().find(|f| f.path == path).unwrap_or_else(|| panic!("file not found: {path}"))
+    }
+
+    #[test]
+    fn test_game_toml_has_dev_section() {
+        let t = make_template("mygame");
+        let files = t.files();
+        let game_toml = find_file(&files, "game.toml");
+
+        assert!(
+            game_toml.content.contains("[dev]"),
+            "game.toml should contain [dev] section"
+        );
+        assert!(
+            game_toml.content.contains("dev_server_port = 9999"),
+            "game.toml should contain dev_server_port = 9999"
+        );
+        assert!(
+            game_toml.content.contains("dev_client_port = 9998"),
+            "game.toml should contain dev_client_port = 9998"
+        );
+        assert!(
+            game_toml.content.contains("server_port = 7777"),
+            "game.toml should contain server_port = 7777"
+        );
+        assert!(
+            game_toml.content.contains("server_package = \"mygame-server\""),
+            "game.toml should contain server_package with project name"
+        );
+        assert!(
+            game_toml.content.contains("client_package = \"mygame-client\""),
+            "game.toml should contain client_package with project name"
+        );
+    }
+
+    #[test]
+    fn test_server_cargo_toml_has_dev_feature() {
+        let t = make_template("mygame");
+        let files = t.files();
+        let server_toml = find_file(&files, "server/Cargo.toml");
+
+        assert!(
+            server_toml.content.contains("dev = [\"engine-dev-tools-hot-reload/dev\"]"),
+            "server/Cargo.toml should contain dev feature enabling engine-dev-tools-hot-reload/dev"
+        );
+        assert!(
+            server_toml.content.contains("engine-dev-tools-hot-reload"),
+            "server/Cargo.toml should depend on engine-dev-tools-hot-reload"
+        );
+        assert!(
+            server_toml.content.contains("optional = true"),
+            "server/Cargo.toml engine-dev-tools-hot-reload dependency should be optional"
+        );
+    }
+
+    #[test]
+    fn test_client_cargo_toml_has_dev_feature() {
+        let t = make_template("mygame");
+        let files = t.files();
+        let client_toml = find_file(&files, "client/Cargo.toml");
+
+        assert!(
+            client_toml.content.contains("dev = [\"engine-dev-tools-hot-reload/dev\"]"),
+            "client/Cargo.toml should contain dev feature enabling engine-dev-tools-hot-reload/dev"
+        );
+        assert!(
+            client_toml.content.contains("engine-dev-tools-hot-reload"),
+            "client/Cargo.toml should depend on engine-dev-tools-hot-reload"
+        );
+        assert!(
+            client_toml.content.contains("optional = true"),
+            "client/Cargo.toml engine-dev-tools-hot-reload dependency should be optional"
+        );
+    }
+
+    #[test]
+    fn test_server_main_rs_calls_dev_reload_server() {
+        let t = make_template("mygame");
+        let files = t.files();
+        let server_main = find_file(&files, "server/src/main.rs");
+
+        assert!(
+            server_main.content.contains("engine_dev_tools_hot_reload::server::DevReloadServer::start(None).await"),
+            "server/src/main.rs should call DevReloadServer::start(None).await"
+        );
+        assert!(
+            server_main.content.contains("async fn main"),
+            "server/src/main.rs should use async fn main"
+        );
+        assert!(
+            server_main.content.contains("#[tokio::main]"),
+            "server/src/main.rs should have #[tokio::main]"
+        );
+    }
+
+    #[test]
+    fn test_client_main_rs_calls_dev_reload_server() {
+        let t = make_template("mygame");
+        let files = t.files();
+        let client_main = find_file(&files, "client/src/main.rs");
+
+        assert!(
+            client_main.content.contains("engine_dev_tools_hot_reload::server::DevReloadServer::start(None).await"),
+            "client/src/main.rs should call DevReloadServer::start(None).await"
+        );
+        assert!(
+            client_main.content.contains("async fn main"),
+            "client/src/main.rs should use async fn main"
+        );
+        assert!(
+            client_main.content.contains("#[tokio::main]"),
+            "client/src/main.rs should have #[tokio::main]"
+        );
+    }
+
+    #[test]
+    fn test_project_name_substitution_in_dev_section() {
+        let t = make_template("my-awesome-game");
+        let files = t.files();
+        let game_toml = find_file(&files, "game.toml");
+
+        assert!(
+            game_toml.content.contains("server_package = \"my-awesome-game-server\""),
+            "server_package should use the actual project name"
+        );
+        assert!(
+            game_toml.content.contains("client_package = \"my-awesome-game-client\""),
+            "client_package should use the actual project name"
+        );
     }
 }
