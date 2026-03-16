@@ -25,6 +25,12 @@ toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+
+# Logging
+tracing = { workspace = true }
+
 # UI
 colored = "2.0"
 walkdir = "2.4"
@@ -38,3 +44,4 @@ engine-templating = { path = "../templating" }
 
 [dev-dependencies]
 tempfile = "3.10"
+tokio = { workspace = true, features = ["full"] }
