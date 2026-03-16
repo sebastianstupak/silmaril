@@ -21,12 +21,13 @@ members = [
     "engine/shared",
     "engine/auth",
     "engine/templating",
+    "engine/dev-tools/hot-reload",
     "engine/binaries/client",
     "engine/binaries/server",
     "examples/singleplayer",
 ]
 exclude = [
-    "wasm-demo",  # Separate WASM demo project with its own build process
+    "examples/wasm-simd",  # Separate WASM demo project with its own build process
 ]
 
 [workspace.package]
