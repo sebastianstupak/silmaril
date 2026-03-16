@@ -141,6 +141,17 @@ path = "tests/dev_force_reload_test.rs"
 harness = true
 required-features = ["hot-reload"]
 
+[[test]]
+name = "dev_server_integration_test"
+path = "tests/dev_server_integration_test.rs"
+harness = true
+required-features = ["dev"]
+
+[[bench]]
+name = "dev_state_bench"
+path = "benches/dev_state_bench.rs"
+harness = false
+
 [[bench]]
 name = "integration_bench"
 path = "benches/integration_bench.rs"
@@ -168,6 +179,7 @@ harness = false
 
 [features]
 hot-reload = ["engine-assets/hot-reload"]
+dev = ["engine-dev-tools-hot-reload/dev", "engine-assets/hot-reload"]
 
 [dependencies]
 engine-core = { path = "../core" }
@@ -192,3 +204,4 @@ rand = { version = "0.8", features = ["small_rng"] }
 tempfile = "3.8"
 serde_yaml = "0.9"
 rustc-hash = "1.1"
+serde_json = "1"
