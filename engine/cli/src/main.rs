@@ -39,9 +39,16 @@ enum Commands {
         #[command(subcommand)]
         command: commands::add::AddCommand,
     },
+
+    /// Start the hot-reload development server (server + client, or either)
+    Dev {
+        #[command(subcommand)]
+        subcmd: Option<commands::dev::DevSubcommand>,
+    },
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -53,6 +60,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Add { command } => {
             commands::add::handle_add_command(command)?;
+        }
+        Commands::Dev { subcmd } => {
+            commands::dev::handle_dev_command(subcmd).await?;
         }
     }
 
