@@ -20,6 +20,7 @@
 //! - 1800-1899: Interest Management
 //! - 1900-1999: Auto-update
 //! - 2000-2099: Template System
+//! - 2100-2199: Dev Tools
 
 use std::fmt;
 
@@ -281,6 +282,18 @@ pub enum ErrorCode {
     TemplateIo = 2005,
     /// Template serialization error
     TemplateSerialization = 2006,
+
+    // Dev Tools (2100-2199)
+    /// DevReloadServer failed to bind TCP port
+    DevPortBindFailed = 2100,
+    /// Failed to serialize ECS world state for dev handoff
+    DevSerializeFailed = 2101,
+    /// Failed to restore ECS world state after dev restart
+    DevRestoreFailed = 2102,
+    /// Asset or config hot-reload failed
+    DevReloadFailed = 2103,
+    /// TCP send to DevReloadServer failed
+    DevTcpSendFailed = 2104,
 }
 
 impl ErrorCode {
@@ -299,6 +312,7 @@ impl ErrorCode {
             1800..=1899 => "Interest Management",
             1900..=1999 => "Auto-update",
             2000..=2099 => "Template System",
+            2100..=2199 => "Dev Tools",
             _ => "Unknown",
         }
     }
@@ -490,5 +504,16 @@ mod tests {
 
         assert!((ErrorCode::WindowCreationFailed as u32) >= 1200);
         assert!((ErrorCode::WindowCreationFailed as u32) < 1300);
+    }
+
+    #[test]
+    fn test_dev_tools_error_code_range() {
+        assert_eq!(ErrorCode::DevPortBindFailed.subsystem(), "Dev Tools");
+        assert_eq!(ErrorCode::DevSerializeFailed.subsystem(), "Dev Tools");
+        assert_eq!(ErrorCode::DevRestoreFailed.subsystem(), "Dev Tools");
+        assert_eq!(ErrorCode::DevReloadFailed.subsystem(), "Dev Tools");
+        assert_eq!(ErrorCode::DevTcpSendFailed.subsystem(), "Dev Tools");
+        assert!((ErrorCode::DevPortBindFailed as u32) >= 2100);
+        assert!((ErrorCode::DevPortBindFailed as u32) < 2200);
     }
 }

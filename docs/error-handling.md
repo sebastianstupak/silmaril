@@ -52,11 +52,18 @@ define_error! {
 
 | Range | System |
 |-------|--------|
-| 1000-1999 | Core (ECS, assets) |
-| 2000-2999 | Renderer (Vulkan, shaders) |
-| 3000-3999 | Networking |
-| 4000-4999 | Physics |
-| 5000-5999 | Audio |
+| 1000-1099 | Core ECS |
+| 1100-1199 | Serialization |
+| 1200-1299 | Platform |
+| 1300-1399 | Rendering |
+| 1400-1499 | Networking |
+| 1500-1599 | Physics |
+| 1600-1699 | Audio |
+| 1700-1799 | LOD |
+| 1800-1899 | Interest Management |
+| 1900-1999 | Auto-update |
+| 2000-2099 | Template System |
+| 2100-2199 | Dev Tools |
 | 10000+ | Game-specific |
 
 ---
