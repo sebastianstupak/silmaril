@@ -5,5 +5,6 @@
 //! without restarting the game process.
 
 pub mod error;
+pub mod force_reload;
 pub mod handoff;
 pub mod messages;

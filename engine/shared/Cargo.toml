@@ -135,6 +135,12 @@ name = "dev_state_handoff_test"
 path = "tests/dev_state_handoff_test.rs"
 harness = true
 
+[[test]]
+name = "dev_force_reload_test"
+path = "tests/dev_force_reload_test.rs"
+harness = true
+required-features = ["hot-reload"]
+
 [[bench]]
 name = "integration_bench"
 path = "benches/integration_bench.rs"
