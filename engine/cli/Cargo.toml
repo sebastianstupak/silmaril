@@ -47,6 +47,8 @@ engine-templating = { path = "../templating" }
 engine-dev-tools-hot-reload = { path = "../dev-tools/hot-reload" }
 notify-debouncer-full = "0.3"
 
+pathdiff = "0.2"
+
 [dev-dependencies]
 tempfile = "3.10"
 tokio = { workspace = true, features = ["full"] }

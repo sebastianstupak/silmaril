@@ -1,5 +1,14 @@
 #![allow(dead_code)]
 
+use std::fs;
+use std::path::Path;
+
+use crate::codegen::module_wiring::{
+    crate_name_from_module_name, generate_wiring_block, has_wiring_block, module_type_from_name,
+    parse_module_metadata,
+};
+use super::wiring::{atomic_write, crate_dir, find_project_root, wiring_target, Target};
+
 // ── game.toml string helpers ──────────────────────────────────────────────────
 
 /// Return true if `[modules]` already has an entry for `name`.
@@ -119,4 +128,245 @@ pub fn remove_workspace_member(content: &str, member_path: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
         + "\n"
+}
+
+// ── add_module orchestrator ───────────────────────────────────────────────────
+
+/// Add a module to the game project.
+///
+/// Source mode is determined by the arguments provided:
+/// - `vendor=true, local_path=Some(p)` → vendor mode (copies source to `modules/<name>/`)
+/// - `local_path=Some(p)` → path mode (relative path dep)
+/// - `git_url=Some(url)` → git mode
+/// - else → registry mode (crates.io)
+///
+/// `name` may contain an optional `@version` suffix, e.g. `"combat@1.2.0"`.
+pub fn add_module(
+    name: &str,
+    git_url: Option<&str>,
+    tag: Option<&str>,
+    rev: Option<&str>,
+    local_path: Option<&str>,
+    vendor: bool,
+    target: Target,
+) -> anyhow::Result<()> {
+    use std::env;
+
+    // Parse optional @version suffix from name
+    let (module_name, requested_version) = if let Some(at) = name.rfind('@') {
+        (&name[..at], Some(&name[at + 1..]))
+    } else {
+        (name, None)
+    };
+
+    // Validation: vendor mode requires --path
+    if vendor && local_path.is_none() {
+        anyhow::bail!(
+            "--vendor requires --path: clone the module to a local directory first, \
+             then vendor it with --vendor --path <dir>"
+        );
+    }
+
+    // Find project root
+    let cwd = env::current_dir()?;
+    let project_root = find_project_root(&cwd)?;
+
+    // Resolve consuming crate paths
+    let crate_root = crate_dir(&project_root, target)?;
+    let game_toml_path = project_root.join("game.toml");
+    let cargo_toml_path = crate_root.join("Cargo.toml");
+    let entry_file = wiring_target(&crate_root, target);
+
+    // Read originals for rollback
+    let orig_game_toml = fs::read_to_string(&game_toml_path)?;
+    let orig_cargo_toml = fs::read_to_string(&cargo_toml_path)?;
+    let orig_entry_file = if entry_file.exists() {
+        fs::read_to_string(&entry_file)?
+    } else {
+        String::new()
+    };
+
+    // Duplicate check via game.toml
+    if game_toml_has_module(&orig_game_toml, module_name) {
+        anyhow::bail!(
+            "module '{}' is already installed — use 'silm module upgrade' to update",
+            module_name
+        );
+    }
+
+    // Vendor mode: delegate entirely to the vendor helper
+    if vendor {
+        let path = local_path.unwrap(); // validated above
+        return add_module_vendor_from_path(module_name, Path::new(path), target, &project_root);
+    }
+
+    // Resolve (crate_name, dep_value, game_entry_fields, module_type, init_expr)
+    let (crate_name, dep_value, game_entry_fields, module_type, init_expr) =
+        if let Some(path_str) = local_path {
+            // ── Path mode ────────────────────────────────────────────────────
+            let mod_cargo = Path::new(path_str).join("Cargo.toml");
+            let mod_cargo_content = fs::read_to_string(&mod_cargo)
+                .map_err(|e| anyhow::anyhow!("cannot read {}: {}", mod_cargo.display(), e))?;
+
+            // Read actual crate name from the module's own Cargo.toml
+            let actual_crate_name = {
+                #[derive(serde::Deserialize)]
+                struct Pkg {
+                    package: PkgInner,
+                }
+                #[derive(serde::Deserialize)]
+                struct PkgInner {
+                    name: String,
+                }
+                let p: Pkg = toml::from_str(&mod_cargo_content).map_err(|e| {
+                    anyhow::anyhow!("invalid Cargo.toml at {}: {}", path_str, e)
+                })?;
+                p.package.name
+            };
+
+            let (mt, init) = if let Some(meta) = parse_module_metadata(&mod_cargo_content) {
+                (meta.module_type, meta.init)
+            } else {
+                let mt = module_type_from_name(module_name);
+                let init = format!("{}::new()", mt);
+                (mt, init)
+            };
+
+            // Canonicalise and make path relative from the consuming crate directory
+            let abs_path = Path::new(path_str)
+                .canonicalize()
+                .map_err(|_| anyhow::anyhow!("path '{}' does not exist", path_str))?;
+            let rel_path = pathdiff::diff_paths(&abs_path, &crate_root)
+                .unwrap_or_else(|| abs_path.clone())
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            let dep_val = format!("{{ path = \"{}\" }}", rel_path);
+            let game_entry = format!(
+                "source = \"local\", path = \"{}\", target = \"{}\", crate = \"{}\"",
+                path_str,
+                target.crate_subdir(),
+                actual_crate_name
+            );
+            (actual_crate_name, dep_val, game_entry, mt, init)
+        } else if let Some(url) = git_url {
+            // ── Git mode ─────────────────────────────────────────────────────
+            let cn = crate_name_from_module_name(module_name);
+            let pin = if let Some(r) = rev {
+                format!(", rev = \"{}\"", r)
+            } else if let Some(t) = tag {
+                format!(", tag = \"{}\"", t)
+            } else {
+                String::new()
+            };
+            let dep_val = format!("{{ git = \"{}\"{} }}", url, pin);
+
+            let game_entry = if let Some(r) = rev {
+                format!(
+                    "source = \"git\", url = \"{}\", rev = \"{}\", target = \"{}\", crate = \"{}\"",
+                    url, r, target.crate_subdir(), cn
+                )
+            } else if let Some(t) = tag {
+                format!(
+                    "source = \"git\", url = \"{}\", tag = \"{}\", target = \"{}\", crate = \"{}\"",
+                    url, t, target.crate_subdir(), cn
+                )
+            } else {
+                format!(
+                    "source = \"git\", url = \"{}\", target = \"{}\", crate = \"{}\"",
+                    url, target.crate_subdir(), cn
+                )
+            };
+
+            let mt = module_type_from_name(module_name);
+            let init = format!("{}::new()", mt);
+            tracing::warn!(
+                "[silm] module '{}' is from a git URL — review the source before use",
+                module_name
+            );
+            (cn, dep_val, game_entry, mt, init)
+        } else {
+            // ── Registry mode ─────────────────────────────────────────────────
+            let cn = crate_name_from_module_name(module_name);
+            let version = requested_version.unwrap_or("*");
+            let dep_val = format!("\"{}\"", version);
+            let game_entry = format!(
+                "source = \"registry\", version = \"{}\", target = \"{}\", crate = \"{}\"",
+                version,
+                target.crate_subdir(),
+                cn
+            );
+            let mt = module_type_from_name(module_name);
+            let init = format!("{}::new()", mt);
+            (cn, dep_val, game_entry, mt, init)
+        };
+
+    // Duplicate check via Cargo.toml
+    if cargo_toml_has_dep(&orig_cargo_toml, &crate_name) {
+        anyhow::bail!(
+            "module '{}' is already installed — use 'silm module upgrade' to update",
+            module_name
+        );
+    }
+
+    // Apply all three writes with rollback on failure
+    let result = (|| -> anyhow::Result<()> {
+        // 1. Add dep to consuming crate's Cargo.toml
+        let new_cargo = append_dep_to_cargo_toml(&orig_cargo_toml, &crate_name, &dep_value);
+        atomic_write(&cargo_toml_path, &new_cargo)?;
+
+        // 2. Append wiring block to entry file (idempotent guard)
+        if !has_wiring_block(&orig_entry_file, module_name) {
+            let block = generate_wiring_block(
+                module_name,
+                &crate_name,
+                "latest",
+                &module_type,
+                &init_expr,
+            );
+            let new_entry = if orig_entry_file.is_empty() {
+                block
+            } else {
+                format!("{}\n{}", orig_entry_file.trim_end(), block)
+            };
+            atomic_write(&entry_file, &new_entry)?;
+        }
+
+        // 3. Record in game.toml [modules]
+        let new_game =
+            append_module_to_game_toml(&orig_game_toml, module_name, &game_entry_fields);
+        atomic_write(&game_toml_path, &new_game)?;
+
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        // Best-effort rollback
+        let _ = atomic_write(&cargo_toml_path, &orig_cargo_toml);
+        let _ = atomic_write(&entry_file, &orig_entry_file);
+        let _ = atomic_write(&game_toml_path, &orig_game_toml);
+        return Err(e);
+    }
+
+    tracing::info!(
+        "[silm] added {} to {}/",
+        crate_name,
+        target.crate_subdir()
+    );
+    tracing::info!("[silm] wired: {}", entry_file.display());
+    tracing::info!("[silm] tracked: game.toml [modules.{}]", module_name);
+    Ok(())
+}
+
+/// Vendor mode: copy the module source tree into `<project_root>/modules/<name>/`
+/// then wire it as a path dependency.
+///
+/// This is a stub — full implementation is Task 4.
+pub fn add_module_vendor_from_path(
+    _module_name: &str,
+    _source: &Path,
+    _target: Target,
+    _project_root: &std::path::Path,
+) -> anyhow::Result<()> {
+    anyhow::bail!("vendor mode is not yet implemented — use Task 4")
 }
