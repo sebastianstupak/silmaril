@@ -32,6 +32,7 @@ impl Template for BasicTemplate {
             // Client crate
             self.client_cargo_toml(),
             self.client_main_rs(),
+            self.client_index_html(),
             // Config files
             self.server_config_ron(),
             self.client_config_ron(),
@@ -72,6 +73,13 @@ client_package = "{name}-client"
 server_port = 7777
 dev_server_port = 9999
 dev_client_port = 9998
+
+[build]
+platforms = ["native", "wasm"]
+
+[build.env]
+SERVER_ADDRESS = "ws://localhost:7777"
+SERVER_PORT = "7777"
 "#,
             name = self.project_name
         );
@@ -151,6 +159,8 @@ serde_json = "1.0""#
 profiling-output.log
 pgo-data/
 *.prof
+dist/
+*.zip
 "#;
         TemplateFile::new(".gitignore", content)
     }
@@ -439,6 +449,22 @@ async fn main() -> anyhow::Result<()> {{
             name = self.project_name
         );
         TemplateFile::new("client/src/main.rs", content)
+    }
+
+    fn client_index_html(&self) -> TemplateFile {
+        let content = r#"<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>My Game</title>
+  </head>
+  <body>
+    <canvas id="silmaril"></canvas>
+    <link data-trunk rel="rust" data-wasm-opt="z"/>
+  </body>
+</html>
+"#;
+        TemplateFile::new("client/index.html", content)
     }
 
     fn server_config_ron(&self) -> TemplateFile {

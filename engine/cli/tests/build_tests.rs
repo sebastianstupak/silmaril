@@ -1,5 +1,6 @@
 //! Comprehensive tests for the build command layers.
 
+use silm::templates::{Template, BasicTemplate};
 use silm::commands::build::env::{merge_env, parse_build_env, parse_build_section, parse_env_file};
 use silm::commands::build::native::build_native;
 use silm::commands::build::package::{generate_dockerfile, zip_filename};
@@ -1087,4 +1088,44 @@ name = "my-game"
     assert!(result.is_ok());
     let cmds = commands.lock().unwrap();
     assert_eq!(cmds.len(), 0);
+}
+
+// ============================================================================
+// Template: game.toml [build] section and client/index.html (Task 9)
+// ============================================================================
+
+#[test]
+fn test_template_game_toml_has_build_section() {
+    let t = BasicTemplate::new("my-game".to_string(), false);
+    let files = t.files();
+    let game_toml = files.iter().find(|f| f.path == "game.toml").unwrap();
+    assert!(game_toml.content.contains("[build]"));
+    assert!(game_toml.content.contains("platforms = [\"native\", \"wasm\"]"));
+}
+
+#[test]
+fn test_template_game_toml_has_build_env() {
+    let t = BasicTemplate::new("my-game".to_string(), false);
+    let files = t.files();
+    let game_toml = files.iter().find(|f| f.path == "game.toml").unwrap();
+    assert!(game_toml.content.contains("[build.env]"));
+    assert!(game_toml.content.contains("SERVER_ADDRESS"));
+}
+
+#[test]
+fn test_template_has_client_index_html() {
+    let t = BasicTemplate::new("my-game".to_string(), false);
+    let files = t.files();
+    let index = files.iter().find(|f| f.path == "client/index.html").unwrap();
+    assert!(index.content.contains("data-trunk"));
+    assert!(index.content.contains("id=\"silmaril\""));
+}
+
+#[test]
+fn test_template_gitignore_has_dist() {
+    let t = BasicTemplate::new("my-game".to_string(), false);
+    let files = t.files();
+    let gitignore = files.iter().find(|f| f.path == ".gitignore").unwrap();
+    assert!(gitignore.content.contains("dist/"));
+    assert!(gitignore.content.contains("*.zip"));
 }
