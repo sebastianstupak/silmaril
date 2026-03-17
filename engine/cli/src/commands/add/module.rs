@@ -358,15 +358,147 @@ pub fn add_module(
     Ok(())
 }
 
-/// Vendor mode: copy the module source tree into `<project_root>/modules/<name>/`
-/// then wire it as a path dependency.
+/// Vendor mode: copy `source_path` into `modules/<name>/`, add workspace member,
+/// wire dep + wiring block + game.toml entry.
 ///
-/// This is a stub — full implementation is Task 4.
+/// Isolated code path for future license-gating.
 pub fn add_module_vendor_from_path(
-    _module_name: &str,
-    _source: &Path,
-    _target: Target,
-    _project_root: &std::path::Path,
+    module_name: &str,
+    source_path: &Path,
+    target: Target,
+    project_root: &Path,
 ) -> anyhow::Result<()> {
-    anyhow::bail!("vendor mode is not yet implemented — use Task 4")
+    let modules_dir = project_root.join("modules").join(module_name);
+    if modules_dir.exists() {
+        anyhow::bail!(
+            "modules/{} already exists — remove it first with 'silm module remove {}'",
+            module_name, module_name
+        );
+    }
+
+    let crate_root = crate_dir(project_root, target)?;
+    let game_toml_path = project_root.join("game.toml");
+    let root_cargo_path = project_root.join("Cargo.toml");
+    let cargo_toml_path = crate_root.join("Cargo.toml");
+    let entry_file = wiring_target(&crate_root, target);
+
+    // Read originals for rollback
+    let orig_game_toml = fs::read_to_string(&game_toml_path)?;
+    let orig_root_cargo = fs::read_to_string(&root_cargo_path)?;
+    let orig_cargo_toml = fs::read_to_string(&cargo_toml_path)?;
+    let orig_entry = if entry_file.exists() {
+        fs::read_to_string(&entry_file)?
+    } else {
+        String::new()
+    };
+
+    // Duplicate check
+    if game_toml_has_module(&orig_game_toml, module_name) {
+        anyhow::bail!("module '{}' is already installed", module_name);
+    }
+
+    // Copy source → modules/<name>/
+    copy_dir_all(source_path, &modules_dir)?;
+
+    // Read crate name and metadata from the vendored Cargo.toml
+    let vendored_cargo_content = fs::read_to_string(modules_dir.join("Cargo.toml"))
+        .map_err(|e| anyhow::anyhow!("vendored Cargo.toml missing or unreadable: {}", e))?;
+
+    let crate_name = {
+        #[derive(serde::Deserialize)]
+        struct Pkg {
+            package: PkgInner,
+        }
+        #[derive(serde::Deserialize)]
+        struct PkgInner {
+            name: String,
+        }
+        let p: Pkg = toml::from_str(&vendored_cargo_content)
+            .map_err(|e| anyhow::anyhow!("invalid Cargo.toml in vendored module: {}", e))?;
+        p.package.name
+    };
+
+    let (module_type, init) = if let Some(meta) = parse_module_metadata(&vendored_cargo_content) {
+        (meta.module_type, meta.init)
+    } else {
+        let mt = module_type_from_name(module_name);
+        let i = format!("{}::new()", mt);
+        (mt, i)
+    };
+
+    // Path dep: from consuming crate's directory to modules/<name>/
+    // e.g. shared/ → ../../modules/combat
+    let rel_path = format!("../../modules/{}", module_name);
+    let dep_value = format!("{{ path = \"{}\" }}", rel_path);
+
+    let result = (|| -> anyhow::Result<()> {
+        // 1. Add workspace member to root Cargo.toml
+        let new_root = add_workspace_member(
+            &orig_root_cargo,
+            &format!("modules/{}", module_name),
+        );
+        atomic_write(&root_cargo_path, &new_root)?;
+
+        // 2. Add path dep to consuming Cargo.toml
+        let new_cargo = append_dep_to_cargo_toml(&orig_cargo_toml, &crate_name, &dep_value);
+        atomic_write(&cargo_toml_path, &new_cargo)?;
+
+        // 3. Append wiring block to entry file
+        if !has_wiring_block(&orig_entry, module_name) {
+            let block = generate_wiring_block(
+                module_name, &crate_name, "vendored", &module_type, &init,
+            );
+            let new_entry = if orig_entry.is_empty() {
+                block
+            } else {
+                format!("{}\n{}", orig_entry.trim_end(), block)
+            };
+            atomic_write(&entry_file, &new_entry)?;
+        }
+
+        // 4. Update game.toml
+        let game_entry = format!(
+            "source = \"vendor\", ref = \"vendored\", target = \"{}\", crate = \"{}\"",
+            target.crate_subdir(),
+            crate_name
+        );
+        let new_game = append_module_to_game_toml(&orig_game_toml, module_name, &game_entry);
+        atomic_write(&game_toml_path, &new_game)?;
+
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        // Rollback: delete copied dir, restore all files
+        let _ = fs::remove_dir_all(&modules_dir);
+        let _ = atomic_write(&root_cargo_path, &orig_root_cargo);
+        let _ = atomic_write(&cargo_toml_path, &orig_cargo_toml);
+        let _ = atomic_write(&entry_file, &orig_entry);
+        let _ = atomic_write(&game_toml_path, &orig_game_toml);
+        return Err(e);
+    }
+
+    tracing::info!(
+        module = %module_name,
+        crate_name = %crate_name,
+        "vendored module into modules/{}",
+        module_name
+    );
+    tracing::info!("[silm] wired: {}", entry_file.display());
+    tracing::info!("[silm] tracked: game.toml [modules.{}]", module_name);
+    Ok(())
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> anyhow::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
 }

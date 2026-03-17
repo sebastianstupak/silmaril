@@ -130,3 +130,50 @@ fn test_add_module_path() {
     let game = fs::read_to_string(dir.path().join("game.toml")).unwrap();
     assert!(game.contains("source = \"local\""));
 }
+
+#[test]
+fn test_add_module_vendor() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+
+    // Create a fake upstream module (just a directory with Cargo.toml)
+    let upstream = TempDir::new().unwrap();
+    fs::write(
+        upstream.path().join("Cargo.toml"),
+        "[package]\nname = \"silmaril-module-combat\"\nversion = \"1.0.0\"\n\n[dependencies]\n",
+    ).unwrap();
+    fs::create_dir_all(upstream.path().join("src")).unwrap();
+    fs::write(upstream.path().join("src/lib.rs"), "pub struct CombatModule;\n").unwrap();
+
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module_vendor_from_path(
+        "combat",
+        upstream.path(),
+        silm::commands::add::wiring::Target::Shared,
+        &dir.path().to_path_buf(),
+    ).unwrap();
+
+    // modules/combat/ should exist with the vendored files
+    assert!(dir.path().join("modules/combat/Cargo.toml").exists());
+    assert!(dir.path().join("modules/combat/src/lib.rs").exists());
+
+    // Root Cargo.toml should have workspace member
+    let root_cargo = fs::read_to_string(dir.path().join("Cargo.toml")).unwrap();
+    assert!(root_cargo.contains("modules/combat"), "workspace member missing");
+
+    // shared/Cargo.toml should have path dep
+    let shared_cargo = fs::read_to_string(dir.path().join("shared/Cargo.toml")).unwrap();
+    assert!(shared_cargo.contains("path ="), "no path dep in shared/Cargo.toml");
+    assert!(shared_cargo.contains("silmaril-module-combat"), "wrong crate name in dep");
+
+    // shared/src/lib.rs should have wiring block
+    let lib = fs::read_to_string(dir.path().join("shared/src/lib.rs")).unwrap();
+    assert!(lib.contains("// --- silmaril module: combat"), "wiring block missing");
+
+    // game.toml should have vendor entry
+    let game = fs::read_to_string(dir.path().join("game.toml")).unwrap();
+    assert!(game.contains("source = \"vendor\""), "source not vendor");
+    assert!(game.contains("crate = \"silmaril-module-combat\""), "crate name not stored");
+}
