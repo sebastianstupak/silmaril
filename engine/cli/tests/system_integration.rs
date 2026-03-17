@@ -1,55 +1,73 @@
 use std::fs;
+use std::sync::Mutex;
 use tempfile::TempDir;
 
-/// Helper to create a test project structure
-fn create_test_project() -> TempDir {
-    let temp_dir = TempDir::new().unwrap();
-    let shared_systems = temp_dir.path().join("shared/src/systems");
-    fs::create_dir_all(&shared_systems).unwrap();
-    temp_dir
+use silm::commands::add::wiring::Target;
+
+// Serialize tests that call `env::set_current_dir` — that is process-global state.
+static CWD_LOCK: Mutex<()> = Mutex::new(());
+
+/// Helper to create a minimal project structure for testing
+fn make_project(tmp: &TempDir) -> std::path::PathBuf {
+    let root = tmp.path().to_path_buf();
+    fs::write(root.join("game.toml"), "[game]\nname = \"test\"").unwrap();
+    fs::create_dir_all(root.join("shared/src")).unwrap();
+    fs::write(root.join("shared/src/lib.rs"), "").unwrap();
+    fs::create_dir_all(root.join("client/src")).unwrap();
+    fs::write(root.join("client/src/main.rs"), "").unwrap();
+    fs::create_dir_all(root.join("server/src")).unwrap();
+    fs::write(root.join("server/src/main.rs"), "").unwrap();
+    root
 }
 
 #[test]
-fn test_system_generation_creates_file() {
-    let temp_dir = create_test_project();
-    std::env::set_current_dir(&temp_dir).unwrap();
+fn test_system_generation_creates_domain_file() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
-    // Simulate the add_system command
-    let result = silm::commands::add::handle_add_command(
-        silm::commands::add::AddCommand::System {
-            name: "health_regen".to_string(),
-            query: "mut:Health,RegenerationRate".to_string(),
-            location: "shared".to_string(),
-            phase: "update".to_string(),
-            doc: None,
-        }
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let result = silm::commands::add::system::add_system(
+        "health_regen",
+        "mut:Health,RegenerationRate",
+        Target::Shared,
+        "health",
     );
 
-    assert!(result.is_ok());
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    let file_path = temp_dir.path().join("shared/src/systems/health_regen.rs");
-    assert!(file_path.exists());
+    assert!(result.is_ok(), "System generation failed: {:?}", result);
+
+    let domain_file = root.join("shared/src/health/mod.rs");
+    assert!(domain_file.exists(), "Domain file not created: {}", domain_file.display());
 }
 
 #[test]
 fn test_generated_system_code_structure() {
-    let temp_dir = create_test_project();
-    std::env::set_current_dir(&temp_dir).unwrap();
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
-    let result = silm::commands::add::handle_add_command(
-        silm::commands::add::AddCommand::System {
-            name: "health_regen".to_string(),
-            query: "mut:Health,RegenerationRate".to_string(),
-            location: "shared".to_string(),
-            phase: "update".to_string(),
-            doc: Some("Regenerate health over time".to_string()),
-        }
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let result = silm::commands::add::system::add_system(
+        "health_regen",
+        "mut:Health,RegenerationRate",
+        Target::Shared,
+        "health",
     );
 
-    assert!(result.is_ok());
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    let file_path = temp_dir.path().join("shared/src/systems/health_regen.rs");
-    let content = fs::read_to_string(&file_path).unwrap();
+    assert!(result.is_ok(), "System generation failed: {:?}", result);
+
+    let domain_file = root.join("shared/src/health/mod.rs");
+    let content = fs::read_to_string(&domain_file).unwrap();
 
     // Verify imports
     assert!(content.contains("use engine_core::ecs::World"));
@@ -68,72 +86,131 @@ fn test_generated_system_code_structure() {
 
 #[test]
 fn test_system_generation_invalid_name() {
-    let temp_dir = create_test_project();
-    std::env::set_current_dir(&temp_dir).unwrap();
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
-    let result = silm::commands::add::handle_add_command(
-        silm::commands::add::AddCommand::System {
-            name: "HealthRegen".to_string(), // Invalid: PascalCase
-            query: "mut:Health".to_string(),
-            location: "shared".to_string(),
-            phase: "update".to_string(),
-            doc: None,
-        }
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    // PascalCase is invalid for system names (must be snake_case)
+    let result = silm::commands::add::system::add_system(
+        "HealthRegen",
+        "mut:Health",
+        Target::Shared,
+        "health",
     );
+
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_err());
 }
 
 #[test]
-fn test_system_generation_invalid_query() {
-    let temp_dir = create_test_project();
-    std::env::set_current_dir(&temp_dir).unwrap();
+fn test_system_generation_invalid_query_old_syntax() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
-    let result = silm::commands::add::handle_add_command(
-        silm::commands::add::AddCommand::System {
-            name: "health_regen".to_string(),
-            query: "Health".to_string(), // Invalid: lowercase (actually this would be invalid because it doesn't start uppercase — wait it does. But missing mut: is fine for immutable)
-            location: "shared".to_string(),
-            phase: "update".to_string(),
-            doc: None,
-        }
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    // Old & syntax is invalid
+    let result = silm::commands::add::system::add_system(
+        "health_regen",
+        "&Health",
+        Target::Shared,
+        "health",
     );
 
-    // "Health" alone is valid (immutable), so we need a truly invalid query
-    // Let's use an actually invalid one: old & syntax
-    let _ = result;
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    let result2 = silm::commands::add::handle_add_command(
-        silm::commands::add::AddCommand::System {
-            name: "health_regen2".to_string(),
-            query: "&Health".to_string(), // Invalid: old & syntax
-            location: "shared".to_string(),
-            phase: "update".to_string(),
-            doc: None,
-        }
-    );
-
-    assert!(result2.is_err());
+    assert!(result.is_err());
 }
 
 #[test]
-fn test_system_generation_different_phases() {
-    let temp_dir = create_test_project();
-    std::env::set_current_dir(&temp_dir).unwrap();
+fn test_system_generation_server_target() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
-    // Test fixed_update phase — phase is now ignored in codegen but still accepted
-    let result = silm::commands::add::handle_add_command(
-        silm::commands::add::AddCommand::System {
-            name: "physics_step".to_string(),
-            query: "mut:Transform,Velocity".to_string(),
-            location: "shared".to_string(),
-            phase: "fixed_update".to_string(),
-            doc: None,
-        }
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let result = silm::commands::add::system::add_system(
+        "physics_step",
+        "mut:Transform,Velocity",
+        Target::Server,
+        "physics",
     );
+
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
+
+    assert!(result.is_ok(), "System generation failed: {:?}", result);
+
+    let domain_file = root.join("server/src/physics/mod.rs");
+    assert!(domain_file.exists());
+}
+
+#[test]
+fn test_system_duplicate_error() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
+
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    // Create first time
+    let result1 = silm::commands::add::system::add_system(
+        "health_regen",
+        "mut:Health",
+        Target::Shared,
+        "health",
+    );
+    assert!(result1.is_ok());
+
+    // Try again in same domain
+    let result2 = silm::commands::add::system::add_system(
+        "health_regen",
+        "mut:Health",
+        Target::Shared,
+        "health",
+    );
+
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
+
+    assert!(result2.is_err(), "Should fail when system already exists");
+    assert!(result2.unwrap_err().to_string().contains("already exists"));
+}
+
+#[test]
+fn test_system_wires_mod_declaration() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
+
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let result = silm::commands::add::system::add_system(
+        "health_regen",
+        "mut:Health",
+        Target::Shared,
+        "health",
+    );
+
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_ok());
 
-    let file_path = temp_dir.path().join("shared/src/systems/physics_step.rs");
-    assert!(file_path.exists());
+    // Verify lib.rs was updated with module declaration
+    let lib_rs = root.join("shared/src/lib.rs");
+    let content = fs::read_to_string(&lib_rs).unwrap();
+    assert!(content.contains("pub mod health;"), "lib.rs missing 'pub mod health;'");
 }

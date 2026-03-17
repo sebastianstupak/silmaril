@@ -1,129 +1,133 @@
 use std::fs;
-use std::path::PathBuf;
+use std::sync::Mutex;
 use tempfile::TempDir;
 
-use silm::commands::add::add_component;
+use silm::commands::add::wiring::Target;
+
+// Serialize tests that call `env::set_current_dir` — that is process-global state.
+static CWD_LOCK: Mutex<()> = Mutex::new(());
 
 /// Helper to create a minimal project structure for testing
-fn create_project_structure(root: &PathBuf) {
-    // Create shared/src/components directory
-    let components_dir = root.join("shared/src/components");
-    fs::create_dir_all(&components_dir).unwrap();
-
-    // Create client/src/components directory
-    let client_components = root.join("client/src/components");
-    fs::create_dir_all(&client_components).unwrap();
-
-    // Create server/src/components directory
-    let server_components = root.join("server/src/components");
-    fs::create_dir_all(&server_components).unwrap();
+fn make_project(tmp: &TempDir) -> std::path::PathBuf {
+    let root = tmp.path().to_path_buf();
+    fs::write(root.join("game.toml"), "[game]\nname = \"test\"").unwrap();
+    fs::create_dir_all(root.join("shared/src")).unwrap();
+    fs::write(root.join("shared/src/lib.rs"), "").unwrap();
+    fs::create_dir_all(root.join("client/src")).unwrap();
+    fs::write(root.join("client/src/main.rs"), "").unwrap();
+    fs::create_dir_all(root.join("server/src")).unwrap();
+    fs::write(root.join("server/src/main.rs"), "").unwrap();
+    root
 }
 
 #[test]
 fn test_add_component_basic() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
-    // Change to temp directory
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    // Generate component
-    let result = add_component(
+    let result = silm::commands::add::component::add_component(
         "Health",
         "current:f32,max:f32",
-        "shared",
-        Some("Default".to_string()),
-        Some("Player health".to_string()),
+        Target::Shared,
+        "health",
     );
 
-    // Restore original directory
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_ok(), "Component generation failed: {:?}", result);
 
-    // Verify file created
-    let component_file = root.join("shared/src/components/health.rs");
-    assert!(
-        component_file.exists(),
-        "Component file not created: {}",
-        component_file.display()
-    );
+    // Verify domain file created
+    let domain_file = root.join("shared/src/health/mod.rs");
+    assert!(domain_file.exists(), "Domain file not created: {}", domain_file.display());
 
     // Verify content
-    let content = fs::read_to_string(&component_file).unwrap();
+    let content = fs::read_to_string(&domain_file).unwrap();
     assert!(content.contains("pub struct Health"));
     assert!(content.contains("pub current: f32"));
     assert!(content.contains("pub max: f32"));
 }
 
 #[test]
-fn test_add_component_client_location() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+fn test_add_component_client_target() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    let result = add_component("CameraState", "fov:f32,zoom:f32", "client", None, None);
+    let result = silm::commands::add::component::add_component(
+        "CameraState",
+        "fov:f32,zoom:f32",
+        Target::Client,
+        "camera",
+    );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Component generation failed: {:?}", result);
 
-    // Verify file in client location
-    let component_file = root.join("client/src/components/camera_state.rs");
-    assert!(component_file.exists());
+    let domain_file = root.join("client/src/camera/mod.rs");
+    assert!(domain_file.exists());
 
-    let content = fs::read_to_string(&component_file).unwrap();
+    let content = fs::read_to_string(&domain_file).unwrap();
     assert!(content.contains("pub struct CameraState"));
 }
 
 #[test]
-fn test_add_component_server_location() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+fn test_add_component_server_target() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    let result = add_component("ServerState", "tick:u64", "server", None, None);
-
-    std::env::set_current_dir(&original_dir).unwrap();
-
-    assert!(result.is_ok());
-
-    // Verify file in server location
-    let component_file = root.join("server/src/components/server_state.rs");
-    assert!(component_file.exists());
-}
-
-#[test]
-fn test_add_component_with_complex_types() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
-
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&root).unwrap();
-
-    let result = add_component(
-        "Inventory",
-        "items:Vec<Item>,capacity:usize",
-        "shared",
-        Some("Default".to_string()),
-        None,
+    let result = silm::commands::add::component::add_component(
+        "ServerState",
+        "tick:u64",
+        Target::Server,
+        "state",
     );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Component generation failed: {:?}", result);
 
-    let component_file = root.join("shared/src/components/inventory.rs");
-    let content = fs::read_to_string(&component_file).unwrap();
+    let domain_file = root.join("server/src/state/mod.rs");
+    assert!(domain_file.exists());
+}
+
+#[test]
+fn test_add_component_with_vec_type() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
+
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let result = silm::commands::add::component::add_component(
+        "Inventory",
+        "items:Vec<Item>,capacity:usize",
+        Target::Shared,
+        "inventory",
+    );
+
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
+
+    assert!(result.is_ok(), "Component generation failed: {:?}", result);
+
+    let domain_file = root.join("shared/src/inventory/mod.rs");
+    let content = fs::read_to_string(&domain_file).unwrap();
     assert!(content.contains("pub items: Vec<Item>"));
     assert!(content.contains("pub capacity: usize"));
     assert!(content.contains("items: Vec::new()"));
@@ -131,134 +135,179 @@ fn test_add_component_with_complex_types() {
 
 #[test]
 fn test_add_component_with_array_type() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    let result = add_component(
+    let result = silm::commands::add::component::add_component(
         "Transform",
         "position:[f32;3],rotation:[f32;4],scale:[f32;3]",
-        "shared",
-        Some("Default".to_string()),
-        None,
+        Target::Shared,
+        "transform",
     );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Component generation failed: {:?}", result);
 
-    let component_file = root.join("shared/src/components/transform.rs");
-    let content = fs::read_to_string(&component_file).unwrap();
+    let domain_file = root.join("shared/src/transform/mod.rs");
+    let content = fs::read_to_string(&domain_file).unwrap();
     assert!(content.contains("pub position: [f32;3]"));
-    assert!(content.contains("position: [0.0; 3]"));
+    assert!(content.contains("position: [0.0, 0.0, 0.0]"));
 }
 
 #[test]
 fn test_add_component_duplicate_error() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
     // Create component first time
-    let result1 = add_component("Health", "hp:f32", "shared", None, None);
+    let result1 = silm::commands::add::component::add_component(
+        "Health",
+        "hp:f32",
+        Target::Shared,
+        "health",
+    );
     assert!(result1.is_ok());
 
-    // Try to create again
-    let result2 = add_component("Health", "hp:f32", "shared", None, None);
+    // Try to create again in same domain
+    let result2 = silm::commands::add::component::add_component(
+        "Health",
+        "hp:f32",
+        Target::Shared,
+        "health",
+    );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
-    assert!(result2.is_err(), "Should fail when file already exists");
+    assert!(result2.is_err(), "Should fail when component already exists");
     assert!(result2.unwrap_err().to_string().contains("already exists"));
 }
 
 #[test]
 fn test_add_component_invalid_name() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    // Try with lowercase name (invalid PascalCase)
-    let result = add_component("health", "hp:f32", "shared", None, None);
+    // Lowercase name is invalid PascalCase
+    let result = silm::commands::add::component::add_component(
+        "health",
+        "hp:f32",
+        Target::Shared,
+        "health",
+    );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("must start with uppercase"));
 }
 
 #[test]
-fn test_add_component_invalid_location() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+fn test_add_component_no_project_root() {
+    let tmp = TempDir::new().unwrap();
+    // No game.toml created
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&root).unwrap();
+    std::env::set_current_dir(tmp.path()).unwrap();
 
-    let result = add_component("Health", "hp:f32", "invalid_location", None, None);
+    let result = silm::commands::add::component::add_component(
+        "Health",
+        "hp:f32",
+        Target::Shared,
+        "health",
+    );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid location"));
-}
-
-#[test]
-fn test_add_component_missing_directory() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    // Don't create project structure
-
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&root).unwrap();
-
-    let result = add_component("Health", "hp:f32", "shared", None, None);
-
-    std::env::set_current_dir(&original_dir).unwrap();
-
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("does not exist"));
+    assert!(result.unwrap_err().to_string().contains("game.toml"));
 }
 
 #[test]
 fn test_add_component_empty_fields() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    let result = add_component("Empty", "", "shared", None, None);
+    let result = silm::commands::add::component::add_component(
+        "Empty",
+        "",
+        Target::Shared,
+        "empty",
+    );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_err());
 }
 
 #[test]
 fn test_add_component_invalid_field_format() {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path().to_path_buf();
-    create_project_structure(&root);
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
 
+    let _guard = CWD_LOCK.lock().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    // Invalid format: no colon
-    let result = add_component("Health", "hp", "shared", None, None);
+    // Invalid format: no colon separator
+    let result = silm::commands::add::component::add_component(
+        "Health",
+        "hp",
+        Target::Shared,
+        "health",
+    );
 
     std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
 
     assert!(result.is_err());
+}
+
+#[test]
+fn test_add_component_wires_mod_declaration() {
+    let tmp = TempDir::new().unwrap();
+    let root = make_project(&tmp);
+
+    let _guard = CWD_LOCK.lock().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let result = silm::commands::add::component::add_component(
+        "Health",
+        "hp:f32",
+        Target::Shared,
+        "health",
+    );
+
+    std::env::set_current_dir(&original_dir).unwrap();
+    drop(_guard);
+
+    assert!(result.is_ok());
+
+    // Verify lib.rs was updated with module declaration
+    let lib_rs = root.join("shared/src/lib.rs");
+    let content = fs::read_to_string(&lib_rs).unwrap();
+    assert!(content.contains("pub mod health;"), "lib.rs missing 'pub mod health;'");
 }

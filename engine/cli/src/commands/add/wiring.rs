@@ -150,6 +150,7 @@ pub fn rollback_domain_file(file: &Path, original: Option<String>) -> Result<()>
 }
 
 /// Rollback wiring target to original content.
+#[allow(dead_code)]
 pub fn rollback_wiring_target(file: &Path, original: &str) -> Result<()> {
     atomic_write(file, original)
 }
