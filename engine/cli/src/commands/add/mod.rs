@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use clap::Subcommand;
 
 pub mod component;
+#[allow(dead_code)] // functions will be wired in Task 7 (CLI registration)
 pub mod module;
 pub mod system;
 pub mod wiring;

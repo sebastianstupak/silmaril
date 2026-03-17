@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::Path;
 
@@ -132,6 +130,21 @@ pub fn remove_workspace_member(content: &str, member_path: &str) -> String {
 
 // ── add_module orchestrator ───────────────────────────────────────────────────
 
+/// Parse the `[package] name` field from a Cargo.toml string.
+fn crate_name_from_cargo_toml(content: &str) -> anyhow::Result<String> {
+    #[derive(serde::Deserialize)]
+    struct Pkg {
+        package: PkgInner,
+    }
+    #[derive(serde::Deserialize)]
+    struct PkgInner {
+        name: String,
+    }
+    let p: Pkg = toml::from_str(content)
+        .map_err(|e| anyhow::anyhow!("invalid Cargo.toml: {}", e))?;
+    Ok(p.package.name)
+}
+
 /// Add a module to the game project.
 ///
 /// Source mode is determined by the arguments provided:
@@ -209,20 +222,7 @@ pub fn add_module(
                 .map_err(|e| anyhow::anyhow!("cannot read {}: {}", mod_cargo.display(), e))?;
 
             // Read actual crate name from the module's own Cargo.toml
-            let actual_crate_name = {
-                #[derive(serde::Deserialize)]
-                struct Pkg {
-                    package: PkgInner,
-                }
-                #[derive(serde::Deserialize)]
-                struct PkgInner {
-                    name: String,
-                }
-                let p: Pkg = toml::from_str(&mod_cargo_content).map_err(|e| {
-                    anyhow::anyhow!("invalid Cargo.toml at {}: {}", path_str, e)
-                })?;
-                p.package.name
-            };
+            let actual_crate_name = crate_name_from_cargo_toml(&mod_cargo_content)?;
 
             let (mt, init) = if let Some(meta) = parse_module_metadata(&mod_cargo_content) {
                 (meta.module_type, meta.init)
@@ -404,19 +404,8 @@ pub fn add_module_vendor_from_path(
     let vendored_cargo_content = fs::read_to_string(modules_dir.join("Cargo.toml"))
         .map_err(|e| anyhow::anyhow!("vendored Cargo.toml missing or unreadable: {}", e))?;
 
-    let crate_name = {
-        #[derive(serde::Deserialize)]
-        struct Pkg {
-            package: PkgInner,
-        }
-        #[derive(serde::Deserialize)]
-        struct PkgInner {
-            name: String,
-        }
-        let p: Pkg = toml::from_str(&vendored_cargo_content)
-            .map_err(|e| anyhow::anyhow!("invalid Cargo.toml in vendored module: {}", e))?;
-        p.package.name
-    };
+    let crate_name = crate_name_from_cargo_toml(&vendored_cargo_content)
+        .map_err(|e| anyhow::anyhow!("invalid Cargo.toml in vendored module: {}", e))?;
 
     let (module_type, init) = if let Some(meta) = parse_module_metadata(&vendored_cargo_content) {
         (meta.module_type, meta.init)
