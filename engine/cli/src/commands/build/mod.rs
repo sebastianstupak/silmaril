@@ -530,3 +530,94 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
         false,
     )
 }
+
+/// Entry point for `silm package` called from the CLI.
+///
+/// Reads game.toml, triggers a release build via [`handle_build_command`],
+/// then assembles distribution directories and creates zip archives for
+/// each target platform.
+pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Result<()> {
+    let game_toml_path = project_root.join("game.toml");
+    let game_toml_content = std::fs::read_to_string(&game_toml_path)
+        .map_err(|e| anyhow::anyhow!("Failed to read game.toml: {e}"))?;
+
+    let project_name = parse_project_name(&game_toml_content)
+        .ok_or_else(|| anyhow::anyhow!("game.toml is missing [project] name"))?;
+    let version = parse_project_version(&game_toml_content);
+
+    let platform_names: Vec<String> = if let Some(ref p) = cmd.platform {
+        vec![p.clone()]
+    } else {
+        env::parse_build_section(&game_toml_content)
+            .ok_or_else(|| anyhow::anyhow!(
+                "no platforms specified — add [build] platforms = [...] to game.toml, or use --platform <name>"
+            ))?
+    };
+
+    // Build in release mode first
+    let build_cmd = BuildCommand {
+        platform: cmd.platform.clone(),
+        release: true,
+        env_file: None,
+    };
+    handle_build_command(build_cmd, project_root.clone())?;
+
+    let out_dir = cmd
+        .out_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| project_root.clone());
+
+    // Build env entries for server Dockerfile
+    let build_env = env::parse_build_env(&game_toml_content);
+
+    for name in &platform_names {
+        let platform = platform_from_str(name)?;
+
+        info!(platform = %name, "Packaging platform");
+
+        let dist_dir = if name == "wasm" {
+            // Trunk already outputs to dist/wasm, just zip it
+            let wasm_dist = project_root.join("dist").join("wasm");
+            if !wasm_dist.is_dir() {
+                bail!("dist/wasm/ not found — did the WASM build succeed?");
+            }
+            wasm_dist
+        } else if name == "server" {
+            package::assemble_server_dist(
+                &project_root,
+                &build_env,
+                platform.uses_exe_extension(),
+            )?
+        } else {
+            let (server_bin, client_bin) = match platform.build_kind() {
+                BuildKind::ServerAndClient => (true, true),
+                BuildKind::ServerOnly => (true, false),
+                BuildKind::ClientOnly => (false, true),
+            };
+
+            let target_triple = if platform.target_triple() != host_target_triple() {
+                Some(platform.target_triple())
+            } else {
+                None
+            };
+
+            package::assemble_native_dist(
+                &project_root,
+                name,
+                target_triple,
+                server_bin,
+                client_bin,
+                platform.uses_exe_extension(),
+            )?
+        };
+
+        // Create zip
+        let zip_name = package::zip_filename(&project_name, &version, name);
+        let zip_path = out_dir.join(&zip_name);
+        package::create_zip(&dist_dir, &zip_path)?;
+        info!(zip = %zip_name, "Package complete");
+    }
+
+    Ok(())
+}

@@ -51,6 +51,18 @@ enum Commands {
         #[command(subcommand)]
         command: commands::module::ModuleCommand,
     },
+
+    /// Build the game for one or more target platforms
+    Build {
+        #[command(flatten)]
+        command: commands::build::BuildCommand,
+    },
+
+    /// Package the game into distributable zip archives
+    Package {
+        #[command(flatten)]
+        command: commands::build::PackageCommand,
+    },
 }
 
 #[tokio::main]
@@ -74,6 +86,16 @@ async fn main() -> anyhow::Result<()> {
             let cwd = std::env::current_dir()?;
             let project_root = commands::add::wiring::find_project_root(&cwd)?;
             commands::module::handle_module_command(command, project_root)?;
+        }
+        Commands::Build { command } => {
+            let cwd = std::env::current_dir()?;
+            let project_root = commands::add::wiring::find_project_root(&cwd)?;
+            commands::build::handle_build_command(command, project_root)?;
+        }
+        Commands::Package { command } => {
+            let cwd = std::env::current_dir()?;
+            let project_root = commands::add::wiring::find_project_root(&cwd)?;
+            commands::build::handle_package_command(command, project_root)?;
         }
     }
 

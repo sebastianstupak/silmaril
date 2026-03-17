@@ -3,7 +3,10 @@
 use silm::templates::{Template, BasicTemplate};
 use silm::commands::build::env::{merge_env, parse_build_env, parse_build_section, parse_env_file};
 use silm::commands::build::native::build_native;
-use silm::commands::build::package::{generate_dockerfile, zip_filename};
+use silm::commands::build::package::{
+    assemble_native_dist, assemble_server_dist, copy_assets, create_zip, generate_dockerfile,
+    zip_filename,
+};
 use silm::commands::build::wasm::build_wasm;
 use silm::commands::build::{
     build_all_platforms, check_tool, dist_dir_name, host_target_triple, parse_dev_section,
@@ -1128,4 +1131,188 @@ fn test_template_gitignore_has_dist() {
     let gitignore = files.iter().find(|f| f.path == ".gitignore").unwrap();
     assert!(gitignore.content.contains("dist/"));
     assert!(gitignore.content.contains("*.zip"));
+}
+
+// ============================================================================
+// create_zip (Task 7)
+// ============================================================================
+
+#[test]
+fn test_create_zip() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source");
+    std::fs::create_dir_all(&source).unwrap();
+    std::fs::write(source.join("hello.txt"), "world").unwrap();
+    std::fs::write(source.join("data.bin"), vec![0u8; 128]).unwrap();
+
+    let zip_path = dir.path().join("output.zip");
+    create_zip(&source, &zip_path).unwrap();
+
+    assert!(zip_path.exists());
+    assert!(std::fs::metadata(&zip_path).unwrap().len() > 0);
+}
+
+#[test]
+fn test_create_zip_nested_dirs() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("nested");
+    let sub = source.join("a").join("b").join("c");
+    std::fs::create_dir_all(&sub).unwrap();
+    std::fs::write(sub.join("deep.txt"), "deep content").unwrap();
+    std::fs::write(source.join("root.txt"), "root content").unwrap();
+
+    let zip_path = dir.path().join("nested.zip");
+    create_zip(&source, &zip_path).unwrap();
+
+    assert!(zip_path.exists());
+    assert!(std::fs::metadata(&zip_path).unwrap().len() > 0);
+}
+
+// ============================================================================
+// copy_assets (Task 7)
+// ============================================================================
+
+#[test]
+fn test_copy_assets_present() {
+    let dir = tempfile::tempdir().unwrap();
+    let project_root = dir.path().join("project");
+    let assets = project_root.join("assets");
+    std::fs::create_dir_all(assets.join("textures")).unwrap();
+    std::fs::write(assets.join("textures").join("sky.png"), "fake png").unwrap();
+    std::fs::write(assets.join("config.yaml"), "key: value").unwrap();
+
+    let dist = dir.path().join("dist_platform");
+    std::fs::create_dir_all(&dist).unwrap();
+
+    copy_assets(&project_root, &dist).unwrap();
+
+    assert!(dist.join("assets").join("config.yaml").is_file());
+    assert!(dist.join("assets").join("textures").join("sky.png").is_file());
+}
+
+#[test]
+fn test_copy_assets_absent_no_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let project_root = dir.path().join("no_assets_project");
+    std::fs::create_dir_all(&project_root).unwrap();
+    // No assets/ directory
+
+    let dist = dir.path().join("dist_platform");
+    std::fs::create_dir_all(&dist).unwrap();
+
+    // Should not error
+    copy_assets(&project_root, &dist).unwrap();
+
+    // No assets copied
+    assert!(!dist.join("assets").exists());
+}
+
+// ============================================================================
+// assemble_native_dist (Task 7)
+// ============================================================================
+
+#[test]
+fn test_assemble_native_dist() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("project");
+    let release = root.join("target").join("release");
+    std::fs::create_dir_all(&release).unwrap();
+
+    // Create fake binaries
+    std::fs::write(release.join("server"), "fake server").unwrap();
+    std::fs::write(release.join("client"), "fake client").unwrap();
+
+    // Create assets
+    let assets = root.join("assets");
+    std::fs::create_dir_all(&assets).unwrap();
+    std::fs::write(assets.join("level.dat"), "level data").unwrap();
+
+    let dist_dir = assemble_native_dist(&root, "native", None, true, true, false).unwrap();
+
+    assert!(dist_dir.join("server").is_file());
+    assert!(dist_dir.join("client").is_file());
+    assert!(dist_dir.join("assets").join("level.dat").is_file());
+}
+
+#[test]
+fn test_assemble_native_dist_with_target_triple() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("project");
+    let release = root
+        .join("target")
+        .join("x86_64-unknown-linux-gnu")
+        .join("release");
+    std::fs::create_dir_all(&release).unwrap();
+
+    std::fs::write(release.join("server"), "fake server").unwrap();
+
+    let dist_dir = assemble_native_dist(
+        &root,
+        "linux-x86_64",
+        Some("x86_64-unknown-linux-gnu"),
+        true,
+        false,
+        false,
+    )
+    .unwrap();
+
+    assert!(dist_dir.join("server").is_file());
+    assert!(!dist_dir.join("client").exists());
+}
+
+#[test]
+fn test_assemble_native_dist_exe_extension() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("project");
+    let release = root.join("target").join("release");
+    std::fs::create_dir_all(&release).unwrap();
+
+    std::fs::write(release.join("server.exe"), "fake server").unwrap();
+    std::fs::write(release.join("client.exe"), "fake client").unwrap();
+
+    let dist_dir = assemble_native_dist(&root, "windows", None, true, true, true).unwrap();
+
+    assert!(dist_dir.join("server.exe").is_file());
+    assert!(dist_dir.join("client.exe").is_file());
+}
+
+// ============================================================================
+// assemble_server_dist (Task 7)
+// ============================================================================
+
+#[test]
+fn test_assemble_server_dist_has_dockerfile() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("project");
+    let release = root.join("target").join("release");
+    std::fs::create_dir_all(&release).unwrap();
+
+    std::fs::write(release.join("server"), "fake server binary").unwrap();
+
+    let env = vec![("RUST_LOG".into(), "info".into())];
+    let dist_dir = assemble_server_dist(&root, &env, false).unwrap();
+
+    assert!(dist_dir.join("server").is_file());
+    assert!(dist_dir.join("Dockerfile").is_file());
+
+    let dockerfile = std::fs::read_to_string(dist_dir.join("Dockerfile")).unwrap();
+    assert!(dockerfile.contains("FROM debian:bookworm-slim"));
+    assert!(dockerfile.contains("ENV RUST_LOG=info"));
+    assert!(dockerfile.contains("ENTRYPOINT"));
+}
+
+#[test]
+fn test_assemble_server_dist_missing_binary_no_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("project");
+    let release = root.join("target").join("release");
+    std::fs::create_dir_all(&release).unwrap();
+    // No server binary created
+
+    let dist_dir = assemble_server_dist(&root, &[], false).unwrap();
+
+    // Dockerfile is still generated
+    assert!(dist_dir.join("Dockerfile").is_file());
+    // Server binary not present
+    assert!(!dist_dir.join("server").exists());
 }
