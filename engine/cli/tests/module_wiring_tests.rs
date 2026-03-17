@@ -90,6 +90,8 @@ fn test_read_module_metadata_absent() {
 // game.toml helpers
 use silm::commands::add::module::{
     game_toml_has_module, append_module_to_game_toml, remove_module_from_game_toml,
+    cargo_toml_has_dep, append_dep_to_cargo_toml, remove_dep_from_cargo_toml,
+    add_workspace_member, remove_workspace_member,
 };
 
 #[test]
@@ -119,4 +121,50 @@ fn test_remove_module_from_game_toml() {
     let result = remove_module_from_game_toml(content, "combat");
     assert!(!result.contains("combat ="));
     assert!(result.contains("health ="));
+}
+
+#[test]
+fn test_cargo_has_dep_found() {
+    let content = "[dependencies]\nsome-crate = \"1.0\"\n";
+    assert!(cargo_toml_has_dep(content, "some-crate"));
+}
+
+#[test]
+fn test_cargo_has_dep_not_found() {
+    let content = "[dependencies]\n# empty\n";
+    assert!(!cargo_toml_has_dep(content, "some-crate"));
+}
+
+#[test]
+fn test_cargo_append_dep() {
+    let content = "[package]\nname = \"foo\"\n\n[dependencies]\n";
+    let result = append_dep_to_cargo_toml(content, "combat", "\"^1.0\"");
+    assert!(result.contains("combat = \"^1.0\""));
+    assert!(result.contains("[package]"));
+}
+
+#[test]
+fn test_cargo_remove_dep_scoped() {
+    // Should only remove from [dependencies], not [dev-dependencies]
+    let content = "[dependencies]\ncombat = \"^1.0\"\nhealth = \"^1.0\"\n\n[dev-dependencies]\ncombat = \"^1.0\"\n";
+    let result = remove_dep_from_cargo_toml(content, "combat");
+    assert!(!result.contains("[dependencies]\ncombat"), "combat still in [dependencies]");
+    assert!(result.contains("health ="), "health was incorrectly removed");
+    assert!(result.contains("[dev-dependencies]\ncombat"), "combat incorrectly removed from [dev-dependencies]");
+}
+
+#[test]
+fn test_add_workspace_member() {
+    let content = "[workspace]\nmembers = [\n    \"shared\",\n]\n";
+    let result = add_workspace_member(content, "modules/combat");
+    assert!(result.contains("\"modules/combat\""));
+    assert!(result.contains("\"shared\""));
+}
+
+#[test]
+fn test_remove_workspace_member() {
+    let content = "[workspace]\nmembers = [\n    \"shared\",\n    \"modules/combat\",\n]\n";
+    let result = remove_workspace_member(content, "modules/combat");
+    assert!(!result.contains("modules/combat"));
+    assert!(result.contains("\"shared\""));
 }

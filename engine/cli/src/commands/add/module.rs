@@ -31,12 +31,19 @@ pub fn append_module_to_game_toml(content: &str, name: &str, fields: &str) -> St
 /// Remove the line `<name> = { ... }` from `[modules]` section.
 pub fn remove_module_from_game_toml(content: &str, name: &str) -> String {
     let prefix = format!("{} = {{", name);
-    content
-        .lines()
-        .filter(|l| !l.trim_start().starts_with(&prefix))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + "\n"
+    let mut in_modules = false;
+    let mut lines_out: Vec<&str> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_modules = trimmed == "[modules]";
+        }
+        if in_modules && line.trim_start().starts_with(&prefix) {
+            continue;
+        }
+        lines_out.push(line);
+    }
+    lines_out.join("\n") + "\n"
 }
 
 // ── Cargo.toml string helpers ─────────────────────────────────────────────────
@@ -73,12 +80,19 @@ pub fn append_dep_to_cargo_toml(content: &str, crate_name: &str, dep_value: &str
 /// Remove the dep line for `crate_name` from `[dependencies]`.
 pub fn remove_dep_from_cargo_toml(content: &str, crate_name: &str) -> String {
     let prefix = format!("{} =", crate_name);
-    content
-        .lines()
-        .filter(|l| !l.trim_start().starts_with(&prefix))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + "\n"
+    let mut in_deps = false;
+    let mut lines_out: Vec<&str> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_deps = trimmed == "[dependencies]";
+        }
+        if in_deps && line.trim_start().starts_with(&prefix) {
+            continue;
+        }
+        lines_out.push(line);
+    }
+    lines_out.join("\n") + "\n"
 }
 
 /// Add `"<member_path>"` to `[workspace] members = [...]` array.
