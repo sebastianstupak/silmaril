@@ -177,3 +177,32 @@ fn test_add_module_vendor() {
     assert!(game.contains("source = \"vendor\""), "source not vendor");
     assert!(game.contains("crate = \"silmaril-module-combat\""), "crate name not stored");
 }
+
+#[test]
+fn test_module_list_empty() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    // Should not error on empty [modules]
+    let result = silm::commands::module::list::list_modules(&dir.path().to_path_buf());
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_module_list_after_add() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module(
+        "combat", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+
+    // list should not error even without Cargo.lock (resolves to "?")
+    let result = silm::commands::module::list::list_modules(&dir.path().to_path_buf());
+    assert!(result.is_ok());
+}
