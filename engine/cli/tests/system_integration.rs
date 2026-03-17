@@ -76,7 +76,7 @@ fn test_generated_system_code_structure() {
     assert!(content.contains("pub fn health_regen_system(world: &mut World, dt: f32)"));
 
     // Verify query
-    assert!(content.contains("world.query::<(&mut Health, &RegenerationRate)>()"));
+    assert!(content.contains("world.query_mut::<(&mut Health, &RegenerationRate)>()"));
 
     // Verify tests
     assert!(content.contains("#[cfg(test)]"));

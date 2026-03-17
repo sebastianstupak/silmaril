@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use std::env;
 
-use crate::codegen::{generate_component_code, parse_fields, validate_pascal_case};
+use crate::codegen::{generate_component_code_inner, parse_fields, validate_pascal_case};
 
 use super::wiring::{
     append_to_domain_file, crate_dir, domain_file, find_project_root, has_duplicate_component,
@@ -38,8 +38,9 @@ pub fn add_component(
         );
     }
 
-    // Generate code
-    let code = generate_component_code(name, &fields);
+    // Generate code — skip imports if domain file already exists (imports already present)
+    let include_imports = !domain_mod.exists();
+    let code = generate_component_code_inner(name, &fields, include_imports);
 
     // Step 1: Append to domain file (atomic)
     let original_domain = append_to_domain_file(&domain_mod, &code)?;

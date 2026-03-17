@@ -34,8 +34,8 @@ pub mod validator;
 // Re-export commonly used items
 #[allow(unused_imports)]
 pub use component::{
-    default_value_for_type, extract_array_type, generate_component_code, parse_fields,
-    to_snake_case,
+    default_value_for_type, extract_array_type, generate_component_code,
+    generate_component_code_inner, parse_fields, to_snake_case,
 };
 #[allow(unused_imports)]
 pub use module_exports::update_module_exports;
@@ -44,6 +44,6 @@ pub use parser::{parse_query_components, QueryAccess, QueryComponent};
 #[allow(unused_imports)]
 pub use registry::{ComponentEntry, ComponentRegistry, FieldInfo, QueryComponentInfo, SystemEntry};
 #[allow(unused_imports)]
-pub use system::generate_system_code;
+pub use system::{generate_system_code, generate_system_code_inner};
 #[allow(unused_imports)]
 pub use validator::{validate_pascal_case, validate_snake_case};

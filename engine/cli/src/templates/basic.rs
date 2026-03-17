@@ -126,19 +126,13 @@ strip = true
 "#,
             name = self.project_name,
             dependencies = if self.use_local {
-                r#"silmaril-core = { path = "../silmaril/engine/core" }
-silmaril-ecs = { path = "../silmaril/engine/core" }
-silmaril-math = { path = "../silmaril/engine/math" }
-silmaril-renderer = { path = "../silmaril/engine/renderer" }
-silmaril-networking = { path = "../silmaril/engine/networking" }
-silmaril-physics = { path = "../silmaril/engine/physics" }"#
+                r#"engine-core = { path = "../silmaril/engine/core" }
+engine-networking = { path = "../silmaril/engine/networking" }
+serde_json = "1.0""#
             } else {
-                r#"silmaril-core = "0.1"
-silmaril-ecs = "0.1"
-silmaril-math = "0.1"
-silmaril-renderer = "0.1"
-silmaril-networking = "0.1"
-silmaril-physics = "0.1""#
+                r#"engine-core = "0.1"
+engine-networking = "0.1"
+serde_json = "1.0""#
             }
         );
         TemplateFile::new("Cargo.toml", content)
@@ -280,12 +274,13 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-silmaril-core = {{ workspace = true }}
+engine-core = {{ workspace = true }}
 serde = {{ workspace = true }}
 tracing = {{ workspace = true }}
 
 [dev-dependencies]
 tokio-test = "0.4"
+serde_json = "1.0"
 "#,
             name = self.project_name
         );
@@ -320,13 +315,13 @@ dev = ["engine-dev-tools-hot-reload/dev"]
 
 [dependencies]
 {name}-shared = {{ path = "../shared" }}
-silmaril-core = {{ workspace = true }}
-silmaril-networking = {{ workspace = true }}
+engine-core = {{ workspace = true }}
+engine-networking = {{ workspace = true }}
 tokio = {{ workspace = true }}
 tracing = {{ workspace = true }}
 tracing-subscriber = {{ workspace = true }}
 anyhow = {{ workspace = true }}
-engine-dev-tools-hot-reload = {{ path = "../../engine/dev-tools/hot-reload", optional = true }}
+engine-dev-tools-hot-reload = {{ path = "../../silmaril/engine/dev-tools/hot-reload", optional = true }}
 "#,
             name = self.project_name
         );
@@ -351,7 +346,8 @@ async fn main() -> anyhow::Result<()> {{
 
     info!("{name} server starting...");
 
-    // Start dev reload server — no-op in release builds (dev feature off)
+    // Start dev reload server (only when dev feature is enabled)
+    #[cfg(feature = "dev")]
     engine_dev_tools_hot_reload::server::DevReloadServer::start(None).await;
 
     // TODO: Initialize game server
@@ -391,14 +387,13 @@ dev = ["engine-dev-tools-hot-reload/dev"]
 
 [dependencies]
 {name}-shared = {{ path = "../shared" }}
-silmaril-core = {{ workspace = true }}
-silmaril-renderer = {{ workspace = true }}
-silmaril-networking = {{ workspace = true }}
+engine-core = {{ workspace = true }}
+engine-networking = {{ workspace = true }}
 tokio = {{ workspace = true }}
 tracing = {{ workspace = true }}
 tracing-subscriber = {{ workspace = true }}
 anyhow = {{ workspace = true }}
-engine-dev-tools-hot-reload = {{ path = "../../engine/dev-tools/hot-reload", optional = true }}
+engine-dev-tools-hot-reload = {{ path = "../../silmaril/engine/dev-tools/hot-reload", optional = true }}
 "#,
             name = self.project_name
         );
@@ -423,7 +418,8 @@ async fn main() -> anyhow::Result<()> {{
 
     info!("{name} client starting...");
 
-    // Start dev reload server — no-op in release builds (dev feature off)
+    // Start dev reload server (only when dev feature is enabled)
+    #[cfg(feature = "dev")]
     engine_dev_tools_hot_reload::server::DevReloadServer::start(None).await;
 
     // TODO: Initialize game client

@@ -1,15 +1,30 @@
 use super::parser::QueryComponent;
 
-/// Generate complete system code
+/// Generate complete system code.
+///
+/// When `include_imports` is false, the top-level `use engine_core::ecs::World;` is omitted
+/// (for appending to files that already have it).
+#[allow(dead_code)]
 pub fn generate_system_code(name: &str, components: &[QueryComponent]) -> String {
+    generate_system_code_inner(name, components, true)
+}
+
+/// Generate system code with optional imports.
+pub fn generate_system_code_inner(
+    name: &str,
+    components: &[QueryComponent],
+    include_imports: bool,
+) -> String {
     let fn_name = format!("{}_system", name);
     let test_mod_name = format!("{}_system_tests", name);
 
     let mut code = String::new();
 
-    // Top-level import
-    code.push_str("use engine_core::ecs::World;\n");
-    code.push('\n');
+    // Top-level import (only if this is the first system in the file)
+    if include_imports {
+        code.push_str("use engine_core::ecs::World;\n");
+        code.push('\n');
+    }
 
     // Registration comment + tracing attribute
     code.push_str(&format!(
@@ -26,25 +41,31 @@ pub fn generate_system_code(name: &str, components: &[QueryComponent]) -> String
 
     // Query + iteration
     if !components.is_empty() {
-        // Build query tuple type
+        let has_mutable = components
+            .iter()
+            .any(|c| c.access == super::parser::QueryAccess::Mutable);
+
+        // Build query type: single component uses bare type, multi uses tuple
         let query_types: Vec<String> = components.iter().map(|c| c.type_syntax()).collect();
-        let query_tuple = if components.len() == 1 {
-            format!("({},)", query_types[0])
+        let query_type = if components.len() == 1 {
+            query_types[0].clone()
         } else {
             format!("({})", query_types.join(", "))
         };
 
-        // Build iter binding
+        // Build iter binding: iteration yields (Entity, data)
         let var_names: Vec<String> = components.iter().map(|c| c.var_name()).collect();
-        let iter_binding = if components.len() == 1 {
-            format!("({},)", var_names[0])
+        let data_binding = if components.len() == 1 {
+            var_names[0].clone()
         } else {
             format!("({})", var_names.join(", "))
         };
 
+        let query_method = if has_mutable { "query_mut" } else { "query" };
+
         code.push_str(&format!(
-            "    for {} in world.query::<{}>() {{\n",
-            iter_binding, query_tuple
+            "    for (_entity, {}) in world.{}::<{}>() {{\n",
+            data_binding, query_method, query_type
         ));
         code.push_str(&format!("        // TODO: implement {} logic\n", name));
         code.push_str("        let _ = dt;\n");
@@ -106,7 +127,7 @@ mod tests {
     fn test_direct_query_iteration() {
         let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
         let code = generate_system_code("health_regen", &components);
-        assert!(code.contains("for (health,) in world.query::<(&mut Health,)>()"));
+        assert!(code.contains("for (_entity, health) in world.query_mut::<&mut Health>()"));
     }
 
     #[test]
@@ -135,8 +156,8 @@ mod tests {
         assert!(code.contains("pub fn health_regen_system"));
         assert!(code.contains("use engine_core::ecs::World"));
         assert!(code.contains("#[tracing::instrument(skip(world))]"));
-        assert!(code.contains("world.query::<(&mut Health, &RegenerationRate)>()"));
-        assert!(code.contains("for (health, regeneration_rate)"));
+        assert!(code.contains("world.query_mut::<(&mut Health, &RegenerationRate)>()"));
+        assert!(code.contains("for (_entity, (health, regeneration_rate))"));
         assert!(code.contains("#[cfg(test)]"));
     }
 
@@ -150,22 +171,22 @@ mod tests {
     }
 
     #[test]
-    fn test_single_component_trailing_comma() {
+    fn test_single_component_bare_type() {
         let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
         let code = generate_system_code("health_check", &components);
-        assert!(code.contains("(&mut Health,)"));
-        assert!(code.contains("(health,)"));
+        assert!(code.contains("query_mut::<&mut Health>()"));
+        assert!(code.contains("(_entity, health)"));
     }
 
     #[test]
-    fn test_multiple_components_no_trailing_comma() {
+    fn test_multiple_components_tuple() {
         let components = vec![
             QueryComponent::new("Health".to_string(), QueryAccess::Mutable),
             QueryComponent::new("Velocity".to_string(), QueryAccess::Immutable),
         ];
         let code = generate_system_code("movement", &components);
         assert!(code.contains("(&mut Health, &Velocity)"));
-        assert!(code.contains("(health, velocity)"));
+        assert!(code.contains("(_entity, (health, velocity))"));
     }
 
     #[test]

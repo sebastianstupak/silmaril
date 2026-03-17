@@ -19,6 +19,9 @@ pub mod schedule;
 pub mod storage;
 pub mod world;
 
+// Re-export derive macro so `use engine_core::ecs::Component` brings in both trait and derive
+pub use engine_macros::Component;
+
 // Re-export commonly used types
 pub use change_detection::{Changed, ComponentTicks, SystemTicks, Tick};
 pub use component::{Component, ComponentDescriptor};

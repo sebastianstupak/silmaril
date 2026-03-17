@@ -36,10 +36,10 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    // Use crate::ecs::Component which works inside engine-core
-    // External crates should re-export or use full path
+    // Use engine_core::ecs::Component — works both inside engine-core
+    // (via `extern crate self as engine_core`) and in external crates.
     let expanded = quote::quote! {
-        impl #impl_generics crate::ecs::Component for #name #ty_generics #where_clause {}
+        impl #impl_generics engine_core::ecs::Component for #name #ty_generics #where_clause {}
     };
 
     TokenStream::from(expanded)

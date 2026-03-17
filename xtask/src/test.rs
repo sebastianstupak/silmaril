@@ -33,6 +33,8 @@ pub enum TestCommand {
     E2e,
     /// Run E2E tests with output
     E2eVerbose,
+    /// Run CLI E2E tests (silm add component/system full workflow)
+    E2eCli,
 }
 
 pub fn execute(cmd: TestCommand) -> Result<()> {
@@ -129,6 +131,16 @@ pub fn execute(cmd: TestCommand) -> Result<()> {
                 "--nocapture",
             ])?;
             print_success("E2E tests passed");
+        }
+        TestCommand::E2eCli => {
+            print_section("Running CLI E2E Tests");
+            print_info("This runs test-silm-add.sh -- requires bash");
+            let script = project_root()?.join("scripts/e2e-tests/test-silm-add.sh");
+            run_command_streaming(
+                "bash",
+                &[script.to_str().unwrap(), "--skip-dev"],
+            )?;
+            print_success("CLI E2E tests passed");
         }
     }
     Ok(())

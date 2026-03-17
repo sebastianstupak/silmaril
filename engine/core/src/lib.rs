@@ -9,6 +9,9 @@
 
 #![warn(missing_docs)]
 
+// Allow `engine_core::` paths to resolve inside this crate (needed by derive macros)
+extern crate self as engine_core;
+
 pub mod allocators;
 pub mod ecs;
 pub mod error;
@@ -21,6 +24,7 @@ pub mod serialization;
 pub mod spatial;
 
 // Re-export commonly used types
+// Note: The `Component` derive macro is re-exported from `ecs` module
 pub use allocators::{Arena, FrameAllocator, PoolAllocator};
 pub use ecs::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet, World};
 pub use error::{EngineError, ErrorCode, ErrorSeverity};

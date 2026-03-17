@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use std::env;
 
-use crate::codegen::{generate_system_code, parse_query_components, validate_snake_case};
+use crate::codegen::{generate_system_code_inner, parse_query_components, validate_snake_case};
 
 use super::wiring::{
     append_to_domain_file, crate_dir, domain_file, find_project_root, has_duplicate_system,
@@ -37,8 +37,13 @@ pub fn add_system(
         );
     }
 
-    // Generate code
-    let code = generate_system_code(name, &components);
+    // Generate code — skip imports if domain file already has a top-level World import
+    // (check for line starting with "use engine_core::ecs::World;" to avoid matching test-module imports)
+    let file_has_world_import = domain_mod.exists() && {
+        let content = std::fs::read_to_string(&domain_mod).unwrap_or_default();
+        content.lines().any(|line| line.starts_with("use engine_core::ecs::World;"))
+    };
+    let code = generate_system_code_inner(name, &components, !file_has_world_import);
 
     // Step 1: Append to domain file (atomic)
     let original_domain = append_to_domain_file(&domain_mod, &code)?;

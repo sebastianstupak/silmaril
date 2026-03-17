@@ -132,6 +132,13 @@ fn parse_array_type(type_str: &str) -> Option<(String, usize)> {
     Some((inner_type, size))
 }
 
+/// Generate the standard imports for component code.
+///
+/// Returns the import lines that components need (engine_core::ecs::Component and serde).
+pub fn component_imports() -> &'static str {
+    "use engine_core::ecs::Component;\nuse serde::{Deserialize, Serialize};\n"
+}
+
 /// Generate complete component code
 ///
 /// # Arguments
@@ -139,10 +146,20 @@ fn parse_array_type(type_str: &str) -> Option<(String, usize)> {
 /// - `fields`: List of (field_name, field_type) tuples
 ///
 /// # Returns
-/// Complete Rust source code for the component with fixed derives and domain-scoped test module
+/// Complete Rust source code for the component with fixed derives and domain-scoped test module.
+/// When `include_imports` is false, the import lines are omitted (for appending to existing files).
 pub fn generate_component_code(
     name: &str,
     fields: &[(String, String)],
+) -> String {
+    generate_component_code_inner(name, fields, true)
+}
+
+/// Generate component code with optional imports.
+pub fn generate_component_code_inner(
+    name: &str,
+    fields: &[(String, String)],
+    include_imports: bool,
 ) -> String {
     let snake_name = to_snake_case(name);
 
@@ -162,8 +179,14 @@ pub fn generate_component_code(
     let test_module = generate_test_module(name, &snake_name, fields);
 
     // Combine all parts
+    let imports = if include_imports {
+        format!("{}\n", component_imports())
+    } else {
+        String::new()
+    };
     format!(
-        "use engine_core::ecs::Component;\nuse serde::{{Deserialize, Serialize}};\n\n#[derive({derives})]\npub struct {name} {{\n{fields}}}\n\n{tests}",
+        "{imports}#[derive({derives})]\npub struct {name} {{\n{fields}}}\n\n{tests}",
+        imports = imports,
         derives = derives_str,
         name = name,
         fields = fields_code,
@@ -194,6 +217,7 @@ mod {snake_name}_tests {{
     #[test]
     fn test_{snake_name}_add_get() {{
         let mut world = World::new();
+        world.register::<{name}>();
         let entity = world.spawn();
         let component = {name} {{{field_inits}
         }};
@@ -213,6 +237,7 @@ mod {snake_name}_tests {{
     #[test]
     fn test_{snake_name}_remove() {{
         let mut world = World::new();
+        world.register::<{name}>();
         let entity = world.spawn();
         let component = {name} {{{field_inits}
         }};
