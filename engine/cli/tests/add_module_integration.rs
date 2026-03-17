@@ -206,3 +206,39 @@ fn test_module_list_after_add() {
     let result = silm::commands::module::list::list_modules(&dir.path().to_path_buf());
     assert!(result.is_ok());
 }
+
+#[test]
+fn test_module_remove() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module(
+        "combat", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+
+    silm::commands::module::remove::remove_module("combat", &dir.path().to_path_buf()).unwrap();
+
+    let cargo = fs::read_to_string(dir.path().join("shared/Cargo.toml")).unwrap();
+    assert!(!cargo.contains("silmaril-module-combat"), "dep still in Cargo.toml");
+
+    let lib = fs::read_to_string(dir.path().join("shared/src/lib.rs")).unwrap();
+    assert!(!lib.contains("// --- silmaril module: combat"), "wiring block still present");
+
+    let game = fs::read_to_string(dir.path().join("game.toml")).unwrap();
+    assert!(!game.contains("combat ="), "game.toml entry still present");
+}
+
+#[test]
+fn test_module_remove_not_installed() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    let result = silm::commands::module::remove::remove_module("combat", &dir.path().to_path_buf());
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("not installed"));
+}
