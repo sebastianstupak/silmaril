@@ -3,7 +3,6 @@ use std::fs;
 use std::path::Path;
 use crate::codegen::module_wiring::parse_cargo_lock_version;
 
-#[allow(dead_code)]
 pub fn list_modules(project_root: &Path) -> Result<()> {
     let game_toml_path = project_root.join("game.toml");
     if !game_toml_path.exists() {
@@ -61,7 +60,6 @@ pub fn list_modules(project_root: &Path) -> Result<()> {
 }
 
 /// Parse the [modules] section into (name, fields_string) pairs.
-#[allow(dead_code)]
 fn parse_modules_section(content: &str) -> Vec<(String, String)> {
     let mut in_modules = false;
     let mut result = Vec::new();
@@ -80,7 +78,6 @@ fn parse_modules_section(content: &str) -> Vec<(String, String)> {
 }
 
 /// Extract a field value from an inline TOML fields string.
-#[allow(dead_code)]
 fn extract_field(fields: &str, key: &str) -> Option<String> {
     let pattern = format!("{} = \"", key);
     if let Some(start) = fields.find(&pattern) {
