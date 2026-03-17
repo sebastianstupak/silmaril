@@ -2,7 +2,6 @@ use anyhow::{bail, Result};
 use clap::Subcommand;
 
 pub mod component;
-#[allow(dead_code)] // functions will be wired in Task 7 (CLI registration)
 pub mod module;
 pub mod system;
 pub mod wiring;
@@ -62,6 +61,36 @@ pub enum AddCommand {
         #[arg(long, conflicts_with_all = ["shared", "server"])]
         client: bool,
     },
+
+    /// Add a game module (registry, git, path, or vendor)
+    Module {
+        /// Module name, optionally with version: combat or combat@1.2.0
+        name: String,
+        /// Git URL (git source mode)
+        #[arg(long)]
+        git: Option<String>,
+        /// Git tag to pin (use with --git)
+        #[arg(long)]
+        tag: Option<String>,
+        /// Git commit hash to pin (use with --git)
+        #[arg(long)]
+        rev: Option<String>,
+        /// Local path to module source
+        #[arg(long)]
+        path: Option<String>,
+        /// Vendor mode: copy source into modules/<name>/
+        #[arg(long)]
+        vendor: bool,
+        /// Target the shared crate
+        #[arg(long, conflicts_with_all = ["server", "client"])]
+        shared: bool,
+        /// Target the server crate
+        #[arg(long, conflicts_with_all = ["shared", "client"])]
+        server: bool,
+        /// Target the client crate
+        #[arg(long, conflicts_with_all = ["shared", "server"])]
+        client: bool,
+    },
 }
 
 fn resolve_target(shared: bool, server: bool, client: bool) -> Result<Target> {
@@ -82,6 +111,18 @@ pub fn handle_add_command(command: AddCommand) -> Result<()> {
         AddCommand::System { name, query, domain, shared, server, client } => {
             let target = resolve_target(shared, server, client)?;
             system::add_system(&name, &query, target, &domain)
+        }
+        AddCommand::Module { name, git, tag, rev, path, vendor, shared, server, client } => {
+            let target = resolve_target(shared, server, client)?;
+            module::add_module(
+                &name,
+                git.as_deref(),
+                tag.as_deref(),
+                rev.as_deref(),
+                path.as_deref(),
+                vendor,
+                target,
+            )
         }
     }
 }

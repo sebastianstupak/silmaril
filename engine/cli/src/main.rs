@@ -45,6 +45,12 @@ enum Commands {
         #[command(subcommand)]
         subcmd: Option<commands::dev::DevSubcommand>,
     },
+
+    /// Manage installed game modules
+    Module {
+        #[command(subcommand)]
+        command: commands::module::ModuleCommand,
+    },
 }
 
 #[tokio::main]
@@ -63,6 +69,11 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Dev { subcmd } => {
             commands::dev::handle_dev_command(subcmd).await?;
+        }
+        Commands::Module { command } => {
+            let cwd = std::env::current_dir()?;
+            let project_root = commands::add::wiring::find_project_root(&cwd)?;
+            commands::module::handle_module_command(command, project_root)?;
         }
     }
 

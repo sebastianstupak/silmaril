@@ -1,6 +1,4 @@
-#[allow(dead_code)] // functions will be wired in Task 7 (CLI registration)
 pub mod list;
-#[allow(dead_code)] // stub — implemented in Task 6
 pub mod remove;
 
 use anyhow::Result;
@@ -17,7 +15,6 @@ pub enum ModuleCommand {
     },
 }
 
-#[allow(dead_code)] // will be wired in Task 7 (CLI registration)
 pub fn handle_module_command(command: ModuleCommand, project_root: std::path::PathBuf) -> Result<()> {
     match command {
         ModuleCommand::List => list::list_modules(&project_root),
