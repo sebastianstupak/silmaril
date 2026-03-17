@@ -119,15 +119,16 @@ name = "my-game"
 }
 
 #[test]
-fn test_parse_build_env_integer_value() {
+fn test_parse_build_env_skips_non_string_values() {
     let content = r#"
 [build.env]
+GOOD = "yes"
 PORT = 8080
+ENABLED = true
 "#;
     let result = parse_build_env(content);
     assert_eq!(result.len(), 1);
-    // Integer values get stringified
-    assert_eq!(result[0].1, "8080");
+    assert_eq!(result[0].0, "GOOD");
 }
 
 // ============================================================================
@@ -239,9 +240,9 @@ fn test_merge_env_shell_wins() {
 fn test_platform_from_str_native() {
     let p = platform_from_str("native").unwrap();
     assert_eq!(p.name(), "native");
-    assert_eq!(p.tool(), BuildTool::Cargo);
-    assert_eq!(p.kind(), BuildKind::ServerAndClient);
-    assert!(!p.experimental());
+    assert_eq!(p.build_tool(), BuildTool::Cargo);
+    assert_eq!(p.build_kind(), BuildKind::ServerAndClient);
+    assert!(!p.is_experimental());
     // target triple should match host
     assert_eq!(p.target_triple(), host_target_triple());
 }
@@ -250,8 +251,8 @@ fn test_platform_from_str_native() {
 fn test_platform_from_str_server() {
     let p = platform_from_str("server").unwrap();
     assert_eq!(p.name(), "server");
-    assert_eq!(p.kind(), BuildKind::ServerOnly);
-    assert_eq!(p.tool(), BuildTool::Cargo);
+    assert_eq!(p.build_kind(), BuildKind::ServerOnly);
+    assert_eq!(p.build_tool(), BuildTool::Cargo);
 }
 
 #[test]
@@ -259,13 +260,13 @@ fn test_platform_from_str_windows_x86_64() {
     let p = platform_from_str("windows-x86_64").unwrap();
     assert_eq!(p.name(), "windows-x86_64");
     assert!(p.uses_exe_extension());
-    assert!(!p.experimental());
+    assert!(!p.is_experimental());
     // Tool depends on host
     if std::env::consts::OS == "windows" {
-        assert_eq!(p.tool(), BuildTool::Cargo);
+        assert_eq!(p.build_tool(), BuildTool::Cargo);
         assert_eq!(p.target_triple(), "x86_64-pc-windows-msvc");
     } else {
-        assert_eq!(p.tool(), BuildTool::Cross);
+        assert_eq!(p.build_tool(), BuildTool::Cross);
         assert_eq!(p.target_triple(), "x86_64-pc-windows-gnu");
     }
 }
@@ -274,7 +275,7 @@ fn test_platform_from_str_windows_x86_64() {
 fn test_platform_from_str_linux_x86_64() {
     let p = platform_from_str("linux-x86_64").unwrap();
     assert_eq!(p.target_triple(), "x86_64-unknown-linux-gnu");
-    assert_eq!(p.tool(), BuildTool::Cross);
+    assert_eq!(p.build_tool(), BuildTool::Cross);
     assert!(!p.uses_exe_extension());
 }
 
@@ -282,29 +283,29 @@ fn test_platform_from_str_linux_x86_64() {
 fn test_platform_from_str_linux_arm64() {
     let p = platform_from_str("linux-arm64").unwrap();
     assert_eq!(p.target_triple(), "aarch64-unknown-linux-gnu");
-    assert_eq!(p.tool(), BuildTool::Cross);
+    assert_eq!(p.build_tool(), BuildTool::Cross);
 }
 
 #[test]
 fn test_platform_from_str_macos_x86_64() {
     let p = platform_from_str("macos-x86_64").unwrap();
     assert_eq!(p.target_triple(), "x86_64-apple-darwin");
-    assert!(p.experimental());
+    assert!(p.is_experimental());
 }
 
 #[test]
 fn test_platform_from_str_macos_arm64() {
     let p = platform_from_str("macos-arm64").unwrap();
     assert_eq!(p.target_triple(), "aarch64-apple-darwin");
-    assert!(p.experimental());
+    assert!(p.is_experimental());
 }
 
 #[test]
 fn test_platform_from_str_wasm() {
     let p = platform_from_str("wasm").unwrap();
     assert_eq!(p.target_triple(), "wasm32-unknown-unknown");
-    assert_eq!(p.tool(), BuildTool::Trunk);
-    assert_eq!(p.kind(), BuildKind::ClientOnly);
+    assert_eq!(p.build_tool(), BuildTool::Trunk);
+    assert_eq!(p.build_kind(), BuildKind::ClientOnly);
     assert!(!p.uses_exe_extension());
 }
 
@@ -380,6 +381,7 @@ fn test_generate_dockerfile_basic() {
     assert!(df.contains("FROM debian:bookworm-slim"));
     assert!(df.contains("COPY server /usr/local/bin/server"));
     assert!(df.contains("EXPOSE 7777/udp"));
+    assert!(df.contains("# Override at runtime: docker run -e KEY=value ..."));
     assert!(df.contains("ENV RUST_LOG=info"));
     assert!(df.contains("ENTRYPOINT [\"/usr/local/bin/server\"]"));
 }
@@ -392,6 +394,7 @@ fn test_generate_dockerfile_multiple_env() {
         ("C".into(), "3".into()),
     ];
     let df = generate_dockerfile(&env);
+    assert!(df.contains("# Override at runtime: docker run -e KEY=value ..."));
     assert!(df.contains("ENV A=1"));
     assert!(df.contains("ENV B=2"));
     assert!(df.contains("ENV C=3"));
@@ -403,6 +406,15 @@ fn test_generate_dockerfile_no_env() {
     assert!(df.contains("FROM debian:bookworm-slim"));
     assert!(df.contains("ENTRYPOINT"));
     assert!(!df.contains("ENV "));
+    assert!(!df.contains("# Override at runtime"));
+}
+
+#[test]
+fn test_generate_dockerfile_has_blank_lines() {
+    let env = vec![("KEY".into(), "val".into())];
+    let df = generate_dockerfile(&env);
+    // Should have blank lines between sections
+    assert!(df.contains("\n\n"));
 }
 
 // ============================================================================

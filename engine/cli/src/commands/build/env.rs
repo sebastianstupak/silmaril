@@ -39,8 +39,8 @@ pub fn parse_env_file(content: &str) -> Vec<(String, String)> {
 /// Parse the `[build.env]` section from game.toml content.
 ///
 /// Returns key-value pairs from the `[build.env]` table.
-/// All values are converted to strings. Returns empty Vec if
-/// the section is absent.
+/// Only string values are extracted; non-string values are skipped.
+/// Returns empty Vec if the section is absent.
 pub fn parse_build_env(game_toml_content: &str) -> Vec<(String, String)> {
     let table: toml::Value = match game_toml_content.parse() {
         Ok(v) => v,
@@ -55,13 +55,7 @@ pub fn parse_build_env(game_toml_content: &str) -> Vec<(String, String)> {
     match env_table {
         Some(t) => t
             .iter()
-            .map(|(k, v)| {
-                let val = match v {
-                    toml::Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                };
-                (k.clone(), val)
-            })
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
             .collect(),
         None => Vec::new(),
     }

@@ -8,6 +8,7 @@ use anyhow::{bail, Result};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+use tracing::info;
 
 // ============================================================================
 // Build Tool / Kind enums
@@ -53,15 +54,15 @@ impl Platform {
         &self.target_triple
     }
 
-    pub fn tool(&self) -> BuildTool {
+    pub fn build_tool(&self) -> BuildTool {
         self.tool
     }
 
-    pub fn kind(&self) -> BuildKind {
+    pub fn build_kind(&self) -> BuildKind {
         self.kind
     }
 
-    pub fn experimental(&self) -> bool {
+    pub fn is_experimental(&self) -> bool {
         self.experimental
     }
 
@@ -213,6 +214,7 @@ impl BuildRunner for RealRunner {
         env: &HashMap<String, String>,
         cwd: &Path,
     ) -> Result<()> {
+        info!("[silm] running: {} {}", program, args.join(" "));
         let status = Command::new(program)
             .args(args)
             .envs(env)
