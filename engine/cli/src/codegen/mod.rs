@@ -26,6 +26,7 @@
 
 pub mod component;
 pub mod module_exports;
+pub mod module_wiring;
 pub mod parser;
 pub mod registry;
 pub mod system;

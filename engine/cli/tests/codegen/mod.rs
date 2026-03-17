@@ -1,5 +1,6 @@
 mod component_tests;
 mod module_exports_tests;
+mod module_wiring_tests;
 mod parser_tests;
 mod registry_tests;
 mod system_tests;
