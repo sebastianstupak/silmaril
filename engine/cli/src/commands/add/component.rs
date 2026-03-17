@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use std::env;
 
-use crate::codegen::{generate_component_code, parse_fields, to_snake_case, validate_pascal_case};
+use crate::codegen::{generate_component_code, parse_fields, validate_pascal_case};
 
 use super::wiring::{
     append_to_domain_file, crate_dir, domain_file, find_project_root, has_duplicate_component,
@@ -39,7 +39,6 @@ pub fn add_component(
     }
 
     // Generate code
-    let _snake_name = to_snake_case(name);
     let code = generate_component_code(name, &fields);
 
     // Step 1: Append to domain file (atomic)

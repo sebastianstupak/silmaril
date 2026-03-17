@@ -145,12 +145,15 @@ fn parse_mod_file(content: &str) -> (String, Vec<String>, Vec<String>) {
         } else {
             in_header = false;
 
+            // Strip inline comment before checking suffix
+            let bare = trimmed.splitn(2, "//").next().unwrap_or("").trim();
+
             // Module declarations
-            if trimmed.starts_with("pub mod ") && trimmed.ends_with(';') {
+            if bare.starts_with("pub mod ") && bare.ends_with(';') {
                 mod_declarations.push(line.to_string());
             }
             // Re-exports
-            else if trimmed.starts_with("pub use ") && trimmed.ends_with(';') {
+            else if bare.starts_with("pub use ") && bare.ends_with(';') {
                 re_exports.push(line.to_string());
             }
             // Ignore other lines (blank lines, etc.)
