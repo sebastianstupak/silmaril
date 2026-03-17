@@ -118,16 +118,17 @@ pub fn default_value_for_type(type_str: &str) -> String {
 /// - "[f32; 3]" → Some(("f32", 3))
 /// - "[u8; 16]" → Some(("u8", 16))
 fn parse_array_type(type_str: &str) -> Option<(String, usize)> {
-    let trimmed = type_str.trim_start_matches('[').trim_end_matches(']');
-    let parts: Vec<&str> = trimmed.split(';').map(|s| s.trim()).collect();
-
+    let s = type_str.trim();
+    if !s.starts_with('[') || !s.ends_with(']') {
+        return None;
+    }
+    let inner = s[1..s.len() - 1].trim();
+    let parts: Vec<&str> = inner.splitn(2, ';').collect();
     if parts.len() != 2 {
         return None;
     }
-
-    let inner_type = parts[0].to_string();
-    let size = parts[1].parse::<usize>().ok()?;
-
+    let inner_type = parts[0].trim().to_string();
+    let size = parts[1].trim().parse::<usize>().ok()?;
     Some((inner_type, size))
 }
 
