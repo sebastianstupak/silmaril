@@ -26,8 +26,6 @@ impl Template for BasicTemplate {
             // Shared crate
             self.shared_cargo_toml(),
             self.shared_lib_rs(),
-            self.shared_components_rs(),
-            self.shared_systems_rs(),
             // Server crate
             self.server_cargo_toml(),
             self.server_main_rs(),
@@ -295,110 +293,13 @@ tokio-test = "0.4"
     }
 
     fn shared_lib_rs(&self) -> TemplateFile {
-        let content = r#"//! Shared game logic that runs on both client and server.
+        let content = String::from(
+            r#"//! Shared game logic — components, systems, and types used by both server and client.
 //!
-//! This crate contains:
-//! - Components (data): Health, Transform, Velocity, etc.
-//! - Systems (logic): movement, combat, regeneration, etc.
-//!
-//! IMPORTANT: Code here must be deterministic and work the same on client & server.
-
-pub mod components;
-pub mod systems;
-
-// Re-export for convenience
-pub use components::*;
-pub use systems::*;
-"#;
+//! Add new domains with: silm add component <Name> --shared --domain <domain>
+"#,
+        );
         TemplateFile::new("shared/src/lib.rs", content)
-    }
-
-    fn shared_components_rs(&self) -> TemplateFile {
-        let content = r#"//! Game components (data structures attached to entities)
-//!
-//! Add your components here using `silm add component`
-
-use serde::{Deserialize, Serialize};
-
-/// Example: Transform component (position, rotation, scale)
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Transform {
-    pub position: [f32; 3],
-    pub rotation: [f32; 4], // Quaternion
-    pub scale: [f32; 3],
-}
-
-impl Default for Transform {
-    fn default() -> Self {
-        Self {
-            position: [0.0, 0.0, 0.0],
-            rotation: [0.0, 0.0, 0.0, 1.0], // Identity quaternion
-            scale: [1.0, 1.0, 1.0],
-        }
-    }
-}
-
-/// Example: Velocity component
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Velocity {
-    pub linear: [f32; 3],
-    pub angular: [f32; 3],
-}
-
-impl Default for Velocity {
-    fn default() -> Self {
-        Self {
-            linear: [0.0, 0.0, 0.0],
-            angular: [0.0, 0.0, 0.0],
-        }
-    }
-}
-"#;
-        TemplateFile::new("shared/src/components.rs", content)
-    }
-
-    fn shared_systems_rs(&self) -> TemplateFile {
-        let content = r#"//! Game systems (logic that operates on components)
-//!
-//! Add your systems here using `silm add system`
-
-use tracing::debug;
-use crate::components::*;
-
-/// Example: Simple movement system
-pub fn movement_system(transform: &mut Transform, velocity: &Velocity, dt: f32) {
-    transform.position[0] += velocity.linear[0] * dt;
-    transform.position[1] += velocity.linear[1] * dt;
-    transform.position[2] += velocity.linear[2] * dt;
-
-    debug!(
-        position = ?transform.position,
-        velocity = ?velocity.linear,
-        "Entity moved"
-    );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_movement_system() {
-        let mut transform = Transform::default();
-        let velocity = Velocity {
-            linear: [1.0, 0.0, 0.0],
-            angular: [0.0, 0.0, 0.0],
-        };
-
-        movement_system(&mut transform, &velocity, 1.0);
-
-        assert_eq!(transform.position[0], 1.0);
-        assert_eq!(transform.position[1], 0.0);
-        assert_eq!(transform.position[2], 0.0);
-    }
-}
-"#;
-        TemplateFile::new("shared/src/systems.rs", content)
     }
 
     fn server_cargo_toml(&self) -> TemplateFile {
