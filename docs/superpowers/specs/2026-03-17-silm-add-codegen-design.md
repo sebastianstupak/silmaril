@@ -98,7 +98,7 @@ server/src/
 3. Read original `src/<domain>/mod.rs` into memory (if it exists); check for duplicate — error before any write
 4. Read original wiring target (`lib.rs` or `main.rs`) into memory
 5. Build new `mod.rs` content (original + generated block); write to temp file; atomically rename to `src/<domain>/mod.rs`
-6. Add `pub mod <domain>;` to wiring target if not already present; write wiring target
+6. Add `pub mod <domain>;` to wiring target if not already present; write wiring target via temp file and atomic rename (same as step 5)
 7. **Rollback if step 6 fails:**
    - Restore `src/<domain>/mod.rs` from in-memory original (or delete if newly created)
    - Restore wiring target from in-memory original
