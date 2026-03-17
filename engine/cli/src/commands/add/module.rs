@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::codegen::module_wiring::{
     crate_name_from_module_name, generate_wiring_block, has_wiring_block, module_type_from_name,
@@ -232,10 +232,21 @@ pub fn add_module(
                 (mt, init)
             };
 
-            // Canonicalise and make path relative from the consuming crate directory
-            let abs_path = Path::new(path_str)
-                .canonicalize()
-                .map_err(|_| anyhow::anyhow!("path '{}' does not exist", path_str))?;
+            // Canonicalise and make path relative from the consuming crate directory.
+            // Strip the \\?\ extended-path prefix that Windows canonicalize() adds —
+            // pathdiff treats VerbatimDisk and Disk prefixes as different roots (returns None),
+            // and Cargo rejects \\?\ in path dependencies entirely.
+            let abs_path = {
+                let canon = Path::new(path_str)
+                    .canonicalize()
+                    .map_err(|_| anyhow::anyhow!("path '{}' does not exist", path_str))?;
+                let s = canon.to_string_lossy();
+                if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                    PathBuf::from(stripped)
+                } else {
+                    canon
+                }
+            };
             let rel_path = pathdiff::diff_paths(&abs_path, &crate_root)
                 .unwrap_or_else(|| abs_path.clone())
                 .to_string_lossy()
