@@ -3,13 +3,16 @@
 #![allow(dead_code)]
 
 pub mod env;
+pub mod native;
 pub mod package;
+pub mod wasm;
 
 use anyhow::{bail, Result};
+use clap::Args;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use tracing::info;
+use tracing::{info, warn};
 
 // ============================================================================
 // Build Tool / Kind enums
@@ -249,4 +252,242 @@ pub fn check_docker() -> Result<()> {
         Ok(output) if output.status.success() => Ok(()),
         _ => bail!("Docker is not running — start Docker Desktop, then retry"),
     }
+}
+
+// ============================================================================
+// Clap command structs
+// ============================================================================
+
+/// Build the game for one or more target platforms.
+#[derive(Args, Debug)]
+pub struct BuildCommand {
+    /// Target platform (e.g. native, wasm, linux-x86_64). Defaults to game.toml [build] platforms.
+    #[arg(long)]
+    pub platform: Option<String>,
+
+    /// Build in release mode with optimizations.
+    #[arg(long)]
+    pub release: bool,
+
+    /// Path to an additional .env file whose variables are passed to builds.
+    #[arg(long)]
+    pub env_file: Option<String>,
+}
+
+/// Package built artefacts for distribution.
+#[derive(Args, Debug)]
+pub struct PackageCommand {
+    /// Target platform to package (defaults to game.toml [build] platforms).
+    #[arg(long)]
+    pub platform: Option<String>,
+
+    /// Output directory for packaged artefacts.
+    #[arg(long)]
+    pub out_dir: Option<String>,
+}
+
+// ============================================================================
+// game.toml parsing helpers
+// ============================================================================
+
+/// Parse `[dev]` section from game.toml, returning `(server_package, client_package)`.
+///
+/// Falls back to `"{project_name}-server"` / `"{project_name}-client"` when keys are absent.
+pub fn parse_dev_section(game_toml_content: &str, project_name: &str) -> (String, String) {
+    let table: toml::Value = match game_toml_content.parse() {
+        Ok(v) => v,
+        Err(_) => {
+            return (
+                format!("{project_name}-server"),
+                format!("{project_name}-client"),
+            )
+        }
+    };
+
+    let dev = table.get("dev");
+
+    let server_package = dev
+        .and_then(|d| d.get("server_package"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| format!("{project_name}-server"));
+
+    let client_package = dev
+        .and_then(|d| d.get("client_package"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| format!("{project_name}-client"));
+
+    (server_package, client_package)
+}
+
+/// Parse the project name from `[project] name` in game.toml.
+pub fn parse_project_name(game_toml_content: &str) -> Option<String> {
+    let table: toml::Value = game_toml_content.parse().ok()?;
+    table
+        .get("project")
+        .and_then(|p| p.get("name"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+/// Parse the project version from `[project] version` in game.toml.
+///
+/// Returns `"0.0.0"` if the field is absent or the file cannot be parsed.
+pub fn parse_project_version(game_toml_content: &str) -> String {
+    let table: toml::Value = match game_toml_content.parse() {
+        Ok(v) => v,
+        Err(_) => return "0.0.0".into(),
+    };
+
+    table
+        .get("project")
+        .and_then(|p| p.get("version"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| "0.0.0".into())
+}
+
+// ============================================================================
+// Build orchestration
+// ============================================================================
+
+/// Build a single platform, handling tool checks and dispatch.
+fn build_platform(
+    runner: &dyn BuildRunner,
+    project_root: &Path,
+    env: &HashMap<String, String>,
+    server_package: &str,
+    client_package: &str,
+    platform: &Platform,
+    release: bool,
+) -> Result<()> {
+    info!(
+        platform = %platform.name(),
+        tool = ?platform.build_tool(),
+        "Building platform"
+    );
+
+    match platform.build_tool() {
+        BuildTool::Trunk => {
+            wasm::build_wasm(runner, project_root, env, release)
+        }
+        tool => {
+            let target = if tool == BuildTool::Cross || platform.target_triple() != host_target_triple() {
+                Some(platform.target_triple())
+            } else {
+                None
+            };
+
+            native::build_native(
+                runner,
+                project_root,
+                env,
+                server_package,
+                client_package,
+                tool,
+                target,
+                platform.build_kind(),
+                release,
+            )
+        }
+    }
+}
+
+/// Build all specified platforms.
+///
+/// This is the main testable orchestration function. It:
+/// 1. Parses project name, dev section, env vars from game.toml
+/// 2. For each platform: resolves via [`platform_from_str`], dispatches to
+///    [`native::build_native`] or [`wasm::build_wasm`]
+/// 3. macOS (experimental) failures are non-fatal (warn + continue), other failures are fatal
+pub fn build_all_platforms(
+    runner: &dyn BuildRunner,
+    project_root: &Path,
+    game_toml_content: &str,
+    platform_names: &[String],
+    release: bool,
+    env_file_path: Option<&Path>,
+) -> Result<()> {
+    let project_name = parse_project_name(game_toml_content)
+        .unwrap_or_else(|| "unknown".into());
+
+    let (server_package, client_package) = parse_dev_section(game_toml_content, &project_name);
+
+    // Build env from game.toml [build.env]
+    let build_env = env::parse_build_env(game_toml_content);
+
+    // Load .env file if present
+    let dotenv_path = project_root.join(".env");
+    let dotenv = if dotenv_path.is_file() {
+        let content = std::fs::read_to_string(&dotenv_path).unwrap_or_default();
+        env::parse_env_file(&content)
+    } else {
+        Vec::new()
+    };
+
+    // Load explicit --env-file if provided
+    let env_file_entries = if let Some(path) = env_file_path {
+        let content = std::fs::read_to_string(path)?;
+        env::parse_env_file(&content)
+    } else {
+        Vec::new()
+    };
+
+    let merged_env = env::merge_env(&build_env, &dotenv, &env_file_entries);
+
+    for name in platform_names {
+        let platform = platform_from_str(name)?;
+
+        let result = build_platform(
+            runner,
+            project_root,
+            &merged_env,
+            &server_package,
+            &client_package,
+            &platform,
+            release,
+        );
+
+        if let Err(e) = result {
+            if platform.is_experimental() {
+                warn!(
+                    platform = %platform.name(),
+                    error = %e,
+                    "Experimental platform build failed (non-fatal)"
+                );
+            } else {
+                return Err(e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Entry point for `silm build` called from the CLI.
+///
+/// Reads game.toml, resolves platforms, and delegates to [`build_all_platforms`].
+pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<()> {
+    let game_toml_path = project_root.join("game.toml");
+    let game_toml_content = std::fs::read_to_string(&game_toml_path)
+        .map_err(|e| anyhow::anyhow!("Failed to read game.toml: {e}"))?;
+
+    let platform_names: Vec<String> = if let Some(ref p) = cmd.platform {
+        vec![p.clone()]
+    } else {
+        env::parse_build_section(&game_toml_content)
+            .unwrap_or_else(|| vec!["native".into()])
+    };
+
+    let env_file_path = cmd.env_file.as_ref().map(PathBuf::from);
+
+    build_all_platforms(
+        &RealRunner,
+        &project_root,
+        &game_toml_content,
+        &platform_names,
+        cmd.release,
+        env_file_path.as_deref(),
+    )
 }

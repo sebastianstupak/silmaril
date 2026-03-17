@@ -1,11 +1,83 @@
-//! Comprehensive tests for the build command foundation layer (Tasks 1-3).
+//! Comprehensive tests for the build command layers.
 
 use silm::commands::build::env::{merge_env, parse_build_env, parse_build_section, parse_env_file};
+use silm::commands::build::native::build_native;
 use silm::commands::build::package::{generate_dockerfile, zip_filename};
+use silm::commands::build::wasm::build_wasm;
 use silm::commands::build::{
-    check_tool, dist_dir_name, host_target_triple, platform_from_str, BuildKind, BuildTool,
-    KNOWN_PLATFORMS,
+    build_all_platforms, check_tool, dist_dir_name, host_target_triple, parse_dev_section,
+    parse_project_name, parse_project_version, platform_from_str, BuildKind, BuildRunner,
+    BuildTool, KNOWN_PLATFORMS,
 };
+
+use anyhow::Result;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+// ============================================================================
+// MockRunner for testing
+// ============================================================================
+
+/// A captured command invocation for test assertions.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+struct CapturedCommand {
+    program: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    cwd: PathBuf,
+}
+
+/// Mock build runner that records commands instead of executing them.
+struct MockRunner {
+    commands: Arc<Mutex<Vec<CapturedCommand>>>,
+    /// If set, the runner will return this error on the next call.
+    fail_on_program: Option<String>,
+}
+
+impl MockRunner {
+    fn new() -> (Self, Arc<Mutex<Vec<CapturedCommand>>>) {
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let runner = Self {
+            commands: Arc::clone(&commands),
+            fail_on_program: None,
+        };
+        (runner, commands)
+    }
+
+    fn new_failing(program: &str) -> (Self, Arc<Mutex<Vec<CapturedCommand>>>) {
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let runner = Self {
+            commands: Arc::clone(&commands),
+            fail_on_program: Some(program.to_string()),
+        };
+        (runner, commands)
+    }
+}
+
+impl BuildRunner for MockRunner {
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[String],
+        env: &HashMap<String, String>,
+        cwd: &Path,
+    ) -> Result<()> {
+        if let Some(ref fail_prog) = self.fail_on_program {
+            if program == fail_prog {
+                anyhow::bail!("{program} failed");
+            }
+        }
+        self.commands.lock().unwrap().push(CapturedCommand {
+            program: program.to_string(),
+            args: args.to_vec(),
+            env: env.clone(),
+            cwd: cwd.to_path_buf(),
+        });
+        Ok(())
+    }
+}
 
 // ============================================================================
 // parse_env_file
@@ -437,4 +509,456 @@ fn test_check_tool_nonexistent() {
     let msg = result.unwrap_err().to_string();
     assert!(msg.contains("not found"));
     assert!(msg.contains("cargo install"));
+}
+
+// ============================================================================
+// build_native tests (Task 4)
+// ============================================================================
+
+#[test]
+fn test_native_cargo_server_and_client() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_native(
+        &runner,
+        &root,
+        &env,
+        "my-game-server",
+        "my-game-client",
+        BuildTool::Cargo,
+        None,
+        BuildKind::ServerAndClient,
+        false,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 2);
+
+    // Server build
+    assert_eq!(cmds[0].program, "cargo");
+    assert!(cmds[0].args.contains(&"--package".to_string()));
+    assert!(cmds[0].args.contains(&"my-game-server".to_string()));
+    assert!(cmds[0].args.contains(&"--bin".to_string()));
+    assert!(cmds[0].args.contains(&"server".to_string()));
+    assert!(!cmds[0].args.contains(&"--release".to_string()));
+
+    // Client build
+    assert_eq!(cmds[1].program, "cargo");
+    assert!(cmds[1].args.contains(&"my-game-client".to_string()));
+    assert!(cmds[1].args.contains(&"client".to_string()));
+}
+
+#[test]
+fn test_native_server_only() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_native(
+        &runner,
+        &root,
+        &env,
+        "my-server",
+        "my-client",
+        BuildTool::Cargo,
+        None,
+        BuildKind::ServerOnly,
+        false,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 1);
+    assert!(cmds[0].args.contains(&"my-server".to_string()));
+    assert!(cmds[0].args.contains(&"server".to_string()));
+}
+
+#[test]
+fn test_native_client_only() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_native(
+        &runner,
+        &root,
+        &env,
+        "my-server",
+        "my-client",
+        BuildTool::Cargo,
+        None,
+        BuildKind::ClientOnly,
+        false,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 1);
+    assert!(cmds[0].args.contains(&"my-client".to_string()));
+    assert!(cmds[0].args.contains(&"client".to_string()));
+}
+
+#[test]
+fn test_native_release_flag() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_native(
+        &runner,
+        &root,
+        &env,
+        "srv",
+        "cli",
+        BuildTool::Cargo,
+        None,
+        BuildKind::ServerOnly,
+        true,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert!(cmds[0].args.contains(&"--release".to_string()));
+}
+
+#[test]
+fn test_native_cross_with_target_triple() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_native(
+        &runner,
+        &root,
+        &env,
+        "srv",
+        "cli",
+        BuildTool::Cross,
+        Some("x86_64-unknown-linux-gnu"),
+        BuildKind::ServerAndClient,
+        true,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 2);
+    for cmd in cmds.iter() {
+        assert_eq!(cmd.program, "cross");
+        assert!(cmd.args.contains(&"--target".to_string()));
+        assert!(cmd.args.contains(&"x86_64-unknown-linux-gnu".to_string()));
+        assert!(cmd.args.contains(&"--release".to_string()));
+    }
+}
+
+#[test]
+fn test_native_trunk_is_error() {
+    let (runner, _) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    let result = build_native(
+        &runner,
+        &root,
+        &env,
+        "srv",
+        "cli",
+        BuildTool::Trunk,
+        None,
+        BuildKind::ClientOnly,
+        false,
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Trunk"));
+}
+
+// ============================================================================
+// build_wasm tests (Task 5)
+// ============================================================================
+
+#[test]
+fn test_wasm_debug_mode() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_wasm(&runner, &root, &env, false).unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 1);
+    assert_eq!(cmds[0].program, "trunk");
+    assert_eq!(cmds[0].args[0], "build");
+    assert_eq!(cmds[0].args[1], "client/index.html");
+    assert_eq!(cmds[0].args[2], "--dist");
+    assert_eq!(cmds[0].args[3], "dist/wasm");
+    assert!(!cmds[0].args.contains(&"--release".to_string()));
+}
+
+#[test]
+fn test_wasm_release_mode() {
+    let (runner, commands) = MockRunner::new();
+    let env = HashMap::new();
+    let root = PathBuf::from("/project");
+
+    build_wasm(&runner, &root, &env, true).unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 1);
+    assert!(cmds[0].args.contains(&"--release".to_string()));
+}
+
+// ============================================================================
+// game.toml parsing helpers (Task 6)
+// ============================================================================
+
+#[test]
+fn test_parse_dev_section_present() {
+    let content = r#"
+[project]
+name = "my-game"
+
+[dev]
+server_package = "custom-server"
+client_package = "custom-client"
+"#;
+    let (srv, cli) = parse_dev_section(content, "my-game");
+    assert_eq!(srv, "custom-server");
+    assert_eq!(cli, "custom-client");
+}
+
+#[test]
+fn test_parse_dev_section_fallback() {
+    let content = r#"
+[project]
+name = "my-game"
+"#;
+    let (srv, cli) = parse_dev_section(content, "my-game");
+    assert_eq!(srv, "my-game-server");
+    assert_eq!(cli, "my-game-client");
+}
+
+#[test]
+fn test_parse_dev_section_partial_fallback() {
+    let content = r#"
+[dev]
+server_package = "custom-server"
+"#;
+    let (srv, cli) = parse_dev_section(content, "cool-game");
+    assert_eq!(srv, "custom-server");
+    assert_eq!(cli, "cool-game-client");
+}
+
+#[test]
+fn test_parse_project_name_present() {
+    let content = r#"
+[project]
+name = "silmaril"
+"#;
+    assert_eq!(parse_project_name(content), Some("silmaril".into()));
+}
+
+#[test]
+fn test_parse_project_name_absent() {
+    let content = r#"
+[build]
+platforms = ["native"]
+"#;
+    assert_eq!(parse_project_name(content), None);
+}
+
+#[test]
+fn test_parse_project_version_present() {
+    let content = r#"
+[project]
+version = "1.2.3"
+"#;
+    assert_eq!(parse_project_version(content), "1.2.3");
+}
+
+#[test]
+fn test_parse_project_version_missing() {
+    let content = r#"
+[project]
+name = "my-game"
+"#;
+    assert_eq!(parse_project_version(content), "0.0.0");
+}
+
+#[test]
+fn test_parse_project_version_invalid_toml() {
+    assert_eq!(parse_project_version("not valid toml {{{{"), "0.0.0");
+}
+
+// ============================================================================
+// build_all_platforms orchestration (Task 6)
+// ============================================================================
+
+#[test]
+fn test_build_all_platforms_native() {
+    let (runner, commands) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+
+[dev]
+server_package = "my-server"
+client_package = "my-client"
+"#;
+
+    build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["native".into()],
+        false,
+        None,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    // native = ServerAndClient = 2 commands (server + client)
+    assert_eq!(cmds.len(), 2);
+    assert_eq!(cmds[0].program, "cargo");
+    assert!(cmds[0].args.contains(&"my-server".to_string()));
+    assert!(cmds[1].args.contains(&"my-client".to_string()));
+}
+
+#[test]
+fn test_build_all_platforms_wasm() {
+    let (runner, commands) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["wasm".into()],
+        true,
+        None,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 1);
+    assert_eq!(cmds[0].program, "trunk");
+    assert!(cmds[0].args.contains(&"--release".to_string()));
+}
+
+#[test]
+fn test_build_all_platforms_unknown_platform_errors() {
+    let (runner, _) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    let result = build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["playstation-5".into()],
+        false,
+        None,
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Unknown platform"));
+}
+
+#[test]
+fn test_build_all_platforms_experimental_failure_nonfatal() {
+    // Use a runner that fails on "cross" (used by macos platforms)
+    let (runner, _commands) = MockRunner::new_failing("cross");
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    // macos-arm64 is experimental, so failure should be non-fatal
+    let result = build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["macos-arm64".into()],
+        false,
+        None,
+    );
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_build_all_platforms_non_experimental_failure_is_fatal() {
+    let (runner, _commands) = MockRunner::new_failing("cross");
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    // linux-x86_64 uses cross and is not experimental
+    let result = build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["linux-x86_64".into()],
+        false,
+        None,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_build_all_platforms_server_only() {
+    let (runner, commands) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["server".into()],
+        false,
+        None,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 1);
+    assert!(cmds[0].args.contains(&"server".to_string()));
+}
+
+#[test]
+fn test_build_all_platforms_multiple() {
+    let (runner, commands) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["native".into(), "wasm".into()],
+        false,
+        None,
+    )
+    .unwrap();
+
+    let cmds = commands.lock().unwrap();
+    // native = 2 (server+client) + wasm = 1 = 3 total
+    assert_eq!(cmds.len(), 3);
 }
