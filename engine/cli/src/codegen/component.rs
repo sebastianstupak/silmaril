@@ -136,42 +136,17 @@ fn parse_array_type(type_str: &str) -> Option<(String, usize)> {
 /// # Arguments
 /// - `name`: Component name in PascalCase (e.g., "Health")
 /// - `fields`: List of (field_name, field_type) tuples
-/// - `derive`: Optional additional derives (e.g., "Default,PartialEq")
-/// - `doc`: Optional documentation string
 ///
 /// # Returns
-/// Complete Rust source code for the component
+/// Complete Rust source code for the component with fixed derives and domain-scoped test module
 pub fn generate_component_code(
     name: &str,
     fields: &[(String, String)],
-    derive: Option<String>,
-    doc: Option<String>,
 ) -> String {
     let snake_name = to_snake_case(name);
 
-    // Build derives list
-    let mut derives = vec!["Debug", "Clone"];
-    let has_default = if let Some(ref d) = derive {
-        let custom_derives: Vec<&str> = d.split(',').map(|s| s.trim()).collect();
-        for custom in custom_derives {
-            if !derives.contains(&custom) {
-                derives.push(custom);
-            }
-        }
-        derives.contains(&"Default")
-    } else {
-        false
-    };
-    derives.extend_from_slice(&["Component", "Serialize", "Deserialize"]);
-
-    let derives_str = derives.join(", ");
-
-    // Generate documentation
-    let doc_comment = if let Some(d) = doc {
-        format!("/// {}\n", d)
-    } else {
-        format!("/// Component: {}\n", name)
-    };
+    // Fixed derives
+    let derives_str = "Component, Debug, Clone, PartialEq, Serialize, Deserialize";
 
     // Generate struct fields
     let mut fields_code = String::new();
@@ -182,33 +157,15 @@ pub fn generate_component_code(
         ));
     }
 
-    // Generate Default implementation if requested
-    let default_impl = if has_default {
-        let mut default_fields = String::new();
-        for (field_name, field_type) in fields {
-            let default_val = default_value_for_type(field_type);
-            default_fields.push_str(&format!("            {}: {},\n", field_name, default_val));
-        }
-
-        format!(
-            "\nimpl Default for {} {{\n    fn default() -> Self {{\n        Self {{\n{}        }}\n    }}\n}}\n",
-            name, default_fields
-        )
-    } else {
-        String::new()
-    };
-
     // Generate test module
-    let test_module = generate_test_module(name, &snake_name, has_default, fields);
+    let test_module = generate_test_module(name, &snake_name, fields);
 
     // Combine all parts
     format!(
-        "use engine_core::ecs::Component;\nuse serde::{{Deserialize, Serialize}};\n\n{doc_comment}#[derive({derives})]\npub struct {name} {{\n{fields}}}\n{default_impl}\n{tests}",
-        doc_comment = doc_comment,
+        "use engine_core::ecs::Component;\nuse serde::{{Deserialize, Serialize}};\n\n#[derive({derives})]\npub struct {name} {{\n{fields}}}\n\n{tests}",
         derives = derives_str,
         name = name,
         fields = fields_code,
-        default_impl = default_impl,
         tests = test_module
     )
 }
@@ -217,33 +174,19 @@ pub fn generate_component_code(
 fn generate_test_module(
     name: &str,
     snake_name: &str,
-    has_default: bool,
     fields: &[(String, String)],
 ) -> String {
-    let creation = if has_default {
-        format!("        let component = {}::default();", name)
-    } else {
-        // Generate manual construction
-        let mut field_inits = String::new();
-        for (field_name, field_type) in fields {
-            let default_val = default_value_for_type(field_type);
-            field_inits.push_str(&format!("\n            {}: {},", field_name, default_val));
-        }
-        format!("        let component = {} {{{}\n        }};", name, field_inits)
-    };
-
-    // Generate field assertions for serialization test
-    let mut field_assertions = String::new();
-    for (field_name, _) in fields {
-        field_assertions.push_str(&format!(
-            "        // assert_eq!(deserialized.{}, component.{});\n",
-            field_name, field_name
-        ));
+    // Generate manual construction
+    let mut field_inits = String::new();
+    for (field_name, field_type) in fields {
+        let default_val = default_value_for_type(field_type);
+        field_inits.push_str(&format!("\n            {}: {},", field_name, default_val));
     }
+    let creation = format!("        let component = {} {{{}\n        }};", name, field_inits);
 
     format!(
         r#"#[cfg(test)]
-mod tests {{
+mod {snake_name}_tests {{
     use super::*;
     use engine_core::ecs::World;
 
@@ -251,42 +194,38 @@ mod tests {{
     fn test_{snake_name}_add_get() {{
         let mut world = World::new();
         let entity = world.spawn();
-
-{creation}
-        world.add(entity, component.clone());
-
+        let component = {name} {{{field_inits}
+        }};
+        world.add(entity, component);
+        assert!(world.get::<{name}>(entity).is_some());
         let retrieved = world.get::<{name}>(entity).unwrap();
-        assert!(world.has::<{name}>(entity));
+        let _ = retrieved;
     }}
 
     #[test]
     fn test_{snake_name}_serialization() {{
 {creation}
-
-        let yaml = serde_yaml::to_string(&component).unwrap();
-        let deserialized: {name} = serde_yaml::from_str(&yaml).unwrap();
-
-        // Field-specific assertions
-{field_assertions}    }}
+        let json = serde_json::to_string(&component).unwrap();
+        let _deserialized: {name} = serde_json::from_str(&json).unwrap();
+    }}
 
     #[test]
     fn test_{snake_name}_remove() {{
         let mut world = World::new();
         let entity = world.spawn();
-
-{creation}
+        let component = {name} {{{field_inits}
+        }};
         world.add(entity, component);
-
-        assert!(world.has::<{name}>(entity));
+        assert!(world.get::<{name}>(entity).is_some());
         world.remove::<{name}>(entity);
-        assert!(!world.has::<{name}>(entity));
+        assert!(world.get::<{name}>(entity).is_none());
     }}
 }}
 "#,
         snake_name = snake_name,
         name = name,
+        field_inits = field_inits,
         creation = creation,
-        field_assertions = field_assertions
     )
 }
 
@@ -370,33 +309,25 @@ mod tests {
             ("max".to_string(), "f32".to_string()),
         ];
 
-        let code = generate_component_code(
-            "Health",
-            &fields,
-            Some("Default".to_string()),
-            Some("Player health".to_string()),
-        );
+        let code = generate_component_code("Health", &fields);
 
         assert!(code.contains("pub struct Health"));
         assert!(code.contains("pub current: f32"));
         assert!(code.contains("pub max: f32"));
-        assert!(code.contains("impl Default for Health"));
         assert!(code.contains("#[cfg(test)]"));
         assert!(code.contains("test_health_add_get"));
         assert!(code.contains("test_health_serialization"));
         assert!(code.contains("test_health_remove"));
-        assert!(code.contains("/// Player health"));
     }
 
     #[test]
     fn test_generate_without_default() {
         let fields = vec![("value".to_string(), "String".to_string())];
 
-        let code = generate_component_code("Name", &fields, Some("Clone".to_string()), None);
+        let code = generate_component_code("Name", &fields);
 
         assert!(code.contains("pub struct Name"));
         assert!(code.contains("pub value: String"));
-        assert!(!code.contains("impl Default for Name"));
         assert!(code.contains("#[cfg(test)]"));
     }
 
@@ -407,7 +338,7 @@ mod tests {
             ("capacity".to_string(), "usize".to_string()),
         ];
 
-        let code = generate_component_code("Inventory", &fields, Some("Default".to_string()), None);
+        let code = generate_component_code("Inventory", &fields);
 
         assert!(code.contains("pub items: Vec<Item>"));
         assert!(code.contains("pub capacity: usize"));
@@ -419,26 +350,44 @@ mod tests {
     fn test_generate_with_array_type() {
         let fields = vec![("position".to_string(), "[f32; 3]".to_string())];
 
-        let code = generate_component_code("Transform", &fields, Some("Default".to_string()), None);
+        let code = generate_component_code("Transform", &fields);
 
         assert!(code.contains("pub position: [f32; 3]"));
         assert!(code.contains("position: [0.0, 0.0, 0.0]"));
     }
 
     #[test]
-    fn test_generate_derives_deduplication() {
+    fn test_generate_derives_fixed() {
         let fields = vec![("value".to_string(), "i32".to_string())];
 
-        let code = generate_component_code(
-            "Counter",
-            &fields,
-            Some("Debug,Clone,Default".to_string()),
-            None,
-        );
+        let code = generate_component_code("Counter", &fields);
 
-        // Debug and Clone should not be duplicated
-        assert!(code.contains("#[derive("));
-        let derive_count = code.matches("Debug").count();
-        assert_eq!(derive_count, 1); // Only one Debug in derives
+        // Fixed derives should always be present
+        assert!(code.contains("#[derive(Component, Debug, Clone, PartialEq, Serialize, Deserialize)]"));
+        // Debug should appear exactly once in derives
+        let derives_line = code.lines().find(|l| l.contains("#[derive(")).unwrap();
+        assert_eq!(derives_line.matches("Debug").count(), 1);
+    }
+
+    #[test]
+    fn test_generate_fixed_derives() {
+        let fields = vec![("current".to_string(), "f32".to_string())];
+        let code = generate_component_code("Health", &fields);
+        assert!(code.contains("#[derive(Component, Debug, Clone, PartialEq, Serialize, Deserialize)]"));
+    }
+
+    #[test]
+    fn test_generate_test_module_name() {
+        let fields = vec![("current".to_string(), "f32".to_string())];
+        let code = generate_component_code("Health", &fields);
+        assert!(code.contains("mod health_tests {"));
+        assert!(!code.contains("mod tests {"));
+    }
+
+    #[test]
+    fn test_generate_uses_serde_json() {
+        let fields = vec![("current".to_string(), "f32".to_string())];
+        let code = generate_component_code("Health", &fields);
+        assert!(code.contains("serde_json"));
     }
 }

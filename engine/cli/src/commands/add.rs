@@ -72,8 +72,8 @@ pub fn add_component(
     name: &str,
     fields_str: &str,
     location: &str,
-    derive: Option<String>,
-    doc: Option<String>,
+    _derive: Option<String>,
+    _doc: Option<String>,
 ) -> Result<()> {
     // Validate component name
     validate_pascal_case(name)?;
@@ -91,7 +91,7 @@ pub fn add_component(
     }
 
     // Generate code
-    let code = generate_component_code(name, &fields, derive.clone(), doc.clone());
+    let code = generate_component_code(name, &fields);
 
     // Determine file path
     let snake_name = to_snake_case(name);

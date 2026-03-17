@@ -56,8 +56,6 @@ fn test_add_component_basic() {
     assert!(content.contains("pub struct Health"));
     assert!(content.contains("pub current: f32"));
     assert!(content.contains("pub max: f32"));
-    assert!(content.contains("impl Default for Health"));
-    assert!(content.contains("/// Player health"));
 }
 
 #[test]

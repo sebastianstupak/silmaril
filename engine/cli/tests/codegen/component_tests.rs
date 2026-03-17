@@ -7,38 +7,19 @@ fn test_generate_simple_component() {
         ("max".to_string(), "f32".to_string()),
     ];
 
-    let code = generate_component_code(
-        "Health",
-        &fields,
-        Some("Debug,Clone,Default".to_string()),
-        Some("Player health".to_string()),
-    );
+    let code = generate_component_code("Health", &fields);
 
     // Check struct definition
     assert!(code.contains("pub struct Health"));
     assert!(code.contains("pub current: f32"));
     assert!(code.contains("pub max: f32"));
 
-    // Check documentation
-    assert!(code.contains("/// Player health"));
-
-    // Check derives
-    assert!(code.contains("#[derive("));
-    assert!(code.contains("Debug"));
-    assert!(code.contains("Clone"));
-    assert!(code.contains("Default"));
-    assert!(code.contains("Component"));
-    assert!(code.contains("Serialize"));
-    assert!(code.contains("Deserialize"));
-
-    // Check Default implementation
-    assert!(code.contains("impl Default for Health"));
-    assert!(code.contains("current: 0.0"));
-    assert!(code.contains("max: 0.0"));
+    // Check fixed derives
+    assert!(code.contains("#[derive(Component, Debug, Clone, PartialEq, Serialize, Deserialize)]"));
 
     // Check test module
     assert!(code.contains("#[cfg(test)]"));
-    assert!(code.contains("mod tests"));
+    assert!(code.contains("mod health_tests {"));
     assert!(code.contains("test_health_add_get"));
     assert!(code.contains("test_health_serialization"));
     assert!(code.contains("test_health_remove"));
@@ -48,12 +29,12 @@ fn test_generate_simple_component() {
 fn test_generate_component_without_default() {
     let fields = vec![("value".to_string(), "String".to_string())];
 
-    let code = generate_component_code("Name", &fields, Some("Clone".to_string()), None);
+    let code = generate_component_code("Name", &fields);
 
     assert!(code.contains("pub struct Name"));
     assert!(code.contains("pub value: String"));
-    assert!(!code.contains("impl Default for Name"));
     assert!(code.contains("#[cfg(test)]"));
+    assert!(code.contains("mod name_tests {"));
 }
 
 #[test]
@@ -63,12 +44,7 @@ fn test_generate_component_with_vec_field() {
         ("capacity".to_string(), "usize".to_string()),
     ];
 
-    let code = generate_component_code(
-        "Inventory",
-        &fields,
-        Some("Default".to_string()),
-        None,
-    );
+    let code = generate_component_code("Inventory", &fields);
 
     assert!(code.contains("pub items: Vec<Item>"));
     assert!(code.contains("pub capacity: usize"));
@@ -80,34 +56,31 @@ fn test_generate_component_with_vec_field() {
 fn test_generate_component_with_array_field() {
     let fields = vec![("position".to_string(), "[f32; 3]".to_string())];
 
-    let code = generate_component_code("Transform", &fields, Some("Default".to_string()), None);
+    let code = generate_component_code("Transform", &fields);
 
     assert!(code.contains("pub position: [f32; 3]"));
-    assert!(code.contains("position: [0.0; 3]"));
+    assert!(code.contains("position: [0.0, 0.0, 0.0]"));
 }
 
 #[test]
 fn test_generate_component_with_option_field() {
     let fields = vec![("metadata".to_string(), "Option<String>".to_string())];
 
-    let code = generate_component_code("Entity", &fields, Some("Default".to_string()), None);
+    let code = generate_component_code("Entity", &fields);
 
     assert!(code.contains("pub metadata: Option<String>"));
     assert!(code.contains("metadata: None"));
 }
 
 #[test]
-fn test_generate_component_no_duplicate_derives() {
+fn test_generate_component_fixed_derives() {
     let fields = vec![("value".to_string(), "i32".to_string())];
 
-    let code = generate_component_code(
-        "Counter",
-        &fields,
-        Some("Debug,Clone,Default".to_string()),
-        None,
-    );
+    let code = generate_component_code("Counter", &fields);
 
-    // Should only have one instance of Debug in the derives list
+    // Should have fixed derives
+    assert!(code.contains("#[derive(Component, Debug, Clone, PartialEq, Serialize, Deserialize)]"));
+    // Should only have one Debug in derives line
     let derives_section = code
         .lines()
         .find(|line| line.contains("#[derive("))
@@ -117,26 +90,23 @@ fn test_generate_component_no_duplicate_derives() {
 }
 
 #[test]
-fn test_generate_component_with_documentation() {
+fn test_generate_component_uses_serde_json() {
     let fields = vec![("hp".to_string(), "f32".to_string())];
 
-    let code = generate_component_code(
-        "Health",
-        &fields,
-        None,
-        Some("Player health points".to_string()),
-    );
+    let code = generate_component_code("Health", &fields);
 
-    assert!(code.contains("/// Player health points"));
+    assert!(code.contains("serde_json"));
+    assert!(!code.contains("serde_yaml"));
 }
 
 #[test]
-fn test_generate_component_without_documentation() {
+fn test_generate_component_domain_scoped_test_module() {
     let fields = vec![("hp".to_string(), "f32".to_string())];
 
-    let code = generate_component_code("Health", &fields, None, None);
+    let code = generate_component_code("Health", &fields);
 
-    assert!(code.contains("/// Component: Health"));
+    assert!(code.contains("mod health_tests {"));
+    assert!(!code.contains("mod tests {"));
 }
 
 #[test]
@@ -147,7 +117,7 @@ fn test_generate_component_multiple_fields() {
         ("z".to_string(), "f32".to_string()),
     ];
 
-    let code = generate_component_code("Position", &fields, Some("Default".to_string()), None);
+    let code = generate_component_code("Position", &fields);
 
     assert!(code.contains("pub x: f32"));
     assert!(code.contains("pub y: f32"));
@@ -185,9 +155,9 @@ fn test_default_value_option() {
 
 #[test]
 fn test_default_value_array() {
-    assert_eq!(default_value_for_type("[f32; 3]"), "[0.0; 3]");
-    assert_eq!(default_value_for_type("[i32; 2]"), "[0; 2]");
-    assert_eq!(default_value_for_type("[bool; 4]"), "[false; 4]");
+    assert_eq!(default_value_for_type("[f32; 3]"), "[0.0, 0.0, 0.0]");
+    assert_eq!(default_value_for_type("[i32; 2]"), "[0, 0]");
+    assert_eq!(default_value_for_type("[bool; 4]"), "[false, false, false, false]");
 }
 
 #[test]
