@@ -1,6 +1,4 @@
 //! Build command types, platform mapping, and runner abstraction.
-// Tasks 4+ will use these types; remove when fully wired
-#![allow(dead_code)]
 
 pub mod env;
 pub mod native;
@@ -188,6 +186,7 @@ pub fn platform_from_str(name: &str) -> Result<Platform> {
 }
 
 /// Returns the distribution directory name for a platform (same as platform name).
+#[allow(dead_code)] // Used in tests and by package.rs indirectly via platform.name()
 pub fn dist_dir_name(platform: &Platform) -> &str {
     &platform.name
 }
