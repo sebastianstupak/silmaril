@@ -1,136 +1,72 @@
 use super::parser::QueryComponent;
 
-/// System execution phase
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SystemPhase {
-    Update,
-    FixedUpdate,
-    Render,
-}
-
-impl SystemPhase {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SystemPhase::Update => "update",
-            SystemPhase::FixedUpdate => "fixed_update",
-            SystemPhase::Render => "render",
-        }
-    }
-}
-
 /// Generate complete system code
-pub fn generate_system_code(
-    name: &str,
-    components: &[QueryComponent],
-    phase: SystemPhase,
-    doc: Option<String>,
-) -> String {
+pub fn generate_system_code(name: &str, components: &[QueryComponent]) -> String {
+    let fn_name = format!("{}_system", name);
+    let test_mod_name = format!("{}_system_tests", name);
+
     let mut code = String::new();
 
-    // Imports
-    code.push_str("use engine_core::ecs::{Query, World};\n");
-    code.push_str("use tracing::{debug, instrument};\n");
+    // Top-level import
+    code.push_str("use engine_core::ecs::World;\n");
     code.push('\n');
 
-    // Component imports
-    if !components.is_empty() {
-        code.push_str("use crate::components::{");
-        for (i, comp) in components.iter().enumerate() {
-            if i > 0 {
-                code.push_str(", ");
-            }
-            code.push_str(&comp.name);
-        }
-        code.push_str("};\n\n");
-    }
-
-    // Documentation
-    if let Some(doc_str) = doc {
-        code.push_str(&format!("/// {}\n", doc_str));
-    } else {
-        code.push_str(&format!("/// System: {}\n", name));
-    }
-    code.push_str("///\n");
-    code.push_str(&format!("/// # Phase\n"));
-    code.push_str(&format!("/// {}\n", phase.as_str()));
-    code.push_str("///\n");
-    code.push_str("/// # Query\n");
-    for comp in components {
-        code.push_str(&format!("/// - {}\n", comp.type_syntax()));
-    }
+    // Registration comment + tracing attribute
+    code.push_str(&format!(
+        "// To register: app.add_system({});\n",
+        fn_name
+    ));
+    code.push_str("#[tracing::instrument(skip(world))]\n");
 
     // Function signature
-    code.push_str("#[instrument(skip(world))]\n");
-    code.push_str(&format!("pub fn {}(world: &mut World, delta_time: f32) {{\n", name));
+    code.push_str(&format!(
+        "pub fn {}(world: &mut World, dt: f32) {{\n",
+        fn_name
+    ));
 
-    // Query construction
+    // Query + iteration
     if !components.is_empty() {
-        code.push_str("    let query = world.query::<(");
-        for (i, comp) in components.iter().enumerate() {
-            if i > 0 {
-                code.push_str(", ");
-            }
-            code.push_str(&comp.type_syntax());
-        }
-        code.push_str(")>();\n\n");
+        // Build query tuple type
+        let query_types: Vec<String> = components.iter().map(|c| c.type_syntax()).collect();
+        let query_tuple = if components.len() == 1 {
+            format!("({},)", query_types[0])
+        } else {
+            format!("({})", query_types.join(", "))
+        };
 
-        // Iteration
-        code.push_str("    for (entity, (");
-        for (i, comp) in components.iter().enumerate() {
-            if i > 0 {
-                code.push_str(", ");
-            }
-            code.push_str(&comp.var_name());
-        }
-        code.push_str(")) in query.iter() {\n");
-        code.push_str("        // TODO: Implement system logic\n\n");
-        code.push_str("        debug!(?entity, \"Processing entity\");\n");
+        // Build iter binding
+        let var_names: Vec<String> = components.iter().map(|c| c.var_name()).collect();
+        let iter_binding = if components.len() == 1 {
+            format!("({},)", var_names[0])
+        } else {
+            format!("({})", var_names.join(", "))
+        };
+
+        code.push_str(&format!(
+            "    for {} in world.query::<{}>() {{\n",
+            iter_binding, query_tuple
+        ));
+        code.push_str(&format!("        // TODO: implement {} logic\n", name));
+        code.push_str("        let _ = dt;\n");
         code.push_str("    }\n");
     } else {
-        code.push_str("    // TODO: Implement system logic\n");
+        code.push_str(&format!("    // TODO: implement {} logic\n", name));
+        code.push_str("    let _ = dt;\n");
     }
 
     code.push_str("}\n\n");
 
-    // Tests module
+    // Test module
     code.push_str("#[cfg(test)]\n");
-    code.push_str("mod tests {\n");
-    code.push_str("    use super::*;\n\n");
+    code.push_str(&format!("mod {} {{\n", test_mod_name));
+    code.push_str("    use super::*;\n");
+    code.push_str("    use engine_core::ecs::World;\n\n");
 
-    // Test 1: Basic test
-    code.push_str(&format!("    #[test]\n"));
-    code.push_str(&format!("    fn test_{}_basic() {{\n", name));
-    code.push_str("        let mut world = World::new();\n\n");
-    code.push_str("        // TODO: Setup test entities\n");
-    code.push_str("        let entity = world.spawn();\n");
-    for comp in components {
-        code.push_str(&format!("        // world.add(entity, {}::default());\n", comp.name));
-    }
-    code.push_str("\n");
-    code.push_str(&format!("        {}(&mut world, 0.016);\n\n", name));
-    code.push_str("        // TODO: Assert expected behavior\n");
-    code.push_str("    }\n\n");
-
-    // Test 2: Multiple entities
-    code.push_str(&format!("    #[test]\n"));
-    code.push_str(&format!("    fn test_{}_multiple_entities() {{\n", name));
-    code.push_str("        let mut world = World::new();\n\n");
-    code.push_str("        for _i in 0..10 {\n");
-    code.push_str("            let entity = world.spawn();\n");
-    for comp in components {
-        code.push_str(&format!("            // world.add(entity, {}::default());\n", comp.name));
-    }
-    code.push_str("        }\n\n");
-    code.push_str(&format!("        {}(&mut world, 0.016);\n\n", name));
-    code.push_str("        // TODO: Verify all entities updated\n");
-    code.push_str("    }\n\n");
-
-    // Test 3: No matching entities
-    code.push_str(&format!("    #[test]\n"));
-    code.push_str(&format!("    fn test_{}_no_matching_entities() {{\n", name));
-    code.push_str("        let mut world = World::new();\n\n");
-    code.push_str("        // Should not crash with no entities\n");
-    code.push_str(&format!("        {}(&mut world, 0.016);\n", name));
+    code.push_str("    #[test]\n");
+    code.push_str(&format!("    fn test_{}() {{\n", fn_name));
+    code.push_str("        let mut world = World::new();\n");
+    code.push_str("        // TODO: spawn test entity, run system, assert\n");
+    code.push_str(&format!("        {}(&mut world, 0.016);\n", fn_name));
     code.push_str("    }\n");
 
     code.push_str("}\n");
@@ -144,74 +80,109 @@ mod tests {
     use crate::codegen::parser::{QueryAccess, QueryComponent};
 
     #[test]
+    fn test_function_name_has_system_suffix() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        assert!(code.contains("pub fn health_regen_system("));
+        assert!(!code.contains("pub fn health_regen("));
+    }
+
+    #[test]
+    fn test_parameter_name_is_dt() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        assert!(code.contains("dt: f32"));
+        assert!(!code.contains("delta_time"));
+    }
+
+    #[test]
+    fn test_no_crate_components_import() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        assert!(!code.contains("use crate::components"));
+    }
+
+    #[test]
+    fn test_direct_query_iteration() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        assert!(code.contains("for (health,) in world.query::<(&mut Health,)>()"));
+    }
+
+    #[test]
+    fn test_test_module_name_has_system_suffix() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        assert!(code.contains("mod health_regen_system_tests {"));
+    }
+
+    #[test]
+    fn test_registration_comment() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        assert!(code.contains("// To register: app.add_system(health_regen_system)"));
+    }
+
+    #[test]
     fn test_generate_simple_system() {
         let components = vec![
             QueryComponent::new("Health".to_string(), QueryAccess::Mutable),
             QueryComponent::new("RegenerationRate".to_string(), QueryAccess::Immutable),
         ];
 
-        let code = generate_system_code(
-            "health_regen",
-            &components,
-            SystemPhase::Update,
-            Some("Regenerate health over time".to_string()),
-        );
+        let code = generate_system_code("health_regen", &components);
 
-        assert!(code.contains("pub fn health_regen"));
-        assert!(code.contains("use engine_core::ecs::{Query, World}"));
-        assert!(code.contains("use tracing::{debug, instrument}"));
-        assert!(code.contains("use crate::components::{Health, RegenerationRate}"));
-        assert!(code.contains("#[instrument(skip(world))]"));
-        assert!(code.contains("Regenerate health over time"));
+        assert!(code.contains("pub fn health_regen_system"));
+        assert!(code.contains("use engine_core::ecs::World"));
+        assert!(code.contains("#[tracing::instrument(skip(world))]"));
         assert!(code.contains("world.query::<(&mut Health, &RegenerationRate)>()"));
-        assert!(code.contains("for (entity, (health, regeneration_rate))"));
+        assert!(code.contains("for (health, regeneration_rate)"));
         assert!(code.contains("#[cfg(test)]"));
-        assert!(code.contains("fn test_health_regen_basic()"));
-        assert!(code.contains("fn test_health_regen_multiple_entities()"));
-        assert!(code.contains("fn test_health_regen_no_matching_entities()"));
-    }
-
-    #[test]
-    fn test_generate_system_no_doc() {
-        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Immutable)];
-
-        let code = generate_system_code("health_check", &components, SystemPhase::Update, None);
-
-        assert!(code.contains("/// System: health_check"));
-    }
-
-    #[test]
-    fn test_generate_system_fixed_update() {
-        let components = vec![QueryComponent::new("Transform".to_string(), QueryAccess::Mutable)];
-
-        let code =
-            generate_system_code("physics_step", &components, SystemPhase::FixedUpdate, None);
-
-        assert!(code.contains("/// fixed_update"));
-    }
-
-    #[test]
-    fn test_generate_system_render_phase() {
-        let components = vec![QueryComponent::new("Camera".to_string(), QueryAccess::Immutable)];
-
-        let code = generate_system_code("camera_update", &components, SystemPhase::Render, None);
-
-        assert!(code.contains("/// render"));
     }
 
     #[test]
     fn test_generate_system_empty_components() {
-        let code = generate_system_code("global_update", &[], SystemPhase::Update, None);
+        let code = generate_system_code("global_update", &[]);
 
-        assert!(code.contains("pub fn global_update"));
+        assert!(code.contains("pub fn global_update_system"));
         assert!(!code.contains("world.query"));
-        assert!(code.contains("// TODO: Implement system logic"));
+        assert!(code.contains("// TODO: implement global_update logic"));
     }
 
     #[test]
-    fn test_system_phase_as_str() {
-        assert_eq!(SystemPhase::Update.as_str(), "update");
-        assert_eq!(SystemPhase::FixedUpdate.as_str(), "fixed_update");
-        assert_eq!(SystemPhase::Render.as_str(), "render");
+    fn test_single_component_trailing_comma() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_check", &components);
+        assert!(code.contains("(&mut Health,)"));
+        assert!(code.contains("(health,)"));
+    }
+
+    #[test]
+    fn test_multiple_components_no_trailing_comma() {
+        let components = vec![
+            QueryComponent::new("Health".to_string(), QueryAccess::Mutable),
+            QueryComponent::new("Velocity".to_string(), QueryAccess::Immutable),
+        ];
+        let code = generate_system_code("movement", &components);
+        assert!(code.contains("(&mut Health, &Velocity)"));
+        assert!(code.contains("(health, velocity)"));
+    }
+
+    #[test]
+    fn test_tracing_instrument_before_fn() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        let instrument_pos = code.find("#[tracing::instrument(skip(world))]").unwrap();
+        let fn_pos = code.find("pub fn health_regen_system(").unwrap();
+        assert!(instrument_pos < fn_pos);
+    }
+
+    #[test]
+    fn test_registration_comment_before_instrument() {
+        let components = vec![QueryComponent::new("Health".to_string(), QueryAccess::Mutable)];
+        let code = generate_system_code("health_regen", &components);
+        let comment_pos = code.find("// To register:").unwrap();
+        let instrument_pos = code.find("#[tracing::instrument").unwrap();
+        assert!(comment_pos < instrument_pos);
     }
 }

@@ -44,6 +44,6 @@ pub use parser::{parse_query_components, QueryAccess, QueryComponent};
 #[allow(unused_imports)]
 pub use registry::{ComponentEntry, ComponentRegistry, FieldInfo, QueryComponentInfo, SystemEntry};
 #[allow(unused_imports)]
-pub use system::{generate_system_code, SystemPhase};
+pub use system::generate_system_code;
 #[allow(unused_imports)]
 pub use validator::{validate_pascal_case, validate_snake_case};

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use crate::codegen::{
     generate_component_code, parse_fields, parse_query_components, to_snake_case,
 };
-use crate::codegen::system::{generate_system_code, SystemPhase};
+use crate::codegen::system::generate_system_code;
 use crate::codegen::validator::{validate_pascal_case, validate_snake_case};
 
 #[derive(Subcommand)]
@@ -134,8 +134,8 @@ pub fn add_system(
     name: &str,
     query: &str,
     location: &str,
-    phase_str: &str,
-    doc: Option<String>,
+    _phase_str: &str,
+    _doc: Option<String>,
 ) -> Result<()> {
     // Validate system name
     validate_snake_case(name)?;
@@ -145,14 +145,6 @@ pub fn add_system(
         bail!("Invalid location '{}'. Must be: shared, client, or server", location);
     }
 
-    // Parse phase
-    let phase = match phase_str {
-        "update" => SystemPhase::Update,
-        "fixed_update" => SystemPhase::FixedUpdate,
-        "render" => SystemPhase::Render,
-        _ => bail!("Invalid phase '{}'. Must be: update, fixed_update, or render", phase_str),
-    };
-
     // Parse query components
     let components = parse_query_components(query)?;
 
@@ -161,7 +153,7 @@ pub fn add_system(
     }
 
     // Generate code
-    let code = generate_system_code(name, &components, phase, doc.clone());
+    let code = generate_system_code(name, &components);
 
     // Determine file path
     let systems_dir = PathBuf::from(location).join("src").join("systems");
@@ -212,13 +204,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_phase() {
-        let phase = match "update" {
-            "update" => SystemPhase::Update,
-            "fixed_update" => SystemPhase::FixedUpdate,
-            "render" => SystemPhase::Render,
-            _ => panic!("Invalid phase"),
-        };
-        assert_eq!(phase, SystemPhase::Update);
+    fn test_phase_strings_are_valid() {
+        // phase strings are passed through but no longer parsed into an enum
+        let valid_phases = ["update", "fixed_update", "render"];
+        assert_eq!(valid_phases.len(), 3);
     }
 }
