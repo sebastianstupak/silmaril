@@ -815,6 +815,7 @@ client_package = "my-client"
         &["native".into()],
         false,
         None,
+        true,
     )
     .unwrap();
 
@@ -842,6 +843,7 @@ name = "my-game"
         &["wasm".into()],
         true,
         None,
+        true,
     )
     .unwrap();
 
@@ -867,6 +869,7 @@ name = "my-game"
         &["playstation-5".into()],
         false,
         None,
+        true,
     );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Unknown platform"));
@@ -890,6 +893,7 @@ name = "my-game"
         &["macos-arm64".into()],
         false,
         None,
+        true,
     );
     assert!(result.is_ok());
 }
@@ -911,6 +915,7 @@ name = "my-game"
         &["linux-x86_64".into()],
         false,
         None,
+        true,
     );
     assert!(result.is_err());
 }
@@ -931,6 +936,7 @@ name = "my-game"
         &["server".into()],
         false,
         None,
+        true,
     )
     .unwrap();
 
@@ -955,10 +961,130 @@ name = "my-game"
         &["native".into(), "wasm".into()],
         false,
         None,
+        true,
     )
     .unwrap();
 
     let cmds = commands.lock().unwrap();
     // native = 2 (server+client) + wasm = 1 = 3 total
     assert_eq!(cmds.len(), 3);
+}
+
+// ============================================================================
+// Pre-flight checks (Issues 1-3)
+// ============================================================================
+
+#[test]
+fn test_preflight_wasm_missing_index_html() {
+    // Use a temp dir that does NOT contain client/index.html
+    let dir = tempfile::tempdir().unwrap();
+    let (runner, _) = MockRunner::new();
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    let result = build_all_platforms(
+        &runner,
+        dir.path(),
+        game_toml,
+        &["wasm".into()],
+        false,
+        None,
+        false, // DO run preflight
+    );
+    // trunk is not installed, so we may get a tool error first;
+    // but if trunk happens to be installed, we'd get the index.html error.
+    // Either way, the build should fail.
+    assert!(result.is_err());
+    let msg = result.unwrap_err().to_string();
+    // Should mention either trunk not found or index.html not found
+    assert!(
+        msg.contains("trunk") || msg.contains("index.html"),
+        "Unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn test_preflight_cross_tool_not_found() {
+    // linux-x86_64 uses cross. If cross is not installed, preflight should fail.
+    let dir = tempfile::tempdir().unwrap();
+    let (runner, _) = MockRunner::new();
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    let result = build_all_platforms(
+        &runner,
+        dir.path(),
+        game_toml,
+        &["linux-x86_64".into()],
+        false,
+        None,
+        false, // DO run preflight
+    );
+    // cross is almost certainly not installed in CI/dev
+    assert!(result.is_err());
+    let msg = result.unwrap_err().to_string();
+    assert!(
+        msg.contains("cross") || msg.contains("Docker"),
+        "Unexpected error: {msg}"
+    );
+}
+
+// ============================================================================
+// Issue 4: missing project name should error
+// ============================================================================
+
+#[test]
+fn test_build_all_platforms_missing_project_name_errors() {
+    let (runner, _) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[build]
+platforms = ["native"]
+"#;
+
+    let result = build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &["native".into()],
+        false,
+        None,
+        true,
+    );
+    assert!(result.is_err());
+    let msg = result.unwrap_err().to_string();
+    assert!(msg.contains("missing [project] name"), "Unexpected error: {msg}");
+}
+
+// ============================================================================
+// Issue 5: no platforms should error (tested via handle_build_command indirectly,
+// but we can test parse_build_section returning None + build_all_platforms requiring name)
+// ============================================================================
+
+#[test]
+fn test_build_all_platforms_empty_platform_list_succeeds() {
+    // build_all_platforms with empty list is a no-op (the error is in handle_build_command)
+    let (runner, commands) = MockRunner::new();
+    let root = PathBuf::from("/project");
+    let game_toml = r#"
+[project]
+name = "my-game"
+"#;
+
+    let result = build_all_platforms(
+        &runner,
+        &root,
+        game_toml,
+        &[],
+        false,
+        None,
+        true,
+    );
+    assert!(result.is_ok());
+    let cmds = commands.lock().unwrap();
+    assert_eq!(cmds.len(), 0);
 }

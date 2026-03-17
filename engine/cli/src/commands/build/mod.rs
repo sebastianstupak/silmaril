@@ -352,7 +352,33 @@ pub fn parse_project_version(game_toml_content: &str) -> String {
 // Build orchestration
 // ============================================================================
 
+/// Run pre-flight checks for a platform (tool availability, required files/env).
+fn preflight_checks(project_root: &Path, platform: &Platform) -> Result<()> {
+    match platform.build_tool() {
+        BuildTool::Trunk => {
+            check_tool("trunk")?;
+            if !project_root.join("client/index.html").exists() {
+                bail!("WASM build requires client/index.html — not found");
+            }
+        }
+        BuildTool::Cross => {
+            check_tool("cross")?;
+            check_docker()?;
+            if platform.name().starts_with("macos-") {
+                if std::env::var("MACOS_SDK_URL").is_err() {
+                    bail!("macOS cross-build requires MACOS_SDK_URL");
+                }
+            }
+        }
+        BuildTool::Cargo => {
+            // cargo is assumed available (we're running from cargo)
+        }
+    }
+    Ok(())
+}
+
 /// Build a single platform, handling tool checks and dispatch.
+#[allow(clippy::too_many_arguments)]
 fn build_platform(
     runner: &dyn BuildRunner,
     project_root: &Path,
@@ -361,12 +387,17 @@ fn build_platform(
     client_package: &str,
     platform: &Platform,
     release: bool,
+    skip_preflight: bool,
 ) -> Result<()> {
     info!(
         platform = %platform.name(),
         tool = ?platform.build_tool(),
         "Building platform"
     );
+
+    if !skip_preflight {
+        preflight_checks(project_root, platform)?;
+    }
 
     match platform.build_tool() {
         BuildTool::Trunk => {
@@ -398,9 +429,12 @@ fn build_platform(
 ///
 /// This is the main testable orchestration function. It:
 /// 1. Parses project name, dev section, env vars from game.toml
-/// 2. For each platform: resolves via [`platform_from_str`], dispatches to
-///    [`native::build_native`] or [`wasm::build_wasm`]
+/// 2. For each platform: resolves via [`platform_from_str`], runs pre-flight checks,
+///    dispatches to [`native::build_native`] or [`wasm::build_wasm`]
 /// 3. macOS (experimental) failures are non-fatal (warn + continue), other failures are fatal
+///
+/// Set `skip_preflight` to `true` in tests to avoid real tool-availability checks.
+#[allow(clippy::too_many_arguments)]
 pub fn build_all_platforms(
     runner: &dyn BuildRunner,
     project_root: &Path,
@@ -408,9 +442,10 @@ pub fn build_all_platforms(
     platform_names: &[String],
     release: bool,
     env_file_path: Option<&Path>,
+    skip_preflight: bool,
 ) -> Result<()> {
     let project_name = parse_project_name(game_toml_content)
-        .unwrap_or_else(|| "unknown".into());
+        .ok_or_else(|| anyhow::anyhow!("game.toml is missing [project] name"))?;
 
     let (server_package, client_package) = parse_dev_section(game_toml_content, &project_name);
 
@@ -447,6 +482,7 @@ pub fn build_all_platforms(
             &client_package,
             &platform,
             release,
+            skip_preflight,
         );
 
         if let Err(e) = result {
@@ -477,7 +513,9 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
         vec![p.clone()]
     } else {
         env::parse_build_section(&game_toml_content)
-            .unwrap_or_else(|| vec!["native".into()])
+            .ok_or_else(|| anyhow::anyhow!(
+                "no platforms specified — add [build] platforms = [...] to game.toml, or use --platform <name>"
+            ))?
     };
 
     let env_file_path = cmd.env_file.as_ref().map(PathBuf::from);
@@ -489,5 +527,6 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
         &platform_names,
         cmd.release,
         env_file_path.as_deref(),
+        false,
     )
 }
