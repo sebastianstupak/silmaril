@@ -59,7 +59,7 @@ description = "A game built with Silmaril"
 [modules]
 # Game modules added via `silm add module` appear here
 # Example:
-# combat = {{ source = "git", version = "0.1.0" }}
+# combat = {{ source = "registry", version = "^1.0.0", target = "shared" }}
 
 [features]
 client = []
