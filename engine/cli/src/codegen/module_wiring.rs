@@ -110,8 +110,8 @@ pub fn has_wiring_block(content: &str, module_name: &str) -> bool {
 /// Remove the wiring block for `module_name` from `content`.
 ///
 /// A wiring block starts with `// --- silmaril module: {name} (` and ends
-/// immediately before the next `// --- silmaril module:` marker, the first
-/// blank line after the block content, or EOF.
+/// immediately before the next `// --- silmaril module:` marker, a blank line
+/// separator, or at EOF.
 pub fn remove_wiring_block(content: &str, module_name: &str) -> String {
     let marker = format!("// --- silmaril module: {} (", module_name);
     let next_marker = "// --- silmaril module:";
@@ -121,34 +121,22 @@ pub fn remove_wiring_block(content: &str, module_name: &str) -> String {
         None => return content.to_string(),
     };
 
-    // Find the end of the block by scanning line-by-line from the start.
-    // The block ends when we encounter the next block marker or an empty line.
-    let block_region = &content[start..];
-    let mut end_offset = block_region.len();
-    let mut first_line = true;
-    let mut consumed = 0usize;
+    // Find where the block ends: next marker, blank line (\n\n), or EOF.
+    // Uses byte-offset search (str::find) to avoid line-ending arithmetic bugs.
+    let after_start = &content[start + marker.len()..];
 
-    for line in block_region.lines() {
-        if first_line {
-            // The header line is always part of the block.
-            consumed += line.len() + 1; // +1 for '\n'
-            first_line = false;
-            continue;
-        }
-        // Subsequent lines: stop at next block marker or blank line.
-        if line.starts_with(next_marker) {
-            end_offset = consumed;
-            break;
-        }
-        if line.is_empty() {
-            // Blank separator — stop here (do not include the blank line in removal).
-            end_offset = consumed;
-            break;
-        }
-        consumed += line.len() + 1;
-    }
+    // Candidates: position of next block marker or blank line within after_start.
+    let next_block = after_start.find(next_marker);
+    let blank_line = after_start.find("\n\n").map(|i| i + 1); // +1: keep first \n, cut before second
 
-    let end = start + end_offset;
+    let end_offset = match (next_block, blank_line) {
+        (Some(a), Some(b)) => a.min(b),
+        (Some(a), None) => a,
+        (None, Some(b)) => b,
+        (None, None) => after_start.len(),
+    };
+
+    let end = start + marker.len() + end_offset;
 
     let before = content[..start].trim_end_matches('\n').to_string();
     let after = content[end..].to_string();
