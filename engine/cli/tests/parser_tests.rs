@@ -112,7 +112,7 @@ fn test_parse_many_fields() {
 
 #[test]
 fn test_parse_immutable_query() {
-    let result = parse_query_components("&Health,&Velocity").unwrap();
+    let result = parse_query_components("Health,Velocity").unwrap();
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].name, "Health");
     assert_eq!(result[0].access, QueryAccess::Immutable);
@@ -122,7 +122,7 @@ fn test_parse_immutable_query() {
 
 #[test]
 fn test_parse_mutable_query() {
-    let result = parse_query_components("&mut Health,&RegenerationRate").unwrap();
+    let result = parse_query_components("mut:Health,RegenerationRate").unwrap();
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].name, "Health");
     assert_eq!(result[0].access, QueryAccess::Mutable);
@@ -132,7 +132,7 @@ fn test_parse_mutable_query() {
 
 #[test]
 fn test_parse_single_component() {
-    let result = parse_query_components("&Transform").unwrap();
+    let result = parse_query_components("Transform").unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].name, "Transform");
     assert_eq!(result[0].access, QueryAccess::Immutable);
@@ -140,7 +140,7 @@ fn test_parse_single_component() {
 
 #[test]
 fn test_parse_all_mutable() {
-    let result = parse_query_components("&mut Transform,&mut Velocity").unwrap();
+    let result = parse_query_components("mut:Transform,mut:Velocity").unwrap();
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].access, QueryAccess::Mutable);
     assert_eq!(result[1].access, QueryAccess::Mutable);
@@ -148,26 +148,34 @@ fn test_parse_all_mutable() {
 
 #[test]
 fn test_parse_query_with_spaces() {
-    let result = parse_query_components(" &mut Health , &Velocity ").unwrap();
+    let result = parse_query_components(" mut:Health , Velocity ").unwrap();
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].name, "Health");
     assert_eq!(result[0].access, QueryAccess::Mutable);
 }
 
 #[test]
-fn test_parse_query_missing_ampersand() {
-    let result = parse_query_components("Health");
+fn test_parse_query_lowercase_rejected() {
+    let result = parse_query_components("health");
     assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_query_old_ampersand_syntax_rejected() {
+    let result = parse_query_components("&Health");
+    assert!(result.is_err());
+    let msg = result.unwrap_err().to_string();
+    assert!(msg.contains("use 'mut:ComponentName' syntax"), "got: {msg}");
 }
 
 #[test]
 fn test_parse_query_invalid_component_name() {
-    let result = parse_query_components("&invalid_name");
+    let result = parse_query_components("invalid_name");
     assert!(result.is_err());
 }
 
 #[test]
-fn test_parse_query_mut_without_ampersand() {
+fn test_parse_query_mut_without_colon() {
     let result = parse_query_components("mut Health");
     assert!(result.is_err());
 }
