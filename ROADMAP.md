@@ -157,11 +157,13 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
   - [x] Atomic writes + rollback on failure ✅
   - [x] E2E tested: each `silm add` verified compilable, 12 generated tests pass ✅
 
-- [ ] **CLI.3:** Module management
-  - [ ] `silm add module` (dependency mode)
-  - [ ] `silm add module --copy` (vendor mode)
-  - [ ] `silm module update --merge` (pull upstream changes)
-  - [ ] game.toml tracking (source, upstream)
+- [x] **CLI.3:** Module management ✅
+  - [x] `silm add module` (registry, git, path modes)
+  - [x] `silm add module --vendor` (vendor mode — isolated for future license gating)
+  - [x] `silm module list` (reads game.toml + Cargo.lock, tabular output)
+  - [x] `silm module remove` (unwires dep, wiring block, game.toml entry with rollback)
+  - [x] game.toml tracking (source, target, crate, version/tag/ref)
+  - [ ] `silm module update --merge` (pull upstream changes — future)
 
 - [x] **CLI.4:** Hot-reload development (`silm dev`) ✅ **COMPLETE**
   - [x] File watcher (code + assets + config) ✅
