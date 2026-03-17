@@ -48,7 +48,7 @@ impl Template for BasicTemplate {
 impl BasicTemplate {
     fn game_toml(&self) -> TemplateFile {
         let content = format!(
-            r#"[game]
+            r#"[project]
 name = "{name}"
 version = "0.1.0"
 description = "A game built with Silmaril"

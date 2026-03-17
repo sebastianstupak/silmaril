@@ -224,17 +224,18 @@ PASS "Missing game.toml gives clear error"
 cd "$GAME_DIR"
 rm -rf "$TMPTEST"
 
-# Missing client crate
+# Missing client crate (save and fully restore)
 INFO "Testing missing client crate..."
+CLIENT_BACKUP=$(mktemp -d)
+cp -r "$GAME_DIR/client/." "$CLIENT_BACKUP/"
 rm -rf "$GAME_DIR/client"
 OUTPUT=$("$SILM" add component Bar --client --domain test --fields "x:f32" 2>&1 || true)
 echo "$OUTPUT" | grep -qi "client" || FAIL "Error should mention client/, got: $OUTPUT"
 PASS "Missing client crate gives clear error"
-# Restore client dir for dev test
-mkdir -p "$GAME_DIR/client/src"
-cat > "$GAME_DIR/client/src/main.rs" << 'MAINEOF'
-fn main() {}
-MAINEOF
+# Restore client dir fully (including Cargo.toml) for dev test
+mkdir -p "$GAME_DIR/client"
+cp -r "$CLIENT_BACKUP/." "$GAME_DIR/client/"
+rm -rf "$CLIENT_BACKUP"
 
 # -- Test 9: silm dev integration ---------------------------------------------
 
@@ -250,7 +251,7 @@ else
     # Start silm dev in background
     "$SILM" dev >"$LOG_FILE" 2>&1 &
     DEV_PID=$!
-    trap "kill $DEV_PID 2>/dev/null; rm -rf '$GAME_DIR' '$LOG_FILE'" EXIT
+    trap "kill $DEV_PID 2>/dev/null || true; rm -rf '$GAME_DIR' '$LOG_FILE'" EXIT
 
     # Wait up to 90s for dev server to start (initial cargo build is slow)
     INFO "Waiting for dev server to start (may take up to 90s for initial build)..."
