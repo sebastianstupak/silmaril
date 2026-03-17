@@ -86,3 +86,37 @@ fn test_read_module_metadata_absent() {
     let cargo_toml = "[package]\nname = \"my-combat\"\nversion = \"1.0.0\"\n";
     assert!(parse_module_metadata(cargo_toml).is_none());
 }
+
+// game.toml helpers
+use silm::commands::add::module::{
+    game_toml_has_module, append_module_to_game_toml, remove_module_from_game_toml,
+};
+
+#[test]
+fn test_game_toml_has_module_found() {
+    let content = "[modules]\ncombat = { source = \"registry\", version = \"^1.0.0\", target = \"shared\" }\n";
+    assert!(game_toml_has_module(content, "combat"));
+}
+
+#[test]
+fn test_game_toml_has_module_not_found() {
+    let content = "[modules]\n# empty\n";
+    assert!(!game_toml_has_module(content, "combat"));
+}
+
+#[test]
+fn test_append_module_to_game_toml_registry() {
+    let content = "[project]\nname = \"test\"\n\n[modules]\n# modules here\n\n[dev]\n";
+    let result = append_module_to_game_toml(content, "combat",
+        "source = \"registry\", version = \"^1.2.0\", target = \"shared\"");
+    assert!(result.contains("combat = { source = \"registry\", version = \"^1.2.0\", target = \"shared\" }"));
+    assert!(result.contains("[dev]"));
+}
+
+#[test]
+fn test_remove_module_from_game_toml() {
+    let content = "[modules]\ncombat = { source = \"registry\", version = \"^1.0.0\", target = \"shared\" }\nhealth = { source = \"registry\", version = \"^1.0.0\", target = \"shared\" }\n";
+    let result = remove_module_from_game_toml(content, "combat");
+    assert!(!result.contains("combat ="));
+    assert!(result.contains("health ="));
+}

@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use clap::Subcommand;
 
 pub mod component;
+pub mod module;
 pub mod system;
 pub mod wiring;
 
