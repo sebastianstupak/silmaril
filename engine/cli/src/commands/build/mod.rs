@@ -1,4 +1,5 @@
 //! Build command types, platform mapping, and runner abstraction.
+// Tasks 4+ will use these types; remove when fully wired
 #![allow(dead_code)]
 
 pub mod env;
@@ -246,6 +247,6 @@ pub fn check_docker() -> Result<()> {
     let result = Command::new("docker").arg("info").output();
     match result {
         Ok(output) if output.status.success() => Ok(()),
-        _ => bail!("Docker is not running"),
+        _ => bail!("Docker is not running — start Docker Desktop, then retry"),
     }
 }

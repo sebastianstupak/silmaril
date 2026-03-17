@@ -63,8 +63,9 @@ pub fn parse_build_env(game_toml_content: &str) -> Vec<(String, String)> {
 
 /// Parse the `[build]` section's `platforms` array from game.toml content.
 ///
-/// Returns `Some(vec)` with platform names if present, `None` if
-/// the `[build]` section or `platforms` key is absent.
+/// Returns `Some(vec)` with platform names if present and non-empty,
+/// `None` if the `[build]` section or `platforms` key is absent or
+/// the array is empty.
 pub fn parse_build_section(game_toml_content: &str) -> Option<Vec<String>> {
     let table: toml::Value = game_toml_content.parse().ok()?;
 
@@ -73,12 +74,16 @@ pub fn parse_build_section(game_toml_content: &str) -> Option<Vec<String>> {
         .and_then(|b| b.get("platforms"))
         .and_then(|p| p.as_array())?;
 
-    Some(
-        platforms
-            .iter()
-            .filter_map(|v| v.as_str().map(String::from))
-            .collect(),
-    )
+    let result: Vec<String> = platforms
+        .iter()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect();
+
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
 }
 
 /// Merge environment variable layers with priority:
@@ -111,31 +116,3 @@ pub fn merge_env(
     merged
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_env_file_basic() {
-        let content = "FOO=bar\nBAZ=qux";
-        let result = parse_env_file(content);
-        assert_eq!(result, vec![
-            ("FOO".into(), "bar".into()),
-            ("BAZ".into(), "qux".into()),
-        ]);
-    }
-
-    #[test]
-    fn test_parse_env_file_comments_and_blanks() {
-        let content = "# comment\nFOO=bar\n\n# another\nBAZ=qux\n";
-        let result = parse_env_file(content);
-        assert_eq!(result.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_env_file_blank_value() {
-        let content = "EMPTY=";
-        let result = parse_env_file(content);
-        assert_eq!(result, vec![("EMPTY".into(), "".into())]);
-    }
-}

@@ -173,6 +173,15 @@ optimization = "release"
     assert!(parse_build_section(content).is_none());
 }
 
+#[test]
+fn test_parse_build_section_empty_array_returns_none() {
+    let content = r#"
+[build]
+platforms = []
+"#;
+    assert!(parse_build_section(content).is_none());
+}
+
 // ============================================================================
 // merge_env
 // ============================================================================
