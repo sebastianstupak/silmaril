@@ -242,3 +242,97 @@ fn test_module_remove_not_installed() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not installed"));
 }
+
+#[test]
+fn test_wiring_block_idempotent() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module(
+        "combat", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+
+    // Second add with different module, should not duplicate wiring for first
+    silm::commands::add::module::add_module(
+        "health", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+
+    let lib = fs::read_to_string(dir.path().join("shared/src/lib.rs")).unwrap();
+    let count = lib.matches("// --- silmaril module: combat").count();
+    assert_eq!(count, 1, "wiring block should appear exactly once");
+}
+
+#[test]
+fn test_add_module_server_target() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module(
+        "combat", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Server,
+    ).unwrap();
+
+    let cargo = fs::read_to_string(dir.path().join("server/Cargo.toml")).unwrap();
+    assert!(cargo.contains("silmaril-module-combat"));
+
+    let main_rs = fs::read_to_string(dir.path().join("server/src/main.rs")).unwrap();
+    assert!(main_rs.contains("// --- silmaril module: combat"));
+
+    let game = fs::read_to_string(dir.path().join("game.toml")).unwrap();
+    assert!(game.contains("target = \"server\""));
+}
+
+#[test]
+fn test_remove_preserves_adjacent_modules() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module(
+        "combat", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+    silm::commands::add::module::add_module(
+        "health", None, None, None, None, false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+
+    silm::commands::module::remove::remove_module("combat", &dir.path().to_path_buf()).unwrap();
+
+    let lib = fs::read_to_string(dir.path().join("shared/src/lib.rs")).unwrap();
+    assert!(!lib.contains("// --- silmaril module: combat"), "combat block still present");
+    assert!(lib.contains("// --- silmaril module: health"), "health block removed incorrectly");
+
+    let game = fs::read_to_string(dir.path().join("game.toml")).unwrap();
+    assert!(!game.contains("combat ="));
+    assert!(game.contains("health ="));
+}
+
+#[test]
+fn test_git_rev_pinning() {
+    let _lock = CWD_LOCK.lock().unwrap();
+    let dir = TempDir::new().unwrap();
+    make_project(&dir);
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    silm::commands::add::module::add_module(
+        "combat",
+        Some("https://github.com/org/combat"),
+        None,
+        Some("abc123f"),
+        None,
+        false,
+        silm::commands::add::wiring::Target::Shared,
+    ).unwrap();
+
+    let cargo = fs::read_to_string(dir.path().join("shared/Cargo.toml")).unwrap();
+    assert!(cargo.contains("rev = \"abc123f\""));
+    assert!(!cargo.contains("tag ="));
+}
