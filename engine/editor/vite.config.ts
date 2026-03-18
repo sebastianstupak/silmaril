@@ -12,6 +12,10 @@ export default defineConfig({
     alias: {
       $lib: path.resolve('./src/lib'),
     },
+    conditions: ['svelte', 'default'],
+  },
+  optimizeDeps: {
+    exclude: ['@lucide/svelte', 'bits-ui'],
   },
   server: {
     port: 5173,
