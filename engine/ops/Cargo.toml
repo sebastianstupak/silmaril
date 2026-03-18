@@ -1,0 +1,30 @@
+[package]
+name = "engine-ops"
+version = "0.1.0"
+edition = "2021"
+authors = ["Silmaril Team"]
+license = "Apache-2.0"
+description = "Silmaril shared operation layer — used by both CLI and editor"
+
+[dependencies]
+# Error handling and logging
+anyhow = "1.0"
+tracing = { workspace = true }
+
+# Serialization
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# File utilities
+walkdir = "2.4"
+pathdiff = "0.2"
+zip = "2"
+
+# Engine dependencies
+engine-core = { path = "../core" }
+engine-templating = { path = "../templating" }
+
+[dev-dependencies]
+tempfile = "3.10"

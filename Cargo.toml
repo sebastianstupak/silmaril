@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "xtask",
+    "engine/ops",
     "engine/cli",
     "engine/cli/asset-cooker",
     "engine/core",
