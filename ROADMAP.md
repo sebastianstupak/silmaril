@@ -24,7 +24,7 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 | Phase | Duration | Key Deliverables | Status |
 |-------|----------|------------------|--------|
-| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~80% (Profiling ✅, Docs ✅, **CLI ~70%** (new/add/dev ✅), **Editor ⚪ Not Started**) |
+| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~95% (Profiling ✅, Docs ✅, **CLI ✅ 100%** (new/add/module/dev/build/package/completions), **Editor ⚪ Not Started**) |
 | **Phase 1** | 6-7 weeks | Core ECS + Basic Rendering + **Agentic Rendering Debug** | ✅ ~85-90% (ECS ✅, Serialization ✅, Templates ✅, Rendering ✅, Agentic Debug ✅, Assets ✅, Frame Capture ✅) |
 | **Phase 2** | 3-4 weeks | Networking + Client/Server | 🟡 ~75-80% (Foundation ✅, TCP/UDP ✅, Prediction ✅, Server Loop ✅, TLS ✅, Missing: Full E2E integration) |
 | **Phase 3** | 3-4 weeks | Physics + Audio + LOD | 🟡 ~35-40% (Audio ✅ 100%, Physics ~40-50%, Interest Mgmt ~30-40%, LOD ⚪ Not Started) |
@@ -34,7 +34,7 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 **Total Estimated Time:** 21-27 weeks (5-7 months)
 
 **New Additions:**
-- **Phase 0.7: Silm CLI Tool** 🔴 **CRITICAL** - Code-first game development (2-3 weeks)
+- **Phase 0.7: Silm CLI Tool** ✅ **COMPLETE** - Code-first game development
 - **Phase 0.8: Editor Foundation** 🟡 **MEDIUM** - Tauri + Svelte + shadcn-svelte (3-4 weeks)
 - **Phase 4.9: Editor Advanced Features** 🟢 **LOW** - Drag-drop, full AI integration (3-4 weeks)
 
@@ -134,13 +134,11 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 ---
 
-#### **0.7 Silm CLI Tool** 🔴 **IN PROGRESS** - [docs/tasks/phase0-7-silm-cli.md](docs/tasks/phase0-7-silm-cli.md)
+#### **0.7 Silm CLI Tool** ✅ **COMPLETE** - [docs/tasks/phase0-7-silm-cli.md](docs/tasks/phase0-7-silm-cli.md)
 
 **Priority:** 🔴 **CRITICAL** - This is foundational infrastructure that unblocks AI-agent workflows
 
-**Status:** 🟡 In Progress (~70%)
-
-**Time Estimate:** ~1 week remaining
+**Status:** ✅ **Complete**
 
 **Core Features:**
 - [x] **CLI.1:** Project scaffolding (`silm new my-game`) ✅ **COMPLETE**
