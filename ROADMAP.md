@@ -183,18 +183,14 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
   - [x] 92 unit/integration tests + 16 Rust E2E tests ✅
   - [ ] Cross-compilation E2E (requires Docker + cross installed)
 
-- [ ] **CLI.6:** Testing (`silm test`)
-  - [ ] Test runner (per crate)
-  - [ ] Determinism tests (client/server parity)
-  - [ ] Benchmark runner
-
-- [ ] **CLI.7:** Integration & Polish
+- [ ] **CLI.6:** Integration & Polish
+  - [ ] `cargo-packager` integration (AppImage, DMG, NSIS installers)
+  - [ ] Multi-value `--platform` flag for `silm build`/`silm package`
+  - [ ] `silm build --watch` (rebuild on file change)
+  - [ ] Shell completions (bash, zsh, fish, PowerShell)
+  - [ ] Progress indicators for long builds
   - [ ] Install script (`cargo install silm-cli`)
-  - [ ] Shell completions (bash, zsh, fish)
-  - [ ] Helpful error messages
-  - [ ] Progress indicators
-  - [ ] Comprehensive help text
-  - [ ] Tutorial documentation
+  - [ ] Comprehensive help text and tutorial documentation
 
 **Example Workflow:**
 ```bash
