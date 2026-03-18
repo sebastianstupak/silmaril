@@ -221,6 +221,14 @@ test_loader.sh
 run_delta_benchmarks.ps1
 test.justfile
 
+# Build output (silm package)
+dist/
+*.zip
+
+# Node.js (editor)
+node_modules/
+.svelte-kit/
+
 # Env files
 .env
 .env.local

@@ -159,8 +159,22 @@ serde_json = "1.0""#
 profiling-output.log
 pgo-data/
 *.prof
+
+# Build output (silm package)
 dist/
 *.zip
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor runtime state
+.silmaril/
+*.editor.yaml
+
+# Node.js (editor panels)
+node_modules/
 "#;
         TemplateFile::new(".gitignore", content)
     }
