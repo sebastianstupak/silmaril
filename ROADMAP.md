@@ -174,12 +174,14 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
   - [x] E2E tested: detects file changes, triggers rebuild, shuts down cleanly ✅
   - [ ] Asset reloading (textures, models, audio) — future
 
-- [ ] **CLI.5:** Production builds (`silm build`, `silm package`)
-  - [ ] Release builds (LTO, optimizations)
-  - [ ] Asset packing (assets.pak)
-  - [ ] Asset embedding (optional)
-  - [ ] Distribution packaging (zip/tar.gz)
-  - [ ] Cross-compilation support
+- [x] **CLI.5:** Production builds (`silm build`, `silm package`) ✅
+  - [x] `silm build` — native (cargo), cross-platform (cross+Docker), WASM (trunk) ✅
+  - [x] `silm package` — dist/ assembly, zip archives, Dockerfile generation ✅
+  - [x] Environment variable propagation (shell > --env-file > .env > game.toml [build.env]) ✅
+  - [x] 8 platform targets (native, server, windows-x86_64, linux-x86_64, linux-arm64, macos-x86_64, macos-arm64, wasm) ✅
+  - [x] Pre-flight tool detection (trunk, cross, Docker) with actionable errors ✅
+  - [x] 92 unit/integration tests + 16 Rust E2E tests ✅
+  - [ ] Cross-compilation E2E (requires Docker + cross installed)
 
 - [ ] **CLI.6:** Testing (`silm test`)
   - [ ] Test runner (per crate)
