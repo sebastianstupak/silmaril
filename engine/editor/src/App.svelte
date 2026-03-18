@@ -1,31 +1,44 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getEditorState, openProjectDialog, openProject, scanProjectEntities, type EditorState, type EntityInfo } from './lib/api';
+  import { getEditorState, openProjectDialog, openProject, scanProjectEntities, type EditorState } from './lib/api';
   import { t } from './lib/i18n';
   import { setLocale } from './lib/i18n';
-  import PanelShell from './lib/components/PanelShell.svelte';
-  import ResizeHandle from './lib/components/ResizeHandle.svelte';
   import MenuBar from './lib/components/MenuBar.svelte';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
-  import HierarchyPanel from './lib/components/HierarchyPanel.svelte';
-  import InspectorPanel from './lib/components/InspectorPanel.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
-  import ConsolePanel from './lib/components/ConsolePanel.svelte';
+  import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
+  import DockContainer from './lib/docking/DockContainer.svelte';
+  import DockSplitter from './lib/docking/DockSplitter.svelte';
+  import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit } from './lib/docking/store';
+  import type { EditorLayout } from './lib/docking/types';
+
+  // Panel components (no-prop wrappers for docking)
+  import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
+  import InspectorWrapper from './lib/docking/panels/InspectorWrapper.svelte';
+  import ConsoleWrapper from './lib/docking/panels/ConsoleWrapper.svelte';
+  import ViewportPanel from './lib/docking/panels/ViewportPanel.svelte';
+  import ProfilerPanel from './lib/docking/panels/ProfilerPanel.svelte';
+  import AssetsPanel from './lib/docking/panels/AssetsPanel.svelte';
 
   let editorState: EditorState | null = $state(null);
   let settings: EditorSettings = $state(loadSettings());
   let showSettings = $state(false);
 
-  // Project entities state
-  let entities: EntityInfo[] = $state([]);
-  let selectedEntityId: number | null = $state(null);
+  // Docking layout state
+  let layout: EditorLayout = $state(loadLayout());
+  let bottomHeight = $state(loadSettings().bottomPanelHeight);
+  const MIN_BOTTOM = 60;
+  const MAX_BOTTOM_RATIO = 0.6;
 
-  let selectedEntity = $derived(
-    selectedEntityId != null
-      ? entities.find(e => e.id === selectedEntityId) ?? null
-      : null
-  );
+  const panelComponents: Record<string, any> = {
+    hierarchy: HierarchyWrapper,
+    viewport: ViewportPanel,
+    inspector: InspectorWrapper,
+    console: ConsoleWrapper,
+    profiler: ProfilerPanel,
+    assets: AssetsPanel,
+  };
 
   async function handleOpenProject() {
     const path = await openProjectDialog();
@@ -33,44 +46,48 @@
 
     try {
       editorState = await openProject(path);
-      entities = await scanProjectEntities(path);
-      selectedEntityId = null;
+      const entities = await scanProjectEntities(path);
+      setEntities(entities);
+      setSelectedEntityId(null);
     } catch {
-      // Project open failed — state unchanged
+      // Project open failed - state unchanged
     }
   }
 
-  function handleSelectEntity(id: number) {
-    selectedEntityId = id;
+  function handleLayoutChange(newLayout: EditorLayout) {
+    layout = newLayout;
+    saveLayout(layout);
   }
 
-  // Panel sizes (reactive, persisted)
-  let leftWidth = $state(settings.leftPanelWidth);
-  let rightWidth = $state(settings.rightPanelWidth);
-  let bottomHeight = $state(settings.bottomPanelHeight);
+  function handleLayoutReset() {
+    layout = JSON.parse(JSON.stringify(defaultLayout));
+    saveLayout(layout);
+  }
 
-  const MIN_PANEL = 120;
-  const MIN_VIEWPORT = 200;
+  function handleLayoutSelect(template: string) {
+    const tmpl = layoutTemplates[template];
+    if (tmpl) {
+      layout = JSON.parse(JSON.stringify(tmpl));
+      saveLayout(layout);
+    }
+  }
 
-  function clampLeft(w: number) { return Math.max(MIN_PANEL, Math.min(w, window.innerWidth - rightWidth - MIN_VIEWPORT)); }
-  function clampRight(w: number) { return Math.max(MIN_PANEL, Math.min(w, window.innerWidth - leftWidth - MIN_VIEWPORT)); }
-  function clampBottom(h: number) { return Math.max(MIN_PANEL, Math.min(h, window.innerHeight - 240)); }
+  function clampBottom(h: number): number {
+    return Math.max(MIN_BOTTOM, Math.min(h, window.innerHeight * MAX_BOTTOM_RATIO));
+  }
 
-  function onResizeLeft(delta: number) { leftWidth = clampLeft(leftWidth + delta); }
-  function onResizeRight(delta: number) { rightWidth = clampRight(rightWidth - delta); }
-  function onResizeBottom(delta: number) { bottomHeight = clampBottom(bottomHeight - delta); }
+  function onResizeBottom(delta: number) {
+    bottomHeight = clampBottom(bottomHeight - delta);
+  }
 
-  // Persist on change (debounced)
+  // Persist settings on change (debounced)
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   $effect(() => {
-    // Track reactive values
-    leftWidth; rightWidth; bottomHeight; settings.theme; settings.fontSize; settings.language; settings.autoSave;
+    bottomHeight; settings.theme; settings.fontSize; settings.language; settings.autoSave;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveSettings({
         ...settings,
-        leftPanelWidth: leftWidth,
-        rightPanelWidth: rightWidth,
         bottomPanelHeight: bottomHeight,
       });
     }, 300);
@@ -90,7 +107,12 @@
 
 <main class="editor-shell">
   <!-- Menu Bar -->
-  <MenuBar onSettingsOpen={() => showSettings = true} onOpenProject={handleOpenProject} />
+  <MenuBar
+    onSettingsOpen={() => showSettings = true}
+    onOpenProject={handleOpenProject}
+    onLayoutReset={handleLayoutReset}
+    onLayoutSelect={handleLayoutSelect}
+  />
 
   <!-- Toolbar -->
   <div class="toolbar">
@@ -148,46 +170,30 @@
     onSettingsChange={handleSettingsChange}
   />
 
-  <!-- Main area: left | resize | viewport | resize | right -->
+  <!-- Main content area: docked panels + bottom panel -->
   <div class="content-area">
     <div class="main-area">
-      <div class="sidebar-left" style="width: {leftWidth}px">
-        <PanelShell title={t('panel.hierarchy')}>
-          <HierarchyPanel
-            {entities}
-            selectedId={selectedEntityId}
-            onSelect={handleSelectEntity}
-          />
-        </PanelShell>
-      </div>
-
-      <ResizeHandle direction="horizontal" onResize={onResizeLeft} />
-
-      <div class="viewport">
-        <PanelShell title={t('panel.viewport')}>
-          <div class="viewport-placeholder">
-            <p>{t('placeholder.viewport')}</p>
-          </div>
-        </PanelShell>
-      </div>
-
-      <ResizeHandle direction="horizontal" onResize={onResizeRight} />
-
-      <div class="sidebar-right" style="width: {rightWidth}px">
-        <PanelShell title={t('panel.inspector')}>
-          <InspectorPanel entity={selectedEntity} />
-        </PanelShell>
-      </div>
+      <DockContainer
+        node={layout.root}
+        {layout}
+        {panelComponents}
+        onLayoutChange={handleLayoutChange}
+      />
     </div>
 
-    <ResizeHandle direction="vertical" onResize={onResizeBottom} />
+    {#if layout.bottomPanel.panels.length > 0}
+      <DockSplitter direction="vertical" onResize={onResizeBottom} />
 
-    <!-- Bottom panel -->
-    <div class="bottom-bar" style="height: {bottomHeight}px">
-      <PanelShell title={t('panel.console')}>
-        <ConsolePanel />
-      </PanelShell>
-    </div>
+      <div class="bottom-bar" style="height: {bottomHeight}px">
+        <DockContainer
+          node={layout.bottomPanel}
+          {layout}
+          {panelComponents}
+          onLayoutChange={handleLayoutChange}
+          isBottomPanel={true}
+        />
+      </div>
+    {/if}
   </div>
 
   <!-- Status bar -->
@@ -332,39 +338,11 @@
     display: flex;
     overflow: hidden;
   }
-  .sidebar-left, .sidebar-right {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .viewport {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 200px;
-    overflow: hidden;
-  }
   .bottom-bar {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-  }
-  .viewport-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--color-textDim, #666);
-  }
-  .placeholder { color: var(--color-textDim, #666); font-style: italic; padding: 8px; }
-
-  .sidebar-left :global(.panel),
-  .sidebar-right :global(.panel),
-  .viewport :global(.panel),
-  .bottom-bar :global(.panel) {
-    flex: 1;
   }
 
   /* Status bar */

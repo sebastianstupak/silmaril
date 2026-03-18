@@ -1,0 +1,359 @@
+// Docking layout state management with persistence and templates
+import type { EditorLayout, LayoutNode, TabsNode, SplitNode, DropZone } from './types';
+
+const STORAGE_KEY = 'silmaril-editor-layout';
+
+// ---------------------------------------------------------------------------
+// Layout Templates
+// ---------------------------------------------------------------------------
+
+export const defaultLayout: EditorLayout = {
+  root: {
+    type: 'split',
+    direction: 'horizontal',
+    sizes: [20, 55, 25],
+    children: [
+      { type: 'tabs', activeTab: 0, panels: ['hierarchy'] },
+      { type: 'tabs', activeTab: 0, panels: ['viewport'] },
+      { type: 'tabs', activeTab: 0, panels: ['inspector'] },
+    ],
+  },
+  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console'] },
+};
+
+export const tallLayout: EditorLayout = {
+  root: {
+    type: 'split',
+    direction: 'horizontal',
+    sizes: [20, 60, 20],
+    children: [
+      {
+        type: 'split',
+        direction: 'vertical',
+        sizes: [60, 40],
+        children: [
+          { type: 'tabs', activeTab: 0, panels: ['hierarchy'] },
+          { type: 'tabs', activeTab: 0, panels: ['assets'] },
+        ],
+      },
+      { type: 'tabs', activeTab: 0, panels: ['viewport'] },
+      { type: 'tabs', activeTab: 0, panels: ['inspector'] },
+    ],
+  },
+  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console'] },
+};
+
+export const wideLayout: EditorLayout = {
+  root: {
+    type: 'split',
+    direction: 'vertical',
+    sizes: [70, 30],
+    children: [
+      {
+        type: 'split',
+        direction: 'horizontal',
+        sizes: [20, 80],
+        children: [
+          { type: 'tabs', activeTab: 0, panels: ['hierarchy'] },
+          { type: 'tabs', activeTab: 0, panels: ['viewport'] },
+        ],
+      },
+      {
+        type: 'split',
+        direction: 'horizontal',
+        sizes: [50, 50],
+        children: [
+          { type: 'tabs', activeTab: 0, panels: ['inspector'] },
+          { type: 'tabs', activeTab: 0, panels: ['console'] },
+        ],
+      },
+    ],
+  },
+  bottomPanel: { type: 'tabs', activeTab: 0, panels: [] },
+};
+
+export const layoutTemplates: Record<string, EditorLayout> = {
+  default: defaultLayout,
+  tall: tallLayout,
+  wide: wideLayout,
+};
+
+// ---------------------------------------------------------------------------
+// Deep clone utility
+// ---------------------------------------------------------------------------
+
+function cloneLayout(layout: EditorLayout): EditorLayout {
+  return JSON.parse(JSON.stringify(layout));
+}
+
+// ---------------------------------------------------------------------------
+// Persistence
+// ---------------------------------------------------------------------------
+
+export function loadLayout(): EditorLayout {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as EditorLayout;
+      if (parsed.root && parsed.bottomPanel) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return cloneLayout(defaultLayout);
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function saveLayout(layout: EditorLayout) {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
+    } catch {
+      // ignore storage errors
+    }
+  }, 300);
+}
+
+// ---------------------------------------------------------------------------
+// Drag state (module-level singleton)
+// ---------------------------------------------------------------------------
+
+export interface DragState {
+  panelId: string;
+  active: boolean;
+}
+
+let _dragState: DragState = { panelId: '', active: false };
+let _dragListeners: Array<() => void> = [];
+
+export function getDragState(): DragState {
+  return _dragState;
+}
+
+export function startDrag(panelId: string) {
+  _dragState = { panelId, active: true };
+  _notifyDragListeners();
+}
+
+export function endDrag() {
+  _dragState = { panelId: '', active: false };
+  _notifyDragListeners();
+}
+
+export function subscribeDrag(fn: () => void): () => void {
+  _dragListeners.push(fn);
+  return () => {
+    _dragListeners = _dragListeners.filter(l => l !== fn);
+  };
+}
+
+function _notifyDragListeners() {
+  for (const fn of _dragListeners) fn();
+}
+
+// ---------------------------------------------------------------------------
+// Layout Mutations
+// ---------------------------------------------------------------------------
+
+/** Find a TabsNode by path indices through the tree */
+function getNodeAtPath(root: LayoutNode, path: number[]): LayoutNode | null {
+  let node: LayoutNode = root;
+  for (const idx of path) {
+    if (node.type !== 'split') return null;
+    if (idx < 0 || idx >= node.children.length) return null;
+    node = node.children[idx];
+  }
+  return node;
+}
+
+/** Remove a panel from wherever it currently lives in the tree.
+ *  Returns a cleaned tree (empty tabs nodes are pruned, single-child splits are collapsed). */
+export function removePanelFromLayout(layout: EditorLayout, panelId: string): EditorLayout {
+  const result = cloneLayout(layout);
+  removePanelFromNode(result.root, panelId);
+  result.root = cleanNode(result.root);
+
+  const bIdx = result.bottomPanel.panels.indexOf(panelId);
+  if (bIdx !== -1) {
+    result.bottomPanel.panels.splice(bIdx, 1);
+    if (result.bottomPanel.activeTab >= result.bottomPanel.panels.length) {
+      result.bottomPanel.activeTab = Math.max(0, result.bottomPanel.panels.length - 1);
+    }
+  }
+
+  return result;
+}
+
+function removePanelFromNode(node: LayoutNode, panelId: string) {
+  if (node.type === 'tabs') {
+    const idx = node.panels.indexOf(panelId);
+    if (idx !== -1) {
+      node.panels.splice(idx, 1);
+      if (node.activeTab >= node.panels.length) {
+        node.activeTab = Math.max(0, node.panels.length - 1);
+      }
+    }
+  } else {
+    for (const child of node.children) {
+      removePanelFromNode(child, panelId);
+    }
+  }
+}
+
+/** Clean up the tree: remove empty tab nodes, collapse single-child splits */
+function cleanNode(node: LayoutNode): LayoutNode {
+  if (node.type === 'tabs') {
+    return node;
+  }
+
+  // Recursively clean children
+  node.children = node.children.map(c => cleanNode(c));
+
+  // Remove empty tabs nodes
+  const nonEmpty: { node: LayoutNode; size: number }[] = [];
+  for (let i = 0; i < node.children.length; i++) {
+    const child = node.children[i];
+    if (child.type === 'tabs' && child.panels.length === 0) continue;
+    nonEmpty.push({ node: child, size: node.sizes[i] });
+  }
+
+  if (nonEmpty.length === 0) {
+    return { type: 'tabs', activeTab: 0, panels: [] };
+  }
+
+  if (nonEmpty.length === 1) {
+    return nonEmpty[0].node;
+  }
+
+  // Re-normalize sizes
+  const totalSize = nonEmpty.reduce((s, e) => s + e.size, 0);
+  node.children = nonEmpty.map(e => e.node);
+  node.sizes = nonEmpty.map(e => (e.size / totalSize) * 100);
+
+  return node;
+}
+
+/** Drop a panel onto a target location, producing a new layout */
+export function dropPanel(
+  layout: EditorLayout,
+  panelId: string,
+  targetPath: number[],
+  zone: DropZone,
+  isBottomPanel: boolean,
+): EditorLayout {
+  // First remove the panel from its current location
+  let result = removePanelFromLayout(layout, panelId);
+
+  if (isBottomPanel) {
+    // Dropping into the bottom panel area
+    if (zone === 'center') {
+      result.bottomPanel.panels.push(panelId);
+      result.bottomPanel.activeTab = result.bottomPanel.panels.length - 1;
+    }
+    return result;
+  }
+
+  // Find the target node
+  const targetNode = getNodeAtPath(result.root, targetPath);
+  if (!targetNode) return result;
+
+  if (zone === 'center' && targetNode.type === 'tabs') {
+    // Add as a new tab
+    targetNode.panels.push(panelId);
+    targetNode.activeTab = targetNode.panels.length - 1;
+    return result;
+  }
+
+  // Side drop: split the target node
+  const newPanel: TabsNode = { type: 'tabs', activeTab: 0, panels: [panelId] };
+  const direction: 'horizontal' | 'vertical' =
+    zone === 'left' || zone === 'right' ? 'horizontal' : 'vertical';
+  const insertBefore = zone === 'left' || zone === 'top';
+
+  // Clone the target to avoid reference issues
+  const targetClone: LayoutNode = JSON.parse(JSON.stringify(targetNode));
+
+  const splitNode: SplitNode = {
+    type: 'split',
+    direction,
+    children: insertBefore ? [newPanel, targetClone] : [targetClone, newPanel],
+    sizes: insertBefore ? [30, 70] : [70, 30],
+  };
+
+  // Replace target in tree
+  replaceNodeAtPath(result.root, targetPath, splitNode);
+
+  // If the path was empty we replaced root itself
+  if (targetPath.length === 0) {
+    result.root = splitNode;
+  }
+
+  return result;
+}
+
+function replaceNodeAtPath(root: LayoutNode, path: number[], replacement: LayoutNode) {
+  if (path.length === 0) return; // handled by caller for root
+  const parentPath = path.slice(0, -1);
+  const idx = path[path.length - 1];
+  const parent = getNodeAtPath(root, parentPath);
+  if (parent && parent.type === 'split') {
+    parent.children[idx] = replacement;
+  }
+}
+
+/** Update sizes in a split node at a given path */
+export function resizeSplit(
+  layout: EditorLayout,
+  path: number[],
+  index: number,
+  deltaPx: number,
+  containerSizePx: number,
+): EditorLayout {
+  const result = cloneLayout(layout);
+  const node = getNodeAtPath(result.root, path);
+  if (!node || node.type !== 'split') return result;
+  if (index < 1 || index >= node.sizes.length) return result;
+
+  const deltaPct = (deltaPx / containerSizePx) * 100;
+  const minSize = 5; // minimum 5%
+
+  let newPrev = node.sizes[index - 1] + deltaPct;
+  let newCurr = node.sizes[index] - deltaPct;
+
+  if (newPrev < minSize) {
+    newCurr += newPrev - minSize;
+    newPrev = minSize;
+  }
+  if (newCurr < minSize) {
+    newPrev += newCurr - minSize;
+    newCurr = minSize;
+  }
+
+  node.sizes[index - 1] = newPrev;
+  node.sizes[index] = newCurr;
+
+  return result;
+}
+
+/** Set active tab in a tabs node at the given path */
+export function setActiveTab(
+  layout: EditorLayout,
+  path: number[],
+  tabIndex: number,
+  isBottomPanel: boolean,
+): EditorLayout {
+  const result = cloneLayout(layout);
+  if (isBottomPanel) {
+    result.bottomPanel.activeTab = tabIndex;
+    return result;
+  }
+  const node = getNodeAtPath(result.root, path);
+  if (node && node.type === 'tabs') {
+    node.activeTab = tabIndex;
+  }
+  return result;
+}

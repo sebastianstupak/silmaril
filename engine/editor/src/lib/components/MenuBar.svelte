@@ -5,15 +5,11 @@
   interface Props {
     onSettingsOpen?: () => void;
     onOpenProject?: () => void;
+    onLayoutReset?: () => void;
+    onLayoutSelect?: (template: string) => void;
   }
 
-  let { onSettingsOpen, onOpenProject }: Props = $props();
-
-  // View panel toggle state
-  let showHierarchy = $state(true);
-  let showInspector = $state(true);
-  let showConsole = $state(true);
-  let showViewport = $state(true);
+  let { onSettingsOpen, onOpenProject, onLayoutReset, onLayoutSelect }: Props = $props();
 </script>
 
 <Menubar.Root class="h-8 rounded-none border-x-0 border-t-0 bg-[var(--color-bgHeader,#2d2d2d)] shadow-none">
@@ -84,20 +80,16 @@
   <Menubar.Menu>
     <Menubar.Trigger class="text-xs">{t('menu.view')}</Menubar.Trigger>
     <Menubar.Content>
-      <Menubar.CheckboxItem bind:checked={showHierarchy}>
-        {t('menu.view.hierarchy')}
-      </Menubar.CheckboxItem>
-      <Menubar.CheckboxItem bind:checked={showInspector}>
-        {t('menu.view.inspector')}
-      </Menubar.CheckboxItem>
-      <Menubar.CheckboxItem bind:checked={showConsole}>
-        {t('menu.view.console')}
-      </Menubar.CheckboxItem>
-      <Menubar.CheckboxItem bind:checked={showViewport}>
-        {t('menu.view.viewport')}
-      </Menubar.CheckboxItem>
+      <Menubar.Sub>
+        <Menubar.SubTrigger>{t('menu.view.layout')}</Menubar.SubTrigger>
+        <Menubar.SubContent>
+          <Menubar.Item onclick={() => onLayoutSelect?.('default')}>{t('layout.default')}</Menubar.Item>
+          <Menubar.Item onclick={() => onLayoutSelect?.('tall')}>{t('layout.tall')}</Menubar.Item>
+          <Menubar.Item onclick={() => onLayoutSelect?.('wide')}>{t('layout.wide')}</Menubar.Item>
+        </Menubar.SubContent>
+      </Menubar.Sub>
       <Menubar.Separator />
-      <Menubar.Item>{t('menu.view.reset_layout')}</Menubar.Item>
+      <Menubar.Item onclick={() => onLayoutReset?.()}>{t('layout.reset')}</Menubar.Item>
     </Menubar.Content>
   </Menubar.Menu>
 

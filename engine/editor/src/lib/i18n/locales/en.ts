@@ -29,6 +29,7 @@ const en = {
   'menu.view.console': 'Console',
   'menu.view.viewport': 'Viewport',
   'menu.view.profiler': 'Profiler',
+  'menu.view.layout': 'Layout',
   'menu.view.reset_layout': 'Reset Layout',
 
   'menu.entity': 'Entity',
@@ -131,6 +132,17 @@ const en = {
 
   // Dialog
   'dialog.open_project_title': 'Open Silmaril Project',
+
+  // Layout
+  'layout.default': 'Default',
+  'layout.tall': 'Tall',
+  'layout.wide': 'Wide',
+  'layout.reset': 'Reset Layout',
+  'layout.save': 'Save Layout',
+
+  // Docking
+  'dock.close_tab': 'Close',
+  'dock.drop_here': 'Drop here',
 
   // Common
   'common.ok': 'OK',
