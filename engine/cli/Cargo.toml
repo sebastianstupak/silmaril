@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Silmaril Team"]
 license = "Apache-2.0"
-description = "Silmaril game engine CLI tool - code-first game development"
-repository = "https://github.com/your-org/silmaril"
+description = "Silmaril game engine CLI — code-first game development"
+repository = "https://github.com/maethril/silmaril"
+homepage = "https://github.com/maethril/silmaril"
+readme = "../../README.md"
+keywords = ["game-engine", "cli", "ecs", "multiplayer", "silmaril"]
+categories = ["game-development", "command-line-utilities"]
 
 [lib]
 name = "silm"
@@ -18,6 +22,7 @@ path = "src/main.rs"
 [dependencies]
 # CLI framework
 clap = { version = "4.4", features = ["derive", "cargo"] }
+clap_complete = "4"
 anyhow = "1.0"
 
 # Serialization
