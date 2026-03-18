@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Many helpers now superseded by engine_ops::project
+
 use anyhow::{bail, Result};
 use std::fs;
 use std::path::{Path, PathBuf};

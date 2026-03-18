@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Superseded by engine_ops::codegen — kept for test compatibility
+
 //! Code generation for components and systems.
 //!
 //! This module provides functionality to generate Rust code for ECS components
