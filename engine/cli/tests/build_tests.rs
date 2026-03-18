@@ -1316,3 +1316,34 @@ fn test_assemble_server_dist_missing_binary_no_error() {
     // Server binary not present
     assert!(!dist_dir.join("server").exists());
 }
+
+// ============================================================================
+// installer module (cargo-packager integration)
+// ============================================================================
+
+use silm::commands::build::installer::{check_packager, generate_packager_config};
+
+#[test]
+fn test_generate_packager_config() {
+    let config = generate_packager_config("my-game", "1.2.3", "A cool game", "client");
+    assert!(config.contains("product-name = \"my-game\""));
+    assert!(config.contains("version = \"1.2.3\""));
+    assert!(config.contains("description = \"A cool game\""));
+    assert!(config.contains("identifier = \"com.silmaril.my-game\""));
+    assert!(config.contains("name = \"client\""));
+    assert!(config.contains("path = \"client\""));
+    assert!(config.contains("[[package.binaries]]"));
+}
+
+#[test]
+fn test_check_packager_not_found() {
+    // cargo-packager is almost certainly not installed in test environments
+    let result = check_packager();
+    // We cannot assert it always fails (it might be installed), but if it
+    // does fail, the error message should be helpful.
+    if let Err(e) = result {
+        let msg = e.to_string();
+        assert!(msg.contains("cargo-packager"));
+        assert!(msg.contains("cargo install"));
+    }
+}
