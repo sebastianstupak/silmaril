@@ -43,6 +43,7 @@ async-trait = "0.1"
 colored = "2.0"
 walkdir = "2.4"
 zip = "2"
+indicatif = "0.17"
 
 # Serialization for dates
 serde_json = "1.0"

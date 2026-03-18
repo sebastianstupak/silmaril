@@ -8,6 +8,7 @@ pub mod wasm;
 
 use anyhow::{bail, Result};
 use clap::Args;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -505,6 +506,18 @@ pub fn build_all_platforms(
     Ok(())
 }
 
+fn make_spinner(message: &str) -> ProgressBar {
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::with_template("{spinner:.cyan} {msg}")
+            .unwrap()
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", "✓"]),
+    );
+    pb.set_message(message.to_string());
+    pb.enable_steady_tick(std::time::Duration::from_millis(80));
+    pb
+}
+
 /// Entry point for `silm build` called from the CLI.
 ///
 /// Reads game.toml, resolves platforms, and delegates to [`build_all_platforms`].
@@ -522,9 +535,14 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
             ))?
     };
 
+    let spinner = make_spinner(&format!(
+        "building {} platform(s)...",
+        platform_names.len()
+    ));
+
     let env_file_path = cmd.env_file.as_ref().map(PathBuf::from);
 
-    build_all_platforms(
+    let result = build_all_platforms(
         &RealRunner,
         &project_root,
         &game_toml_content,
@@ -532,7 +550,14 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
         cmd.release,
         env_file_path.as_deref(),
         false,
-    )
+    );
+
+    match &result {
+        Ok(()) => spinner.finish_with_message(format!("built {} platform(s)", platform_names.len())),
+        Err(e) => spinner.finish_with_message(format!("build failed: {e}")),
+    }
+
+    result
 }
 
 /// Entry point for `silm package` called from the CLI.
@@ -575,10 +600,15 @@ pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Res
     // Build env entries for server Dockerfile
     let build_env = env::parse_build_env(&game_toml_content);
 
+    let spinner = make_spinner(&format!(
+        "packaging {} platform(s)...",
+        platform_names.len()
+    ));
+
     for name in &platform_names {
         let platform = platform_from_str(name)?;
 
-        info!(platform = %name, "Packaging platform");
+        spinner.set_message(format!("packaging {}...", name));
 
         let dist_dir = if name == "wasm" {
             // Trunk already outputs to dist/wasm, just zip it
@@ -622,6 +652,8 @@ pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Res
         package::create_zip(&dist_dir, &zip_path)?;
         info!(zip = %zip_name, "Package complete");
     }
+
+    spinner.finish_with_message(format!("packaged {} platform(s)", platform_names.len()));
 
     // Generate native installers if requested
     if cmd.installer {
