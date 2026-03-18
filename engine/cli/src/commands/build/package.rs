@@ -214,7 +214,6 @@ pub fn assemble_server_dist(
     fs::write(dist_dir.join("Dockerfile"), &dockerfile_content)?;
     info!("Generated Dockerfile in dist/server/");
 
-    copy_assets(project_root, &dist_dir)?;
-
+    // No assets copy for server-only dist — server is headless
     Ok(dist_dir)
 }
