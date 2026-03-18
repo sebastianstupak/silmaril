@@ -229,6 +229,9 @@ dist/
 node_modules/
 .svelte-kit/
 
+# Tauri generated files
+engine/editor/gen/
+
 # Env files
 .env
 .env.local
