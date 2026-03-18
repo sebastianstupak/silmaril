@@ -128,7 +128,6 @@ export interface DragState {
 }
 
 let _dragState: DragState = { panelId: '', active: false };
-let _dragListeners: Array<() => void> = [];
 
 export function getDragState(): DragState {
   return _dragState;
@@ -136,23 +135,10 @@ export function getDragState(): DragState {
 
 export function startDrag(panelId: string) {
   _dragState = { panelId, active: true };
-  _notifyDragListeners();
 }
 
 export function endDrag() {
   _dragState = { panelId: '', active: false };
-  _notifyDragListeners();
-}
-
-export function subscribeDrag(fn: () => void): () => void {
-  _dragListeners.push(fn);
-  return () => {
-    _dragListeners = _dragListeners.filter(l => l !== fn);
-  };
-}
-
-function _notifyDragListeners() {
-  for (const fn of _dragListeners) fn();
 }
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,23 @@
   }: Props = $props();
 
   let containerEl: HTMLDivElement | undefined = $state(undefined);
+  let isDragging = $state(false);
+
+  $effect(() => {
+    function onDragStart() { isDragging = true; }
+    function onDragEnd() { isDragging = false; }
+
+    window.addEventListener('dragstart', onDragStart);
+    window.addEventListener('dragend', onDragEnd);
+    // Also listen for drop to clear state in case dragend doesn't fire
+    window.addEventListener('drop', onDragEnd);
+
+    return () => {
+      window.removeEventListener('dragstart', onDragStart);
+      window.removeEventListener('dragend', onDragEnd);
+      window.removeEventListener('drop', onDragEnd);
+    };
+  });
 
   function handleResize(index: number, deltaPx: number) {
     if (!containerEl) return;
@@ -111,7 +128,7 @@
       {/if}
 
       <!-- Drop zone overlay for side splits -->
-      <DockDropZone onDrop={handleZoneDrop} />
+      <DockDropZone {isDragging} onDrop={handleZoneDrop} />
     </div>
   </div>
 {/if}

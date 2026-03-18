@@ -1,26 +1,15 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import type { DropZone } from './types';
-  import { getDragState, subscribeDrag } from './store';
-  import { onMount } from 'svelte';
 
   interface Props {
+    isDragging: boolean;
     onDrop: (zone: DropZone) => void;
   }
 
-  let { onDrop }: Props = $props();
+  let { isDragging, onDrop }: Props = $props();
 
-  let isDragging = $state(false);
   let hoveredZone: DropZone | null = $state(null);
-
-  onMount(() => {
-    // Subscribe to drag state changes
-    const unsub = subscribeDrag(() => {
-      isDragging = getDragState().active;
-      if (!isDragging) hoveredZone = null;
-    });
-    return unsub;
-  });
 
   function handleDragOver(e: DragEvent, zone: DropZone) {
     e.preventDefault();
