@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getEditorState, type EditorState } from './lib/api';
+  import { getEditorState, openProjectDialog, openProject, scanProjectEntities, type EditorState, type EntityInfo } from './lib/api';
   import { t } from './lib/i18n';
   import { setLocale } from './lib/i18n';
   import PanelShell from './lib/components/PanelShell.svelte';
   import ResizeHandle from './lib/components/ResizeHandle.svelte';
   import MenuBar from './lib/components/MenuBar.svelte';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
+  import HierarchyPanel from './lib/components/HierarchyPanel.svelte';
+  import InspectorPanel from './lib/components/InspectorPanel.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
   import ConsolePanel from './lib/components/ConsolePanel.svelte';
@@ -14,6 +16,33 @@
   let editorState: EditorState | null = $state(null);
   let settings: EditorSettings = $state(loadSettings());
   let showSettings = $state(false);
+
+  // Project entities state
+  let entities: EntityInfo[] = $state([]);
+  let selectedEntityId: number | null = $state(null);
+
+  let selectedEntity = $derived(
+    selectedEntityId != null
+      ? entities.find(e => e.id === selectedEntityId) ?? null
+      : null
+  );
+
+  async function handleOpenProject() {
+    const path = await openProjectDialog();
+    if (!path) return;
+
+    try {
+      editorState = await openProject(path);
+      entities = await scanProjectEntities(path);
+      selectedEntityId = null;
+    } catch {
+      // Project open failed — state unchanged
+    }
+  }
+
+  function handleSelectEntity(id: number) {
+    selectedEntityId = id;
+  }
 
   // Panel sizes (reactive, persisted)
   let leftWidth = $state(settings.leftPanelWidth);
@@ -61,7 +90,7 @@
 
 <main class="editor-shell">
   <!-- Menu Bar -->
-  <MenuBar onSettingsOpen={() => showSettings = true} />
+  <MenuBar onSettingsOpen={() => showSettings = true} onOpenProject={handleOpenProject} />
 
   <!-- Toolbar -->
   <div class="toolbar">
@@ -124,7 +153,11 @@
     <div class="main-area">
       <div class="sidebar-left" style="width: {leftWidth}px">
         <PanelShell title={t('panel.hierarchy')}>
-          <p class="placeholder">{t('placeholder.no_project')}</p>
+          <HierarchyPanel
+            {entities}
+            selectedId={selectedEntityId}
+            onSelect={handleSelectEntity}
+          />
         </PanelShell>
       </div>
 
@@ -142,7 +175,7 @@
 
       <div class="sidebar-right" style="width: {rightWidth}px">
         <PanelShell title={t('panel.inspector')}>
-          <p class="placeholder">{t('placeholder.select_entity')}</p>
+          <InspectorPanel entity={selectedEntity} />
         </PanelShell>
       </div>
     </div>

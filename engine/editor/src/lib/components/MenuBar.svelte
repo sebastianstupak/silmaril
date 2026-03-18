@@ -4,9 +4,10 @@
 
   interface Props {
     onSettingsOpen?: () => void;
+    onOpenProject?: () => void;
   }
 
-  let { onSettingsOpen }: Props = $props();
+  let { onSettingsOpen, onOpenProject }: Props = $props();
 
   // View panel toggle state
   let showHierarchy = $state(true);
@@ -20,7 +21,7 @@
   <Menubar.Menu>
     <Menubar.Trigger class="text-xs">{t('menu.file')}</Menubar.Trigger>
     <Menubar.Content>
-      <Menubar.Item>{t('menu.file.open_project')}</Menubar.Item>
+      <Menubar.Item onclick={() => onOpenProject?.()}>{t('menu.file.open_project')}</Menubar.Item>
       <Menubar.Item>
         {t('menu.file.save_scene')}
         <Menubar.Shortcut>Ctrl+S</Menubar.Shortcut>
