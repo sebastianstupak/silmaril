@@ -150,6 +150,84 @@ fn extract_component_names(source: &str, out: &mut Vec<String>) {
 }
 
 // ---------------------------------------------------------------------------
+// Scene commands (AI agent API)
+// ---------------------------------------------------------------------------
+
+/// Unified scene command dispatcher.
+///
+/// AI agents (via MCP) and the frontend can call this with a command name and
+/// a JSON-encoded argument object.  For MVP the backend simply validates and
+/// echoes the command; the real scene state lives in the frontend.  When the
+/// ECS backend is wired, this will mutate server-side state.
+#[tauri::command]
+pub fn scene_command(command: String, args: String) -> Result<serde_json::Value, String> {
+    let parsed: serde_json::Value =
+        serde_json::from_str(&args).map_err(|e| format!("Invalid args JSON: {e}"))?;
+
+    match command.as_str() {
+        "select_entity" => {
+            let _id = parsed.get("id");
+            Ok(serde_json::json!({ "ok": true, "command": "select_entity" }))
+        }
+        "create_entity" => {
+            let name = parsed
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("New Entity");
+            Ok(serde_json::json!({ "ok": true, "command": "create_entity", "name": name }))
+        }
+        "delete_entity" => {
+            let id = parsed
+                .get("id")
+                .and_then(|v| v.as_u64())
+                .ok_or("delete_entity requires 'id'")?;
+            Ok(serde_json::json!({ "ok": true, "command": "delete_entity", "id": id }))
+        }
+        "duplicate_entity" => {
+            let id = parsed
+                .get("id")
+                .and_then(|v| v.as_u64())
+                .ok_or("duplicate_entity requires 'id'")?;
+            Ok(serde_json::json!({ "ok": true, "command": "duplicate_entity", "id": id }))
+        }
+        "move_entity" => {
+            let id = parsed.get("id").and_then(|v| v.as_u64()).ok_or("move_entity requires 'id'")?;
+            let x = parsed.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let y = parsed.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let z = parsed.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            Ok(serde_json::json!({ "ok": true, "command": "move_entity", "id": id, "x": x, "y": y, "z": z }))
+        }
+        "pan_camera" => {
+            let dx = parsed.get("dx").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let dy = parsed.get("dy").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            Ok(serde_json::json!({ "ok": true, "command": "pan_camera", "dx": dx, "dy": dy }))
+        }
+        "zoom_camera" => {
+            let delta = parsed.get("delta").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            Ok(serde_json::json!({ "ok": true, "command": "zoom_camera", "delta": delta }))
+        }
+        "focus_entity" => {
+            let id = parsed
+                .get("id")
+                .and_then(|v| v.as_u64())
+                .ok_or("focus_entity requires 'id'")?;
+            Ok(serde_json::json!({ "ok": true, "command": "focus_entity", "id": id }))
+        }
+        "set_tool" => {
+            let tool = parsed
+                .get("tool")
+                .and_then(|v| v.as_str())
+                .unwrap_or("select");
+            Ok(serde_json::json!({ "ok": true, "command": "set_tool", "tool": tool }))
+        }
+        "get_state" => {
+            Ok(serde_json::json!({ "ok": true, "command": "get_state" }))
+        }
+        _ => Err(format!("Unknown scene command: {command}")),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Viewport commands
 // ---------------------------------------------------------------------------
 

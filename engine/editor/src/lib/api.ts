@@ -184,3 +184,27 @@ export async function getViewportFrame(request: ViewportFrameRequest): Promise<s
 export async function pickViewportEntity(request: PickEntityRequest): Promise<number | null> {
   return tauriInvoke<number | null>('pick_viewport_entity', { request });
 }
+
+// ---------------------------------------------------------------------------
+// Scene commands (AI agent API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Execute a scene command by name with the given arguments.
+ * This is the primary entry point for AI agents to manipulate the scene via
+ * Tauri. In the browser (Playwright testing), it dispatches locally.
+ */
+export async function executeSceneCommand(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<unknown> {
+  if (isTauri) {
+    return tauriInvoke<unknown>('scene_command', {
+      command,
+      args: JSON.stringify(args),
+    });
+  }
+  // Browser fallback — dispatch through local scene commands
+  const mod = await import('$lib/scene/commands');
+  return mod.dispatchSceneCommand(command, args);
+}

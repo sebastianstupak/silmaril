@@ -148,6 +148,24 @@ const en = {
   'dock.close_tab': 'Close',
   'dock.drop_here': 'Drop here',
 
+  // Scene tools
+  'tool.select': 'Select (Q)',
+  'tool.move': 'Move (W)',
+  'tool.rotate': 'Rotate (E)',
+  'tool.scale': 'Scale (R)',
+  'tool.focus': 'Focus (F)',
+
+  // Viewport scene controls
+  'viewport.grid': 'Toggle Grid',
+  'viewport.snap': 'Snap to Grid',
+  'viewport.orbit': 'Orbit',
+  'viewport.pan': 'Pan',
+
+  // Scene entity operations
+  'scene.create_entity': 'Create Entity',
+  'scene.delete_entity': 'Delete Entity',
+  'scene.duplicate_entity': 'Duplicate Entity',
+
   // Common
   'common.ok': 'OK',
   'common.cancel': 'Cancel',

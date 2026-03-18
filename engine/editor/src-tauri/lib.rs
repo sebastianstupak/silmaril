@@ -16,6 +16,7 @@ pub fn run() {
             commands::scan_project_entities,
             commands::get_viewport_frame,
             commands::pick_viewport_entity,
+            commands::scene_command,
         ])
         .run(tauri::generate_context!())
         .expect("error running Silmaril Editor");
