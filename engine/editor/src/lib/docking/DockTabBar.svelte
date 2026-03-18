@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import { getPanelInfo } from './types';
-  import { getDragState, startDrag, endDrag } from './store';
+  import { getPanelInfo, getBasePanelId, createPanelInstance } from './types';
+  import { startDrag, updateDrag, endDrag, getDragState } from './store';
 
   interface Props {
     panels: string[];
@@ -9,64 +9,130 @@
     onTabSelect: (index: number) => void;
     onDrop: (panelId: string, zone: 'center') => void;
     onClose: (panelId: string) => void;
+    onDuplicate?: (panelId: string, newPanelId: string) => void;
+    onCloseOthers?: (panelId: string) => void;
+    onCloseAll?: () => void;
   }
 
-  let { panels, activeTab, onTabSelect, onDrop, onClose }: Props = $props();
+  let {
+    panels,
+    activeTab,
+    onTabSelect,
+    onDrop,
+    onClose,
+    onDuplicate,
+    onCloseOthers,
+    onCloseAll,
+  }: Props = $props();
 
-  let dragOver = $state(false);
+  let contextMenu = $state<{ x: number; y: number; panelId: string } | null>(null);
 
-  function handleDragStart(e: DragEvent, panelId: string) {
-    if (!e.dataTransfer) return;
-    e.dataTransfer.setData('text/plain', panelId);
-    e.dataTransfer.effectAllowed = 'move';
-    startDrag(panelId);
-  }
+  // ----------- Mouse-based drag (replaces HTML5 drag) -----------
 
-  function handleDragEnd() {
-    endDrag();
-  }
+  function handleTabMouseDown(e: MouseEvent, panelId: string) {
+    if (e.button !== 0) return; // left button only
+    // Don't start drag from close button
+    if ((e.target as HTMLElement).closest('.dock-tab-close')) return;
 
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    dragOver = true;
-  }
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
 
-  function handleDragLeave() {
-    dragOver = false;
-  }
+    function onMouseMove(ev: MouseEvent) {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
 
-  function handleDropOnBar(e: DragEvent) {
-    e.preventDefault();
-    dragOver = false;
-    const panelId = e.dataTransfer?.getData('text/plain');
-    if (panelId) {
-      onDrop(panelId, 'center');
+      // Start drag after 5px threshold
+      if (!dragging && Math.abs(dx) + Math.abs(dy) > 5) {
+        dragging = true;
+        startDrag(panelId, ev.clientX, ev.clientY);
+      }
+
+      if (dragging) {
+        updateDrag(ev.clientX, ev.clientY);
+      }
     }
-    endDrag();
+
+    function onMouseUp(ev: MouseEvent) {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      if (dragging) {
+        // Check if we're over a tab bar — if so, the DockContainer will
+        // handle the drop via its own hit-test logic. Fire endDrag to let
+        // listeners know the drag completed at this position.
+        // The DockContainer's effect handles the actual drop.
+        endDrag();
+      }
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  // ----------- Context menu -----------
+
+  function handleContextMenu(e: MouseEvent, panelId: string) {
+    e.preventDefault();
+    contextMenu = { x: e.clientX, y: e.clientY, panelId };
+
+    // Close on next click anywhere
+    function closeMenu() {
+      contextMenu = null;
+      window.removeEventListener('mousedown', closeMenu);
+    }
+    // Use setTimeout so the current event doesn't immediately close it
+    setTimeout(() => {
+      window.addEventListener('mousedown', closeMenu);
+    }, 0);
+  }
+
+  function handleCtxClose() {
+    if (!contextMenu) return;
+    onClose(contextMenu.panelId);
+    contextMenu = null;
+  }
+
+  function handleCtxCloseOthers() {
+    if (!contextMenu) return;
+    if (onCloseOthers) {
+      onCloseOthers(contextMenu.panelId);
+    }
+    contextMenu = null;
+  }
+
+  function handleCtxCloseAll() {
+    if (!contextMenu) return;
+    if (onCloseAll) {
+      onCloseAll();
+    }
+    contextMenu = null;
+  }
+
+  function handleCtxDuplicate() {
+    if (!contextMenu) return;
+    if (onDuplicate) {
+      const baseId = getBasePanelId(contextMenu.panelId);
+      const newId = createPanelInstance(baseId);
+      onDuplicate(contextMenu.panelId, newId);
+    }
+    contextMenu = null;
   }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  class="dock-tab-bar"
-  class:drag-over={dragOver}
-  ondragover={handleDragOver}
-  ondragleave={handleDragLeave}
-  ondrop={handleDropOnBar}
->
+<div class="dock-tab-bar">
   {#each panels as panelId, i}
     {@const info = getPanelInfo(panelId)}
     <div
       class="dock-tab"
       class:active={i === activeTab}
-      draggable="true"
       role="tab"
       tabindex="0"
       aria-selected={i === activeTab}
-      ondragstart={(e) => handleDragStart(e, panelId)}
-      ondragend={handleDragEnd}
+      onmousedown={(e) => handleTabMouseDown(e, panelId)}
       onclick={() => onTabSelect(i)}
+      oncontextmenu={(e) => handleContextMenu(e, panelId)}
       onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTabSelect(i); }}
     >
       <span class="dock-tab-label">{info ? t(info.titleKey) : panelId}</span>
@@ -85,6 +151,34 @@
   {/each}
 </div>
 
+<!-- Context menu -->
+{#if contextMenu}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="context-menu"
+    style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+    onmousedown={(e: MouseEvent) => e.stopPropagation()}
+  >
+    <button class="context-item" onclick={handleCtxClose}>
+      {t('dock.close_tab')}
+    </button>
+    <button class="context-item" onclick={handleCtxCloseOthers} disabled={panels.length <= 1}>
+      {t('dock.close_others')}
+    </button>
+    <button class="context-item" onclick={handleCtxCloseAll}>
+      {t('dock.close_all')}
+    </button>
+    <div class="context-separator"></div>
+    <button class="context-item" onclick={handleCtxDuplicate}>
+      {t('dock.duplicate')}
+    </button>
+    <div class="context-separator"></div>
+    <button class="context-item" disabled>
+      {t('dock.pop_out')}
+    </button>
+  </div>
+{/if}
+
 <style>
   .dock-tab-bar {
     display: flex;
@@ -95,11 +189,6 @@
     min-height: 32px;
     overflow-x: auto;
     overflow-y: hidden;
-  }
-  .dock-tab-bar.drag-over {
-    background: var(--color-bgPanel, #252525);
-    outline: 1px dashed var(--color-accent, #007acc);
-    outline-offset: -1px;
   }
   .dock-tab {
     display: flex;
@@ -149,5 +238,42 @@
   .dock-tab-close:hover {
     color: var(--color-text, #ccc);
     background: var(--color-bg, #1e1e1e);
+  }
+
+  /* Context menu */
+  .context-menu {
+    position: fixed;
+    z-index: 10001;
+    min-width: 160px;
+    background: var(--color-bgHeader, #2d2d2d);
+    border: 1px solid var(--color-border, #404040);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    padding: 4px 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .context-item {
+    background: none;
+    border: none;
+    color: var(--color-text, #ccc);
+    font-size: 12px;
+    padding: 6px 16px;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .context-item:hover:not(:disabled) {
+    background: var(--color-accent, #007acc);
+    color: white;
+  }
+  .context-item:disabled {
+    color: var(--color-textDim, #666);
+    cursor: default;
+  }
+  .context-separator {
+    height: 1px;
+    background: var(--color-border, #404040);
+    margin: 4px 0;
   }
 </style>

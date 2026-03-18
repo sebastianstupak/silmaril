@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { LayoutNode, DropZone } from './types';
+  import { getBasePanelId } from './types';
   import type { Component } from 'svelte';
   import DockContainer from './DockContainer.svelte';
   import DockTabBar from './DockTabBar.svelte';
   import DockSplitter from './DockSplitter.svelte';
   import DockDropZone from './DockDropZone.svelte';
-  import { dropPanel, resizeSplit, setActiveTab, removePanelFromLayout, endDrag, getDragState } from './store';
+  import { dropPanel, resizeSplit, setActiveTab, removePanelFromLayout, endDrag, getDragState, subscribeDrag } from './store';
   import type { EditorLayout } from './types';
+  import { onMount } from 'svelte';
 
   interface Props {
     node: LayoutNode;
@@ -29,21 +31,12 @@
   let containerEl: HTMLDivElement | undefined = $state(undefined);
   let isDragging = $state(false);
 
-  $effect(() => {
-    function onDragStart() { isDragging = true; }
-    function onDragEnd() {
-      isDragging = false;
-    }
-
-    window.addEventListener('dragstart', onDragStart);
-    // dragend always fires on the source element when a drag operation ends
-    // (regardless of whether it was successful or cancelled)
-    window.addEventListener('dragend', onDragEnd);
-
-    return () => {
-      window.removeEventListener('dragstart', onDragStart);
-      window.removeEventListener('dragend', onDragEnd);
-    };
+  // Subscribe to drag state changes instead of using HTML5 drag events
+  onMount(() => {
+    const unsub = subscribeDrag(() => {
+      isDragging = getDragState().active;
+    });
+    return unsub;
   });
 
   function handleResize(index: number, deltaPx: number) {
@@ -77,6 +70,37 @@
   function handleTabClose(panelId: string) {
     const newLayout = removePanelFromLayout(layout, panelId);
     onLayoutChange(newLayout);
+  }
+
+  function handleDuplicate(panelId: string, newPanelId: string) {
+    // Add the new panel instance as a tab next to the original
+    const newLayout = dropPanel(layout, newPanelId, path, 'center', isBottomPanel);
+    onLayoutChange(newLayout);
+  }
+
+  function handleCloseOthers(panelId: string) {
+    if (node.type !== 'tabs') return;
+    let newLayout = layout;
+    for (const p of node.panels) {
+      if (p !== panelId) {
+        newLayout = removePanelFromLayout(newLayout, p);
+      }
+    }
+    onLayoutChange(newLayout);
+  }
+
+  function handleCloseAll() {
+    if (node.type !== 'tabs') return;
+    let newLayout = layout;
+    for (const p of node.panels) {
+      newLayout = removePanelFromLayout(newLayout, p);
+    }
+    onLayoutChange(newLayout);
+  }
+
+  /** Resolve panel component, supporting instance IDs like 'viewport:2' */
+  function resolveComponent(id: string): Component | undefined {
+    return panelComponents[id] ?? panelComponents[getBasePanelId(id)];
   }
 </script>
 
@@ -113,10 +137,13 @@
       onTabSelect={handleTabSelect}
       onDrop={handleTabDrop}
       onClose={handleTabClose}
+      onDuplicate={handleDuplicate}
+      onCloseOthers={handleCloseOthers}
+      onCloseAll={handleCloseAll}
     />
     <div class="dock-tab-content">
       {#if node.panels[node.activeTab]}
-        {@const Comp = panelComponents[node.panels[node.activeTab]]}
+        {@const Comp = resolveComponent(node.panels[node.activeTab])}
         {#if Comp}
           <Comp />
         {:else}
@@ -129,7 +156,7 @@
       {/if}
 
       <!-- Drop zone overlay for side splits -->
-      <DockDropZone {isDragging} onDrop={handleZoneDrop} />
+      <DockDropZone onDrop={handleZoneDrop} />
     </div>
   </div>
 {/if}

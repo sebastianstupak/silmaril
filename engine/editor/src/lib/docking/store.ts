@@ -119,26 +119,47 @@ export function saveLayout(layout: EditorLayout) {
 }
 
 // ---------------------------------------------------------------------------
-// Drag state (module-level singleton)
+// Drag state (module-level singleton, mouse-based)
 // ---------------------------------------------------------------------------
 
 export interface DragState {
   panelId: string;
   active: boolean;
+  mouseX: number;
+  mouseY: number;
 }
 
-let _dragState: DragState = { panelId: '', active: false };
+let _dragState: DragState = { panelId: '', active: false, mouseX: 0, mouseY: 0 };
+let _dragListeners: Array<() => void> = [];
 
 export function getDragState(): DragState {
   return _dragState;
 }
 
-export function startDrag(panelId: string) {
-  _dragState = { panelId, active: true };
+export function subscribeDrag(listener: () => void): () => void {
+  _dragListeners.push(listener);
+  return () => {
+    _dragListeners = _dragListeners.filter(l => l !== listener);
+  };
+}
+
+function notifyDragListeners() {
+  for (const l of _dragListeners) l();
+}
+
+export function startDrag(panelId: string, x: number, y: number) {
+  _dragState = { panelId, active: true, mouseX: x, mouseY: y };
+  notifyDragListeners();
+}
+
+export function updateDrag(x: number, y: number) {
+  _dragState = { ..._dragState, mouseX: x, mouseY: y };
+  notifyDragListeners();
 }
 
 export function endDrag() {
-  _dragState = { panelId: '', active: false };
+  _dragState = { panelId: '', active: false, mouseX: 0, mouseY: 0 };
+  notifyDragListeners();
 }
 
 // ---------------------------------------------------------------------------

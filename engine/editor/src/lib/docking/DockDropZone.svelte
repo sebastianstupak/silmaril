@@ -1,57 +1,94 @@
 <script lang="ts">
-  import { t } from '$lib/i18n';
   import type { DropZone } from './types';
+  import { getDragState, subscribeDrag } from './store';
+  import { onMount } from 'svelte';
 
   interface Props {
-    isDragging: boolean;
     onDrop: (zone: DropZone) => void;
   }
 
-  let { isDragging, onDrop }: Props = $props();
+  let { onDrop }: Props = $props();
 
+  let isDragging = $state(false);
+  let mouseX = $state(0);
+  let mouseY = $state(0);
   let hoveredZone: DropZone | null = $state(null);
+  let overlayEl: HTMLDivElement | undefined = $state(undefined);
 
-  function handleDragOver(e: DragEvent, zone: DropZone) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    hoveredZone = zone;
+  onMount(() => {
+    const unsub = subscribeDrag(() => {
+      const s = getDragState();
+      const wasDragging = isDragging;
+      isDragging = s.active;
+      mouseX = s.mouseX;
+      mouseY = s.mouseY;
+
+      if (s.active && overlayEl) {
+        hoveredZone = hitTestZone(s.mouseX, s.mouseY);
+      } else {
+        // Drag ended — if we had a hovered zone, execute the drop
+        if (wasDragging && hoveredZone && s.panelId === '' && !s.active) {
+          // endDrag was called — but we need the panelId from before.
+          // We handle drop in the mouseup path instead (see below).
+        }
+        hoveredZone = null;
+      }
+    });
+
+    // Listen for mouseup to detect drop while dragging
+    function handleMouseUp(_ev: MouseEvent) {
+      const state = getDragState();
+      if (!state.active) return;
+      if (!overlayEl) return;
+
+      const zone = hitTestZone(state.mouseX, state.mouseY);
+      if (zone) {
+        onDrop(zone);
+      }
+    }
+
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      unsub();
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  });
+
+  function hitTestZone(x: number, y: number): DropZone | null {
+    if (!overlayEl) return null;
+    const rect = overlayEl.getBoundingClientRect();
+
+    const relX = (x - rect.left) / rect.width;
+    const relY = (y - rect.top) / rect.height;
+
+    if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return null;
+
+    // Edge zones (20% from each edge)
+    if (relX < 0.2) return 'left';
+    if (relX > 0.8) return 'right';
+    if (relY < 0.2) return 'top';
+    if (relY > 0.8) return 'bottom';
+    return 'center';
   }
-
-  function handleDragLeave(zone: DropZone) {
-    if (hoveredZone === zone) hoveredZone = null;
-  }
-
-  function handleDrop(e: DragEvent, zone: DropZone) {
-    e.preventDefault();
-    e.stopPropagation();
-    hoveredZone = null;
-    onDrop(zone);
-  }
-
-  const zones: DropZone[] = ['left', 'right', 'top', 'bottom', 'center'];
 </script>
 
 {#if isDragging}
-  <div class="dock-drop-overlay">
-    {#each zones as zone}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="dock-drop-zone zone-{zone}"
-        class:hovered={hoveredZone === zone}
-        ondragover={(e) => handleDragOver(e, zone)}
-        ondragleave={() => handleDragLeave(zone)}
-        ondrop={(e) => handleDrop(e, zone)}
-      >
+  <div class="dock-drop-overlay" bind:this={overlayEl}>
+    <!-- Visual zone indicators -->
+    <div class="dock-drop-zone zone-left" class:hovered={hoveredZone === 'left'}></div>
+    <div class="dock-drop-zone zone-right" class:hovered={hoveredZone === 'right'}></div>
+    <div class="dock-drop-zone zone-top" class:hovered={hoveredZone === 'top'}></div>
+    <div class="dock-drop-zone zone-bottom" class:hovered={hoveredZone === 'bottom'}></div>
+    <div class="dock-drop-zone zone-center" class:hovered={hoveredZone === 'center'}>
+      {#if hoveredZone === 'center'}
         <div class="zone-indicator">
-          {#if zone === 'center'}
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.7">
-              <rect x="2" y="2" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-          {/if}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.7">
+            <rect x="2" y="2" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
         </div>
-      </div>
-    {/each}
+      {/if}
+    </div>
   </div>
 {/if}
 
@@ -60,11 +97,13 @@
     position: absolute;
     inset: 0;
     z-index: 100;
+    /* Allow mouse events to pass through to backdrop for cursor,
+       but the overlay itself needs to be measurable for hit-testing */
     pointer-events: none;
   }
   .dock-drop-zone {
     position: absolute;
-    pointer-events: all;
+    pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -107,10 +146,6 @@
     border-radius: 4px;
   }
   .zone-indicator {
-    opacity: 0;
-    transition: opacity 0.1s;
-  }
-  .dock-drop-zone.hovered .zone-indicator {
     opacity: 1;
   }
 </style>

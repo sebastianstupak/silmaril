@@ -11,6 +11,7 @@
   import { logInfo, logWarn } from './lib/stores/console';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
+  import DragOverlay from './lib/docking/DragOverlay.svelte';
   import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit } from './lib/docking/store';
   import type { EditorLayout } from './lib/docking/types';
 
@@ -199,6 +200,9 @@
       </div>
     {/if}
   </div>
+
+  <!-- Drag overlay (ghost tab + backdrop during panel drag) -->
+  <DragOverlay />
 
   <!-- Status bar -->
   <div class="status-bar">

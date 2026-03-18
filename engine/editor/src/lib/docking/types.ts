@@ -51,7 +51,21 @@ export const panelRegistry: PanelInfo[] = [
   { id: 'assets', titleKey: 'panel.assets' },
 ];
 
-/** Get panel info by ID */
+/** Get the base panel ID (strip instance suffix like 'viewport:2' → 'viewport') */
+export function getBasePanelId(id: string): string {
+  const colonIdx = id.indexOf(':');
+  return colonIdx === -1 ? id : id.substring(0, colonIdx);
+}
+
+/** Get panel info by ID (supports instance IDs like 'viewport:2') */
 export function getPanelInfo(id: string): PanelInfo | undefined {
-  return panelRegistry.find(p => p.id === id);
+  return panelRegistry.find(p => p.id === getBasePanelId(id));
+}
+
+let _instanceCounter = 0;
+
+/** Create a new panel instance ID like 'viewport:1', 'viewport:2' */
+export function createPanelInstance(baseId: string): string {
+  _instanceCounter++;
+  return `${baseId}:${_instanceCounter}`;
 }

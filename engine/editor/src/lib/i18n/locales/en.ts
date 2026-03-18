@@ -147,6 +147,10 @@ const en = {
   // Docking
   'dock.close_tab': 'Close',
   'dock.drop_here': 'Drop here',
+  'dock.pop_out': 'Pop Out',
+  'dock.duplicate': 'Duplicate Panel',
+  'dock.close_others': 'Close Others',
+  'dock.close_all': 'Close All',
 
   // Scene tools
   'tool.select': 'Select (Q)',
