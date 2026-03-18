@@ -2,6 +2,9 @@ use clap::{Parser, Subcommand};
 
 mod codegen;
 mod commands;
+// TODO: templates module is superseded by engine_ops::project.
+// Kept during incremental migration; remove once all commands use engine_ops.
+#[allow(dead_code, unused_imports)]
 mod templates;
 
 #[derive(Parser)]

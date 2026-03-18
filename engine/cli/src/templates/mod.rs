@@ -1,9 +1,11 @@
+// TODO: This module is superseded by engine_ops::project (BasicTemplate, TemplateFile, etc.).
+// Kept during incremental CLI -> ops migration. Remove once all commands use engine_ops.
+
 pub mod basic;
 
 pub use basic::BasicTemplate;
 
 pub trait Template {
-    #[allow(dead_code)]
     fn name(&self) -> &str;
     fn files(&self) -> Vec<TemplateFile>;
 }

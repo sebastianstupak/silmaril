@@ -1,3 +1,7 @@
+// TODO: These operations are duplicated in engine_ops::build.
+// The CLI should eventually delegate to engine_ops instead of
+// maintaining its own implementations. See: engine/ops/src/build/
+
 //! Build command types, platform mapping, and runner abstraction.
 
 pub mod env;

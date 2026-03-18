@@ -50,6 +50,7 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 
 # Engine dependencies
+engine-ops = { path = "../ops" }
 engine-templating = { path = "../templating" }
 engine-dev-tools-hot-reload = { path = "../dev-tools/hot-reload" }
 notify-debouncer-full = "0.3"

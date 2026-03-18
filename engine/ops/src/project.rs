@@ -943,7 +943,9 @@ pub fn run_cargo(args: &[&str]) -> Result<()> {
 /// This writes all template files and creates empty asset directories.
 /// It does **not** produce any terminal output — the caller (CLI or editor)
 /// is responsible for progress reporting.
-pub fn create_project(name: &str, template: &str, use_local: bool) -> Result<()> {
+///
+/// Returns the number of template files written on success.
+pub fn create_project(name: &str, template: &str, use_local: bool) -> Result<usize> {
     validate_project_name(name)?;
 
     let project_path = PathBuf::from(name);
@@ -964,7 +966,10 @@ pub fn create_project(name: &str, template: &str, use_local: bool) -> Result<()>
     fs::create_dir(&project_path)
         .with_context(|| format!("Failed to create project directory: {}", name))?;
 
-    for file in template_impl.files().iter() {
+    let files = template_impl.files();
+    let file_count = files.len();
+
+    for file in files.iter() {
         let file_path = project_path.join(&file.path);
 
         if let Some(parent) = file_path.parent() {
@@ -983,7 +988,7 @@ pub fn create_project(name: &str, template: &str, use_local: bool) -> Result<()>
             .with_context(|| format!("Failed to create directory: {}", dir))?;
     }
 
-    Ok(())
+    Ok(file_count)
 }
 
 #[cfg(test)]

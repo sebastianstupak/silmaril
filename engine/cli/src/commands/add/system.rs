@@ -1,3 +1,7 @@
+// TODO: These operations are duplicated in engine_ops::codegen.
+// The CLI should eventually delegate to engine_ops instead of
+// maintaining its own implementations. See: engine/ops/src/codegen/
+
 use anyhow::{bail, Result};
 use std::env;
 

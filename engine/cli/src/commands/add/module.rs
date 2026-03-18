@@ -1,3 +1,7 @@
+// TODO: These operations are duplicated in engine_ops::module.
+// The CLI should eventually delegate to engine_ops instead of
+// maintaining its own implementations. See: engine/ops/src/module/
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
