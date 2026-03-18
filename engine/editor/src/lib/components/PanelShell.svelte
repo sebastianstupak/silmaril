@@ -19,20 +19,20 @@
   .panel {
     display: flex;
     flex-direction: column;
-    border: 1px solid #404040;
-    background: #252525;
-    border-radius: 4px;
+    background: var(--color-bgPanel, #252525);
     overflow: hidden;
   }
   .panel-header {
     padding: 6px 12px;
-    background: #2d2d2d;
-    border-bottom: 1px solid #404040;
-    font-size: 12px;
+    background: var(--color-bgHeader, #2d2d2d);
+    border-bottom: 1px solid var(--color-border, #404040);
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #999;
+    color: var(--color-textMuted, #999);
+    flex-shrink: 0;
+    user-select: none;
   }
   .panel-content {
     flex: 1;
