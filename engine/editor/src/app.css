@@ -1,31 +1,39 @@
-/* Silmaril Editor global styles */
-/* Uses CSS custom properties from theme system — no Tailwind needed */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --color-background: var(--color-bg, #1e1e1e);
-  --color-foreground: var(--color-text, #cccccc);
-  --color-muted: var(--color-bgHeader, #2d2d2d);
-  --color-muted-foreground: var(--color-textMuted, #999);
-  --color-popover: var(--color-bgPanel, #252525);
-  --color-popover-foreground: var(--color-text, #cccccc);
-  --color-card: var(--color-bgPanel, #252525);
-  --color-card-foreground: var(--color-text, #cccccc);
-  --color-border: var(--color-border, #404040);
-  --color-input: var(--color-bgInput, #333);
-  --color-primary: var(--color-accent, #007acc);
-  --color-primary-foreground: #fff;
-  --color-secondary: var(--color-bgHeader, #2d2d2d);
-  --color-secondary-foreground: var(--color-text, #cccccc);
-  --color-accent-ui: var(--color-bgHeader, #2d2d2d);
-  --color-accent-foreground: var(--color-text, #cccccc);
-  --color-destructive: var(--color-error, #f44336);
-  --color-destructive-foreground: #fff;
-  --color-ring: var(--color-accent, #007acc);
-  --radius: 0.375rem;
-}
+@layer base {
+  :root {
+    --color-background: var(--color-bg, #1e1e1e);
+    --color-foreground: var(--color-text, #cccccc);
+    --color-muted: var(--color-bgHeader, #2d2d2d);
+    --color-muted-foreground: var(--color-textMuted, #999);
+    --color-popover: var(--color-bgPanel, #252525);
+    --color-popover-foreground: var(--color-text, #cccccc);
+    --color-card: var(--color-bgPanel, #252525);
+    --color-card-foreground: var(--color-text, #cccccc);
+    --color-border: var(--color-border, #404040);
+    --color-input: var(--color-bgInput, #333);
+    --color-primary: var(--color-accent, #007acc);
+    --color-primary-foreground: #fff;
+    --color-secondary: var(--color-bgHeader, #2d2d2d);
+    --color-secondary-foreground: var(--color-text, #cccccc);
+    --color-accent-ui: var(--color-bgHeader, #2d2d2d);
+    --color-accent-foreground: var(--color-text, #cccccc);
+    --color-destructive: var(--color-error, #f44336);
+    --color-destructive-foreground: #fff;
+    --color-ring: var(--color-accent, #007acc);
+    --radius: 0.375rem;
+  }
 
-*, *::before, *::after {
-  box-sizing: border-box;
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
 }
 
 html, body {
@@ -33,8 +41,6 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--color-bg, #1e1e1e);
-  color: var(--color-text, #cccccc);
   font-family: var(--font-body, system-ui, -apple-system, sans-serif);
   font-size: 13px;
 }
