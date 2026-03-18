@@ -8,6 +8,7 @@
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
+  import { logInfo, logWarn } from './lib/stores/console';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
   import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit } from './lib/docking/store';
@@ -49,8 +50,10 @@
       const entities = await scanProjectEntities(path);
       setEntities(entities);
       setSelectedEntityId(null);
+      logInfo(`Project loaded: ${editorState.project_name}`);
+      logInfo(`Found ${entities.length} entities in scene`);
     } catch {
-      // Project open failed - state unchanged
+      logWarn('Failed to open project');
     }
   }
 
@@ -101,6 +104,7 @@
     setLocale(settings.language);
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
+    logInfo('Silmaril Editor started');
     editorState = await getEditorState();
   });
 </script>

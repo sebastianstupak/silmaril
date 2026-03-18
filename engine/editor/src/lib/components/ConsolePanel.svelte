@@ -1,7 +1,12 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { onMount, tick } from 'svelte';
-  import type { LogEntry } from '$lib/stores/console';
+  import {
+    type LogEntry,
+    getLogs,
+    clearLogs as clearLogStore,
+    subscribeConsole,
+  } from '$lib/stores/console';
 
   let logs: LogEntry[] = $state([]);
   let filter = $state('');
@@ -45,17 +50,21 @@
     return c;
   });
 
-  function formatTimestamp(iso: string): string {
+  function formatTimestamp(ts: string): string {
+    // Timestamps are already formatted as HH:MM:SS.mmm by the log store
+    if (/^\d{2}:\d{2}:\d{2}/.test(ts)) return ts;
+    // Fallback for ISO strings
     try {
-      const d = new Date(iso);
+      const d = new Date(ts);
       return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
         + '.' + String(d.getMilliseconds()).padStart(3, '0');
     } catch {
-      return iso;
+      return ts;
     }
   }
 
   function clearLogs() {
+    clearLogStore();
     logs = [];
   }
 
@@ -75,16 +84,12 @@
   });
 
   onMount(() => {
-    const now = new Date();
-    const mockLogs: LogEntry[] = [
-      { level: 'info', message: 'Silmaril Editor started', timestamp: new Date(now.getTime() - 5000).toISOString() },
-      { level: 'info', message: 'Project loaded: e2e-editor-demo', timestamp: new Date(now.getTime() - 4000).toISOString() },
-      { level: 'warn', message: 'Vulkan viewport not available in browser mode', timestamp: new Date(now.getTime() - 3000).toISOString() },
-      { level: 'debug', message: 'Theme applied: dark', timestamp: new Date(now.getTime() - 2000).toISOString() },
-      { level: 'info', message: 'Found 5 entities in scene', timestamp: new Date(now.getTime() - 1000).toISOString() },
-      { level: 'error', message: 'Failed to load asset: missing_texture.png', timestamp: now.toISOString() },
-    ];
-    logs = mockLogs;
+    logs = getLogs();
+    const unsub = subscribeConsole(() => {
+      logs = getLogs();
+      scrollToBottom();
+    });
+    return unsub;
   });
 </script>
 

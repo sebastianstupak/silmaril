@@ -71,8 +71,6 @@
   let dragMode: DragMode = $state('none');
   let dragStartX = 0;
   let dragStartY = 0;
-  let panStartOffsetX = 0;
-  let panStartOffsetY = 0;
 
   /** Cursor CSS value — reactive, recalculated on every relevant state change. */
   let cursor = $state('default');
@@ -165,16 +163,27 @@
   // Viewport entity list
   // ---------------------------------------------------------------------------
 
-  /** Build the viewport entity list from editor context entities. */
+  /** Build the viewport entity list from editor context entities.
+   *  Converts 3D world positions to normalised viewport coords (0–1)
+   *  using the scene camera offset and zoom. */
   function buildViewportEntities(): ViewportEntity[] {
-    return entities.map((e, i) => ({
-      id: e.id,
-      name: e.name,
-      // Distribute entities in a circle pattern for visual interest
-      x: 0.5 + 0.3 * Math.cos((2 * Math.PI * i) / Math.max(entities.length, 1)),
-      y: 0.5 + 0.3 * Math.sin((2 * Math.PI * i) / Math.max(entities.length, 1)),
-      color: ENTITY_COLORS[i % ENTITY_COLORS.length],
-    }));
+    const scene = getSceneState();
+    return scene.entities.map((e, i) => {
+      const cam = scene.camera;
+      const worldX = e.position.x - cam.position.x;
+      const worldY = e.position.z - cam.position.z; // Z is "forward" in top-down
+      const scale = cam.zoom * 50; // pixels-per-world-unit
+      const screenX = 0.5 + (worldX * scale) / viewportWidth;
+      const screenY = 0.5 + (worldY * scale) / viewportHeight;
+
+      return {
+        id: e.id,
+        name: e.name,
+        x: Math.max(0.05, Math.min(0.95, screenX)),
+        y: Math.max(0.05, Math.min(0.95, screenY)),
+        color: ENTITY_COLORS[i % ENTITY_COLORS.length],
+      };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -291,8 +300,6 @@
     dragMode = mode;
     dragStartX = event.clientX;
     dragStartY = event.clientY;
-    panStartOffsetX = camera.offset_x;
-    panStartOffsetY = camera.offset_y;
     cursor = cursorForDrag(mode);
   }
 
@@ -304,15 +311,11 @@
 
     switch (dragMode) {
       case 'pan': {
-        // Absolute offset from drag start for smooth panning
-        const panDx = dx / camera.zoom;
-        const panDy = dy / camera.zoom;
-        camera = {
-          ...camera,
-          offset_x: panStartOffsetX + panDx,
-          offset_y: panStartOffsetY + panDy,
-        };
-        requestFrame();
+        const panDx = (event.clientX - dragStartX) / (camera.zoom * 50);
+        const panDy = -(event.clientY - dragStartY) / (camera.zoom * 50);
+        dragStartX = event.clientX;
+        dragStartY = event.clientY;
+        panCamera(panDx, panDy);
         break;
       }
 

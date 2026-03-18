@@ -13,6 +13,7 @@ import {
   type SceneTool,
   type Vec3,
 } from './state';
+import { logInfo, logDebug } from '$lib/stores/console';
 
 // ---------------------------------------------------------------------------
 // Entity colour palette (matches viewport rendering)
@@ -30,6 +31,10 @@ const ENTITY_COLORS = [
 /** Select an entity by id, or deselect by passing null. */
 export function selectEntity(id: number | null): void {
   _mutate((s) => ({ ...s, selectedEntityId: id }));
+  if (id != null) {
+    const entity = getEntityById(id);
+    logDebug(`Selected: ${entity?.name ?? id}`);
+  }
 }
 
 /** Create a new entity with an optional name. Returns the new entity info. */
@@ -59,16 +64,19 @@ export function createEntity(name?: string): SceneEntity {
       selectedEntityId: id,
     };
   });
+  logInfo(`Entity created: ${created.name} (#${created.id})`);
   return created;
 }
 
 /** Delete an entity by id. Deselects if currently selected. */
 export function deleteEntity(id: number): void {
+  const entity = getEntityById(id);
   _mutate((s) => ({
     ...s,
     entities: s.entities.filter((e) => e.id !== id),
     selectedEntityId: s.selectedEntityId === id ? null : s.selectedEntityId,
   }));
+  logInfo(`Entity deleted: ${entity?.name ?? id}`);
 }
 
 /** Duplicate an entity by id. Returns the new copy. */
@@ -97,6 +105,7 @@ export function duplicateEntity(id: number): SceneEntity | null {
       selectedEntityId: newId,
     };
   });
+  logInfo(`Entity duplicated: ${created.name} (#${created.id})`);
   return created;
 }
 
