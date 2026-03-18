@@ -1,5 +1,10 @@
-// Typed wrappers around Tauri invoke() and listen()
-// TODO: Implement when Tauri JS API is available
+import { invoke } from '@tauri-apps/api/core';
+
+export interface EditorState {
+  mode: string;
+  project_name: string | null;
+  project_path: string | null;
+}
 
 export type EntityId = number;
 
@@ -8,34 +13,10 @@ export interface ComponentData {
   data: unknown;
 }
 
-export interface SubscriptionConfig {
-  entity_id?: EntityId;
-  throttle_ms?: number;
+export async function getEditorState(): Promise<EditorState> {
+  return await invoke('get_editor_state');
 }
 
-// Commands (Svelte -> Rust)
-export async function createEntity(): Promise<EntityId> {
-  // return await invoke('create_entity');
-  throw new Error('Not implemented — Tauri not yet integrated');
-}
-
-export async function selectEntity(id: EntityId | null): Promise<void> {
-  // return await invoke('select_entity', { id });
-  throw new Error('Not implemented');
-}
-
-export async function setComponent(entityId: EntityId, name: string, data: unknown): Promise<void> {
-  // return await invoke('set_component', { id: entityId, name, data });
-  throw new Error('Not implemented');
-}
-
-// Subscriptions (Rust -> Svelte)
-export async function subscribe(channel: string, config?: SubscriptionConfig): Promise<number> {
-  // return await invoke('subscribe', { channel, config });
-  throw new Error('Not implemented');
-}
-
-export async function unsubscribe(subscriptionId: number): Promise<void> {
-  // return await invoke('unsubscribe', { subscription_id: subscriptionId });
-  throw new Error('Not implemented');
+export async function openProject(path: string): Promise<EditorState> {
+  return await invoke('open_project', { path });
 }

@@ -1,5 +1,7 @@
-<script>
-  export let title = 'Panel';
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+
+  let { title = 'Panel', children }: { title?: string; children?: Snippet } = $props();
 </script>
 
 <div class="panel">
@@ -7,7 +9,9 @@
     <span>{title}</span>
   </div>
   <div class="panel-content">
-    <slot />
+    {#if children}
+      {@render children()}
+    {/if}
   </div>
 </div>
 
