@@ -7,7 +7,7 @@
   import DockSplitter from './DockSplitter.svelte';
   import DockDropZone from './DockDropZone.svelte';
   import { dropPanel, resizeSplit, setActiveTab, removePanelFromLayout, endDrag, getDragState, subscribeDrag } from './store';
-  import { popOutPanel } from '$lib/api';
+  import { popOutPanel, setViewportVisible } from '$lib/api';
   import type { EditorLayout } from './types';
   import { onMount } from 'svelte';
 
@@ -34,8 +34,16 @@
 
   // Subscribe to drag state changes instead of using HTML5 drag events
   onMount(() => {
+    let wasDragging = false;
     const unsub = subscribeDrag(() => {
       isDragging = getDragState().active;
+      // Hide native Vulkan viewport during drag so webview overlay is visible
+      if (isDragging && !wasDragging) {
+        setViewportVisible(false);
+      } else if (!isDragging && wasDragging) {
+        setViewportVisible(true);
+      }
+      wasDragging = isDragging;
     });
     return unsub;
   });

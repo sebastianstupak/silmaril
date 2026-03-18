@@ -180,6 +180,15 @@ mod platform {
             self.child_hwnd.0
         }
 
+        /// Show or hide the child window. Used during drag operations
+        /// to let the webview drop zone overlay be visible.
+        pub fn set_visible(&self, visible: bool) {
+            unsafe {
+                let cmd = if visible { SW_SHOW } else { SW_HIDE };
+                let _ = ShowWindow(self.child_hwnd.0, cmd);
+            }
+        }
+
         /// Stop the render thread and destroy the child window.
         pub fn destroy(&mut self) {
             self.should_stop.store(true, Ordering::Relaxed);
@@ -314,6 +323,8 @@ impl NativeViewport {
     }
 
     pub fn set_bounds(&self, _bounds: ViewportBounds) {}
+
+    pub fn set_visible(&self, _visible: bool) {}
 
     pub fn destroy(&mut self) {}
 }

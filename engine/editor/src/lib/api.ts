@@ -206,22 +206,40 @@ export async function scanProjectEntities(projectPath: string): Promise<EntityIn
 export async function popOutPanel(panelId: string, x: number, y: number): Promise<void> {
   if (!isTauri) return;
 
-  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+  try {
+    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+    const { getPanelInfo } = await import('$lib/docking/types');
 
-  const info = getPanelInfo(panelId);
-  const title = info ? panelId : 'Panel';
+    const info = getPanelInfo(panelId);
+    const title = info ? `${panelId} — Silmaril Editor` : 'Panel — Silmaril Editor';
 
-  const label = `popout-${panelId.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
+    // Label must be alphanumeric + hyphens, unique
+    const label = `popout-${panelId.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
 
-  new WebviewWindow(label, {
-    url: `index.html?panel=${encodeURIComponent(panelId)}`,
-    title,
-    width: 500,
-    height: 600,
-    x: Math.round(x) - 250,
-    y: Math.round(y) - 50,
-    decorations: true,
-  });
+    // In dev mode, use the Vite dev server URL; in production, use relative path
+    const baseUrl = window.location.origin;
+    const url = `${baseUrl}?panel=${encodeURIComponent(panelId)}`;
+
+    const webview = new WebviewWindow(label, {
+      url,
+      title,
+      width: 500,
+      height: 600,
+      x: Math.round(x) - 250,
+      y: Math.round(y) - 50,
+      decorations: true,
+    });
+
+    webview.once('tauri://error', (e) => {
+      console.error('[silmaril] Failed to create pop-out window:', e);
+    });
+
+    webview.once('tauri://created', () => {
+      console.log('[silmaril] Pop-out window created:', label);
+    });
+  } catch (e) {
+    console.error('[silmaril] popOutPanel error:', e);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +322,13 @@ export async function resizeNativeViewport(
 export async function destroyNativeViewport(): Promise<void> {
   if (!isTauri) return;
   return tauriInvoke<void>('destroy_native_viewport', {});
+}
+
+/** Show or hide the native viewport child window.
+ *  Used during drag operations so the webview drop zone overlay is visible. */
+export async function setViewportVisible(visible: boolean): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('set_viewport_visible', { visible });
 }
 
 // ---------------------------------------------------------------------------

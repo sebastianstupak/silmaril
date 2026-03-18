@@ -1,6 +1,11 @@
 {
   "identifier": "default",
   "description": "Default capabilities for the Silmaril Editor",
-  "windows": ["main"],
-  "permissions": ["core:default", "dialog:default", "core:window:allow-create"]
+  "windows": ["main", "popout-*"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "core:window:allow-create",
+    "core:webview:allow-create-webview-window"
+  ]
 }

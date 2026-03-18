@@ -388,3 +388,18 @@ pub fn destroy_native_viewport(
     }
     Ok(())
 }
+
+/// Show or hide the native viewport child window.
+/// Used to temporarily hide during panel drag operations so the
+/// webview drop zone overlay is visible.
+#[tauri::command]
+pub fn set_viewport_visible(
+    viewport_state: tauri::State<NativeViewportState>,
+    visible: bool,
+) -> Result<(), String> {
+    let guard = viewport_state.0.lock().unwrap();
+    if let Some(ref vp) = *guard {
+        vp.set_visible(visible);
+    }
+    Ok(())
+}
