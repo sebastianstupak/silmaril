@@ -270,6 +270,10 @@ pub struct BuildCommand {
     #[arg(long)]
     pub release: bool,
 
+    /// Watch for file changes and rebuild automatically.
+    #[arg(long)]
+    pub watch: bool,
+
     /// Path to an additional .env file whose variables are passed to builds.
     #[arg(long)]
     pub env_file: Option<String>,
@@ -557,7 +561,60 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
         Err(e) => spinner.finish_with_message(format!("build failed: {e}")),
     }
 
-    result
+    if !cmd.watch {
+        return result;
+    }
+
+    // Watch mode: rebuild on file changes
+    result.ok(); // Don't fail on initial build error in watch mode
+    info!("[silm] watching for changes... (Ctrl+C to stop)");
+
+    use notify_debouncer_full::{new_debouncer, notify::{RecursiveMode, Watcher}};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let (tx, rx) = mpsc::channel();
+    let mut debouncer = new_debouncer(Duration::from_millis(500), None, tx)
+        .map_err(|e| anyhow::anyhow!("failed to start file watcher: {e}"))?;
+
+    for dir in &["shared", "server", "client", "assets"] {
+        let watch_dir = project_root.join(dir);
+        if watch_dir.is_dir() {
+            debouncer.watcher().watch(&watch_dir, RecursiveMode::Recursive).ok();
+        }
+    }
+
+    loop {
+        match rx.recv() {
+            Ok(Ok(_events)) => {
+                let spinner = make_spinner("rebuilding...");
+                let game_toml_content = std::fs::read_to_string(&game_toml_path)
+                    .unwrap_or_default();
+                let env_file_path = cmd.env_file.as_ref().map(PathBuf::from);
+                let result = build_all_platforms(
+                    &RealRunner,
+                    &project_root,
+                    &game_toml_content,
+                    &platform_names,
+                    cmd.release,
+                    env_file_path.as_deref(),
+                    false,
+                );
+                match &result {
+                    Ok(()) => spinner.finish_with_message("rebuild complete"),
+                    Err(e) => spinner.finish_with_message(format!("rebuild failed: {e}")),
+                }
+            }
+            Ok(Err(errors)) => {
+                for e in errors {
+                    warn!(error = ?e, "watch error");
+                }
+            }
+            Err(_) => break, // Channel closed
+        }
+    }
+
+    Ok(())
 }
 
 /// Entry point for `silm package` called from the CLI.
@@ -588,6 +645,7 @@ pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Res
         platform: cmd.platform.clone(),
         release: true,
         env_file: None,
+        watch: false,
     };
     handle_build_command(build_cmd, project_root.clone())?;
 
