@@ -9,6 +9,8 @@
 
 pub mod native_viewport;
 pub mod picking;
+#[cfg(windows)]
+pub mod vulkan_viewport;
 
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;

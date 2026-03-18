@@ -4,9 +4,9 @@
 //! window.  The child window is the target for a Vulkan surface; a render
 //! thread draws into it at ~60 fps.
 //!
-//! Currently the render thread just keeps the window alive and fills it with
-//! a solid colour via `FillRect`.  Once the engine renderer is wired, it
-//! will create a real Vulkan swapchain and render the scene.
+//! The render thread creates a Vulkan swapchain on the child HWND and clears
+//! it to the editor background colour each frame.  Swapchain is automatically
+//! recreated on resize.
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -30,12 +30,11 @@ pub struct ViewportBounds {
 mod platform {
     use super::*;
 
+    use crate::viewport::vulkan_viewport::VulkanViewport;
+
     use windows::Win32::{
-        Foundation::{COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
-        Graphics::Gdi::{
-            BeginPaint, CreateSolidBrush, DeleteObject, EndPaint, FillRect, InvalidateRect,
-            HBRUSH, PAINTSTRUCT,
-        },
+        Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+        Graphics::Gdi::HBRUSH,
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::*,
     };
@@ -120,10 +119,10 @@ mod platform {
             }
         }
 
-        /// Start the render loop on a background thread.
+        /// Start the Vulkan render loop on a background thread.
         ///
-        /// Currently fills the window with a dark colour each frame to prove
-        /// the child window is alive.  Will be replaced with Vulkan rendering.
+        /// Initialises a Vulkan swapchain on the child window and clears it
+        /// to the editor background colour each frame (~60 fps).
         pub fn start_rendering(&mut self) -> Result<(), String> {
             let should_stop = self.should_stop.clone();
             let bounds = self.bounds.clone();
@@ -188,19 +187,64 @@ mod platform {
         }
     }
 
-    /// Minimal render loop: invalidates the child window so WM_PAINT fires,
-    /// then pumps messages.  The actual painting happens in `viewport_wnd_proc`.
+    /// Render loop: initialises Vulkan on the child HWND, then clears the
+    /// swapchain to the background colour each frame.  Falls back to a no-op
+    /// if Vulkan initialisation fails (the child window stays dark).
     fn render_loop(
         hwnd: HWND,
         should_stop: Arc<AtomicBool>,
-        _bounds: Arc<Mutex<ViewportBounds>>,
+        bounds: Arc<Mutex<ViewportBounds>>,
     ) {
-        while !should_stop.load(Ordering::Relaxed) {
-            unsafe {
-                // Invalidate so WM_PAINT fires
-                let _ = InvalidateRect(Some(hwnd), None, false);
+        let initial_bounds = *bounds.lock().unwrap();
+        let hwnd_raw = hwnd.0 as isize;
 
-                // Process pending messages for this window (non-blocking)
+        let mut vk_state = match VulkanViewport::new(
+            hwnd_raw,
+            initial_bounds.width,
+            initial_bounds.height,
+        ) {
+            Ok(state) => state,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to initialise Vulkan for viewport; falling back to idle loop");
+                // Fall back: just pump messages so the window stays alive
+                while !should_stop.load(Ordering::Relaxed) {
+                    unsafe {
+                        let mut msg = std::mem::zeroed::<MSG>();
+                        while PeekMessageW(&mut msg, Some(hwnd), 0, 0, PM_REMOVE).as_bool() {
+                            let _ = TranslateMessage(&msg);
+                            DispatchMessageW(&msg);
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(16));
+                }
+                return;
+            }
+        };
+
+        let mut last_width = initial_bounds.width;
+        let mut last_height = initial_bounds.height;
+
+        while !should_stop.load(Ordering::Relaxed) {
+            // Check for resize
+            {
+                let b = bounds.lock().unwrap();
+                if b.width != last_width || b.height != last_height {
+                    last_width = b.width;
+                    last_height = b.height;
+                    vk_state.notify_resize(last_width, last_height);
+                }
+            }
+
+            // Render frame
+            if let Err(e) = vk_state.render_frame() {
+                tracing::error!(error = %e, "Vulkan render_frame failed");
+                // Don't spin — sleep before retrying
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                continue;
+            }
+
+            // Pump Win32 messages (non-blocking)
+            unsafe {
                 let mut msg = std::mem::zeroed::<MSG>();
                 while PeekMessageW(&mut msg, Some(hwnd), 0, 0, PM_REMOVE).as_bool() {
                     let _ = TranslateMessage(&msg);
@@ -208,14 +252,18 @@ mod platform {
                 }
             }
 
+            // ~60 fps
             std::thread::sleep(std::time::Duration::from_millis(16));
         }
+
+        // Explicit drop to ensure Vulkan cleanup before window destruction
+        drop(vk_state);
     }
 
     /// Window procedure for the child viewport window.
     ///
-    /// Handles WM_PAINT by filling with the dark background colour.
-    /// All other messages are forwarded to `DefWindowProcW`.
+    /// Vulkan owns the rendering; the wndproc just handles WM_ERASEBKGND
+    /// to prevent flicker and forwards everything else to DefWindowProcW.
     unsafe extern "system" fn viewport_wnd_proc(
         hwnd: HWND,
         msg: u32,
@@ -223,20 +271,8 @@ mod platform {
         lparam: LPARAM,
     ) -> LRESULT {
         match msg {
-            WM_PAINT => {
-                let mut ps = std::mem::zeroed::<PAINTSTRUCT>();
-                let hdc = BeginPaint(hwnd, &mut ps);
-                if !hdc.is_invalid() {
-                    // Fill with #1a1a2e (Win32 COLORREF is 0x00BBGGRR)
-                    let brush = CreateSolidBrush(COLORREF(0x002e1a1a));
-                    FillRect(hdc, &ps.rcPaint, brush);
-                    let _ = DeleteObject(brush.into());
-                }
-                let _ = EndPaint(hwnd, &ps);
-                LRESULT(0)
-            }
             WM_ERASEBKGND => {
-                // Prevent flicker — we handle painting in WM_PAINT
+                // Prevent flicker — Vulkan owns the surface
                 LRESULT(1)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
