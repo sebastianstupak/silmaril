@@ -96,6 +96,20 @@ const en = {
   'shortcut.shift': 'Shift',
   'shortcut.alt': 'Alt',
 
+  // Status bar
+  'status.ready': 'Ready',
+  'status.building': 'Building...',
+  'status.saved': 'Scene saved',
+  'status.fps': 'FPS',
+  'status.memory': 'Memory',
+
+  // Panel menu
+  'panel.menu': 'Panel options',
+
+  // Breadcrumb
+  'breadcrumb.no_project': 'No project',
+  'breadcrumb.no_scene': 'Untitled Scene',
+
   // Common
   'common.ok': 'OK',
   'common.cancel': 'Cancel',

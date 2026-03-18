@@ -64,25 +64,42 @@
 
   <!-- Toolbar -->
   <div class="toolbar">
-    <div class="toolbar-spacer"></div>
-    <div class="toolbar-center">
-      <button class="toolbar-btn" title={t('toolbar.play')}>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M4 2l10 6-10 6V2z"/>
-        </svg>
-      </button>
-      <button class="toolbar-btn" title={t('toolbar.pause')}>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <rect x="3" y="2" width="4" height="12"/>
-          <rect x="9" y="2" width="4" height="12"/>
-        </svg>
-      </button>
-      <button class="toolbar-btn" title={t('toolbar.stop')}>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <rect x="3" y="3" width="10" height="10"/>
-        </svg>
-      </button>
+    <!-- Left: breadcrumb -->
+    <div class="toolbar-left">
+      <span class="breadcrumb">
+        <span class="breadcrumb-segment">{editorState?.project_name ?? t('breadcrumb.no_project')}</span>
+        <span class="breadcrumb-sep">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M5.7 13.7l5-5a1 1 0 000-1.4l-5-5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="breadcrumb-segment">{t('breadcrumb.no_scene')}</span>
+      </span>
     </div>
+
+    <!-- Center: transport controls -->
+    <div class="toolbar-center">
+      <div class="transport-group">
+        <button class="toolbar-btn transport-btn transport-play" title={t('toolbar.play')}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M4 2l10 6-10 6V2z"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn transport-btn" title={t('toolbar.pause')}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="3" y="2" width="4" height="12"/>
+            <rect x="9" y="2" width="4" height="12"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn transport-btn" title={t('toolbar.stop')}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="3" y="3" width="10" height="10"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: mode + settings -->
     <div class="toolbar-right">
       <span class="mode-badge">{editorState?.mode ?? '...'}</span>
       <button class="toolbar-btn" onclick={() => showSettings = true} title={t('settings.title')}>
@@ -138,6 +155,21 @@
       </PanelShell>
     </div>
   </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span class="status-item">{t('placeholder.select_entity')}</span>
+    </div>
+    <div class="status-center">
+      <span class="status-item">{t('status.ready')}</span>
+    </div>
+    <div class="status-right">
+      <span class="status-item">{t('status.fps')}: --</span>
+      <span class="status-divider"></span>
+      <span class="status-item">{t('status.memory')}: --</span>
+    </div>
+  </div>
 </main>
 
 <style>
@@ -152,7 +184,7 @@
 
   /* Toolbar */
   .toolbar {
-    height: 36px;
+    height: 38px;
     display: flex;
     align-items: center;
     padding: 0 12px;
@@ -161,11 +193,16 @@
     gap: 8px;
     flex-shrink: 0;
   }
-  .toolbar-spacer { flex: 1; }
+  .toolbar-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
   .toolbar-center {
     display: flex;
     align-items: center;
-    gap: 4px;
+    flex-shrink: 0;
   }
   .toolbar-right {
     flex: 1;
@@ -174,6 +211,56 @@
     justify-content: flex-end;
     gap: 8px;
   }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-textMuted, #999);
+    overflow: hidden;
+  }
+  .breadcrumb-segment {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .breadcrumb-sep {
+    display: flex;
+    align-items: center;
+    color: var(--color-textDim, #666);
+    flex-shrink: 0;
+  }
+
+  /* Transport controls */
+  .transport-group {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--color-border, #404040);
+    border-radius: 5px;
+    background: var(--color-bg, #1e1e1e);
+    overflow: hidden;
+  }
+  .transport-btn {
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid var(--color-border, #404040);
+    padding: 4px 8px;
+  }
+  .transport-btn:last-child {
+    border-right: none;
+  }
+  .transport-play {
+    padding: 4px 10px;
+  }
+  .transport-play:hover {
+    color: var(--color-accent, #007acc);
+    background: var(--color-bgPanel, #252525);
+  }
+
+  /* Mode badge */
   .mode-badge {
     padding: 2px 8px;
     background: var(--color-accent, #007acc);
@@ -244,5 +331,49 @@
   .viewport :global(.panel),
   .bottom-bar :global(.panel) {
     flex: 1;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    background: var(--color-bgHeader, #2d2d2d);
+    border-top: 1px solid var(--color-border, #404040);
+    font-size: 11px;
+    color: var(--color-textDim, #666);
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .status-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .status-center {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+  .status-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .status-item {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .status-divider {
+    width: 1px;
+    height: 12px;
+    background: var(--color-border, #404040);
+    flex-shrink: 0;
   }
 </style>
