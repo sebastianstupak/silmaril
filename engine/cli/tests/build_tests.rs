@@ -15,6 +15,7 @@ use silm::commands::build::{
 };
 
 use anyhow::Result;
+use engine_ops::NoopProgress;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -820,6 +821,7 @@ client_package = "my-client"
         false,
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -848,6 +850,7 @@ name = "my-game"
         true,
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -874,6 +877,7 @@ name = "my-game"
         false,
         None,
         true,
+        &NoopProgress,
     );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Unknown platform"));
@@ -898,6 +902,7 @@ name = "my-game"
         false,
         None,
         true,
+        &NoopProgress,
     );
     assert!(result.is_ok());
 }
@@ -920,6 +925,7 @@ name = "my-game"
         false,
         None,
         true,
+        &NoopProgress,
     );
     assert!(result.is_err());
 }
@@ -941,6 +947,7 @@ name = "my-game"
         false,
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -966,6 +973,7 @@ name = "my-game"
         false,
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -996,6 +1004,7 @@ name = "my-game"
         false,
         None,
         false, // DO run preflight
+        &NoopProgress,
     );
     // trunk is not installed, so we may get a tool error first;
     // but if trunk happens to be installed, we'd get the index.html error.
@@ -1027,6 +1036,7 @@ name = "my-game"
         false,
         None,
         false, // DO run preflight
+        &NoopProgress,
     );
     // cross is almost certainly not installed in CI/dev
     assert!(result.is_err());
@@ -1058,6 +1068,7 @@ platforms = ["native"]
         false,
         None,
         true,
+        &NoopProgress,
     );
     assert!(result.is_err());
     let msg = result.unwrap_err().to_string();
@@ -1087,6 +1098,7 @@ name = "my-game"
         false,
         None,
         true,
+        &NoopProgress,
     );
     assert!(result.is_ok());
     let cmds = commands.lock().unwrap();

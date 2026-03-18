@@ -1,739 +1,165 @@
-// TODO: These operations are duplicated in engine_ops::build.
-// The CLI should eventually delegate to engine_ops instead of
-// maintaining its own implementations. See: engine/ops/src/build/
+//! Build command -- thin CLI wrapper over engine_ops::build.
+//!
+//! The CLI owns clap structs, spinners (indicatif), and --watch mode.
+//! All build logic is delegated to engine_ops::build.
 
-//! Build command types, platform mapping, and runner abstraction.
-
-pub mod env;
-pub mod installer;
-pub mod native;
-pub mod package;
-pub mod wasm;
+#[allow(unused_imports)]
+pub use engine_ops::build::{
+    build_all_platforms, check_docker, check_tool, dist_dir_name, host_target_triple,
+    parse_dev_section, parse_project_name, parse_project_version, platform_from_str, BuildKind,
+    BuildRunner, BuildTool, Platform, RealRunner, KNOWN_PLATFORMS,
+};
+#[allow(unused_imports)]
+pub use engine_ops::build::{env, installer, native, package, wasm};
 
 use anyhow::{bail, Result};
 use clap::Args;
+use engine_ops::ProgressSink;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use tracing::{info, warn};
 
-// ============================================================================
-// Build Tool / Kind enums
-// ============================================================================
-
-/// Which build tool to use for a given platform.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuildTool {
-    Cargo,
-    Cross,
-    Trunk,
-}
-
-/// What binaries to produce.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuildKind {
-    ServerAndClient,
-    ServerOnly,
-    ClientOnly,
-}
-
-// ============================================================================
-// Platform
-// ============================================================================
-
-/// A build target platform with all its resolved properties.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Platform {
-    name: String,
-    target_triple: String,
-    tool: BuildTool,
-    kind: BuildKind,
-    experimental: bool,
-    uses_exe_extension: bool,
-}
-
-impl Platform {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn target_triple(&self) -> &str {
-        &self.target_triple
-    }
-
-    pub fn build_tool(&self) -> BuildTool {
-        self.tool
-    }
-
-    pub fn build_kind(&self) -> BuildKind {
-        self.kind
-    }
-
-    pub fn is_experimental(&self) -> bool {
-        self.experimental
-    }
-
-    pub fn uses_exe_extension(&self) -> bool {
-        self.uses_exe_extension
-    }
-}
-
-/// All known platform name strings.
-pub const KNOWN_PLATFORMS: &[&str] = &[
-    "native",
-    "server",
-    "windows-x86_64",
-    "linux-x86_64",
-    "linux-arm64",
-    "macos-x86_64",
-    "macos-arm64",
-    "wasm",
-];
-
-/// Returns the host target triple based on runtime arch and OS.
-pub fn host_target_triple() -> String {
-    let arch = std::env::consts::ARCH;
-    let os = std::env::consts::OS;
-
-    match (arch, os) {
-        ("x86_64", "windows") => "x86_64-pc-windows-msvc".to_string(),
-        ("x86_64", "linux") => "x86_64-unknown-linux-gnu".to_string(),
-        ("x86_64", "macos") => "x86_64-apple-darwin".to_string(),
-        ("aarch64", "linux") => "aarch64-unknown-linux-gnu".to_string(),
-        ("aarch64", "macos") => "aarch64-apple-darwin".to_string(),
-        _ => format!("{arch}-unknown-{os}"),
-    }
-}
-
-fn is_windows_host() -> bool {
-    std::env::consts::OS == "windows"
-}
-
-/// Resolve a platform name to a fully populated [`Platform`].
-pub fn platform_from_str(name: &str) -> Result<Platform> {
-    let on_windows = is_windows_host();
-
-    match name {
-        "native" => Ok(Platform {
-            name: "native".into(),
-            target_triple: host_target_triple(),
-            tool: BuildTool::Cargo,
-            kind: BuildKind::ServerAndClient,
-            experimental: false,
-            uses_exe_extension: on_windows,
-        }),
-        "server" => Ok(Platform {
-            name: "server".into(),
-            target_triple: host_target_triple(),
-            tool: BuildTool::Cargo,
-            kind: BuildKind::ServerOnly,
-            experimental: false,
-            uses_exe_extension: on_windows,
-        }),
-        "windows-x86_64" => Ok(Platform {
-            name: "windows-x86_64".into(),
-            target_triple: if on_windows {
-                "x86_64-pc-windows-msvc".into()
-            } else {
-                "x86_64-pc-windows-gnu".into()
-            },
-            tool: if on_windows {
-                BuildTool::Cargo
-            } else {
-                BuildTool::Cross
-            },
-            kind: BuildKind::ServerAndClient,
-            experimental: false,
-            uses_exe_extension: true,
-        }),
-        "linux-x86_64" => Ok(Platform {
-            name: "linux-x86_64".into(),
-            target_triple: "x86_64-unknown-linux-gnu".into(),
-            tool: BuildTool::Cross,
-            kind: BuildKind::ServerAndClient,
-            experimental: false,
-            uses_exe_extension: false,
-        }),
-        "linux-arm64" => Ok(Platform {
-            name: "linux-arm64".into(),
-            target_triple: "aarch64-unknown-linux-gnu".into(),
-            tool: BuildTool::Cross,
-            kind: BuildKind::ServerAndClient,
-            experimental: false,
-            uses_exe_extension: false,
-        }),
-        "macos-x86_64" => Ok(Platform {
-            name: "macos-x86_64".into(),
-            target_triple: "x86_64-apple-darwin".into(),
-            tool: BuildTool::Cross,
-            kind: BuildKind::ServerAndClient,
-            experimental: true,
-            uses_exe_extension: false,
-        }),
-        "macos-arm64" => Ok(Platform {
-            name: "macos-arm64".into(),
-            target_triple: "aarch64-apple-darwin".into(),
-            tool: BuildTool::Cross,
-            kind: BuildKind::ServerAndClient,
-            experimental: true,
-            uses_exe_extension: false,
-        }),
-        "wasm" => Ok(Platform {
-            name: "wasm".into(),
-            target_triple: "wasm32-unknown-unknown".into(),
-            tool: BuildTool::Trunk,
-            kind: BuildKind::ClientOnly,
-            experimental: false,
-            uses_exe_extension: false,
-        }),
-        unknown => bail!("Unknown platform: '{unknown}'. Known platforms: {}", KNOWN_PLATFORMS.join(", ")),
-    }
-}
-
-/// Returns the distribution directory name for a platform (same as platform name).
-#[allow(dead_code)] // Used in tests and by package.rs indirectly via platform.name()
-pub fn dist_dir_name(platform: &Platform) -> &str {
-    &platform.name
-}
-
-// ============================================================================
-// BuildRunner trait + RealRunner
-// ============================================================================
-
-/// Abstraction over running external commands, enabling test mocking.
-pub trait BuildRunner {
-    fn run_command(
-        &self,
-        program: &str,
-        args: &[String],
-        env: &HashMap<String, String>,
-        cwd: &Path,
-    ) -> Result<()>;
-}
-
-/// Real implementation that spawns OS processes.
-pub struct RealRunner;
-
-impl BuildRunner for RealRunner {
-    fn run_command(
-        &self,
-        program: &str,
-        args: &[String],
-        env: &HashMap<String, String>,
-        cwd: &Path,
-    ) -> Result<()> {
-        info!("[silm] running: {} {}", program, args.join(" "));
-        let status = Command::new(program)
-            .args(args)
-            .envs(env)
-            .current_dir(cwd)
-            .status()?;
-
-        if !status.success() {
-            bail!(
-                "{} exited with status {}",
-                program,
-                status.code().unwrap_or(-1)
-            );
-        }
-        Ok(())
-    }
-}
-
-/// Check that a CLI tool is available by running `tool --version`.
-pub fn check_tool(tool: &str) -> Result<()> {
-    let result = Command::new(tool).arg("--version").output();
-    match result {
-        Ok(output) if output.status.success() => Ok(()),
-        _ => bail!("{tool} not found — install: cargo install {tool}"),
-    }
-}
-
-/// Check that Docker is running by executing `docker info`.
-pub fn check_docker() -> Result<()> {
-    let result = Command::new("docker").arg("info").output();
-    match result {
-        Ok(output) if output.status.success() => Ok(()),
-        _ => bail!("Docker is not running — start Docker Desktop, then retry"),
-    }
-}
-
-// ============================================================================
-// Clap command structs
-// ============================================================================
-
-/// Build the game for one or more target platforms.
 #[derive(Args, Debug)]
 pub struct BuildCommand {
-    /// Target platform(s) (e.g. native, wasm, linux-x86_64). Repeatable. Defaults to game.toml [build] platforms.
     #[arg(long, num_args = 1..)]
     pub platform: Option<Vec<String>>,
-
-    /// Build in release mode with optimizations.
     #[arg(long)]
     pub release: bool,
-
-    /// Watch for file changes and rebuild automatically.
     #[arg(long)]
     pub watch: bool,
-
-    /// Path to an additional .env file whose variables are passed to builds.
     #[arg(long)]
     pub env_file: Option<String>,
 }
 
-/// Package built artefacts for distribution.
 #[derive(Args, Debug)]
 pub struct PackageCommand {
-    /// Target platform(s) to package. Repeatable. Defaults to game.toml [build] platforms.
     #[arg(long, num_args = 1..)]
     pub platform: Option<Vec<String>>,
-
-    /// Output directory for packaged artefacts.
     #[arg(long)]
     pub out_dir: Option<String>,
-
-    /// Generate native installers (AppImage/DMG/NSIS) via cargo-packager.
     #[arg(long)]
     pub installer: bool,
 }
 
-// ============================================================================
-// game.toml parsing helpers
-// ============================================================================
-
-/// Parse `[dev]` section from game.toml, returning `(server_package, client_package)`.
-///
-/// Falls back to `"{project_name}-server"` / `"{project_name}-client"` when keys are absent.
-pub fn parse_dev_section(game_toml_content: &str, project_name: &str) -> (String, String) {
-    let table: toml::Value = match game_toml_content.parse() {
-        Ok(v) => v,
-        Err(_) => {
-            return (
-                format!("{project_name}-server"),
-                format!("{project_name}-client"),
-            )
-        }
-    };
-
-    let dev = table.get("dev");
-
-    let server_package = dev
-        .and_then(|d| d.get("server_package"))
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| format!("{project_name}-server"));
-
-    let client_package = dev
-        .and_then(|d| d.get("client_package"))
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| format!("{project_name}-client"));
-
-    (server_package, client_package)
-}
-
-/// Parse the project name from `[project] name` in game.toml.
-pub fn parse_project_name(game_toml_content: &str) -> Option<String> {
-    let table: toml::Value = game_toml_content.parse().ok()?;
-    table
-        .get("project")
-        .and_then(|p| p.get("name"))
-        .and_then(|v| v.as_str())
-        .map(String::from)
-}
-
-/// Parse the project version from `[project] version` in game.toml.
-///
-/// Returns `"0.0.0"` if the field is absent or the file cannot be parsed.
-pub fn parse_project_version(game_toml_content: &str) -> String {
-    let table: toml::Value = match game_toml_content.parse() {
-        Ok(v) => v,
-        Err(_) => return "0.0.0".into(),
-    };
-
-    table
-        .get("project")
-        .and_then(|p| p.get("version"))
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| "0.0.0".into())
-}
-
-// ============================================================================
-// Build orchestration
-// ============================================================================
-
-/// Run pre-flight checks for a platform (tool availability, required files/env).
-fn preflight_checks(project_root: &Path, platform: &Platform) -> Result<()> {
-    match platform.build_tool() {
-        BuildTool::Trunk => {
-            check_tool("trunk")?;
-            if !project_root.join("client/index.html").exists() {
-                bail!("WASM build requires client/index.html — not found");
-            }
-        }
-        BuildTool::Cross => {
-            check_tool("cross")?;
-            check_docker()?;
-            if platform.name().starts_with("macos-") {
-                if std::env::var("MACOS_SDK_URL").is_err() {
-                    bail!("macOS cross-build requires MACOS_SDK_URL");
-                }
-            }
-        }
-        BuildTool::Cargo => {
-            // cargo is assumed available (we're running from cargo)
-        }
-    }
-    Ok(())
-}
-
-/// Build a single platform, handling tool checks and dispatch.
-#[allow(clippy::too_many_arguments)]
-fn build_platform(
-    runner: &dyn BuildRunner,
-    project_root: &Path,
-    env: &HashMap<String, String>,
-    server_package: &str,
-    client_package: &str,
-    platform: &Platform,
-    release: bool,
-    skip_preflight: bool,
-) -> Result<()> {
-    info!(
-        platform = %platform.name(),
-        tool = ?platform.build_tool(),
-        "Building platform"
-    );
-
-    if !skip_preflight {
-        preflight_checks(project_root, platform)?;
-    }
-
-    match platform.build_tool() {
-        BuildTool::Trunk => {
-            wasm::build_wasm(runner, project_root, env, release)
-        }
-        tool => {
-            let target = if tool == BuildTool::Cross || platform.target_triple() != host_target_triple() {
-                Some(platform.target_triple())
-            } else {
-                None
-            };
-
-            native::build_native(
-                runner,
-                project_root,
-                env,
-                server_package,
-                client_package,
-                tool,
-                target,
-                platform.build_kind(),
-                release,
-            )
-        }
-    }
-}
-
-/// Build all specified platforms.
-///
-/// This is the main testable orchestration function. It:
-/// 1. Parses project name, dev section, env vars from game.toml
-/// 2. For each platform: resolves via [`platform_from_str`], runs pre-flight checks,
-///    dispatches to [`native::build_native`] or [`wasm::build_wasm`]
-/// 3. macOS (experimental) failures are non-fatal (warn + continue), other failures are fatal
-///
-/// Set `skip_preflight` to `true` in tests to avoid real tool-availability checks.
-#[allow(clippy::too_many_arguments)]
-pub fn build_all_platforms(
-    runner: &dyn BuildRunner,
-    project_root: &Path,
-    game_toml_content: &str,
-    platform_names: &[String],
-    release: bool,
-    env_file_path: Option<&Path>,
-    skip_preflight: bool,
-) -> Result<()> {
-    let project_name = parse_project_name(game_toml_content)
-        .ok_or_else(|| anyhow::anyhow!("game.toml is missing [project] name"))?;
-
-    let (server_package, client_package) = parse_dev_section(game_toml_content, &project_name);
-
-    // Build env from game.toml [build.env]
-    let build_env = env::parse_build_env(game_toml_content);
-
-    // Load .env file if present
-    let dotenv_path = project_root.join(".env");
-    let dotenv = if dotenv_path.is_file() {
-        let content = std::fs::read_to_string(&dotenv_path).unwrap_or_default();
-        env::parse_env_file(&content)
-    } else {
-        Vec::new()
-    };
-
-    // Load explicit --env-file if provided
-    let env_file_entries = if let Some(path) = env_file_path {
-        let content = std::fs::read_to_string(path)?;
-        env::parse_env_file(&content)
-    } else {
-        Vec::new()
-    };
-
-    let merged_env = env::merge_env(&build_env, &dotenv, &env_file_entries);
-
-    for name in platform_names {
-        let platform = platform_from_str(name)?;
-
-        let result = build_platform(
-            runner,
-            project_root,
-            &merged_env,
-            &server_package,
-            &client_package,
-            &platform,
-            release,
-            skip_preflight,
-        );
-
-        if let Err(e) = result {
-            if platform.is_experimental() {
-                warn!(
-                    platform = %platform.name(),
-                    error = %e,
-                    "Experimental platform build failed (non-fatal)"
-                );
-            } else {
-                return Err(e);
-            }
-        }
-    }
-
-    Ok(())
+struct SpinnerProgress<'a> { spinner: &'a ProgressBar }
+impl ProgressSink for SpinnerProgress<'_> {
+    fn on_start(&self, _: &str, _: usize) {}
+    fn on_step(&self, _: &str, _: usize, msg: &str) { self.spinner.set_message(msg.to_string()); }
+    fn on_done(&self, _: &str, _: bool) {}
 }
 
 fn make_spinner(message: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::with_template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", "✓"]),
-    );
+    pb.set_style(ProgressStyle::with_template("{spinner:.cyan} {msg}").unwrap()
+        .tick_strings(&["\u{280b}","\u{2819}","\u{2839}","\u{2838}","\u{283c}","\u{2834}","\u{2826}","\u{2827}","\u{2807}","\u{280f}","\u{2713}"]));
     pb.set_message(message.to_string());
     pb.enable_steady_tick(std::time::Duration::from_millis(80));
     pb
 }
 
-/// Entry point for `silm build` called from the CLI.
-///
-/// Reads game.toml, resolves platforms, and delegates to [`build_all_platforms`].
 pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<()> {
     let game_toml_path = project_root.join("game.toml");
     let game_toml_content = std::fs::read_to_string(&game_toml_path)
         .map_err(|e| anyhow::anyhow!("Failed to read game.toml: {e}"))?;
-
     let platform_names: Vec<String> = if let Some(ref platforms) = cmd.platform {
         platforms.clone()
     } else {
         env::parse_build_section(&game_toml_content)
-            .ok_or_else(|| anyhow::anyhow!(
-                "no platforms specified — add [build] platforms = [...] to game.toml, or use --platform <name>"
-            ))?
+            .ok_or_else(|| anyhow::anyhow!("no platforms specified -- add [build] platforms = [...] to game.toml, or use --platform <name>"))?
     };
-
-    let spinner = make_spinner(&format!(
-        "building {} platform(s)...",
-        platform_names.len()
-    ));
-
+    let spinner = make_spinner(&format!("building {} platform(s)...", platform_names.len()));
     let env_file_path = cmd.env_file.as_ref().map(PathBuf::from);
-
-    let result = build_all_platforms(
-        &RealRunner,
-        &project_root,
-        &game_toml_content,
-        &platform_names,
-        cmd.release,
-        env_file_path.as_deref(),
-        false,
-    );
-
+    let progress = SpinnerProgress { spinner: &spinner };
+    let result = build_all_platforms(&RealRunner, &project_root, &game_toml_content, &platform_names, cmd.release, env_file_path.as_deref(), false, &progress);
     match &result {
         Ok(()) => spinner.finish_with_message(format!("built {} platform(s)", platform_names.len())),
         Err(e) => spinner.finish_with_message(format!("build failed: {e}")),
     }
-
-    if !cmd.watch {
-        return result;
-    }
-
-    // Watch mode: rebuild on file changes
-    result.ok(); // Don't fail on initial build error in watch mode
+    if !cmd.watch { return result; }
+    result.ok();
     info!("[silm] watching for changes... (Ctrl+C to stop)");
-
     use notify_debouncer_full::{new_debouncer, notify::{RecursiveMode, Watcher}};
     use std::sync::mpsc;
     use std::time::Duration;
-
     let (tx, rx) = mpsc::channel();
     let mut debouncer = new_debouncer(Duration::from_millis(500), None, tx)
         .map_err(|e| anyhow::anyhow!("failed to start file watcher: {e}"))?;
-
     for dir in &["shared", "server", "client", "assets"] {
         let watch_dir = project_root.join(dir);
-        if watch_dir.is_dir() {
-            debouncer.watcher().watch(&watch_dir, RecursiveMode::Recursive).ok();
-        }
+        if watch_dir.is_dir() { debouncer.watcher().watch(&watch_dir, RecursiveMode::Recursive).ok(); }
     }
-
     loop {
         match rx.recv() {
             Ok(Ok(_events)) => {
                 let spinner = make_spinner("rebuilding...");
-                let game_toml_content = std::fs::read_to_string(&game_toml_path)
-                    .unwrap_or_default();
+                let game_toml_content = std::fs::read_to_string(&game_toml_path).unwrap_or_default();
                 let env_file_path = cmd.env_file.as_ref().map(PathBuf::from);
-                let result = build_all_platforms(
-                    &RealRunner,
-                    &project_root,
-                    &game_toml_content,
-                    &platform_names,
-                    cmd.release,
-                    env_file_path.as_deref(),
-                    false,
-                );
+                let progress = SpinnerProgress { spinner: &spinner };
+                let result = build_all_platforms(&RealRunner, &project_root, &game_toml_content, &platform_names, cmd.release, env_file_path.as_deref(), false, &progress);
                 match &result {
                     Ok(()) => spinner.finish_with_message("rebuild complete"),
                     Err(e) => spinner.finish_with_message(format!("rebuild failed: {e}")),
                 }
             }
-            Ok(Err(errors)) => {
-                for e in errors {
-                    warn!(error = ?e, "watch error");
-                }
-            }
-            Err(_) => break, // Channel closed
+            Ok(Err(errors)) => { for e in errors { warn!(error = ?e, "watch error"); } }
+            Err(_) => break,
         }
     }
-
     Ok(())
 }
 
-/// Entry point for `silm package` called from the CLI.
-///
-/// Reads game.toml, triggers a release build via [`handle_build_command`],
-/// then assembles distribution directories and creates zip archives for
-/// each target platform.
 pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Result<()> {
     let game_toml_path = project_root.join("game.toml");
     let game_toml_content = std::fs::read_to_string(&game_toml_path)
         .map_err(|e| anyhow::anyhow!("Failed to read game.toml: {e}"))?;
-
     let project_name = parse_project_name(&game_toml_content)
         .ok_or_else(|| anyhow::anyhow!("game.toml is missing [project] name"))?;
     let version = parse_project_version(&game_toml_content);
-
     let platform_names: Vec<String> = if let Some(ref platforms) = cmd.platform {
         platforms.clone()
     } else {
         env::parse_build_section(&game_toml_content)
-            .ok_or_else(|| anyhow::anyhow!(
-                "no platforms specified — add [build] platforms = [...] to game.toml, or use --platform <name>"
-            ))?
+            .ok_or_else(|| anyhow::anyhow!("no platforms specified -- add [build] platforms = [...] to game.toml, or use --platform <name>"))?
     };
-
-    // Build in release mode first
-    let build_cmd = BuildCommand {
-        platform: cmd.platform.clone(),
-        release: true,
-        env_file: None,
-        watch: false,
-    };
+    let build_cmd = BuildCommand { platform: cmd.platform.clone(), release: true, env_file: None, watch: false };
     handle_build_command(build_cmd, project_root.clone())?;
-
-    let out_dir = cmd
-        .out_dir
-        .as_ref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| project_root.clone());
-
-    // Build env entries for server Dockerfile
+    let out_dir = cmd.out_dir.as_ref().map(PathBuf::from).unwrap_or_else(|| project_root.clone());
     let build_env = env::parse_build_env(&game_toml_content);
-
-    let spinner = make_spinner(&format!(
-        "packaging {} platform(s)...",
-        platform_names.len()
-    ));
-
+    let spinner = make_spinner(&format!("packaging {} platform(s)...", platform_names.len()));
     for name in &platform_names {
         let platform = platform_from_str(name)?;
-
         spinner.set_message(format!("packaging {}...", name));
-
         let dist_dir = if name == "wasm" {
-            // Trunk already outputs to dist/wasm, just zip it
             let wasm_dist = project_root.join("dist").join("wasm");
-            if !wasm_dist.is_dir() {
-                bail!("dist/wasm/ not found — did the WASM build succeed?");
-            }
+            if !wasm_dist.is_dir() { bail!("dist/wasm/ not found -- did the WASM build succeed?"); }
             wasm_dist
         } else if name == "server" {
-            package::assemble_server_dist(
-                &project_root,
-                &build_env,
-                platform.uses_exe_extension(),
-            )?
+            package::assemble_server_dist(&project_root, &build_env, platform.uses_exe_extension())?
         } else {
             let (server_bin, client_bin) = match platform.build_kind() {
                 BuildKind::ServerAndClient => (true, true),
                 BuildKind::ServerOnly => (true, false),
                 BuildKind::ClientOnly => (false, true),
             };
-
-            let target_triple = if platform.target_triple() != host_target_triple() {
-                Some(platform.target_triple())
-            } else {
-                None
-            };
-
-            package::assemble_native_dist(
-                &project_root,
-                name,
-                target_triple,
-                server_bin,
-                client_bin,
-                platform.uses_exe_extension(),
-            )?
+            let target_triple = if platform.target_triple() != host_target_triple() { Some(platform.target_triple()) } else { None };
+            package::assemble_native_dist(&project_root, name, target_triple, server_bin, client_bin, platform.uses_exe_extension())?
         };
-
-        // Create zip
         let zip_name = package::zip_filename(&project_name, &version, name);
         let zip_path = out_dir.join(&zip_name);
         package::create_zip(&dist_dir, &zip_path)?;
         info!(zip = %zip_name, "Package complete");
     }
-
     spinner.finish_with_message(format!("packaged {} platform(s)", platform_names.len()));
-
-    // Generate native installers if requested
     if cmd.installer {
         match installer::check_packager() {
             Ok(()) => {
                 let description = "A game built with Silmaril";
-                let config = installer::generate_packager_config(
-                    &project_name, &version, description, "client",
-                );
+                let config = installer::generate_packager_config(&project_name, &version, description, "client");
                 std::fs::write(project_root.join("packager.toml"), &config)?;
                 installer::run_packager(&project_root)?;
             }
-            Err(e) => {
-                info!("{}", e);
-                info!("[silm] skipping installer generation");
-            }
+            Err(e) => { info!("{}", e); info!("[silm] skipping installer generation"); }
         }
     }
-
     Ok(())
 }

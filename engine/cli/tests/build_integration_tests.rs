@@ -12,6 +12,7 @@ use silm::commands::build::wasm::build_wasm;
 use silm::commands::build::{build_all_platforms, platform_from_str, BuildRunner};
 
 use anyhow::Result;
+use engine_ops::NoopProgress;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -123,6 +124,7 @@ fn test_build_native_captures_cargo() {
         false,
         None,
         true, // skip_preflight
+        &NoopProgress,
     )
     .unwrap();
 
@@ -157,6 +159,7 @@ fn test_build_native_release_flag() {
         true, // release
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -248,6 +251,7 @@ client_package = "env-test-client"
         false,
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -286,6 +290,7 @@ fn test_build_env_from_game_toml() {
         false,
         None,
         true,
+        &NoopProgress,
     )
     .unwrap();
 
@@ -345,6 +350,7 @@ name = "priority-test"
         false,
         Some(env_file.as_path()),
         true,
+        &NoopProgress,
     )
     .unwrap();
 
