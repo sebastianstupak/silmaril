@@ -1,6 +1,7 @@
-@import "tailwindcss";
+/* Silmaril Editor global styles */
+/* Uses CSS custom properties from theme system — no Tailwind needed */
 
-@theme {
+:root {
   --color-background: var(--color-bg, #1e1e1e);
   --color-foreground: var(--color-text, #cccccc);
   --color-muted: var(--color-bgHeader, #2d2d2d);
@@ -15,12 +16,16 @@
   --color-primary-foreground: #fff;
   --color-secondary: var(--color-bgHeader, #2d2d2d);
   --color-secondary-foreground: var(--color-text, #cccccc);
-  --color-accent: var(--color-bgHeader, #2d2d2d);
+  --color-accent-ui: var(--color-bgHeader, #2d2d2d);
   --color-accent-foreground: var(--color-text, #cccccc);
   --color-destructive: var(--color-error, #f44336);
   --color-destructive-foreground: #fff;
   --color-ring: var(--color-accent, #007acc);
   --radius: 0.375rem;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 html, body {
@@ -31,4 +36,5 @@ html, body {
   background: var(--color-bg, #1e1e1e);
   color: var(--color-text, #cccccc);
   font-family: var(--font-body, system-ui, -apple-system, sans-serif);
+  font-size: 13px;
 }
