@@ -59,18 +59,63 @@ CLI implements with indicatif spinners. Editor implements by emitting Tauri even
 
 Extract all operations from `engine/cli/src/commands/` into a standalone crate with no CLI framework dependency.
 
-| Module | Operations |
-|--------|-----------|
-| `ops::project` | `create_project`, `load_project_config`, `find_project_root` |
-| `ops::codegen` | `add_component`, `add_system` |
-| `ops::module` | `add_module`, `remove_module`, `list_modules` |
-| `ops::build` | `build_platforms`, `package_platforms`, env merging, platform resolution |
-| `ops::scene` | `save_scene`, `load_scene`, `scene_to_bincode` |
-| `ops::world` | `create_entity`, `delete_entity`, `set_component`, `query_entities` |
+| Module | Operations | Maps to CLI source |
+|--------|-----------|-------------------|
+| `ops::project` | `create_project`, `load_project_config`, `find_project_root` | `commands/new.rs`, `commands/template.rs`, `commands/add/wiring.rs` |
+| `ops::codegen` | `add_component`, `add_system` | `commands/add/component.rs`, `commands/add/system.rs`, `codegen/*` |
+| `ops::module` | `add_module`, `remove_module`, `list_modules` | `commands/add/module.rs`, `commands/module/*` |
+| `ops::build` | `build_platforms`, `package_platforms`, env merging, platform resolution, WASM builds (trunk), native/cross builds, installer generation | `commands/build/mod.rs`, `env.rs`, `native.rs`, `wasm.rs`, `package.rs`, `installer.rs` |
+| `ops::scene` | `save_scene`, `load_scene`, `scene_to_bincode` | New (uses existing `WorldState` serialization) |
+| `ops::undo` | `UndoStack`, `EditorAction`, execute/reverse logic | New (shared so both editor and future frontends can use it) |
 
-**What stays in `engine/cli`:** Clap structs, `main()` dispatch, spinners, terminal formatting.
+**Editor-only (not in ops):**
 
-**What's new in `engine/editor`:** Tauri commands (thin wrappers over ops), subscription bridge, viewport, undo stack, plugin loader.
+| Module | Responsibility |
+|--------|---------------|
+| `editor::world` | Live ECS world management — `create_entity`, `delete_entity`, `set_component`, `query_entities`. These operate on an in-memory `World` and are editor-specific. The CLI does not maintain a live world. |
+| `editor::viewport` | Vulkan surface, render loop, entity picking |
+| `editor::bridge` | Tauri commands, subscriptions, events |
+| `editor::plugins` | Panel plugin loader and registry |
+
+**`silm dev` stays CLI-only.** The editor's play mode is architecturally different from `silm dev` (which manages external processes). The editor runs the game loop in-process. The dev command's file watcher (`commands/dev/watcher.rs`) may be reused by `silm build --watch` via `ops::build`, but the dev orchestrator, process manager, and reload client stay in the CLI.
+
+**What stays in `engine/cli`:** Clap structs, `main()` dispatch, spinners, terminal formatting, `silm dev` command.
+
+**What's new in `engine/editor`:** Tauri commands (thin wrappers over ops + editor-only modules), subscription bridge, viewport, plugin loader.
+
+### Error Types
+
+Per CLAUDE.md, both new crates define custom error types with reserved code ranges:
+
+```rust
+// engine/ops — error codes 2200-2299
+define_error! {
+    pub enum OpsError {
+        ProjectNotFound { path: String } = ErrorCode::OpsProjectNotFound, ErrorSeverity::Error,
+        GameTomlInvalid { reason: String } = ErrorCode::OpsGameTomlInvalid, ErrorSeverity::Error,
+        BuildFailed { platform: String, reason: String } = ErrorCode::OpsBuildFailed, ErrorSeverity::Error,
+        ToolNotFound { tool: String } = ErrorCode::OpsToolNotFound, ErrorSeverity::Error,
+        SceneParseFailed { path: String, reason: String } = ErrorCode::OpsSceneParseFailed, ErrorSeverity::Error,
+        ModuleNotFound { name: String } = ErrorCode::OpsModuleNotFound, ErrorSeverity::Error,
+        CodegenFailed { reason: String } = ErrorCode::OpsCodegenFailed, ErrorSeverity::Error,
+    }
+}
+
+// engine/editor — error codes 2300-2399
+define_error! {
+    pub enum EditorError {
+        ViewportInitFailed { reason: String } = ErrorCode::EditorViewportInit, ErrorSeverity::Critical,
+        PluginLoadFailed { name: String, reason: String } = ErrorCode::EditorPluginLoad, ErrorSeverity::Error,
+        UndoStackEmpty = ErrorCode::EditorUndoEmpty, ErrorSeverity::Warning,
+        RedoStackEmpty = ErrorCode::EditorRedoEmpty, ErrorSeverity::Warning,
+        SubscriptionUnknown { channel: String } = ErrorCode::EditorSubUnknown, ErrorSeverity::Error,
+        EntityNotFound { id: String } = ErrorCode::EditorEntityNotFound, ErrorSeverity::Error,
+        SceneSaveFailed { reason: String } = ErrorCode::EditorSceneSave, ErrorSeverity::Error,
+    }
+}
+```
+
+**Note:** `engine/ops` uses custom `OpsError` (not `anyhow`). The CLI wraps `OpsError` into `anyhow` at the CLI boundary. The editor wraps it into `EditorError` or returns it via Tauri command error handling.
 
 ---
 
@@ -124,10 +169,23 @@ Svelte subscribes to channels. Rust pushes data only for active subscriptions, t
 
 ```rust
 pub struct SubscriptionConfig {
-    pub entity_id: Option<EntityId>,
-    pub throttle_ms: Option<u64>,
+    pub entity_id: Option<EntityId>,  // filter to specific entity (None = all)
+    pub throttle_ms: Option<u64>,     // minimum push interval
 }
+
+// Returns a subscription ID for targeted unsubscribe
+subscribe(channel, config) -> SubscriptionId
+unsubscribe(subscription_id: SubscriptionId)
 ```
+
+**Subscription lifecycle:**
+- `subscribe()` returns a `SubscriptionId` (u64). Multiple subscriptions on the same channel with different filters are allowed.
+- `unsubscribe(id)` removes a specific subscription.
+- **Auto-cleanup:** The SDK (`@silmaril/editor-sdk`) wraps subscriptions in a Svelte `onDestroy` hook. When a panel unmounts, all its subscriptions are automatically unsubscribed.
+- **Mode transitions:** Subscriptions survive Edit -> Play -> Pause -> Stop. The Rust side simply has no data to push in Edit mode (no game loop), so subscriptions idle.
+- **Error delivery:** If a subscription callback fails (e.g., serialization error), the error is emitted on a separate `subscription:error` channel.
+
+**Known limitation (Phase 0.8):** `entity_id` filters to a single entity. Filtering by component type or entity set is deferred.
 
 | Channel | Data | When |
 |---------|------|------|
@@ -143,6 +201,7 @@ pub struct SubscriptionConfig {
 
 ```rust
 struct Subscription {
+    id: SubscriptionId,
     channel: String,
     filter: Option<EntityId>,
     throttle: Duration,
@@ -151,6 +210,10 @@ struct Subscription {
 ```
 
 Rust checks elapsed time since last push per subscription. Skips if throttle hasn't elapsed. Keeps IPC bounded regardless of game tick rate.
+
+### Tracing Bridge
+
+The `console:log` channel is fed by a custom `tracing` subscriber. The editor registers a `TracingBridge` subscriber that captures `tracing` spans/events and pushes them to subscriptions on the `console:log` channel. This means all engine `tracing::info!` / `tracing::warn!` / `tracing::error!` calls automatically appear in the editor console panel.
 
 ---
 
@@ -221,9 +284,9 @@ Supported field types: `f32`, `i32`, `bool`, `String`, `enum`, `Vec3`, `Color`, 
 
 Editor auto-generates Svelte UI from the schema via a generic `<SchemaPanel>` component.
 
-### Tier 2: Rust `panel!` macro
+### Tier 2: Rust `panel!` macro (Phase 4.9)
 
-Declarative, more control, still no JS:
+Declarative, more control, still no JS. The macro expands to a build-script-generated JSON descriptor file (`<crate>/editor-panel.json`) that is functionally equivalent to Tier 1 schema metadata. The editor loads this JSON the same way it loads Tier 1 schemas.
 
 ```rust
 use silmaril_editor::panel;
@@ -234,9 +297,10 @@ panel! {
         slider "Base Damage" => combat.base_damage { range: 0.0..100.0 },
         dropdown "Type" => combat.damage_type { options: ["Physical", "Magical", "True"] },
     }
-    custom "Combo Editor" => "assets/editor/combo-editor.js",
 }
 ```
+
+**Note:** The `custom` escape hatch (loading a JS bundle from within a Tier 2 macro) is removed. If a module needs JS, it should use Tier 3 directly. Mixing tiers in one module is confusing.
 
 ### Tier 3: Full Svelte (via `silm editor panel`)
 
@@ -267,12 +331,22 @@ Provides to Tier 3 plugin authors:
 - Typed API: `getComponent()`, `setComponent()`, `subscribe()`, `undo()`
 - Vite build config for producing loadable bundles
 
+### Tier 3 Sandboxing
+
+Tier 3 JS bundles are loaded inside an `<iframe>` with `sandbox="allow-scripts"`. The iframe communicates with the parent Svelte app via `postMessage`. The SDK wraps `postMessage` into typed API calls (`getComponent()`, `setComponent()`, `subscribe()`).
+
+**Allowed inside iframe:** JavaScript execution, SDK API calls (proxied to Rust via parent).
+**Blocked:** Direct filesystem access, `invoke()` calls, `fetch()` to arbitrary URLs, DOM access outside the iframe.
+
+Core module panels (hierarchy, inspector, viewport, console) are **not sandboxed** — they are compiled directly into the editor Svelte app since they are first-party and need full access to the Tauri bridge.
+
 ### Plugin loading
 
 1. On project open, read `game.toml [modules]`
 2. For each module, read `Cargo.toml [package.metadata.silmaril.editor]`
-3. Tier 1/2: render via `<SchemaPanel>` component
-4. Tier 3: load JS bundle via `<PluginFrame>` component (sandboxed)
+3. If `panel_title` exists but no `panel_bundle` → Tier 1 schema, render via `<SchemaPanel>`
+4. If `panel_bundle` path exists → Tier 3, load via `<PluginFrame>` (iframe sandboxed)
+5. If `editor-panel.json` exists in crate (generated by Tier 2 macro) → treat as Tier 1
 
 ### Core modules provide their own panels
 
@@ -330,14 +404,15 @@ engine/editor/
 │   │   ├── mod.rs                    <- EditorBridge
 │   │   ├── commands.rs               <- #[tauri::command] handlers
 │   │   ├── subscriptions.rs          <- Subscription tracking, throttling
-│   │   └── events.rs                 <- Event emission helpers
+│   │   ├── events.rs                 <- Event emission helpers
+│   │   └── tracing_bridge.rs         <- Custom tracing subscriber -> console:log
 │   ├── viewport/
 │   │   ├── mod.rs                    <- Vulkan surface from raw window handle
 │   │   ├── render_loop.rs            <- Edit/play/pause rendering
 │   │   └── picking.rs               <- Entity picking
-│   ├── undo/
-│   │   ├── mod.rs                    <- UndoStack
-│   │   └── actions.rs               <- EditorAction enum, execute/reverse
+│   ├── world/
+│   │   ├── mod.rs                    <- Live ECS world (editor-only, not in ops)
+│   │   └── queries.rs               <- Entity/component query helpers
 │   ├── plugins/
 │   │   ├── mod.rs                    <- Plugin loader
 │   │   ├── schema_renderer.rs        <- Schema -> component props
@@ -385,9 +460,9 @@ engine/cli/editor/                <- Console + Build panels (Tier 3)
 
 ### Layer 1: `engine/ops` unit tests (CI — fast, no GPU)
 
-Pure logic, mocked ProgressSink:
+Pure logic, mocked ProgressSink. UndoStack lives in `ops::undo` so it is testable here:
 - All operations tested independently
-- Undo/redo architecture tests:
+- Undo/redo architecture tests (in `ops::undo`):
   - SetComponent undo restores old value
   - CreateEntity undo removes entity
   - DeleteEntity undo restores entity + all components
@@ -475,6 +550,44 @@ Full Tauri app via tauri-driver:
 5. Profiler flamegraph UI
 6. Tier 2 `panel!` macro
 7. Playwright + MCP testing infrastructure
+
+---
+
+## Conventions
+
+### `engine/*/editor/` directories
+
+Core engine crates may contain an `editor/` subdirectory with panel source code (Svelte projects for Tier 3, or schema metadata for Tier 1). This is explicitly sanctioned and distinct from the forbidden `engine/*/examples/` pattern in CLAUDE.md. The `editor/` directories contain production panel code that ships with the editor, not throwaway examples.
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+Z / Cmd+Z | Undo |
+| Ctrl+Y / Cmd+Shift+Z | Redo |
+| Ctrl+S / Cmd+S | Save scene |
+| Delete | Delete selected entity |
+| Ctrl+D / Cmd+D | Duplicate selected entity |
+| F5 | Play |
+| Shift+F5 | Stop |
+| F6 | Pause |
+| Ctrl+B / Cmd+B | Build |
+
+Shortcuts are handled by the Svelte shell and forwarded as `invoke()` calls.
+
+### Scene Editor Metadata
+
+Editor-specific state (camera position, selection, panel layout) is stored in a sidecar file `<scene>.editor.yaml` alongside the scene file. This file is gitignored by default (added to the template `.gitignore`). It is not required — the editor works without it, using defaults.
+
+```yaml
+# my-scene.editor.yaml
+camera:
+  position: [0, 10, -20]
+  rotation: [0.3, 0, 0, 1]
+  zoom: 1.0
+selected_entities: [42, 17]
+panel_layout: "default"
+```
 
 ---
 
