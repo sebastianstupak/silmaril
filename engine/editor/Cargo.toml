@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Silmaril Team"]
 license = "Apache-2.0"
 description = "Silmaril game engine visual editor"
+build = "src-tauri/build.rs"
 
 [lib]
 name = "silmaril_editor"
