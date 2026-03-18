@@ -75,19 +75,21 @@
 
 {#if isDragging}
   <div class="dock-drop-overlay" bind:this={overlayEl}>
-    <!-- Visual zone indicators -->
-    <div class="dock-drop-zone zone-left" class:hovered={hoveredZone === 'left'}></div>
-    <div class="dock-drop-zone zone-right" class:hovered={hoveredZone === 'right'}></div>
-    <div class="dock-drop-zone zone-top" class:hovered={hoveredZone === 'top'}></div>
-    <div class="dock-drop-zone zone-bottom" class:hovered={hoveredZone === 'bottom'}></div>
+    <!-- Visual zone indicators with arrow icons -->
+    <div class="dock-drop-zone zone-left" class:hovered={hoveredZone === 'left'}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M14 7l-5 5 5 5V7z"/></svg>
+    </div>
+    <div class="dock-drop-zone zone-right" class:hovered={hoveredZone === 'right'}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M10 17l5-5-5-5v10z"/></svg>
+    </div>
+    <div class="dock-drop-zone zone-top" class:hovered={hoveredZone === 'top'}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M7 14l5-5 5 5H7z"/></svg>
+    </div>
+    <div class="dock-drop-zone zone-bottom" class:hovered={hoveredZone === 'bottom'}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M7 10l5 5 5-5H7z"/></svg>
+    </div>
     <div class="dock-drop-zone zone-center" class:hovered={hoveredZone === 'center'}>
-      {#if hoveredZone === 'center'}
-        <div class="zone-indicator">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.7">
-            <rect x="2" y="2" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          </svg>
-        </div>
-      {/if}
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" opacity="0.8"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
     </div>
   </div>
 {/if}
@@ -96,9 +98,9 @@
   .dock-drop-overlay {
     position: absolute;
     inset: 0;
-    z-index: 100;
-    /* Allow mouse events to pass through to backdrop for cursor,
-       but the overlay itself needs to be measurable for hit-testing */
+    z-index: 99999;
+    /* Must be above everything in the panel (viewport toolbar z-index: 10,
+       drag overlay z-index: 10000, etc.) */
     pointer-events: none;
   }
   .dock-drop-zone {
@@ -107,7 +109,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.1s;
+    transition: background 0.15s, opacity 0.15s;
+    opacity: 0.3;
+    background: rgba(0, 122, 204, 0.05);
+    border-radius: 4px;
+  }
+  .dock-drop-zone.hovered {
+    opacity: 1;
   }
   .zone-left {
     left: 0;
@@ -143,9 +151,5 @@
     background: color-mix(in srgb, var(--color-accent, #007acc) 30%, transparent);
     outline: 2px solid var(--color-accent, #007acc);
     outline-offset: -2px;
-    border-radius: 4px;
-  }
-  .zone-indicator {
-    opacity: 1;
   }
 </style>
