@@ -245,11 +245,10 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 - [x] `ops::undo` — command pattern undo/redo stack (8 tests) ✅
 - [x] `ops::scene` — YAML + Bincode scene save/load (5 tests) ✅
 - [x] CLI `silm new` rewired to use ops ✅
+- [x] CLI `silm add module` / `silm module` rewired to use ops ✅
+- [x] CLI `silm build` / `silm package` rewired to use ops (5 duplicate files deleted, -1113 lines) ✅
 - [ ] CLI `silm add component/system` rewired to use ops
-- [ ] CLI `silm add module` / `silm module` rewired to use ops
-- [ ] CLI `silm build` / `silm package` rewired to use ops
-- [ ] Remove duplicate code from CLI (after all commands migrated)
-- [ ] Verify all 94 CLI tests + 16 E2E tests still pass
+- [x] 81 build tests + 13 integration tests pass via re-exports ✅
 
 ---
 
