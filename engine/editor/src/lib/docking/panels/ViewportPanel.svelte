@@ -696,6 +696,8 @@
     user-select: none;
     background: #1a1a2e;
     outline: none;
+    /* Ensure viewport doesn't create a higher stacking context than the dock drop overlay */
+    z-index: 0;
   }
 
   .viewport-container:focus-visible {

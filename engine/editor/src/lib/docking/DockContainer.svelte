@@ -7,6 +7,7 @@
   import DockSplitter from './DockSplitter.svelte';
   import DockDropZone from './DockDropZone.svelte';
   import { dropPanel, resizeSplit, setActiveTab, removePanelFromLayout, endDrag, getDragState, subscribeDrag } from './store';
+  import { popOutPanel } from '$lib/api';
   import type { EditorLayout } from './types';
   import { onMount } from 'svelte';
 
@@ -98,6 +99,11 @@
     onLayoutChange(newLayout);
   }
 
+  function handlePopOut(panelId: string) {
+    const newLayout = removePanelFromLayout(layout, panelId);
+    onLayoutChange(newLayout);
+  }
+
   /** Resolve panel component, supporting instance IDs like 'viewport:2' */
   function resolveComponent(id: string): Component | undefined {
     return panelComponents[id] ?? panelComponents[getBasePanelId(id)];
@@ -140,6 +146,7 @@
       onDuplicate={handleDuplicate}
       onCloseOthers={handleCloseOthers}
       onCloseAll={handleCloseAll}
+      onPopOut={handlePopOut}
     />
     <div class="dock-tab-content">
       {#if node.panels[node.activeTab]}

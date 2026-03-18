@@ -2,6 +2,7 @@
   import { t } from '$lib/i18n';
   import { getPanelInfo, getBasePanelId, createPanelInstance } from './types';
   import { startDrag, updateDrag, endDrag, getDragState } from './store';
+  import { popOutPanel } from '$lib/api';
 
   interface Props {
     panels: string[];
@@ -12,6 +13,7 @@
     onDuplicate?: (panelId: string, newPanelId: string) => void;
     onCloseOthers?: (panelId: string) => void;
     onCloseAll?: () => void;
+    onPopOut?: (panelId: string) => void;
   }
 
   let {
@@ -23,6 +25,7 @@
     onDuplicate,
     onCloseOthers,
     onCloseAll,
+    onPopOut,
   }: Props = $props();
 
   let contextMenu = $state<{ x: number; y: number; panelId: string } | null>(null);
@@ -58,10 +61,23 @@
       window.removeEventListener('mouseup', onMouseUp);
 
       if (dragging) {
-        // Check if we're over a tab bar — if so, the DockContainer will
-        // handle the drop via its own hit-test logic. Fire endDrag to let
-        // listeners know the drag completed at this position.
-        // The DockContainer's effect handles the actual drop.
+        // Check if the mouse is outside the main editor area — pop out
+        const editorBounds = document.querySelector('.editor-shell')?.getBoundingClientRect();
+        if (editorBounds && (
+          ev.clientX < editorBounds.left || ev.clientX > editorBounds.right ||
+          ev.clientY < editorBounds.top || ev.clientY > editorBounds.bottom
+        )) {
+          popOutPanel(panelId, ev.screenX, ev.screenY);
+          if (onPopOut) {
+            onPopOut(panelId);
+          }
+          endDrag();
+          return;
+        }
+
+        // Normal drop — the DockDropZone's mouseup handler will handle
+        // zone-based drops. Fire endDrag to let listeners know the drag
+        // completed at this position.
         endDrag();
       }
     }
@@ -115,6 +131,17 @@
       const baseId = getBasePanelId(contextMenu.panelId);
       const newId = createPanelInstance(baseId);
       onDuplicate(contextMenu.panelId, newId);
+    }
+    contextMenu = null;
+  }
+
+  function handleCtxPopOut() {
+    if (!contextMenu) return;
+    const pid = contextMenu.panelId;
+    // Position the pop-out window near the context menu click
+    popOutPanel(pid, contextMenu.x + window.screenX, contextMenu.y + window.screenY);
+    if (onPopOut) {
+      onPopOut(pid);
     }
     contextMenu = null;
   }
@@ -173,7 +200,7 @@
       {t('dock.duplicate')}
     </button>
     <div class="context-separator"></div>
-    <button class="context-item" disabled>
+    <button class="context-item" onclick={handleCtxPopOut}>
       {t('dock.pop_out')}
     </button>
   </div>

@@ -2,5 +2,5 @@
   "identifier": "default",
   "description": "Default capabilities for the Silmaril Editor",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": ["core:default", "dialog:default", "core:window:allow-create"]
 }

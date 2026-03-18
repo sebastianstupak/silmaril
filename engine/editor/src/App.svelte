@@ -5,6 +5,7 @@
   import { setLocale } from './lib/i18n';
   import MenuBar from './lib/components/MenuBar.svelte';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
+  import PopoutView from './lib/components/PopoutView.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
@@ -22,6 +23,9 @@
   import ViewportPanel from './lib/docking/panels/ViewportPanel.svelte';
   import ProfilerPanel from './lib/docking/panels/ProfilerPanel.svelte';
   import AssetsPanel from './lib/docking/panels/AssetsPanel.svelte';
+
+  // Pop-out panel detection via query parameter
+  const popoutPanel = new URLSearchParams(window.location.search).get('panel');
 
   let editorState: EditorState | null = $state(null);
   let settings: EditorSettings = $state(loadSettings());
@@ -110,6 +114,9 @@
   });
 </script>
 
+{#if popoutPanel}
+  <PopoutView panelId={popoutPanel} />
+{:else}
 <main class="editor-shell">
   <!-- Menu Bar -->
   <MenuBar
@@ -219,6 +226,7 @@
     </div>
   </div>
 </main>
+{/if}
 
 <style>
   .editor-shell {

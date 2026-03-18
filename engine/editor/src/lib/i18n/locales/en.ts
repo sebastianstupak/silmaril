@@ -170,6 +170,9 @@ const en = {
   'scene.delete_entity': 'Delete Entity',
   'scene.duplicate_entity': 'Duplicate Entity',
 
+  // Pop-out
+  'popout.unknown': 'Unknown panel',
+
   // Common
   'common.ok': 'OK',
   'common.cancel': 'Cancel',

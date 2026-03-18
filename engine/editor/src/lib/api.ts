@@ -1,4 +1,5 @@
 // Tauri API wrapper with browser fallback for Playwright testing
+import { getPanelInfo } from '$lib/docking/types';
 
 export interface EditorState {
   mode: string;
@@ -192,6 +193,35 @@ export async function openProjectDialog(): Promise<string | null> {
 
 export async function scanProjectEntities(projectPath: string): Promise<EntityInfo[]> {
   return tauriInvoke<EntityInfo[]>('scan_project_entities', { projectPath });
+}
+
+// ---------------------------------------------------------------------------
+// Pop-out panel to external window
+// ---------------------------------------------------------------------------
+
+/**
+ * Pop a panel out into a new Tauri window at the given screen position.
+ * In browser mode (Playwright), this is a no-op.
+ */
+export async function popOutPanel(panelId: string, x: number, y: number): Promise<void> {
+  if (!isTauri) return;
+
+  const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+
+  const info = getPanelInfo(panelId);
+  const title = info ? panelId : 'Panel';
+
+  const label = `popout-${panelId.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
+
+  new WebviewWindow(label, {
+    url: `index.html?panel=${encodeURIComponent(panelId)}`,
+    title,
+    width: 500,
+    height: 600,
+    x: Math.round(x) - 250,
+    y: Math.round(y) - 50,
+    decorations: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
