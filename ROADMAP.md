@@ -233,7 +233,7 @@ silm package --platform windows
 
 **Priority:** 🔴 **CRITICAL** - Required for editor to share CLI operations
 
-**Status:** 🟡 In Progress (~60%)
+**Status:** ✅ **Complete**
 
 Extract CLI command logic into `engine/ops` so both CLI and editor use the same operations.
 
@@ -247,7 +247,7 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 - [x] CLI `silm new` rewired to use ops ✅
 - [x] CLI `silm add module` / `silm module` rewired to use ops ✅
 - [x] CLI `silm build` / `silm package` rewired to use ops (5 duplicate files deleted, -1113 lines) ✅
-- [ ] CLI `silm add component/system` rewired to use ops
+- [x] CLI `silm add component/system` rewired to use ops ✅
 - [x] 81 build tests + 13 integration tests pass via re-exports ✅
 
 ---
