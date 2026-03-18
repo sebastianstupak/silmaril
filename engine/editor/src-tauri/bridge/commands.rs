@@ -1,5 +1,7 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
+
+use crate::viewport::{self, EntityView, ViewportCamera};
 
 #[derive(Serialize)]
 pub struct EditorStateResponse {
@@ -145,4 +147,58 @@ fn extract_component_names(source: &str, out: &mut Vec<String>) {
             found_component_derive = false;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Viewport commands
+// ---------------------------------------------------------------------------
+
+/// Request payload for the viewport frame.
+#[derive(Deserialize)]
+pub struct ViewportFrameRequest {
+    pub width: u32,
+    pub height: u32,
+    pub selected_entity_id: Option<u64>,
+    pub camera: Option<ViewportCamera>,
+    /// Entity list — passed from the frontend so the backend does not need
+    /// its own entity store.  Each entry has `{ id, name, x, y, color }`.
+    pub entities: Vec<EntityView>,
+}
+
+/// Generate an SVG frame for the viewport.
+#[tauri::command]
+pub fn get_viewport_frame(request: ViewportFrameRequest) -> String {
+    let camera = request.camera.unwrap_or_default();
+    viewport::generate_viewport_svg(
+        request.width.max(1),
+        request.height.max(1),
+        &request.entities,
+        request.selected_entity_id,
+        &camera,
+    )
+}
+
+/// Request payload for entity picking.
+#[derive(Deserialize)]
+pub struct PickEntityRequest {
+    pub click_x: f32,
+    pub click_y: f32,
+    pub width: u32,
+    pub height: u32,
+    pub entities: Vec<EntityView>,
+    pub camera: Option<ViewportCamera>,
+}
+
+/// Determine which entity (if any) is at a given click position.
+#[tauri::command]
+pub fn pick_viewport_entity(request: PickEntityRequest) -> Option<u64> {
+    let camera = request.camera.unwrap_or_default();
+    viewport::picking::pick_entity(
+        request.click_x,
+        request.click_y,
+        request.width,
+        request.height,
+        &request.entities,
+        &camera,
+    )
 }

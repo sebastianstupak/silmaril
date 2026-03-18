@@ -69,6 +69,10 @@ const en = {
   'placeholder.select_entity': 'Select an entity',
   'placeholder.no_logs': 'No logs yet',
   'placeholder.viewport': 'Vulkan viewport will render here',
+  'viewport.loading': 'Initializing viewport...',
+  'viewport.no_entities': 'No entities in scene',
+  'viewport.zoom': 'Zoom',
+  'viewport.reset_camera': 'Reset Camera',
 
   // Settings dialog
   'settings.title': 'Settings',
