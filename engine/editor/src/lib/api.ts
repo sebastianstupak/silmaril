@@ -66,6 +66,7 @@ function generateMockSvg(args?: Record<string, unknown>): string {
   const h = req.height ?? 600;
   const entities = req.entities ?? [];
   const selectedId = req.selected_entity_id ?? null;
+  const tool = req.tool ?? 'select';
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block">`;
   svg += `<rect width="${w}" height="${h}" fill="#1a1a2e"/>`;
@@ -88,6 +89,11 @@ function generateMockSvg(args?: Record<string, unknown>): string {
     }
     svg += `<circle cx="${px}" cy="${py}" r="${sel ? 14 : 10}" fill="${e.color}" stroke="${sel ? '#fff' : '#aaa'}" stroke-width="${sel ? 2 : 0.8}" opacity="0.9" data-entity-id="${e.id}"/>`;
     svg += `<text x="${px}" y="${py + 24}" fill="#ccc" font-family="sans-serif" font-size="10" text-anchor="middle">${e.name}</text>`;
+
+    // Draw gizmo on selected entity
+    if (sel && tool !== 'select') {
+      svg += generateMockGizmo(px, py, tool);
+    }
   }
 
   if (entities.length === 0) {
@@ -96,6 +102,38 @@ function generateMockSvg(args?: Record<string, unknown>): string {
 
   svg += '</svg>';
   return svg;
+}
+
+/** Generate gizmo SVG elements for the mock renderer. */
+function generateMockGizmo(cx: number, cy: number, tool: string): string {
+  let g = '';
+  if (tool === 'move') {
+    const len = 40;
+    // X axis (red arrow)
+    g += `<line x1="${cx}" y1="${cy}" x2="${cx + len}" y2="${cy}" stroke="#ff4444" stroke-width="2"/>`;
+    g += `<polygon points="${cx + len},${cy - 4} ${cx + len},${cy + 4} ${cx + len + 8},${cy}" fill="#ff4444"/>`;
+    // Y axis (green arrow)
+    g += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - len}" stroke="#44ff44" stroke-width="2"/>`;
+    g += `<polygon points="${cx - 4},${cy - len} ${cx + 4},${cy - len} ${cx},${cy - len - 8}" fill="#44ff44"/>`;
+    // Z axis (blue dashed)
+    g += `<line x1="${cx}" y1="${cy}" x2="${cx - len * 0.5}" y2="${cy + len * 0.5}" stroke="#4444ff" stroke-width="2" stroke-dasharray="4,2"/>`;
+    // Centre square
+    g += `<rect x="${cx - 4}" y="${cy - 4}" width="8" height="8" fill="yellow" opacity="0.6"/>`;
+  } else if (tool === 'rotate') {
+    const r = 35;
+    g += `<ellipse cx="${cx}" cy="${cy}" rx="${r}" ry="${r * 0.3}" fill="none" stroke="#ff4444" stroke-width="1.5"/>`;
+    g += `<ellipse cx="${cx}" cy="${cy}" rx="${r * 0.3}" ry="${r}" fill="none" stroke="#44ff44" stroke-width="1.5"/>`;
+    g += `<circle cx="${cx}" cy="${cy}" r="${r + 5}" fill="none" stroke="white" stroke-width="1" opacity="0.5"/>`;
+  } else if (tool === 'scale') {
+    const len = 35;
+    const cube = 5;
+    g += `<line x1="${cx}" y1="${cy}" x2="${cx + len}" y2="${cy}" stroke="#ff4444" stroke-width="2"/>`;
+    g += `<rect x="${cx + len - cube / 2}" y="${cy - cube / 2}" width="${cube}" height="${cube}" fill="#ff4444"/>`;
+    g += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - len}" stroke="#44ff44" stroke-width="2"/>`;
+    g += `<rect x="${cx - cube / 2}" y="${cy - len - cube / 2}" width="${cube}" height="${cube}" fill="#44ff44"/>`;
+    g += `<rect x="${cx - cube / 2}" y="${cy - cube / 2}" width="${cube}" height="${cube}" fill="white" opacity="0.8"/>`;
+  }
+  return g;
 }
 
 /** Mock entity picking for browser testing. */
@@ -164,6 +202,8 @@ export interface ViewportFrameRequest {
   selected_entity_id: number | null;
   camera: ViewportCamera | null;
   entities: ViewportEntity[];
+  /** Active tool: controls which gizmo is drawn on the selected entity. */
+  tool: string;
 }
 
 export interface PickEntityRequest {

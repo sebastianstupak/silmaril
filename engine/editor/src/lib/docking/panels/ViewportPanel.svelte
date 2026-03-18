@@ -22,7 +22,9 @@
     createEntity,
     deleteEntity,
     duplicateEntity,
-    moveEntity,
+    translateEntity,
+    rotateEntityBy,
+    scaleEntityBy,
     panCamera,
     orbitCamera,
     zoomCamera,
@@ -55,13 +57,25 @@
   // Camera state (viewport-local, synced from scene state)
   let camera: ViewportCamera = $state({ offset_x: 0, offset_y: 0, zoom: 1 });
 
-  // Interaction state
-  let isPanning = $state(false);
-  let isOrbiting = $state(false);
-  let panStartX = 0;
-  let panStartY = 0;
+  // --- Drag / interaction state ---
+  type DragMode =
+    | 'none'
+    | 'pan'
+    | 'orbit'
+    | 'zoom'
+    | 'move_entity'
+    | 'rotate_entity'
+    | 'scale_entity';
+
+  let isDragging = $state(false);
+  let dragMode: DragMode = $state('none');
+  let dragStartX = 0;
+  let dragStartY = 0;
   let panStartOffsetX = 0;
   let panStartOffsetY = 0;
+
+  /** Cursor CSS value — reactive, recalculated on every relevant state change. */
+  let cursor = $state('default');
 
   // Scene state mirror
   let entities = $state(getEditorContext().entities);
@@ -86,6 +100,12 @@
         offset_y: -scene.camera.position.y * 50,
         zoom: scene.camera.zoom,
       };
+
+      // Update cursor when tool changes (and we are not dragging)
+      if (!isDragging) {
+        cursor = cursorForTool(activeTool);
+      }
+
       requestFrame();
     });
 
@@ -113,6 +133,38 @@
     return unsub;
   });
 
+  // ---------------------------------------------------------------------------
+  // Cursor helpers
+  // ---------------------------------------------------------------------------
+
+  /** Map a tool name to its resting (non-drag) cursor. */
+  function cursorForTool(tool: SceneTool): string {
+    switch (tool) {
+      case 'select': return 'default';
+      case 'move':   return 'move';
+      case 'rotate': return 'crosshair';
+      case 'scale':  return 'nwse-resize';
+      default:       return 'default';
+    }
+  }
+
+  /** Map a drag mode to the cursor shown while dragging. */
+  function cursorForDrag(mode: DragMode): string {
+    switch (mode) {
+      case 'pan':            return 'grabbing';
+      case 'orbit':          return 'all-scroll';
+      case 'zoom':           return 'ns-resize';
+      case 'move_entity':    return 'move';
+      case 'rotate_entity':  return 'crosshair';
+      case 'scale_entity':   return 'nwse-resize';
+      default:               return 'default';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Viewport entity list
+  // ---------------------------------------------------------------------------
+
   /** Build the viewport entity list from editor context entities. */
   function buildViewportEntities(): ViewportEntity[] {
     return entities.map((e, i) => ({
@@ -125,6 +177,10 @@
     }));
   }
 
+  // ---------------------------------------------------------------------------
+  // Frame rendering
+  // ---------------------------------------------------------------------------
+
   /** Request a new SVG frame from the backend. */
   async function requestFrame() {
     try {
@@ -135,6 +191,7 @@
         selected_entity_id: selectedEntityId,
         camera,
         entities: viewEntities,
+        tool: activeTool,
       });
       svgContent = svg;
       loading = false;
@@ -143,9 +200,14 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Mouse event handlers
+  // ---------------------------------------------------------------------------
+
   /** Handle click on the viewport to pick entities. */
   async function handleClick(event: MouseEvent) {
-    if (isPanning || isOrbiting) return;
+    // Don't pick if we just finished a drag
+    if (isDragging) return;
     const rect = containerEl?.getBoundingClientRect();
     if (!rect) return;
 
@@ -172,75 +234,156 @@
     zoomCamera(delta);
   }
 
-  /** Start panning or orbiting based on button / modifier. */
+  /** Start a drag interaction based on button / modifier. */
   function handleMouseDown(event: MouseEvent) {
+    const tool = getSceneState().activeTool;
+
     // Middle mouse → pan
     if (event.button === 1) {
       event.preventDefault();
-      isPanning = true;
-      panStartX = event.clientX;
-      panStartY = event.clientY;
-      panStartOffsetX = camera.offset_x;
-      panStartOffsetY = camera.offset_y;
+      startDrag(event, 'pan');
       return;
     }
 
-    // Right mouse drag → orbit
+    // Right mouse → orbit
     if (event.button === 2) {
       event.preventDefault();
-      isOrbiting = true;
-      panStartX = event.clientX;
-      panStartY = event.clientY;
+      startDrag(event, 'orbit');
       return;
     }
 
-    // Alt + left drag → orbit
+    // Alt + left click → orbit (Unity style)
     if (event.button === 0 && event.altKey) {
       event.preventDefault();
-      isOrbiting = true;
-      panStartX = event.clientX;
-      panStartY = event.clientY;
+      startDrag(event, 'orbit');
+      return;
+    }
+
+    // Alt + right click → zoom (Unity style)
+    if (event.button === 2 && event.altKey) {
+      event.preventDefault();
+      startDrag(event, 'zoom');
       return;
     }
 
     // Ctrl + left drag → pan
     if (event.button === 0 && event.ctrlKey) {
       event.preventDefault();
-      isPanning = true;
-      panStartX = event.clientX;
-      panStartY = event.clientY;
-      panStartOffsetX = camera.offset_x;
-      panStartOffsetY = camera.offset_y;
-    }
-  }
-
-  function handleMouseMove(event: MouseEvent) {
-    if (isPanning) {
-      const dx = (event.clientX - panStartX) / camera.zoom;
-      const dy = (event.clientY - panStartY) / camera.zoom;
-      camera = { ...camera, offset_x: panStartOffsetX + dx, offset_y: panStartOffsetY + dy };
-      requestFrame();
+      startDrag(event, 'pan');
       return;
     }
 
-    if (isOrbiting) {
-      const dx = (event.clientX - panStartX) * 0.5;
-      const dy = (event.clientY - panStartY) * 0.5;
-      panStartX = event.clientX;
-      panStartY = event.clientY;
-      orbitCamera(dx, dy);
+    // Left click with manipulation tool on selected entity → entity drag
+    if (event.button === 0 && tool !== 'select' && selectedEntityId != null) {
+      event.preventDefault();
+      const mode: DragMode =
+        tool === 'move' ? 'move_entity' :
+        tool === 'rotate' ? 'rotate_entity' : 'scale_entity';
+      startDrag(event, mode);
+      return;
+    }
+
+    // Left click with select tool → handled by handleClick
+  }
+
+  function startDrag(event: MouseEvent, mode: DragMode) {
+    isDragging = true;
+    dragMode = mode;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    panStartOffsetX = camera.offset_x;
+    panStartOffsetY = camera.offset_y;
+    cursor = cursorForDrag(mode);
+  }
+
+  function handleMouseMove(event: MouseEvent) {
+    if (!isDragging) return;
+
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+
+    switch (dragMode) {
+      case 'pan': {
+        // Absolute offset from drag start for smooth panning
+        const panDx = dx / camera.zoom;
+        const panDy = dy / camera.zoom;
+        camera = {
+          ...camera,
+          offset_x: panStartOffsetX + panDx,
+          offset_y: panStartOffsetY + panDy,
+        };
+        requestFrame();
+        break;
+      }
+
+      case 'orbit': {
+        const orbitDx = (event.clientX - dragStartX);
+        const orbitDy = (event.clientY - dragStartY);
+        dragStartX = event.clientX;
+        dragStartY = event.clientY;
+        orbitCamera(orbitDx * 0.5, orbitDy * 0.5);
+        break;
+      }
+
+      case 'zoom': {
+        const zoomDelta = -dy * 0.005;
+        dragStartX = event.clientX;
+        dragStartY = event.clientY;
+        zoomCamera(zoomDelta);
+        break;
+      }
+
+      case 'move_entity': {
+        if (selectedEntityId != null) {
+          const moveDx = (event.clientX - dragStartX) * 0.02;
+          const moveDy = -(event.clientY - dragStartY) * 0.02;
+          dragStartX = event.clientX;
+          dragStartY = event.clientY;
+          translateEntity(selectedEntityId, moveDx, moveDy, 0);
+        }
+        break;
+      }
+
+      case 'rotate_entity': {
+        if (selectedEntityId != null) {
+          const rotDx = (event.clientX - dragStartX) * 0.5;
+          const rotDy = -(event.clientY - dragStartY) * 0.5;
+          dragStartX = event.clientX;
+          dragStartY = event.clientY;
+          rotateEntityBy(selectedEntityId, rotDy, rotDx, 0);
+        }
+        break;
+      }
+
+      case 'scale_entity': {
+        if (selectedEntityId != null) {
+          const scaleDelta = (event.clientX - dragStartX) * 0.005;
+          dragStartX = event.clientX;
+          dragStartY = event.clientY;
+          const factor = 1 + scaleDelta;
+          scaleEntityBy(selectedEntityId, factor, factor, factor);
+        }
+        break;
+      }
     }
   }
 
   function handleMouseUp() {
-    isPanning = false;
-    isOrbiting = false;
+    if (isDragging) {
+      isDragging = false;
+      dragMode = 'none';
+      cursor = cursorForTool(activeTool);
+    }
   }
 
   /** Prevent context menu so right-click drag works for orbiting. */
   function handleContextMenu(event: MouseEvent) {
     event.preventDefault();
   }
+
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts
+  // ---------------------------------------------------------------------------
 
   /** Handle keyboard shortcuts when viewport is focused. */
   function handleKeyDown(event: KeyboardEvent) {
@@ -297,19 +440,6 @@
     }
   }
 
-  /** Get cursor style based on active tool. */
-  function getCursor(): string {
-    if (isPanning) return 'grabbing';
-    if (isOrbiting) return 'grab';
-    switch (activeTool) {
-      case 'select': return 'crosshair';
-      case 'move': return 'move';
-      case 'rotate': return 'alias';
-      case 'scale': return 'nwse-resize';
-      default: return 'crosshair';
-    }
-  }
-
   /** Tool button data. */
   const tools: { key: SceneTool; label: string; shortcut: string }[] = [
     { key: 'select', label: 'tool.select', shortcut: 'Q' },
@@ -326,7 +456,7 @@
   role="application"
   aria-label={t('panel.viewport')}
   tabindex="0"
-  style:cursor={getCursor()}
+  style:cursor={cursor}
   onclick={handleClick}
   onwheel={handleWheel}
   onmousedown={handleMouseDown}
@@ -424,6 +554,19 @@
       &#8634;
     </button>
   </div>
+
+  <!-- Drag-mode indicator (visible during drag operations) -->
+  {#if isDragging}
+    <div class="drag-indicator" aria-hidden="true">
+      {#if dragMode === 'pan'}Pan
+      {:else if dragMode === 'orbit'}Orbit
+      {:else if dragMode === 'zoom'}Zoom
+      {:else if dragMode === 'move_entity'}Move
+      {:else if dragMode === 'rotate_entity'}Rotate
+      {:else if dragMode === 'scale_entity'}Scale
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -567,5 +710,19 @@
   .hud-btn:hover {
     color: #fff;
     border-color: #888;
+  }
+
+  /* Drag-mode indicator */
+  .drag-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    padding: 3px 10px;
+    background: rgba(0, 0, 0, 0.65);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #61afef;
+    font-weight: 500;
+    pointer-events: none;
   }
 </style>

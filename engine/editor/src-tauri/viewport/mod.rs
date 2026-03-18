@@ -78,12 +78,14 @@ const FONT: &str = "sans-serif";
 /// * `entities`         — entities to draw.
 /// * `selected_id`      — entity id to highlight, if any.
 /// * `camera`           — pan/zoom state.
+/// * `active_tool`      — current tool (`"select"`, `"move"`, `"rotate"`, `"scale"`).
 pub fn generate_viewport_svg(
     width: u32,
     height: u32,
     entities: &[EntityView],
     selected_id: Option<u64>,
     camera: &ViewportCamera,
+    active_tool: &str,
 ) -> String {
     let mut svg = String::with_capacity(4096);
 
@@ -125,6 +127,25 @@ pub fn generate_viewport_svg(
     for entity in entities {
         let is_selected = selected_id == Some(entity.id);
         write_entity(&mut svg, width, height, entity, is_selected, camera);
+
+        // Draw gizmo overlay on the selected entity
+        if is_selected && active_tool != "select" {
+            let half_w = width as f32 / 2.0;
+            let half_h = height as f32 / 2.0;
+            let px = half_w
+                + (entity.x - 0.5) * width as f32 * camera.zoom
+                + camera.offset_x * camera.zoom;
+            let py = half_h
+                + (entity.y - 0.5) * height as f32 * camera.zoom
+                + camera.offset_y * camera.zoom;
+
+            match active_tool {
+                "move" => write_move_gizmo(&mut svg, px, py),
+                "rotate" => write_rotate_gizmo(&mut svg, px, py),
+                "scale" => write_scale_gizmo(&mut svg, px, py),
+                _ => {}
+            }
+        }
     }
 
     // -- "No entities" hint --
@@ -259,6 +280,162 @@ fn write_entity(
     );
 }
 
+// ---------------------------------------------------------------------------
+// Gizmo drawing helpers
+// ---------------------------------------------------------------------------
+
+const GIZMO_X_COLOR: &str = "#ff4444";
+const GIZMO_Y_COLOR: &str = "#44ff44";
+const GIZMO_Z_COLOR: &str = "#4444ff";
+
+/// Draw a move (translate) gizmo: three coloured arrows (X, Y, Z) with arrowheads
+/// and a centre square for free-plane movement.
+fn write_move_gizmo(svg: &mut String, cx: f32, cy: f32) {
+    let len = 40.0;
+
+    // X axis (red) — rightward arrow
+    let _ = write!(
+        svg,
+        "<line x1=\"{cx:.1}\" y1=\"{cy:.1}\" x2=\"{x2:.1}\" y2=\"{cy:.1}\" \
+         stroke=\"{c}\" stroke-width=\"2\"/>",
+        x2 = cx + len,
+        c = GIZMO_X_COLOR,
+    );
+    let _ = write!(
+        svg,
+        "<polygon points=\"{x1:.1},{y1:.1} {x2:.1},{y2:.1} {x3:.1},{y3:.1}\" fill=\"{c}\"/>",
+        x1 = cx + len,
+        y1 = cy - 4.0,
+        x2 = cx + len,
+        y2 = cy + 4.0,
+        x3 = cx + len + 8.0,
+        y3 = cy,
+        c = GIZMO_X_COLOR,
+    );
+
+    // Y axis (green) — upward arrow
+    let _ = write!(
+        svg,
+        "<line x1=\"{cx:.1}\" y1=\"{cy:.1}\" x2=\"{cx:.1}\" y2=\"{y2:.1}\" \
+         stroke=\"{c}\" stroke-width=\"2\"/>",
+        y2 = cy - len,
+        c = GIZMO_Y_COLOR,
+    );
+    let _ = write!(
+        svg,
+        "<polygon points=\"{x1:.1},{y1:.1} {x2:.1},{y2:.1} {x3:.1},{y3:.1}\" fill=\"{c}\"/>",
+        x1 = cx - 4.0,
+        y1 = cy - len,
+        x2 = cx + 4.0,
+        y2 = cy - len,
+        x3 = cx,
+        y3 = cy - len - 8.0,
+        c = GIZMO_Y_COLOR,
+    );
+
+    // Z axis (blue) — diagonal dashed line (perspective hint)
+    let _ = write!(
+        svg,
+        "<line x1=\"{cx:.1}\" y1=\"{cy:.1}\" x2=\"{x2:.1}\" y2=\"{y2:.1}\" \
+         stroke=\"{c}\" stroke-width=\"2\" stroke-dasharray=\"4,2\"/>",
+        x2 = cx - len * 0.5,
+        y2 = cy + len * 0.5,
+        c = GIZMO_Z_COLOR,
+    );
+
+    // Centre square (free-plane movement)
+    let _ = write!(
+        svg,
+        "<rect x=\"{x:.1}\" y=\"{y:.1}\" width=\"8\" height=\"8\" fill=\"yellow\" opacity=\"0.6\"/>",
+        x = cx - 4.0,
+        y = cy - 4.0,
+    );
+}
+
+/// Draw a rotate gizmo: three coloured ellipses (X, Y rotation planes) and an
+/// outer screen-space ring.
+fn write_rotate_gizmo(svg: &mut String, cx: f32, cy: f32) {
+    let r = 35.0;
+
+    // X rotation ellipse (red — horizontal)
+    let _ = write!(
+        svg,
+        "<ellipse cx=\"{cx:.1}\" cy=\"{cy:.1}\" rx=\"{rx:.1}\" ry=\"{ry:.1}\" \
+         fill=\"none\" stroke=\"{c}\" stroke-width=\"1.5\"/>",
+        rx = r,
+        ry = r * 0.3,
+        c = GIZMO_X_COLOR,
+    );
+
+    // Y rotation ellipse (green — vertical)
+    let _ = write!(
+        svg,
+        "<ellipse cx=\"{cx:.1}\" cy=\"{cy:.1}\" rx=\"{rx:.1}\" ry=\"{ry:.1}\" \
+         fill=\"none\" stroke=\"{c}\" stroke-width=\"1.5\"/>",
+        rx = r * 0.3,
+        ry = r,
+        c = GIZMO_Y_COLOR,
+    );
+
+    // Screen-space rotation ring (white outer circle)
+    let _ = write!(
+        svg,
+        "<circle cx=\"{cx:.1}\" cy=\"{cy:.1}\" r=\"{r:.1}\" \
+         fill=\"none\" stroke=\"white\" stroke-width=\"1\" opacity=\"0.5\"/>",
+        r = r + 5.0,
+    );
+}
+
+/// Draw a scale gizmo: three coloured lines with cube endpoints and a centre cube
+/// for uniform scaling.
+fn write_scale_gizmo(svg: &mut String, cx: f32, cy: f32) {
+    let len = 35.0;
+    let cube = 5.0;
+
+    // X axis (red) with cube endpoint
+    let _ = write!(
+        svg,
+        "<line x1=\"{cx:.1}\" y1=\"{cy:.1}\" x2=\"{x2:.1}\" y2=\"{cy:.1}\" \
+         stroke=\"{c}\" stroke-width=\"2\"/>",
+        x2 = cx + len,
+        c = GIZMO_X_COLOR,
+    );
+    let _ = write!(
+        svg,
+        "<rect x=\"{x:.1}\" y=\"{y:.1}\" width=\"{s}\" height=\"{s}\" fill=\"{c}\"/>",
+        x = cx + len - cube / 2.0,
+        y = cy - cube / 2.0,
+        s = cube,
+        c = GIZMO_X_COLOR,
+    );
+
+    // Y axis (green) with cube endpoint
+    let _ = write!(
+        svg,
+        "<line x1=\"{cx:.1}\" y1=\"{cy:.1}\" x2=\"{cx:.1}\" y2=\"{y2:.1}\" \
+         stroke=\"{c}\" stroke-width=\"2\"/>",
+        y2 = cy - len,
+        c = GIZMO_Y_COLOR,
+    );
+    let _ = write!(
+        svg,
+        "<rect x=\"{x:.1}\" y=\"{y:.1}\" width=\"{s}\" height=\"{s}\" fill=\"{c}\"/>",
+        x = cx - cube / 2.0,
+        y = cy - len - cube / 2.0,
+        s = cube,
+        c = GIZMO_Y_COLOR,
+    );
+
+    // Centre cube (uniform scale)
+    let _ = write!(
+        svg,
+        "<rect x=\"{x:.1}\" y=\"{y:.1}\" width=\"{s}\" height=\"{s}\" fill=\"white\" opacity=\"0.8\"/>",
+        x = cx - cube / 2.0,
+        y = cy - cube / 2.0,
+        s = cube,
+    );
+}
+
 /// Minimal HTML entity escaping for SVG text content.
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -273,7 +450,8 @@ mod tests {
 
     #[test]
     fn empty_scene_produces_valid_svg() {
-        let svg = generate_viewport_svg(800, 600, &[], None, &ViewportCamera::default());
+        let svg =
+            generate_viewport_svg(800, 600, &[], None, &ViewportCamera::default(), "select");
         assert!(svg.starts_with("<svg"));
         assert!(svg.ends_with("</svg>"));
         assert!(svg.contains("No entities in scene"));
@@ -298,14 +476,106 @@ mod tests {
             },
         ];
 
-        let svg =
-            generate_viewport_svg(800, 600, &entities, Some(1), &ViewportCamera::default());
+        let svg = generate_viewport_svg(
+            800,
+            600,
+            &entities,
+            Some(1),
+            &ViewportCamera::default(),
+            "select",
+        );
         assert!(svg.contains("data-entity-id=\"1\""));
         assert!(svg.contains("data-entity-id=\"2\""));
         assert!(svg.contains("Player"));
         assert!(svg.contains("Enemy"));
         // Selected entity should have glow filter
         assert!(svg.contains("sel-glow"));
+    }
+
+    #[test]
+    fn move_gizmo_appears_for_selected_entity() {
+        let entities = vec![EntityView {
+            id: 1,
+            name: "Player".to_string(),
+            x: 0.5,
+            y: 0.5,
+            color: "#e06c75".to_string(),
+        }];
+        let svg = generate_viewport_svg(
+            800,
+            600,
+            &entities,
+            Some(1),
+            &ViewportCamera::default(),
+            "move",
+        );
+        // Move gizmo draws red and green arrows
+        assert!(svg.contains("#ff4444"));
+        assert!(svg.contains("#44ff44"));
+        assert!(svg.contains("polygon"));
+    }
+
+    #[test]
+    fn rotate_gizmo_appears_for_selected_entity() {
+        let entities = vec![EntityView {
+            id: 1,
+            name: "Player".to_string(),
+            x: 0.5,
+            y: 0.5,
+            color: "#e06c75".to_string(),
+        }];
+        let svg = generate_viewport_svg(
+            800,
+            600,
+            &entities,
+            Some(1),
+            &ViewportCamera::default(),
+            "rotate",
+        );
+        assert!(svg.contains("ellipse"));
+    }
+
+    #[test]
+    fn scale_gizmo_appears_for_selected_entity() {
+        let entities = vec![EntityView {
+            id: 1,
+            name: "Player".to_string(),
+            x: 0.5,
+            y: 0.5,
+            color: "#e06c75".to_string(),
+        }];
+        let svg = generate_viewport_svg(
+            800,
+            600,
+            &entities,
+            Some(1),
+            &ViewportCamera::default(),
+            "scale",
+        );
+        // Scale gizmo draws cubes (rects) at axis endpoints
+        assert!(svg.contains("opacity=\"0.8\""));
+    }
+
+    #[test]
+    fn no_gizmo_for_select_tool() {
+        let entities = vec![EntityView {
+            id: 1,
+            name: "Player".to_string(),
+            x: 0.5,
+            y: 0.5,
+            color: "#e06c75".to_string(),
+        }];
+        let svg = generate_viewport_svg(
+            800,
+            600,
+            &entities,
+            Some(1),
+            &ViewportCamera::default(),
+            "select",
+        );
+        // Should NOT contain gizmo colours
+        assert!(!svg.contains("#ff4444"));
+        assert!(!svg.contains("#44ff44"));
     }
 
     #[test]

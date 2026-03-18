@@ -142,6 +142,42 @@ export function scaleEntity(id: number, sx: number, sy: number, sz: number): voi
   }));
 }
 
+/** Translate an entity by a delta (relative move). */
+export function translateEntity(id: number, dx: number, dy: number, dz: number): void {
+  _mutate((s) => ({
+    ...s,
+    entities: s.entities.map((e) =>
+      e.id === id
+        ? { ...e, position: { x: e.position.x + dx, y: e.position.y + dy, z: e.position.z + dz } }
+        : e,
+    ),
+  }));
+}
+
+/** Rotate an entity by a delta (relative rotation in degrees). */
+export function rotateEntityBy(id: number, drx: number, dry: number, drz: number): void {
+  _mutate((s) => ({
+    ...s,
+    entities: s.entities.map((e) =>
+      e.id === id
+        ? { ...e, rotation: { x: e.rotation.x + drx, y: e.rotation.y + dry, z: e.rotation.z + drz } }
+        : e,
+    ),
+  }));
+}
+
+/** Scale an entity by a multiplicative factor (relative scale). */
+export function scaleEntityBy(id: number, fx: number, fy: number, fz: number): void {
+  _mutate((s) => ({
+    ...s,
+    entities: s.entities.map((e) =>
+      e.id === id
+        ? { ...e, scale: { x: e.scale.x * fx, y: e.scale.y * fy, z: e.scale.z * fz } }
+        : e,
+    ),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Camera controls
 // ---------------------------------------------------------------------------

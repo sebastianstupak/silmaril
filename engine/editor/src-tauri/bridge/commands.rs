@@ -241,6 +241,14 @@ pub struct ViewportFrameRequest {
     /// Entity list — passed from the frontend so the backend does not need
     /// its own entity store.  Each entry has `{ id, name, x, y, color }`.
     pub entities: Vec<EntityView>,
+    /// Active tool: `"select"`, `"move"`, `"rotate"`, or `"scale"`.
+    /// Controls which gizmo is drawn on the selected entity.
+    #[serde(default = "default_tool")]
+    pub tool: String,
+}
+
+fn default_tool() -> String {
+    "select".to_string()
 }
 
 /// Generate an SVG frame for the viewport.
@@ -253,6 +261,7 @@ pub fn get_viewport_frame(request: ViewportFrameRequest) -> String {
         &request.entities,
         request.selected_entity_id,
         &camera,
+        &request.tool,
     )
 }
 
