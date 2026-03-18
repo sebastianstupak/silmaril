@@ -2,20 +2,24 @@
 
 export interface EditorSettings {
   theme: string;
+  language: string;
   leftPanelWidth: number;
   rightPanelWidth: number;
   bottomPanelHeight: number;
   fontSize: number;
+  autoSave: 'off' | 'on_focus_change' | 'after_delay';
 }
 
 const STORAGE_KEY = 'silmaril-editor-settings';
 
 const defaults: EditorSettings = {
   theme: 'dark',
+  language: 'en',
   leftPanelWidth: 250,
   rightPanelWidth: 300,
   bottomPanelHeight: 200,
   fontSize: 13,
+  autoSave: 'off',
 };
 
 export function loadSettings(): EditorSettings {
