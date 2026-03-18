@@ -9,6 +9,7 @@
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
+  import ConsolePanel from './lib/components/ConsolePanel.svelte';
 
   let editorState: EditorState | null = $state(null);
   let settings: EditorSettings = $state(loadSettings());
@@ -151,7 +152,7 @@
     <!-- Bottom panel -->
     <div class="bottom-bar" style="height: {bottomHeight}px">
       <PanelShell title={t('panel.console')}>
-        <p class="placeholder">{t('placeholder.no_logs')}</p>
+        <ConsolePanel />
       </PanelShell>
     </div>
   </div>

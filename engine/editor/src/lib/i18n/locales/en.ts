@@ -110,6 +110,28 @@ const en = {
   'breadcrumb.no_project': 'No project',
   'breadcrumb.no_scene': 'Untitled Scene',
 
+  // Console
+  'console.clear': 'Clear',
+  'console.filter': 'Filter logs...',
+  'console.info': 'Info',
+  'console.warn': 'Warn',
+  'console.error': 'Error',
+  'console.debug': 'Debug',
+  'console.no_logs': 'No logs',
+
+  // Hierarchy panel
+  'hierarchy.search': 'Search entities...',
+  'hierarchy.empty': 'No entities',
+  'hierarchy.count': '{count} entities',
+
+  // Inspector panel
+  'inspector.no_selection': 'No entity selected',
+  'inspector.components': 'Components',
+  'inspector.add_component': 'Add Component',
+
+  // Dialog
+  'dialog.open_project_title': 'Open Silmaril Project',
+
   // Common
   'common.ok': 'OK',
   'common.cancel': 'Cancel',
