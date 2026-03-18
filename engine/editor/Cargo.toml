@@ -17,10 +17,14 @@ path = "src-tauri/main.rs"
 [dependencies]
 engine-ops = { path = "../ops" }
 engine-core = { path = "../core" }
+tauri = { version = "2", features = [] }
 anyhow = "1.0"
 tracing = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
 
 [dev-dependencies]
 tempfile = "3.10"

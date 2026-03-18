@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicosalm/tauri-docs/refs/heads/dev/tooling/cli/schema.json",
+  "productName": "Silmaril Editor",
+  "version": "0.1.0",
+  "identifier": "com.silmaril.editor",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Silmaril Editor",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ]
+  }
+}

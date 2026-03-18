@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicosalm/tauri-docs/refs/heads/dev/tooling/cli/schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for the Silmaril Editor",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}
