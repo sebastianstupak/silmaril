@@ -191,57 +191,51 @@ export function scaleEntityBy(id: number, fx: number, fy: number, fz: number): v
 // Camera controls
 // ---------------------------------------------------------------------------
 
-/** Pan the camera by a delta in world-space. */
+/** Pan the camera by a screen-space delta, rotated into world-space. */
 export function panCamera(dx: number, dy: number): void {
-  _mutate((s) => ({
-    ...s,
-    camera: {
-      ...s.camera,
-      position: {
-        x: s.camera.position.x + dx,
-        y: s.camera.position.y + dy,
-        z: s.camera.position.z,
-      },
-      target: {
-        x: s.camera.target.x + dx,
-        y: s.camera.target.y + dy,
-        z: s.camera.target.z,
-      },
-    },
-  }));
-}
-
-/** Orbit the camera around the target by delta angles (degrees). */
-export function orbitCamera(dx: number, dy: number): void {
   _mutate((s) => {
-    const cam = s.camera;
-    // Simplified orbit: adjust position relative to target using angular deltas
-    const dist = Math.sqrt(
-      (cam.position.x - cam.target.x) ** 2 +
-      (cam.position.y - cam.target.y) ** 2 +
-      (cam.position.z - cam.target.z) ** 2,
-    );
-    const theta = Math.atan2(
-      cam.position.x - cam.target.x,
-      cam.position.z - cam.target.z,
-    ) + (dx * Math.PI) / 180;
-    const phi = Math.acos(
-      Math.max(-1, Math.min(1, (cam.position.y - cam.target.y) / Math.max(dist, 0.001))),
-    ) + (dy * Math.PI) / 180;
-    const clampedPhi = Math.max(0.1, Math.min(Math.PI - 0.1, phi));
-
+    const cosA = Math.cos(s.camera.viewAngle);
+    const sinA = Math.sin(s.camera.viewAngle);
+    // Transform screen-space delta to world-space
+    const worldDx = dx * cosA + dy * sinA;
+    const worldDz = -dx * sinA + dy * cosA;
     return {
       ...s,
       camera: {
-        ...cam,
+        ...s.camera,
+        target: {
+          x: s.camera.target.x + worldDx,
+          y: s.camera.target.y,
+          z: s.camera.target.z + worldDz,
+        },
         position: {
-          x: cam.target.x + dist * Math.sin(clampedPhi) * Math.sin(theta),
-          y: cam.target.y + dist * Math.cos(clampedPhi),
-          z: cam.target.z + dist * Math.sin(clampedPhi) * Math.cos(theta),
+          x: s.camera.position.x + worldDx,
+          y: s.camera.position.y,
+          z: s.camera.position.z + worldDz,
         },
       },
     };
   });
+}
+
+/** Orbit the camera around the target by delta angles (degrees).
+ *  In the 2D SVG viewport this rotates the view angle. */
+export function orbitCamera(dx: number, _dy: number): void {
+  _mutate((s) => ({
+    ...s,
+    camera: {
+      ...s.camera,
+      viewAngle: s.camera.viewAngle + dx * Math.PI / 180,
+    },
+  }));
+}
+
+/** Snap the camera view angle to an exact value (radians). */
+export function setViewAngle(angle: number): void {
+  _mutate((s) => ({
+    ...s,
+    camera: { ...s.camera, viewAngle: angle },
+  }));
 }
 
 /** Zoom the camera (positive = zoom in, negative = zoom out). */
@@ -419,6 +413,10 @@ export function dispatchSceneCommand(
 
     case 'reset_camera':
       resetCamera();
+      return { ok: true };
+
+    case 'set_view_angle':
+      setViewAngle(args.angle as number);
       return { ok: true };
 
     case 'set_tool':

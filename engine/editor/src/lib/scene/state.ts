@@ -28,6 +28,7 @@ export interface SceneCamera {
   target: Vec3;
   zoom: number;
   fov: number;
+  viewAngle: number; // 2D rotation angle in radians (0 = north-up)
 }
 
 export type SceneTool = 'select' | 'move' | 'rotate' | 'scale';
@@ -53,6 +54,7 @@ function defaultCamera(): SceneCamera {
     target: { x: 0, y: 0, z: 0 },
     zoom: 1,
     fov: 60,
+    viewAngle: 0,
   };
 }
 

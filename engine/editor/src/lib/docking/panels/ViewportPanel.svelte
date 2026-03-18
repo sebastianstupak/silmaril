@@ -31,6 +31,7 @@
     focusEntity,
     resetCamera,
     setActiveTool,
+    setViewAngle,
     toggleGrid,
     toggleSnapToGrid,
   } from '$lib/scene/commands';
@@ -81,6 +82,7 @@
   let activeTool: SceneTool = $state(getSceneState().activeTool);
   let gridVisible = $state(getSceneState().gridVisible);
   let snapToGrid = $state(getSceneState().snapToGrid);
+  let viewAngleDeg = $state(0);
 
   onMount(() => {
     const unsub = subscribeScene(() => {
@@ -91,11 +93,12 @@
       activeTool = scene.activeTool;
       gridVisible = scene.gridVisible;
       snapToGrid = scene.snapToGrid;
+      viewAngleDeg = (scene.camera.viewAngle * 180) / Math.PI;
 
       // Sync camera from scene state to viewport camera
       camera = {
-        offset_x: scene.camera.position.x * 50,
-        offset_y: -scene.camera.position.y * 50,
+        offset_x: scene.camera.target.x * 50,
+        offset_y: -scene.camera.target.z * 50,
         zoom: scene.camera.zoom,
       };
 
@@ -165,16 +168,26 @@
 
   /** Build the viewport entity list from editor context entities.
    *  Converts 3D world positions to normalised viewport coords (0–1)
-   *  using the scene camera offset and zoom. */
+   *  using the scene camera target, zoom, and viewAngle rotation. */
   function buildViewportEntities(): ViewportEntity[] {
     const scene = getSceneState();
+    const cam = scene.camera;
+    const cosA = Math.cos(cam.viewAngle);
+    const sinA = Math.sin(cam.viewAngle);
+
     return scene.entities.map((e, i) => {
-      const cam = scene.camera;
-      const worldX = e.position.x - cam.position.x;
-      const worldY = e.position.z - cam.position.z; // Z is "forward" in top-down
+      // World-space offset from camera target
+      const wx = e.position.x - cam.target.x;
+      const wz = e.position.z - cam.target.z;
+
+      // Rotate by view angle
+      const rx = wx * cosA - wz * sinA;
+      const ry = wx * sinA + wz * cosA;
+
+      // Convert to normalised screen coords
       const scale = cam.zoom * 50; // pixels-per-world-unit
-      const screenX = 0.5 + (worldX * scale) / viewportWidth;
-      const screenY = 0.5 + (worldY * scale) / viewportHeight;
+      const screenX = 0.5 + (rx * scale) / viewportWidth;
+      const screenY = 0.5 - (ry * scale) / viewportHeight; // Y inverted
 
       return {
         id: e.id,
@@ -528,15 +541,38 @@
     {@html svgContent}
   {/if}
 
-  <!-- Axis gizmo (camera orientation indicator) -->
-  <div class="axis-gizmo" aria-hidden="true">
+  <!-- Axis gizmo (camera orientation indicator) — clickable to snap view -->
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
+  <div class="axis-gizmo" role="group" aria-label="Axis gizmo">
     <svg width="60" height="60" viewBox="0 0 60 60">
-      <line x1="30" y1="30" x2="50" y2="30" stroke="#e06c75" stroke-width="2"/>
-      <text x="52" y="34" fill="#e06c75" font-size="10" font-family="sans-serif">X</text>
-      <line x1="30" y1="30" x2="30" y2="10" stroke="#98c379" stroke-width="2"/>
-      <text x="27" y="8" fill="#98c379" font-size="10" font-family="sans-serif">Y</text>
-      <line x1="30" y1="30" x2="16" y2="42" stroke="#61afef" stroke-width="2"/>
-      <text x="8" y="48" fill="#61afef" font-size="10" font-family="sans-serif">Z</text>
+      <g transform="rotate({-viewAngleDeg}, 30, 30)">
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <line x1="30" y1="30" x2="50" y2="30" stroke="#e06c75" stroke-width="2"
+              style="cursor: pointer; pointer-events: stroke;"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(0); }} />
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <text x="52" y="34" fill="#e06c75" font-size="10" font-family="sans-serif"
+              style="cursor: pointer; pointer-events: auto;"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(0); }}>X</text>
+
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <line x1="30" y1="30" x2="30" y2="10" stroke="#98c379" stroke-width="2"
+              style="cursor: pointer; pointer-events: stroke;"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(-Math.PI / 2); }} />
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <text x="27" y="8" fill="#98c379" font-size="10" font-family="sans-serif"
+              style="cursor: pointer; pointer-events: auto;"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(-Math.PI / 2); }}>Y</text>
+
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <line x1="30" y1="30" x2="16" y2="42" stroke="#61afef" stroke-width="2"
+              style="cursor: pointer; pointer-events: stroke;"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(Math.PI / 2); }} />
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <text x="8" y="48" fill="#61afef" font-size="10" font-family="sans-serif"
+              style="cursor: pointer; pointer-events: auto;"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(Math.PI / 2); }}>Z</text>
+      </g>
     </svg>
   </div>
 
@@ -665,8 +701,12 @@
     position: absolute;
     top: 40px;
     right: 8px;
-    pointer-events: none;
+    pointer-events: auto;
     opacity: 0.7;
+  }
+
+  .axis-gizmo:hover {
+    opacity: 1;
   }
 
   /* HUD */
