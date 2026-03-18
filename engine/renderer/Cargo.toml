@@ -25,7 +25,7 @@ engine-core = { path = "../core" }
 engine-assets = { path = "../assets" }
 engine-macros = { path = "../macros" }
 raw-window-handle = "0.6"
-tracy-client = { version = "0.17", optional = true, default-features = false }
+tracy-client = { version = "0.18", optional = true, default-features = false }
 
 # Agentic debugging dependencies (Phase 1.6.R)
 serde = { version = "1.0", features = ["derive"] }

@@ -13,7 +13,7 @@ parking_lot = { workspace = true }
 
 # Optional profiling backends
 puffin = { version = "0.19", optional = true }
-tracy-client = { version = "0.17", optional = true, default-features = false }
+tracy-client = { version = "0.18", optional = true, default-features = false }
 
 # For configuration
 serde = { workspace = true, optional = true }
