@@ -204,40 +204,19 @@ export async function scanProjectEntities(projectPath: string): Promise<EntityIn
  * In browser mode (Playwright), this is a no-op.
  */
 export async function popOutPanel(panelId: string, x: number, y: number): Promise<void> {
-  if (!isTauri) {
-    console.log('[silmaril] popOutPanel: not in Tauri, skipping');
-    return;
-  }
+  if (!isTauri) return;
 
   try {
-    console.log('[silmaril] popOutPanel: creating window for', panelId, 'at', x, y);
-    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-
-    const title = `${panelId} — Silmaril Editor`;
-    const label = `popout-${panelId.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
-    const baseUrl = window.location.origin;
-    const url = `${baseUrl}/?panel=${encodeURIComponent(panelId)}`;
-
-    console.log('[silmaril] popOutPanel: label =', label, 'url =', url);
-
-    const webview = new WebviewWindow(label, {
-      url,
-      title,
-      width: 500,
-      height: 600,
+    await tauriInvoke<void>('create_popout_window', {
+      panelId,
+      title: `${panelId} — Silmaril Editor`,
       x: Math.round(x) - 250,
       y: Math.round(y) - 50,
-    });
-
-    webview.once('tauri://error', (e) => {
-      console.error('[silmaril] Pop-out window error:', e);
-    });
-
-    webview.once('tauri://created', () => {
-      console.log('[silmaril] Pop-out window created successfully:', label);
+      width: 500,
+      height: 600,
     });
   } catch (e) {
-    console.error('[silmaril] popOutPanel exception:', e);
+    console.error('[silmaril] popOutPanel error:', e);
   }
 }
 

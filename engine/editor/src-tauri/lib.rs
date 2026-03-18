@@ -22,6 +22,7 @@ pub fn run() {
             commands::resize_native_viewport,
             commands::destroy_native_viewport,
             commands::set_viewport_visible,
+            commands::create_popout_window,
         ])
         .run(tauri::generate_context!())
         .expect("error running Silmaril Editor");

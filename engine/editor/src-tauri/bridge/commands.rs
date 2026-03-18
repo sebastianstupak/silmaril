@@ -389,6 +389,43 @@ pub fn destroy_native_viewport(
     Ok(())
 }
 
+/// Create a pop-out window for a panel.
+#[tauri::command]
+pub async fn create_popout_window(
+    app: tauri::AppHandle,
+    panel_id: String,
+    title: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+    let label = format!(
+        "popout-{}-{}",
+        panel_id.replace(|c: char| !c.is_alphanumeric(), "-"),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    // Build the URL — in dev mode use the Vite dev server
+    let url = format!("?panel={}", panel_id);
+
+    tracing::info!(label = %label, panel = %panel_id, url = %url, "Creating pop-out window");
+
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+        .title(&title)
+        .inner_size(width as f64, height as f64)
+        .position(x as f64, y as f64)
+        .build()
+        .map_err(|e| format!("Failed to create pop-out window: {e}"))?;
+
+    Ok(())
+}
+
 /// Show or hide the native viewport child window.
 /// Used to temporarily hide during panel drag operations so the
 /// webview drop zone overlay is visible.
