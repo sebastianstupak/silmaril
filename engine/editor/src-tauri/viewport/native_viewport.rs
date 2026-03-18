@@ -102,7 +102,19 @@ mod platform {
                 )
                 .map_err(|e| format!("CreateWindowExW failed: {e}"))?;
 
+                // Bring the child window to the top of the z-order so it
+                // renders above the WebView2 control.
+                let _ = SetWindowPos(
+                    child,
+                    None,
+                    0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER,
+                );
+                // Force to top of z-order
+                let _ = BringWindowToTop(child);
+
                 tracing::info!(
+                    hwnd = ?child,
                     x = bounds.x,
                     y = bounds.y,
                     w = bounds.width,

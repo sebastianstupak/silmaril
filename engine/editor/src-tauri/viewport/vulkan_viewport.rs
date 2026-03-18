@@ -16,8 +16,8 @@ use std::ffi::CStr;
 use tracing::{debug, info};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 
-/// Clear colour for the viewport background: dark blue-gray (#1a1a26).
-const CLEAR_COLOR: [f32; 4] = [0.102, 0.102, 0.149, 1.0];
+/// Clear colour for the viewport background: dark blue-gray.
+const CLEAR_COLOR: [f32; 4] = [0.08, 0.08, 0.12, 1.0];
 
 /// All Vulkan state needed for a minimal clear-colour renderer.
 pub struct VulkanViewport {

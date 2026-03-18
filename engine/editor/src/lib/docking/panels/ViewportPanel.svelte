@@ -600,14 +600,22 @@
     </div>
   </div>
 
-  <!-- SVG viewport -->
-  {#if loading}
+  <!-- In Tauri mode, the native Vulkan child window renders here (no HTML overlay needed).
+       In browser mode (Playwright), show an error/info message since Vulkan isn't available. -->
+  {#if !nativeViewportCreated && !isTauri}
+    {#if loading}
+      <div class="viewport-loading">
+        <p>{t('viewport.loading')}</p>
+      </div>
+    {:else}
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+      {@html svgContent}
+    {/if}
+  {:else if !nativeViewportCreated && isTauri}
     <div class="viewport-loading">
-      <p>{t('viewport.loading')}</p>
+      <p style="color: var(--color-error, #f44336);">Vulkan viewport failed to initialize</p>
+      <p style="color: var(--color-textDim, #666); font-size: 11px;">Check console for details</p>
     </div>
-  {:else}
-    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-    {@html svgContent}
   {/if}
 
   <!-- Axis gizmo (camera orientation indicator) — clickable to snap view -->
