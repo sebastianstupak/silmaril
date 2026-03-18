@@ -68,16 +68,29 @@ function generateMockSvg(args?: Record<string, unknown>): string {
   const selectedId = req.selected_entity_id ?? null;
   const tool = req.tool ?? 'select';
 
+  const viewAngle = req.viewAngle ?? 0;
+  const angleDeg = -(viewAngle * 180 / Math.PI);
+
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block">`;
   svg += `<rect width="${w}" height="${h}" fill="#1a1a2e"/>`;
 
-  // Grid
-  for (let x = 0; x < w; x += 50) {
-    svg += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#252545" stroke-width="0.5"/>`;
+  // Wrap grid, axes, and entities in a rotation group
+  svg += `<g transform="rotate(${angleDeg}, ${w / 2}, ${h / 2})">`;
+
+  // Grid — extend beyond viewport so rotation doesn't reveal gaps
+  const gridExtent = Math.max(w, h) * 1.5;
+  const gridOffX = w / 2 - gridExtent / 2;
+  const gridOffY = h / 2 - gridExtent / 2;
+  for (let x = 0; x <= gridExtent; x += 50) {
+    svg += `<line x1="${gridOffX + x}" y1="${gridOffY}" x2="${gridOffX + x}" y2="${gridOffY + gridExtent}" stroke="#252545" stroke-width="0.5"/>`;
   }
-  for (let y = 0; y < h; y += 50) {
-    svg += `<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="#252545" stroke-width="0.5"/>`;
+  for (let y = 0; y <= gridExtent; y += 50) {
+    svg += `<line x1="${gridOffX}" y1="${gridOffY + y}" x2="${gridOffX + gridExtent}" y2="${gridOffY + y}" stroke="#252545" stroke-width="0.5"/>`;
   }
+
+  // Axis lines through center (X red, Y green)
+  svg += `<line x1="${w / 2 - gridExtent / 2}" y1="${h / 2}" x2="${w / 2 + gridExtent / 2}" y2="${h / 2}" stroke="#e06c7544" stroke-width="1"/>`;
+  svg += `<line x1="${w / 2}" y1="${h / 2 - gridExtent / 2}" x2="${w / 2}" y2="${h / 2 + gridExtent / 2}" stroke="#98c37944" stroke-width="1"/>`;
 
   // Entities
   for (const e of entities) {
@@ -95,6 +108,9 @@ function generateMockSvg(args?: Record<string, unknown>): string {
       svg += generateMockGizmo(px, py, tool);
     }
   }
+
+  // Close rotation group
+  svg += `</g>`;
 
   if (entities.length === 0) {
     svg += `<text x="${w / 2}" y="${h / 2}" fill="#555" font-family="sans-serif" font-size="14" text-anchor="middle" dominant-baseline="middle">No entities in scene</text>`;
@@ -204,6 +220,8 @@ export interface ViewportFrameRequest {
   entities: ViewportEntity[];
   /** Active tool: controls which gizmo is drawn on the selected entity. */
   tool: string;
+  /** Camera view angle in radians — grid and scene rotate by this amount. */
+  viewAngle?: number;
 }
 
 export interface PickEntityRequest {

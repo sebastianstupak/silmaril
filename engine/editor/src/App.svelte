@@ -29,7 +29,7 @@
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
   let bottomHeight = $state(loadSettings().bottomPanelHeight);
-  const MIN_BOTTOM = 60;
+  const MIN_BOTTOM = 150;
   const MAX_BOTTOM_RATIO = 0.6;
 
   const panelComponents: Record<string, any> = {

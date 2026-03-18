@@ -34,7 +34,9 @@
     setViewAngle,
     toggleGrid,
     toggleSnapToGrid,
+    toggleProjection,
   } from '$lib/scene/commands';
+  import type { ProjectionMode } from '$lib/scene/state';
 
   // Entity colour palette — matches the Rust side
   const ENTITY_COLORS = [
@@ -83,6 +85,7 @@
   let gridVisible = $state(getSceneState().gridVisible);
   let snapToGrid = $state(getSceneState().snapToGrid);
   let viewAngleDeg = $state(0);
+  let projection: ProjectionMode = $state(getSceneState().camera.projection);
 
   onMount(() => {
     const unsub = subscribeScene(() => {
@@ -94,6 +97,7 @@
       gridVisible = scene.gridVisible;
       snapToGrid = scene.snapToGrid;
       viewAngleDeg = (scene.camera.viewAngle * 180) / Math.PI;
+      projection = scene.camera.projection;
 
       // Sync camera from scene state to viewport camera
       camera = {
@@ -207,6 +211,7 @@
   async function requestFrame() {
     try {
       const viewEntities = buildViewportEntities();
+      const scene = getSceneState();
       const svg = await getViewportFrame({
         width: viewportWidth,
         height: viewportHeight,
@@ -214,6 +219,7 @@
         camera,
         entities: viewEntities,
         tool: activeTool,
+        viewAngle: scene.camera.viewAngle,
       });
       svgContent = svg;
       loading = false;
@@ -256,7 +262,20 @@
     zoomCamera(delta);
   }
 
-  /** Start a drag interaction based on button / modifier. */
+  /** Start a drag interaction based on button / modifier.
+   *
+   *  Navigation (works regardless of active tool):
+   *    Middle mouse drag        = Pan   (cursor: grabbing)
+   *    Alt + Left mouse drag    = Orbit (cursor: all-scroll)
+   *    Right mouse drag         = Orbit (cursor: all-scroll)
+   *    Scroll wheel             = Zoom  (handled in handleWheel)
+   *
+   *  Tool interactions (Left mouse, no modifier):
+   *    Q (Select)  : Left click         = select entity
+   *    W (Move)    : Left click + drag  = move entity
+   *    E (Rotate)  : Left click + drag  = rotate entity
+   *    R (Scale)   : Left click + drag  = scale entity
+   */
   function handleMouseDown(event: MouseEvent) {
     const tool = getSceneState().activeTool;
 
@@ -264,6 +283,13 @@
     if (event.button === 1) {
       event.preventDefault();
       startDrag(event, 'pan');
+      return;
+    }
+
+    // Alt + right click → zoom (Unity style) — check before plain right-click
+    if (event.button === 2 && event.altKey) {
+      event.preventDefault();
+      startDrag(event, 'zoom');
       return;
     }
 
@@ -281,15 +307,8 @@
       return;
     }
 
-    // Alt + right click → zoom (Unity style)
-    if (event.button === 2 && event.altKey) {
-      event.preventDefault();
-      startDrag(event, 'zoom');
-      return;
-    }
-
     // Ctrl + left drag → pan
-    if (event.button === 0 && event.ctrlKey) {
+    if (event.button === 0 && event.ctrlKey && !event.metaKey) {
       event.preventDefault();
       startDrag(event, 'pan');
       return;
@@ -523,6 +542,18 @@
     <div class="toolbar-group">
       <button
         class="tool-btn"
+        title={projection === 'ortho' ? 'Switch to Perspective' : 'Switch to Orthographic'}
+        onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
+      >
+        <span class="tool-icon">{projection === 'ortho' ? '\u229E' : '\u25CE'}</span>
+      </button>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <button
+        class="tool-btn"
         title={t('scene.create_entity')}
         onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
       >
@@ -581,6 +612,8 @@
     <span class="hud-tool" title={t(`tool.${activeTool}` as any)}>
       {activeTool.charAt(0).toUpperCase() + activeTool.slice(1)}
     </span>
+    <span class="hud-separator">|</span>
+    <span class="hud-projection">{projection === 'ortho' ? 'Ortho' : 'Persp'}</span>
     <span class="hud-separator">|</span>
     <span class="hud-zoom" title={t('viewport.zoom')}>
       {Math.round(camera.zoom * 100)}%
@@ -732,6 +765,13 @@
 
   .hud-separator {
     color: #444;
+  }
+
+  .hud-projection {
+    color: #98c379;
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
   }
 
   .hud-zoom {

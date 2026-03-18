@@ -11,6 +11,7 @@ import {
   defaultCamera,
   type SceneEntity,
   type SceneTool,
+  type ProjectionMode,
   type Vec3,
 } from './state';
 import { logInfo, logDebug } from '$lib/stores/console';
@@ -277,6 +278,17 @@ export function resetCamera(): void {
   }));
 }
 
+/** Toggle between orthographic and perspective projection. */
+export function toggleProjection(): void {
+  _mutate((s) => ({
+    ...s,
+    camera: {
+      ...s.camera,
+      projection: s.camera.projection === 'ortho' ? 'perspective' : 'ortho',
+    },
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Tool system
 // ---------------------------------------------------------------------------
@@ -429,6 +441,10 @@ export function dispatchSceneCommand(
 
     case 'toggle_snap':
       toggleSnapToGrid();
+      return { ok: true };
+
+    case 'toggle_projection':
+      toggleProjection();
       return { ok: true };
 
     case 'new_scene':

@@ -31,17 +31,18 @@
 
   $effect(() => {
     function onDragStart() { isDragging = true; }
-    function onDragEnd() { isDragging = false; }
+    function onDragEnd() {
+      isDragging = false;
+    }
 
     window.addEventListener('dragstart', onDragStart);
+    // dragend always fires on the source element when a drag operation ends
+    // (regardless of whether it was successful or cancelled)
     window.addEventListener('dragend', onDragEnd);
-    // Also listen for drop to clear state in case dragend doesn't fire
-    window.addEventListener('drop', onDragEnd);
 
     return () => {
       window.removeEventListener('dragstart', onDragStart);
       window.removeEventListener('dragend', onDragEnd);
-      window.removeEventListener('drop', onDragEnd);
     };
   });
 
@@ -161,10 +162,11 @@
   }
   .dock-tab-content {
     flex: 1;
-    overflow: hidden;
+    overflow: auto;
     position: relative;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     background: var(--color-bgPanel, #252525);
   }
   .dock-panel-placeholder {

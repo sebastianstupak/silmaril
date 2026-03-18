@@ -23,12 +23,15 @@ export interface SceneEntity extends EntityInfo {
   locked: boolean;
 }
 
+export type ProjectionMode = 'ortho' | 'perspective';
+
 export interface SceneCamera {
   position: Vec3;
   target: Vec3;
   zoom: number;
   fov: number;
   viewAngle: number; // 2D rotation angle in radians (0 = north-up)
+  projection: ProjectionMode;
 }
 
 export type SceneTool = 'select' | 'move' | 'rotate' | 'scale';
@@ -55,6 +58,7 @@ function defaultCamera(): SceneCamera {
     zoom: 1,
     fov: 60,
     viewAngle: 0,
+    projection: 'perspective',
   };
 }
 

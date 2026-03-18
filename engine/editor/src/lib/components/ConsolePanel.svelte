@@ -180,9 +180,10 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-height: 0;
     font-family: var(--font-mono, 'Consolas', 'Courier New', monospace);
     font-size: 12px;
-    margin: -8px;
+    overflow: hidden;
   }
 
   .console-toolbar {

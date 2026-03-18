@@ -223,6 +223,39 @@ function cleanNode(node: LayoutNode): LayoutNode {
   return node;
 }
 
+/** Find a TabsNode by searching for it by one of its panel IDs */
+function findTabsNodeWithPanel(root: LayoutNode, panelId: string, path: number[] = []): { node: TabsNode; path: number[] } | null {
+  if (root.type === 'tabs') {
+    if (root.panels.includes(panelId)) {
+      return { node: root, path };
+    }
+    return null;
+  }
+  for (let i = 0; i < root.children.length; i++) {
+    const result = findTabsNodeWithPanel(root.children[i], panelId, [...path, i]);
+    if (result) return result;
+  }
+  return null;
+}
+
+/** Find any valid tabs node at or near the given path after tree restructuring.
+ *  Falls back to searching the tree if the original path is stale. */
+function findTargetNode(root: LayoutNode, originalPath: number[]): { node: LayoutNode; path: number[] } | null {
+  // Try the original path first
+  const directNode = getNodeAtPath(root, originalPath);
+  if (directNode) return { node: directNode, path: originalPath };
+
+  // The tree was restructured — try progressively shorter paths
+  for (let len = originalPath.length - 1; len >= 0; len--) {
+    const shorterPath = originalPath.slice(0, len);
+    const node = getNodeAtPath(root, shorterPath);
+    if (node) return { node, path: shorterPath };
+  }
+
+  // Last resort: return root
+  return { node: root, path: [] };
+}
+
 /** Drop a panel onto a target location, producing a new layout */
 export function dropPanel(
   layout: EditorLayout,
@@ -243,9 +276,10 @@ export function dropPanel(
     return result;
   }
 
-  // Find the target node
-  const targetNode = getNodeAtPath(result.root, targetPath);
-  if (!targetNode) return result;
+  // Find the target node — tree may have been restructured by removePanelFromLayout
+  const found = findTargetNode(result.root, targetPath);
+  if (!found) return result;
+  const { node: targetNode, path: resolvedPath } = found;
 
   if (zone === 'center' && targetNode.type === 'tabs') {
     // Add as a new tab
@@ -271,10 +305,10 @@ export function dropPanel(
   };
 
   // Replace target in tree
-  replaceNodeAtPath(result.root, targetPath, splitNode);
+  replaceNodeAtPath(result.root, resolvedPath, splitNode);
 
   // If the path was empty we replaced root itself
-  if (targetPath.length === 0) {
+  if (resolvedPath.length === 0) {
     result.root = splitNode;
   }
 
