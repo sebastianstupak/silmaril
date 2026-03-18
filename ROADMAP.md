@@ -221,19 +221,43 @@ silm package --platform windows
 - Foundation for editor (Phase 0.8)
 
 **Deliverables:**
-- [ ] `engine/cli/` crate implementation
-- [ ] `silm` binary in PATH
-- [ ] Hot-reload working (code + assets)
-- [ ] Asset packing working
-- [ ] Documentation complete
+- [x] `engine/cli/` crate implementation ✅
+- [x] `silm` binary (all commands working) ✅
+- [x] Hot-reload working (`silm dev`) ✅
+- [x] Build/package working (`silm build`, `silm package`) ✅
+- [ ] Documentation (tutorial) — deferred
 
 ---
 
-#### **0.8 Silmaril Editor Foundation** 🟡 **MEDIUM - After CLI Works** - [docs/tasks/phase0-8-editor-foundation.md](docs/tasks/phase0-8-editor-foundation.md)
+#### **0.7.1 Shared Operation Layer (`engine/ops`)** 🟡 **IN PROGRESS**
 
-**Priority:** 🟡 **MEDIUM** - After CLI is working, provides visual workflow
+**Priority:** 🔴 **CRITICAL** - Required for editor to share CLI operations
 
-**Status:** ⚪ Not Started (0%)
+**Status:** 🟡 In Progress (~60%)
+
+Extract CLI command logic into `engine/ops` so both CLI and editor use the same operations.
+
+- [x] `engine/ops` crate created with ProgressSink trait ✅
+- [x] `ops::build` — platform builds, packaging, env merging, installer ✅
+- [x] `ops::project` — project creation, discovery, templates, Target, atomic_write ✅
+- [x] `ops::codegen` — component/system code generation, module wiring ✅
+- [x] `ops::module` — add/remove/list module management ✅
+- [x] `ops::undo` — command pattern undo/redo stack (8 tests) ✅
+- [x] `ops::scene` — YAML + Bincode scene save/load (5 tests) ✅
+- [x] CLI `silm new` rewired to use ops ✅
+- [ ] CLI `silm add component/system` rewired to use ops
+- [ ] CLI `silm add module` / `silm module` rewired to use ops
+- [ ] CLI `silm build` / `silm package` rewired to use ops
+- [ ] Remove duplicate code from CLI (after all commands migrated)
+- [ ] Verify all 94 CLI tests + 16 E2E tests still pass
+
+---
+
+#### **0.8 Silmaril Editor Foundation** 🟡 **SCAFFOLDED** - [docs/tasks/phase0-8-editor-foundation.md](docs/tasks/phase0-8-editor-foundation.md)
+
+**Priority:** 🟡 **MEDIUM** - After ops migration, provides visual workflow
+
+**Status:** 🟡 Scaffolded (~15%) — project structure, bridge, plugin system stubs in place
 
 **Time Estimate:** 3-4 weeks (20-25 working days)
 
