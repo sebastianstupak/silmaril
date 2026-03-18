@@ -1,6 +1,7 @@
 //! Build command types, platform mapping, and runner abstraction.
 
 pub mod env;
+pub mod installer;
 pub mod native;
 pub mod package;
 pub mod wasm;
@@ -260,9 +261,9 @@ pub fn check_docker() -> Result<()> {
 /// Build the game for one or more target platforms.
 #[derive(Args, Debug)]
 pub struct BuildCommand {
-    /// Target platform (e.g. native, wasm, linux-x86_64). Defaults to game.toml [build] platforms.
-    #[arg(long)]
-    pub platform: Option<String>,
+    /// Target platform(s) (e.g. native, wasm, linux-x86_64). Repeatable. Defaults to game.toml [build] platforms.
+    #[arg(long, num_args = 1..)]
+    pub platform: Option<Vec<String>>,
 
     /// Build in release mode with optimizations.
     #[arg(long)]
@@ -276,13 +277,17 @@ pub struct BuildCommand {
 /// Package built artefacts for distribution.
 #[derive(Args, Debug)]
 pub struct PackageCommand {
-    /// Target platform to package (defaults to game.toml [build] platforms).
-    #[arg(long)]
-    pub platform: Option<String>,
+    /// Target platform(s) to package. Repeatable. Defaults to game.toml [build] platforms.
+    #[arg(long, num_args = 1..)]
+    pub platform: Option<Vec<String>>,
 
     /// Output directory for packaged artefacts.
     #[arg(long)]
     pub out_dir: Option<String>,
+
+    /// Generate native installers (AppImage/DMG/NSIS) via cargo-packager.
+    #[arg(long)]
+    pub installer: bool,
 }
 
 // ============================================================================
@@ -508,8 +513,8 @@ pub fn handle_build_command(cmd: BuildCommand, project_root: PathBuf) -> Result<
     let game_toml_content = std::fs::read_to_string(&game_toml_path)
         .map_err(|e| anyhow::anyhow!("Failed to read game.toml: {e}"))?;
 
-    let platform_names: Vec<String> = if let Some(ref p) = cmd.platform {
-        vec![p.clone()]
+    let platform_names: Vec<String> = if let Some(ref platforms) = cmd.platform {
+        platforms.clone()
     } else {
         env::parse_build_section(&game_toml_content)
             .ok_or_else(|| anyhow::anyhow!(
@@ -544,8 +549,8 @@ pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Res
         .ok_or_else(|| anyhow::anyhow!("game.toml is missing [project] name"))?;
     let version = parse_project_version(&game_toml_content);
 
-    let platform_names: Vec<String> = if let Some(ref p) = cmd.platform {
-        vec![p.clone()]
+    let platform_names: Vec<String> = if let Some(ref platforms) = cmd.platform {
+        platforms.clone()
     } else {
         env::parse_build_section(&game_toml_content)
             .ok_or_else(|| anyhow::anyhow!(
@@ -616,6 +621,24 @@ pub fn handle_package_command(cmd: PackageCommand, project_root: PathBuf) -> Res
         let zip_path = out_dir.join(&zip_name);
         package::create_zip(&dist_dir, &zip_path)?;
         info!(zip = %zip_name, "Package complete");
+    }
+
+    // Generate native installers if requested
+    if cmd.installer {
+        match installer::check_packager() {
+            Ok(()) => {
+                let description = "A game built with Silmaril";
+                let config = installer::generate_packager_config(
+                    &project_name, &version, description, "client",
+                );
+                std::fs::write(project_root.join("packager.toml"), &config)?;
+                installer::run_packager(&project_root)?;
+            }
+            Err(e) => {
+                info!("{}", e);
+                info!("[silm] skipping installer generation");
+            }
+        }
     }
 
     Ok(())
