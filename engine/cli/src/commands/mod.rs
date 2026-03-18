@@ -1,5 +1,6 @@
 pub mod add;
 pub mod build;
+pub mod completions;
 pub mod dev;
 pub mod module;
 pub mod new;

@@ -63,6 +63,13 @@ enum Commands {
         #[command(flatten)]
         command: commands::build::PackageCommand,
     },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 #[tokio::main]
@@ -96,6 +103,10 @@ async fn main() -> anyhow::Result<()> {
             let cwd = std::env::current_dir()?;
             let project_root = commands::add::wiring::find_project_root(&cwd)?;
             commands::build::handle_package_command(command, project_root)?;
+        }
+        Commands::Completions { shell } => {
+            let mut cmd = <Cli as clap::CommandFactory>::command();
+            commands::completions::generate_completions(shell, &mut cmd)?;
         }
     }
 
