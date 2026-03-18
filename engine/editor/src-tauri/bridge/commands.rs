@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Mutex;
 
+use crate::viewport::native_viewport::{NativeViewport, ViewportBounds};
 use crate::viewport::{self, EntityView, ViewportCamera};
 
 #[derive(Serialize)]
@@ -288,4 +290,101 @@ pub fn pick_viewport_entity(request: PickEntityRequest) -> Option<u64> {
         &request.entities,
         &camera,
     )
+}
+
+// ---------------------------------------------------------------------------
+// Native viewport (child window for Vulkan rendering)
+// ---------------------------------------------------------------------------
+
+/// Managed state holding the optional native viewport.
+pub struct NativeViewportState(pub Mutex<Option<NativeViewport>>);
+
+/// Create a native child window for the Vulkan viewport.
+///
+/// The child window is parented to the Tauri main window.  Svelte passes in
+/// the desired bounds (in physical/device pixels).  Once created, a render
+/// thread starts drawing into the child window.
+#[tauri::command]
+pub fn create_native_viewport(
+    app: tauri::AppHandle,
+    viewport_state: tauri::State<NativeViewportState>,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    // Don't create a second viewport if one already exists.
+    {
+        let guard = viewport_state.0.lock().unwrap();
+        if guard.is_some() {
+            tracing::warn!("Native viewport already exists; ignoring create_native_viewport");
+            return Ok(());
+        }
+    }
+
+    let bounds = ViewportBounds {
+        x,
+        y,
+        width,
+        height,
+    };
+
+    #[cfg(windows)]
+    {
+        use tauri::Manager;
+
+        let window = app
+            .get_webview_window("main")
+            .ok_or("main window not found")?;
+        let parent_hwnd = window.hwnd().map_err(|e| format!("Failed to get HWND: {e}"))?;
+
+        let mut vp = NativeViewport::new(parent_hwnd, bounds)?;
+        vp.start_rendering()?;
+
+        *viewport_state.0.lock().unwrap() = Some(vp);
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (app, bounds);
+        return Err("Native viewport not yet implemented for this platform".into());
+    }
+
+    Ok(())
+}
+
+/// Reposition/resize the native viewport child window.
+///
+/// Called by Svelte whenever the viewport container's bounds change (e.g.
+/// panel resize, window resize).
+#[tauri::command]
+pub fn resize_native_viewport(
+    viewport_state: tauri::State<NativeViewportState>,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let guard = viewport_state.0.lock().unwrap();
+    if let Some(ref vp) = *guard {
+        vp.set_bounds(ViewportBounds {
+            x,
+            y,
+            width,
+            height,
+        });
+    }
+    Ok(())
+}
+
+/// Stop the render thread and destroy the native viewport child window.
+#[tauri::command]
+pub fn destroy_native_viewport(
+    viewport_state: tauri::State<NativeViewportState>,
+) -> Result<(), String> {
+    let mut guard = viewport_state.0.lock().unwrap();
+    if let Some(mut vp) = guard.take() {
+        vp.destroy();
+    }
+    Ok(())
 }

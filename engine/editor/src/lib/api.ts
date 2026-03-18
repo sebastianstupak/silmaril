@@ -244,6 +244,39 @@ export async function pickViewportEntity(request: PickEntityRequest): Promise<nu
 }
 
 // ---------------------------------------------------------------------------
+// Native viewport (child window for Vulkan rendering)
+// ---------------------------------------------------------------------------
+
+/** Create the native child window for the Vulkan viewport.
+ *  Bounds are in physical (device) pixels. */
+export async function createNativeViewport(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<void> {
+  if (!isTauri) return; // no-op in browser mode
+  return tauriInvoke<void>('create_native_viewport', { x, y, width, height });
+}
+
+/** Reposition/resize the native viewport child window. */
+export async function resizeNativeViewport(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('resize_native_viewport', { x, y, width, height });
+}
+
+/** Destroy the native viewport child window. */
+export async function destroyNativeViewport(): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('destroy_native_viewport', {});
+}
+
+// ---------------------------------------------------------------------------
 // Scene commands (AI agent API)
 // ---------------------------------------------------------------------------
 

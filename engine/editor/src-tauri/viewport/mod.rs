@@ -3,7 +3,11 @@
 //! Generates an SVG representation of the scene with a grid, entity
 //! positions, and selection highlighting.  This serves as the visual
 //! scaffold while real Vulkan integration is developed separately.
+//!
+//! The `native_viewport` submodule manages a platform-native child window
+//! for future Vulkan surface rendering.
 
+pub mod native_viewport;
 pub mod picking;
 
 use serde::{Deserialize, Serialize};

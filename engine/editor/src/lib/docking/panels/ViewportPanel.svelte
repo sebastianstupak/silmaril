@@ -9,6 +9,9 @@
   import {
     getViewportFrame,
     pickViewportEntity,
+    createNativeViewport,
+    resizeNativeViewport,
+    destroyNativeViewport,
     type ViewportEntity,
     type ViewportCamera,
   } from '$lib/api';
@@ -51,11 +54,16 @@
     r: 'scale',
   };
 
+  /** Detect if running inside Tauri or standalone browser */
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
   let containerEl: HTMLDivElement | undefined = $state(undefined);
   let viewportWidth = $state(800);
   let viewportHeight = $state(600);
   let svgContent = $state('');
   let loading = $state(true);
+  /** Whether the native viewport child window has been created. */
+  let nativeViewportCreated = $state(false);
 
   // Camera state (viewport-local, synced from scene state)
   let camera: ViewportCamera = $state({ offset_x: 0, offset_y: 0, zoom: 1 });
@@ -116,21 +124,51 @@
 
     // Observe container size
     if (containerEl) {
+      /** Compute physical-pixel bounds of the viewport container. */
+      function getPhysicalBounds(): { x: number; y: number; width: number; height: number } {
+        const rect = containerEl!.getBoundingClientRect();
+        const sf = window.devicePixelRatio || 1;
+        return {
+          x: Math.round(rect.left * sf),
+          y: Math.round(rect.top * sf),
+          width: Math.round(rect.width * sf),
+          height: Math.round(rect.height * sf),
+        };
+      }
+
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
           viewportWidth = Math.round(entry.contentRect.width) || 800;
           viewportHeight = Math.round(entry.contentRect.height) || 600;
         }
         requestFrame();
+
+        // Keep native viewport child window in sync with container size
+        if (isTauri && nativeViewportCreated) {
+          const b = getPhysicalBounds();
+          resizeNativeViewport(b.x, b.y, b.width, b.height);
+        }
       });
       observer.observe(containerEl);
 
-      // Initial frame
+      // Create native viewport child window in Tauri mode
+      if (isTauri) {
+        const b = getPhysicalBounds();
+        createNativeViewport(b.x, b.y, b.width, b.height).then(() => {
+          nativeViewportCreated = true;
+        });
+      }
+
+      // Initial frame (SVG fallback — always rendered for now)
       requestFrame();
 
       return () => {
         unsub();
         observer.disconnect();
+        if (isTauri && nativeViewportCreated) {
+          destroyNativeViewport();
+          nativeViewportCreated = false;
+        }
       };
     }
 
