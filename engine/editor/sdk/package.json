@@ -1,0 +1,13 @@
+{
+  "name": "@silmaril/editor-sdk",
+  "version": "0.1.0",
+  "description": "SDK for building Silmaril Editor panel plugins",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "build": "vite build"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  }
+}

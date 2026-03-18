@@ -1,0 +1,26 @@
+[package]
+name = "silmaril-editor"
+version = "0.1.0"
+edition = "2021"
+authors = ["Silmaril Team"]
+license = "Apache-2.0"
+description = "Silmaril game engine visual editor"
+
+[lib]
+name = "silmaril_editor"
+path = "src-tauri/lib.rs"
+
+[[bin]]
+name = "silmaril-editor"
+path = "src-tauri/main.rs"
+
+[dependencies]
+engine-ops = { path = "../ops" }
+engine-core = { path = "../core" }
+anyhow = "1.0"
+tracing = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"
