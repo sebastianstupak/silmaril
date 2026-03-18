@@ -204,21 +204,21 @@ export async function scanProjectEntities(projectPath: string): Promise<EntityIn
  * In browser mode (Playwright), this is a no-op.
  */
 export async function popOutPanel(panelId: string, x: number, y: number): Promise<void> {
-  if (!isTauri) return;
+  if (!isTauri) {
+    console.log('[silmaril] popOutPanel: not in Tauri, skipping');
+    return;
+  }
 
   try {
+    console.log('[silmaril] popOutPanel: creating window for', panelId, 'at', x, y);
     const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-    const { getPanelInfo } = await import('$lib/docking/types');
 
-    const info = getPanelInfo(panelId);
-    const title = info ? `${panelId} — Silmaril Editor` : 'Panel — Silmaril Editor';
-
-    // Label must be alphanumeric + hyphens, unique
+    const title = `${panelId} — Silmaril Editor`;
     const label = `popout-${panelId.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
-
-    // In dev mode, use the Vite dev server URL; in production, use relative path
     const baseUrl = window.location.origin;
-    const url = `${baseUrl}?panel=${encodeURIComponent(panelId)}`;
+    const url = `${baseUrl}/?panel=${encodeURIComponent(panelId)}`;
+
+    console.log('[silmaril] popOutPanel: label =', label, 'url =', url);
 
     const webview = new WebviewWindow(label, {
       url,
@@ -227,18 +227,17 @@ export async function popOutPanel(panelId: string, x: number, y: number): Promis
       height: 600,
       x: Math.round(x) - 250,
       y: Math.round(y) - 50,
-      decorations: true,
     });
 
     webview.once('tauri://error', (e) => {
-      console.error('[silmaril] Failed to create pop-out window:', e);
+      console.error('[silmaril] Pop-out window error:', e);
     });
 
     webview.once('tauri://created', () => {
-      console.log('[silmaril] Pop-out window created:', label);
+      console.log('[silmaril] Pop-out window created successfully:', label);
     });
   } catch (e) {
-    console.error('[silmaril] popOutPanel error:', e);
+    console.error('[silmaril] popOutPanel exception:', e);
   }
 }
 

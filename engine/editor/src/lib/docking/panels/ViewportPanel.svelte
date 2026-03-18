@@ -151,13 +151,15 @@
       });
       observer.observe(containerEl);
 
-      // Create native viewport child window in Tauri mode
-      if (isTauri) {
-        const b = getPhysicalBounds();
-        createNativeViewport(b.x, b.y, b.width, b.height).then(() => {
-          nativeViewportCreated = true;
-        });
-      }
+      // NOTE: Native Vulkan viewport disabled until it can render grid/entities/gizmos.
+      // Currently it only clears to solid color which is less useful than the SVG viewport.
+      // Uncomment when Vulkan rendering is fully implemented.
+      // if (isTauri) {
+      //   const b = getPhysicalBounds();
+      //   createNativeViewport(b.x, b.y, b.width, b.height).then(() => {
+      //     nativeViewportCreated = true;
+      //   });
+      // }
 
       // Initial frame (SVG fallback — always rendered for now)
       requestFrame();
