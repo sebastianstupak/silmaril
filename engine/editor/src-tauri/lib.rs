@@ -22,6 +22,7 @@ pub fn run() {
             commands::set_viewport_visible,
             commands::create_popout_window,
             commands::dock_panel_back,
+            commands::check_dock_proximity,
         ])
         .run(tauri::generate_context!())
         .expect("error running Silmaril Editor");

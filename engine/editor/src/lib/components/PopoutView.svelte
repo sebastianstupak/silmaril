@@ -28,12 +28,43 @@
   const basePanelId = panelId.split(':')[0];
   const PanelComponent = panels[basePanelId];
 
+  let nearMainWindow = $state(false);
+
   onMount(() => {
     // Apply theme so the pop-out window matches the main editor
     const settings = loadSettings();
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
+
+    // Track window position during drag — detect proximity to main editor
+    if (isTauri) {
+      setupDockDetection();
+    }
   });
+
+  async function setupDockDetection() {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+
+      // Listen for window move events (fires during title bar drag)
+      await win.onMoved(async ({ payload: position }) => {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const size = await win.innerSize();
+          const result = await invoke<{ near: boolean }>('check_dock_proximity', {
+            popoutX: position.x,
+            popoutY: position.y,
+            popoutWidth: size.width,
+            popoutHeight: size.height,
+          });
+          nearMainWindow = result.near;
+        } catch { /* ignore */ }
+      });
+    } catch (e) {
+      console.error('[popout] dock detection setup failed:', e);
+    }
+  }
 
   async function dockBack() {
     if (!isTauri) return;
@@ -47,11 +78,14 @@
   }
 </script>
 
-<div class="popout-container">
+<div class="popout-container" class:near-dock={nearMainWindow}>
   <div class="popout-toolbar">
     <button class="dock-back-btn" onclick={dockBack} title={t('popout.dock_back')}>
       {t('popout.dock_back')}
     </button>
+    {#if nearMainWindow}
+      <span class="dock-hint">Release to dock</span>
+    {/if}
   </div>
   {#if PanelComponent}
     <div class="popout-content">
@@ -104,6 +138,18 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  .near-dock {
+    outline: 2px solid var(--color-accent, #007acc);
+    outline-offset: -2px;
+  }
+
+  .dock-hint {
+    color: var(--color-accent, #007acc);
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
   }
 
   .popout-unknown {

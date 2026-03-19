@@ -391,6 +391,64 @@ pub async fn dock_panel_back(
     Ok(())
 }
 
+/// Check if a pop-out window is near/overlapping the main editor window.
+/// Returns `{ near: true }` if the pop-out overlaps the main window by >30%.
+#[tauri::command]
+pub async fn check_dock_proximity(
+    app: tauri::AppHandle,
+    popout_x: i32,
+    popout_y: i32,
+    popout_width: u32,
+    popout_height: u32,
+) -> Result<serde_json::Value, String> {
+    use tauri::{Emitter, Manager};
+
+    let main = app
+        .get_webview_window("main")
+        .ok_or("main window not found")?;
+
+    let main_pos = main.outer_position().map_err(|e| e.to_string())?;
+    let main_size = main.outer_size().map_err(|e| e.to_string())?;
+
+    // Calculate overlap area
+    let mx1 = main_pos.x;
+    let my1 = main_pos.y;
+    let mx2 = mx1 + main_size.width as i32;
+    let my2 = my1 + main_size.height as i32;
+
+    let px1 = popout_x;
+    let py1 = popout_y;
+    let px2 = px1 + popout_width as i32;
+    let py2 = py1 + popout_height as i32;
+
+    let overlap_x = (mx2.min(px2) - mx1.max(px1)).max(0);
+    let overlap_y = (my2.min(py2) - my1.max(py1)).max(0);
+    let overlap_area = overlap_x as u64 * overlap_y as u64;
+    let popout_area = popout_width as u64 * popout_height as u64;
+
+    let overlap_pct = if popout_area > 0 {
+        (overlap_area * 100) / popout_area
+    } else {
+        0
+    };
+
+    // Near if >30% overlap
+    let near = overlap_pct > 30;
+
+    // If near, tell main window to show dock overlay
+    if near {
+        if let Some(main_win) = app.get_webview_window("main") {
+            let _ = main_win.emit("popout-near", serde_json::json!({ "near": true }));
+        }
+    } else {
+        if let Some(main_win) = app.get_webview_window("main") {
+            let _ = main_win.emit("popout-near", serde_json::json!({ "near": false }));
+        }
+    }
+
+    Ok(serde_json::json!({ "near": near }))
+}
+
 /// Show or hide the native viewport child window.
 /// Used to temporarily hide during panel drag operations so the
 /// webview drop zone overlay is visible.

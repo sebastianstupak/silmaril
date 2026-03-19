@@ -36,6 +36,7 @@
 
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
+  let popoutNearby = $state(false);
   let bottomHeight = $state(loadSettings().bottomPanelHeight);
   const MIN_BOTTOM = 150;
   const MAX_BOTTOM_RATIO = 0.6;
@@ -148,18 +149,24 @@
     logInfo('Silmaril Editor started');
     editorState = await getEditorState();
 
-    // Listen for dock-panel-back events from pop-out windows
+    // Listen for events from pop-out windows
     if (isTauri && !popoutPanel) {
       try {
         const { listen } = await import('@tauri-apps/api/event');
-        const unlisten = await listen<{ panelId: string }>('dock-panel-back', (event) => {
+
+        // Panel docked back
+        await listen<{ panelId: string }>('dock-panel-back', (event) => {
           console.log('[silmaril] dock-panel-back received:', event.payload);
+          popoutNearby = false;
           addPanelToLayout(event.payload.panelId);
         });
-        // Clean up listener on unmount (though main window rarely unmounts)
-        return () => { unlisten(); };
+
+        // Pop-out window proximity detection — show visual indicator
+        await listen<{ near: boolean }>('popout-near', (event) => {
+          popoutNearby = event.payload.near;
+        });
       } catch (e) {
-        console.error('[silmaril] Failed to listen for dock-panel-back:', e);
+        console.error('[silmaril] Failed to listen for pop-out events:', e);
       }
     }
   });
@@ -261,6 +268,14 @@
 
   <!-- Drag overlay (ghost tab + backdrop during panel drag) -->
   <DragOverlay />
+
+  <!-- Pop-out window dock indicator -->
+  {#if popoutNearby}
+    <div class="dock-proximity-indicator">
+      <div class="dock-proximity-border"></div>
+      <div class="dock-proximity-label">Drop window to dock panel</div>
+    </div>
+  {/if}
 
   <!-- Status bar -->
   <div class="status-bar">
@@ -413,6 +428,37 @@
   }
 
   /* Status bar */
+  .dock-proximity-indicator {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    pointer-events: none;
+  }
+  .dock-proximity-border {
+    position: absolute;
+    inset: 4px;
+    border: 3px solid var(--color-accent, #007acc);
+    border-radius: 8px;
+    animation: pulse-border 1s ease-in-out infinite;
+  }
+  .dock-proximity-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--color-accent, #007acc);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  @keyframes pulse-border {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
   .status-bar {
     height: 24px;
     display: flex;
