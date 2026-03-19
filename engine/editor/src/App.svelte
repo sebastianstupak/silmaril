@@ -37,6 +37,7 @@
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
   let popoutNearby = $state(false);
+  let popoutDockZone = $state('none');
   let bottomHeight = $state(loadSettings().bottomPanelHeight);
   const MIN_BOTTOM = 150;
   const MAX_BOTTOM_RATIO = 0.6;
@@ -192,8 +193,9 @@
         });
 
         // Pop-out window proximity detection — show visual indicator
-        await listen<{ near: boolean }>('popout-near', (event) => {
+        await listen<{ near: boolean; zone: string }>('popout-near', (event) => {
           popoutNearby = event.payload.near;
+          popoutDockZone = event.payload.zone ?? 'none';
         });
       } catch (e) {
         console.error('[silmaril] Failed to listen for pop-out events:', e);
@@ -300,10 +302,24 @@
   <DragOverlay />
 
   <!-- Pop-out window dock indicator -->
+  <!-- Pop-out dock zone overlay — shows where the panel will land -->
   {#if popoutNearby}
     <div class="dock-proximity-indicator">
-      <div class="dock-proximity-border"></div>
-      <div class="dock-proximity-label">Drop window to dock panel</div>
+      <div class="dock-zone zone-left" class:active={popoutDockZone === 'left'}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M14 7l-5 5 5 5V7z"/></svg>
+      </div>
+      <div class="dock-zone zone-right" class:active={popoutDockZone === 'right'}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M10 17l5-5-5-5v10z"/></svg>
+      </div>
+      <div class="dock-zone zone-top" class:active={popoutDockZone === 'top'}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M7 14l5-5 5 5H7z"/></svg>
+      </div>
+      <div class="dock-zone zone-bottom" class:active={popoutDockZone === 'bottom'}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M7 10l5 5 5-5H7z"/></svg>
+      </div>
+      <div class="dock-zone zone-center" class:active={popoutDockZone === 'center'}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" opacity="0.8"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+      </div>
     </div>
   {/if}
 
@@ -464,30 +480,26 @@
     z-index: 99998;
     pointer-events: none;
   }
-  .dock-proximity-border {
+  .dock-zone {
     position: absolute;
-    inset: 4px;
-    border: 3px solid var(--color-accent, #007acc);
-    border-radius: 8px;
-    animation: pulse-border 1s ease-in-out infinite;
-  }
-  .dock-proximity-label {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.15;
     background: var(--color-accent, #007acc);
-    color: white;
-    padding: 8px 20px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    transition: opacity 0.15s, background 0.15s;
+    border-radius: 4px;
   }
-  @keyframes pulse-border {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+  .dock-zone.active {
+    opacity: 0.4;
+    outline: 2px solid var(--color-accent, #007acc);
+    outline-offset: -2px;
   }
+  .zone-left   { left: 0; top: 10%; width: 20%; height: 80%; }
+  .zone-right  { right: 0; top: 10%; width: 20%; height: 80%; }
+  .zone-top    { top: 0; left: 10%; width: 80%; height: 15%; }
+  .zone-bottom { bottom: 0; left: 10%; width: 80%; height: 15%; }
+  .zone-center { top: 25%; left: 25%; width: 50%; height: 50%; }
 
   .status-bar {
     height: 24px;

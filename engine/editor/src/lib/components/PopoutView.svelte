@@ -47,6 +47,9 @@
 
   async function startTitleBarDrag(e: MouseEvent) {
     if (e.button !== 0) return;
+    // Don't start drag if clicking on a button
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
     e.preventDefault();
     dragging = true;
     dragStartX = e.screenX;
@@ -97,11 +100,13 @@
     if (!isTauri) return;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const result = await invoke<{ near: boolean }>('check_dock_proximity', {
+      const result = await invoke<{ near: boolean; zone?: string }>('check_dock_proximity', {
         popoutX: screenX - 50,
         popoutY: screenY - 50,
         popoutWidth: 100,
         popoutHeight: 100,
+        cursorX: screenX,
+        cursorY: screenY,
       });
       nearMainWindow = result.near;
     } catch { /* ignore */ }
