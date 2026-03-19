@@ -48,25 +48,42 @@
       const { invoke } = await import('@tauri-apps/api/core');
       const win = getCurrentWindow();
 
-      // onMoved fires when the window position changes (after title bar drag ends on Windows).
-      // If the window lands on top of the main editor, auto-dock immediately.
-      await win.onMoved(async ({ payload: position }) => {
+      let lastX = 0, lastY = 0;
+      let docking = false;
+
+      // Poll window position every 200ms to detect proximity to main editor.
+      // onMoved is unreliable on Windows during title bar drag.
+      const interval = setInterval(async () => {
+        if (docking) return;
         try {
-          const size = await win.innerSize();
+          const pos = await win.outerPosition();
+          const size = await win.outerSize();
+
+          // Only check if position actually changed
+          if (pos.x === lastX && pos.y === lastY) return;
+          lastX = pos.x;
+          lastY = pos.y;
+
           const result = await invoke<{ near: boolean }>('check_dock_proximity', {
-            popoutX: position.x,
-            popoutY: position.y,
+            popoutX: pos.x,
+            popoutY: pos.y,
             popoutWidth: size.width,
             popoutHeight: size.height,
           });
           nearMainWindow = result.near;
-
-          // Auto-dock: if the window was dropped over the main editor, dock back
-          if (result.near) {
-            await dockBack();
-          }
         } catch { /* ignore */ }
+      }, 200);
+
+      // Also listen for onMoved as a backup — fires when drag ends
+      await win.onMoved(async () => {
+        if (docking || !nearMainWindow) return;
+        docking = true;
+        clearInterval(interval);
+        await dockBack();
       });
+
+      // Cleanup on unmount
+      return () => clearInterval(interval);
     } catch (e) {
       console.error('[popout] dock detection setup failed:', e);
     }

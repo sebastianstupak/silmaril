@@ -435,6 +435,14 @@ pub async fn check_dock_proximity(
     // Near if >30% overlap
     let near = overlap_pct > 30;
 
+    tracing::debug!(
+        popout_x, popout_y, popout_width, popout_height,
+        main_x = mx1, main_y = my1,
+        main_w = main_size.width, main_h = main_size.height,
+        overlap_pct, near,
+        "check_dock_proximity"
+    );
+
     // If near, tell main window to show dock overlay
     if near {
         if let Some(main_win) = app.get_webview_window("main") {

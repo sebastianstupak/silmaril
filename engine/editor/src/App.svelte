@@ -84,11 +84,11 @@
     }
   }
 
-  /** Add a panel back into the layout with a smart position based on panel type. */
+  /** Add a panel back into the layout as a new split area on the right side. */
   function addPanelToLayout(panelId: string) {
     const baseId = panelId.split(':')[0];
 
-    // Console goes to bottom panel
+    // Console always goes to bottom panel
     if (baseId === 'console') {
       layout.bottomPanel.panels.push(panelId);
       layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
@@ -97,46 +97,45 @@
       return;
     }
 
-    // For other panels, find the best tabs node based on type
+    // Add as a new split on the appropriate side
+    const newTab: import('./lib/docking/types').TabsNode = {
+      type: 'tabs',
+      activeTab: 0,
+      panels: [panelId],
+    };
+
     const root = layout.root;
+
+    // Determine position: hierarchy/assets → left, inspector → right, others → right
+    const addToLeft = baseId === 'hierarchy' || baseId === 'assets';
+
     if (root.type === 'tabs') {
-      root.panels.push(panelId);
-      root.activeTab = root.panels.length - 1;
+      // Root is a single tabs node — split it
+      layout.root = {
+        type: 'split',
+        direction: 'horizontal',
+        sizes: addToLeft ? [25, 75] : [75, 25],
+        children: addToLeft ? [newTab, root] : [root, newTab],
+      };
     } else {
-      // Smart placement: left panels (hierarchy/assets) → first child,
-      // right panels (inspector) → last child, center (viewport) → middle
-      const allTabs = collectAllTabsNodes(root);
-      let target: import('./lib/docking/types').TabsNode | null = null;
-
-      if ((baseId === 'hierarchy' || baseId === 'assets') && allTabs.length > 0) {
-        target = allTabs[0]; // first = leftmost
-      } else if (baseId === 'inspector' && allTabs.length > 0) {
-        target = allTabs[allTabs.length - 1]; // last = rightmost
-      } else if (allTabs.length > 1) {
-        target = allTabs[Math.floor(allTabs.length / 2)]; // middle
-      } else if (allTabs.length > 0) {
-        target = allTabs[0];
-      }
-
-      if (target) {
-        target.panels.push(panelId);
-        target.activeTab = target.panels.length - 1;
+      // Root is already a split — add as new child
+      if (addToLeft) {
+        root.children.unshift(newTab);
+        const newSize = 20;
+        const scale = (100 - newSize) / 100;
+        root.sizes = root.sizes.map(s => s * scale);
+        root.sizes.unshift(newSize);
       } else {
-        layout.bottomPanel.panels.push(panelId);
-        layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
+        root.children.push(newTab);
+        const newSize = 20;
+        const scale = (100 - newSize) / 100;
+        root.sizes = root.sizes.map(s => s * scale);
+        root.sizes.push(newSize);
       }
     }
+
     layout = { ...layout };
     saveLayout(layout);
-  }
-
-  function collectAllTabsNodes(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode[] {
-    if (node.type === 'tabs') return [node];
-    const result: import('./lib/docking/types').TabsNode[] = [];
-    for (const child of node.children) {
-      result.push(...collectAllTabsNodes(child));
-    }
-    return result;
   }
 
   function findFirstTabsNode(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode | null {
