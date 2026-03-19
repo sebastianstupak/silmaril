@@ -102,16 +102,18 @@ mod platform {
                 )
                 .map_err(|e| format!("CreateWindowExW failed: {e}"))?;
 
-                // Bring the child window to the top of the z-order so it
-                // renders above the WebView2 control.
+                // Place the child window at the BOTTOM of z-order so it
+                // renders BEHIND the WebView2 control. The viewport panel
+                // area has a transparent background so Vulkan shows through,
+                // while menus/dropdowns/overlays naturally appear on top.
+                // HWND_BOTTOM = HWND(1) — place behind all sibling windows
+                let hwnd_bottom = HWND(1 as *mut _);
                 let _ = SetWindowPos(
                     child,
-                    None,
+                    Some(hwnd_bottom),
                     0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
                 );
-                // Force to top of z-order
-                let _ = BringWindowToTop(child);
 
                 tracing::info!(
                     hwnd = ?child,

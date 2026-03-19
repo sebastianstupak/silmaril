@@ -584,7 +584,9 @@
     height: 100%;
     overflow: hidden;
     user-select: none;
-    background: #1a1a2e;
+    /* Transparent so the Vulkan child window (behind webview) shows through.
+       In browser mode without Vulkan, this area will be transparent/empty. */
+    background: transparent;
     outline: none;
     /* Ensure viewport doesn't create a higher stacking context than the dock drop overlay */
     z-index: 0;
