@@ -101,18 +101,17 @@ mod platform {
                 )
                 .map_err(|e| format!("CreateWindowExW failed: {e}"))?;
 
-                // Place the child window at the BOTTOM of z-order so it
-                // renders BEHIND the WebView2 control. The viewport panel
-                // area has a transparent background so Vulkan shows through,
-                // while menus/dropdowns/overlays naturally appear on top.
-                // HWND_BOTTOM = HWND(1) -- place behind all sibling windows
-                let hwnd_bottom = HWND(1 as *mut _);
+                // Explicitly place our Vulkan child on top of sibling windows
+                // (including WebView2's internal Chrome renderer).  WebView2
+                // uses DirectComposition which can override default z-order,
+                // so we must be explicit here.
                 let _ = SetWindowPos(
                     child,
-                    Some(hwnd_bottom),
+                    Some(HWND_TOP),
                     0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
                 );
+                tracing::info!("Vulkan child window created and set to HWND_TOP");
 
                 tracing::info!(
                     hwnd = ?child,
@@ -213,17 +212,17 @@ mod platform {
     // Engine-renderer based viewport state
     // ──────────────────────────────────────────────────────────────────────
 
-    /// Clear colour for the viewport background: dark (#14141e).
+    /// Clear colour for the viewport background: dark (#1a1a2e).
     const CLEAR_COLOR: [f32; 4] = [0.078, 0.078, 0.118, 1.0];
 
-    /// Grid line colour: subtle (#1e1e2e).
-    const GRID_COLOR: [f32; 4] = [0.118, 0.118, 0.180, 1.0];
+    /// Grid line colour: subtle (#2a2a3e).
+    const GRID_COLOR: [f32; 4] = [0.133, 0.133, 0.200, 1.0];
 
-    /// X-axis colour: red-tinted (#401515).
-    const X_AXIS_COLOR: [f32; 4] = [0.251, 0.082, 0.082, 1.0];
+    /// X-axis colour: red (#8b2020).
+    const X_AXIS_COLOR: [f32; 4] = [0.545, 0.125, 0.125, 1.0];
 
-    /// Y-axis colour: green-tinted (#154015).
-    const Y_AXIS_COLOR: [f32; 4] = [0.082, 0.251, 0.082, 1.0];
+    /// Y-axis colour: green (#208b20).
+    const Y_AXIS_COLOR: [f32; 4] = [0.125, 0.545, 0.125, 1.0];
 
     /// Grid spacing in pixels.
     const GRID_SPACING: u32 = 50;
@@ -730,12 +729,21 @@ mod platform {
     ) {
         let initial_bounds = *bounds.lock().unwrap();
 
+        tracing::info!(
+            width = initial_bounds.width,
+            height = initial_bounds.height,
+            "Render thread: initialising ViewportRenderer"
+        );
+
         let mut renderer = match ViewportRenderer::new(
             hwnd,
             initial_bounds.width,
             initial_bounds.height,
         ) {
-            Ok(r) => r,
+            Ok(r) => {
+                tracing::info!("ViewportRenderer initialised successfully!");
+                r
+            }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to initialise engine-renderer for viewport; falling back to idle loop");
                 // Fall back: just pump messages so the window stays alive
@@ -755,8 +763,22 @@ mod platform {
 
         let mut last_width = initial_bounds.width;
         let mut last_height = initial_bounds.height;
+        let mut frame_counter: u64 = 0;
 
         while !should_stop.load(Ordering::Relaxed) {
+            // Re-assert z-order every ~60 frames (~1s) to stay on top of
+            // WebView2's DirectComposition layer.
+            frame_counter += 1;
+            if frame_counter % 60 == 0 {
+                unsafe {
+                    let _ = SetWindowPos(
+                        hwnd,
+                        Some(HWND_TOP),
+                        0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                    );
+                }
+            }
             // Check for resize
             {
                 let b = bounds.lock().unwrap();

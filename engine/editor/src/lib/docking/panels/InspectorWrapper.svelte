@@ -17,4 +17,5 @@
   });
 </script>
 
-<InspectorPanel {entity} />
+<div class="panel-opaque"><InspectorPanel {entity} /></div>
+<style>.panel-opaque { width:100%; height:100%; background: var(--color-bgPanel, #252525); }</style>

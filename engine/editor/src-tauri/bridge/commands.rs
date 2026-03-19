@@ -274,9 +274,18 @@ pub fn create_native_viewport(
             .ok_or("main window not found")?;
         let parent_hwnd = window.hwnd().map_err(|e| format!("Failed to get HWND: {e}"))?;
 
-        let mut vp = NativeViewport::new(parent_hwnd, bounds)?;
-        vp.start_rendering()?;
+        tracing::info!(hwnd = ?parent_hwnd, x, y, width, height, "Creating native viewport");
 
+        let mut vp = NativeViewport::new(parent_hwnd, bounds).map_err(|e| {
+            tracing::error!(error = %e, "NativeViewport::new failed");
+            e
+        })?;
+        vp.start_rendering().map_err(|e| {
+            tracing::error!(error = %e, "start_rendering failed");
+            e
+        })?;
+
+        tracing::info!("Native viewport created and rendering started");
         *viewport_state.0.lock().unwrap() = Some(vp);
     }
 

@@ -31,7 +31,9 @@
   }
 
   body {
-    background-color: var(--color-background);
+    /* Transparent so Vulkan child window (behind webview) shows through
+       in the viewport panel area. All panels set their own opaque backgrounds. */
+    background-color: transparent;
     color: var(--color-foreground);
   }
 }

@@ -421,8 +421,6 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
             info!("Validation layers disabled for benchmarking");
             layer_name_ptrs = vec![];
         } else {
-            layer_name_ptrs = VALIDATION_LAYERS.iter().map(|name| name.as_ptr()).collect();
-
             // Check if validation layers are available
             // SAFETY: enumerate_instance_layer_properties only queries available layers.
             // It returns a Vec of layer properties, no pointer manipulation needed.
@@ -435,6 +433,7 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
                 })?
             };
 
+            let mut enabled_layers: Vec<*const i8> = Vec::new();
             for required_layer in VALIDATION_LAYERS.iter() {
                 let found = available_layers.iter().any(|layer| {
                     // SAFETY: layer_name is a fixed array in VkLayerProperties.
@@ -446,15 +445,20 @@ fn create_instance(entry: &ash::Entry, app_name: &str) -> Result<ash::Instance, 
                 if !found {
                     warn!(
                         layer = ?required_layer,
-                        "Validation layer not available"
+                        "Validation layer not available — skipping (install Vulkan SDK for validation)"
                     );
-                    return Err(RendererError::validationlayernotavailable(
-                        required_layer.to_string_lossy().into_owned(),
-                    ));
+                } else {
+                    enabled_layers.push(required_layer.as_ptr());
                 }
             }
 
-            info!(layers = ?*VALIDATION_LAYERS, "Enabling validation layers");
+            if enabled_layers.is_empty() {
+                warn!("No validation layers available — running without validation");
+            } else {
+                info!(count = enabled_layers.len(), "Enabling validation layers");
+            }
+
+            layer_name_ptrs = enabled_layers;
         }
     }
 

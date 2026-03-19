@@ -366,7 +366,7 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: var(--color-bg, #1e1e1e);
+    background: transparent;
     color: var(--color-text, #cccccc);
     font-family: var(--font-body, system-ui, -apple-system, sans-serif);
   }

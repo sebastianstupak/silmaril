@@ -209,7 +209,9 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: var(--color-bgPanel, #252525);
+    /* Transparent so Vulkan viewport can show through.
+       Non-viewport panels set their own opaque background. */
+    background: transparent;
   }
   .dock-panel-placeholder {
     display: flex;

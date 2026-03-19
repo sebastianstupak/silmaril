@@ -44,7 +44,11 @@
   };
 
   /** Detect if running inside Tauri or standalone browser */
-  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+  // Check at runtime, not module load — __TAURI_INTERNALS__ may not be set yet
+  function checkIsTauri(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+  }
+  let isTauri = checkIsTauri();
 
   let containerEl: HTMLDivElement | undefined = $state(undefined);
   let viewportWidth = $state(800);
@@ -131,14 +135,21 @@
       });
       observer.observe(containerEl);
 
+      // Re-check at mount time in case __TAURI_INTERNALS__ wasn't ready at script eval
+      isTauri = checkIsTauri();
+      console.log('[viewport] isTauri =', isTauri);
+
       // Create native Vulkan viewport in Tauri mode
       if (isTauri) {
+        const bounds = getPhysicalBounds();
+        console.log('[viewport] Creating native viewport at', bounds);
         const b = getPhysicalBounds();
-        createNativeViewport(b.x, b.y, b.width, b.height).then(() => {
+        createNativeViewport(bounds.x, bounds.y, bounds.width, bounds.height).then(() => {
           nativeViewportCreated = true;
           loading = false;
+          console.log('[viewport] Native viewport created successfully!');
         }).catch((e) => {
-          console.error('[viewport] Vulkan init failed:', e);
+          console.error('[viewport] Vulkan init FAILED:', e);
           loading = false;
         });
       } else {
@@ -496,17 +507,8 @@
     </div>
   </div>
 
-  <!-- In Tauri: native Vulkan child window renders here (no HTML content needed).
-       In browser: show a placeholder message. -->
-  {#if !nativeViewportCreated && !isTauri}
-    <div class="viewport-loading">
-      <p style="color: var(--color-textDim, #666);">Viewport requires Tauri desktop app</p>
-    </div>
-  {:else if !nativeViewportCreated && isTauri}
-    <div class="viewport-loading">
-      <p>{t('viewport.loading')}</p>
-    </div>
-  {/if}
+  <!-- No fallback content. In Tauri, the Vulkan child window renders behind
+       this transparent area. In browser mode, it's just empty/transparent. -->
 
   <!-- Axis gizmo (camera orientation indicator) — clickable to snap view -->
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
@@ -584,11 +586,9 @@
     height: 100%;
     overflow: hidden;
     user-select: none;
-    /* Transparent so the Vulkan child window (behind webview) shows through.
-       In browser mode without Vulkan, this area will be transparent/empty. */
+    /* Transparent — Vulkan renders behind the webview */
     background: transparent;
     outline: none;
-    /* Ensure viewport doesn't create a higher stacking context than the dock drop overlay */
     z-index: 0;
   }
 

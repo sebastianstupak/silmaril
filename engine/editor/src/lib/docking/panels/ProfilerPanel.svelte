@@ -14,5 +14,6 @@
     height: 100%;
     color: var(--color-textDim, #666);
     font-style: italic;
+    background: var(--color-bgPanel, #252525);
   }
 </style>
