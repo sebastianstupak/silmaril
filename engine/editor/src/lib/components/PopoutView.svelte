@@ -38,10 +38,12 @@
   async function dockBack() {
     if (!isTauri) return;
     try {
-      const { emit } = await import('@tauri-apps/api/event');
-      await emit('dock-panel-back', { panelId });
+      // Use emitTo to target the main window specifically
+      const { emitTo } = await import('@tauri-apps/api/event');
+      await emitTo('main', 'dock-panel-back', { panelId });
+      // Close this pop-out window
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      getCurrentWindow().close();
+      await getCurrentWindow().close();
     } catch (e) {
       console.error('[silmaril] dockBack error:', e);
     }

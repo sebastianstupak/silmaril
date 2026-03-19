@@ -5,8 +5,9 @@
   "webviews": ["*"],
   "permissions": [
     "core:default",
-    "dialog:default",
+    "core:event:default",
     "core:window:default",
-    "core:webview:default"
+    "core:webview:default",
+    "dialog:default"
   ]
 }

@@ -150,10 +150,17 @@
 
     // Listen for dock-panel-back events from pop-out windows
     if (isTauri && !popoutPanel) {
-      const { listen } = await import('@tauri-apps/api/event');
-      listen<{ panelId: string }>('dock-panel-back', (event) => {
-        addPanelToLayout(event.payload.panelId);
-      });
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        const unlisten = await listen<{ panelId: string }>('dock-panel-back', (event) => {
+          console.log('[silmaril] dock-panel-back received:', event.payload);
+          addPanelToLayout(event.payload.panelId);
+        });
+        // Clean up listener on unmount (though main window rarely unmounts)
+        return () => { unlisten(); };
+      } catch (e) {
+        console.error('[silmaril] Failed to listen for dock-panel-back:', e);
+      }
     }
   });
 </script>
