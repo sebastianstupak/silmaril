@@ -36,57 +36,51 @@
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
 
-    // Track window position during drag — detect proximity to main editor
-    if (isTauri) {
-      setupDockDetection();
-    }
+    // Dock detection is handled by the drag handle (grab dots icon in toolbar)
   });
 
-  async function setupDockDetection() {
-    try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const { invoke } = await import('@tauri-apps/api/core');
-      const win = getCurrentWindow();
+  // Drag handle state — user drags the handle to dock the panel back
+  let dragHandleActive = $state(false);
 
-      let lastX = 0, lastY = 0;
-      let docking = false;
+  /** Start dragging the dock handle — tracks mouse globally */
+  function startDragHandle(e: MouseEvent) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragHandleActive = true;
 
-      // Poll window position every 200ms to detect proximity to main editor.
-      // onMoved is unreliable on Windows during title bar drag.
-      const interval = setInterval(async () => {
-        if (docking) return;
-        try {
-          const pos = await win.outerPosition();
-          const size = await win.outerSize();
-
-          // Only check if position actually changed
-          if (pos.x === lastX && pos.y === lastY) return;
-          lastX = pos.x;
-          lastY = pos.y;
-
-          const result = await invoke<{ near: boolean }>('check_dock_proximity', {
-            popoutX: pos.x,
-            popoutY: pos.y,
-            popoutWidth: size.width,
-            popoutHeight: size.height,
-          });
-          nearMainWindow = result.near;
-        } catch { /* ignore */ }
-      }, 200);
-
-      // Also listen for onMoved as a backup — fires when drag ends
-      await win.onMoved(async () => {
-        if (docking || !nearMainWindow) return;
-        docking = true;
-        clearInterval(interval);
-        await dockBack();
-      });
-
-      // Cleanup on unmount
-      return () => clearInterval(interval);
-    } catch (e) {
-      console.error('[popout] dock detection setup failed:', e);
+    // Track mouse position to detect when it enters the main window
+    function onMouseMove(ev: MouseEvent) {
+      // screenX/screenY gives us the global position
+      checkMainWindowProximity(ev.screenX, ev.screenY);
     }
+
+    async function onMouseUp(ev: MouseEvent) {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      dragHandleActive = false;
+
+      if (nearMainWindow) {
+        await dockBack();
+      }
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  async function checkMainWindowProximity(screenX: number, screenY: number) {
+    if (!isTauri) return;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      // Use a small rect around the cursor as the "pop-out bounds"
+      const result = await invoke<{ near: boolean }>('check_dock_proximity', {
+        popoutX: screenX - 50,
+        popoutY: screenY - 50,
+        popoutWidth: 100,
+        popoutHeight: 100,
+      });
+      nearMainWindow = result.near;
+    } catch { /* ignore */ }
   }
 
   async function dockBack() {
@@ -101,13 +95,32 @@
   }
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="popout-container" class:near-dock={nearMainWindow}>
   <div class="popout-toolbar">
+    <!-- Drag handle: grab this and drag over main editor to dock back -->
+    <div
+      class="drag-dock-handle"
+      class:dragging={dragHandleActive}
+      onmousedown={startDragHandle}
+      title="Drag to dock back into editor"
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.6">
+        <rect x="3" y="3" width="4" height="2" rx="0.5"/>
+        <rect x="9" y="3" width="4" height="2" rx="0.5"/>
+        <rect x="3" y="7" width="4" height="2" rx="0.5"/>
+        <rect x="9" y="7" width="4" height="2" rx="0.5"/>
+        <rect x="3" y="11" width="4" height="2" rx="0.5"/>
+        <rect x="9" y="11" width="4" height="2" rx="0.5"/>
+      </svg>
+    </div>
     <button class="dock-back-btn" onclick={dockBack} title={t('popout.dock_back')}>
       {t('popout.dock_back')}
     </button>
     {#if nearMainWindow}
       <span class="dock-hint">Release to dock</span>
+    {:else if dragHandleActive}
+      <span class="dock-hint drag-active">Drag over editor to dock</span>
     {/if}
   </div>
   {#if PanelComponent}
@@ -161,6 +174,29 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  .drag-dock-handle {
+    cursor: grab;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: background 0.1s;
+  }
+  .drag-dock-handle:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .drag-dock-handle.dragging {
+    cursor: grabbing;
+    background: var(--color-accent, #007acc);
+  }
+  .drag-dock-handle.dragging svg {
+    opacity: 1;
+  }
+
+  .dock-hint.drag-active {
+    color: var(--color-textMuted, #999);
   }
 
   .near-dock {
