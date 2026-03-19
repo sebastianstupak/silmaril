@@ -3,6 +3,7 @@
   import { t } from '$lib/i18n';
   import { loadSettings } from '$lib/stores/settings';
   import { themes, applyTheme } from '$lib/theme/tokens';
+  import { getPanelInfo } from '$lib/docking/types';
   import HierarchyWrapper from '$lib/docking/panels/HierarchyWrapper.svelte';
   import InspectorWrapper from '$lib/docking/panels/InspectorWrapper.svelte';
   import ConsoleWrapper from '$lib/docking/panels/ConsoleWrapper.svelte';
@@ -28,6 +29,10 @@
   const basePanelId = panelId.split(':')[0];
   const PanelComponent = panels[basePanelId];
 
+  // Resolve localized panel title
+  const info = getPanelInfo(basePanelId);
+  const panelTitle = info ? t(info.titleKey) : panelId;
+
   let nearMainWindow = $state(false);
 
   onMount(() => {
@@ -35,26 +40,23 @@
     const settings = loadSettings();
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
-
-    // Dock detection is handled by the drag handle (grab dots icon in toolbar)
   });
 
-  // Drag handle state — user drags the handle to dock the panel back
+  // Drag handle state — user drags the grip to dock the panel back
   let dragHandleActive = $state(false);
 
-  /** Start dragging the dock handle — tracks mouse globally */
-  function startDragHandle(e: MouseEvent) {
+  /** Start dragging the dock grip — tracks mouse globally */
+  function startDragDock(e: MouseEvent) {
     if (e.button !== 0) return;
     e.preventDefault();
+    e.stopPropagation(); // prevent data-tauri-drag-region from firing
     dragHandleActive = true;
 
-    // Track mouse position to detect when it enters the main window
     function onMouseMove(ev: MouseEvent) {
-      // screenX/screenY gives us the global position
       checkMainWindowProximity(ev.screenX, ev.screenY);
     }
 
-    async function onMouseUp(ev: MouseEvent) {
+    async function onMouseUp(_ev: MouseEvent) {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       dragHandleActive = false;
@@ -72,7 +74,6 @@
     if (!isTauri) return;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      // Use a small rect around the cursor as the "pop-out bounds"
       const result = await invoke<{ near: boolean }>('check_dock_proximity', {
         popoutX: screenX - 50,
         popoutY: screenY - 50,
@@ -86,26 +87,43 @@
   async function dockBack() {
     if (!isTauri) return;
     try {
-      // Call Rust command — it emits event to main window and closes this one
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('dock_panel_back', { panelId });
     } catch (e) {
       console.error('[silmaril] dockBack error:', e);
     }
   }
+
+  async function minimizeWindow() {
+    if (!isTauri) return;
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    getCurrentWindow().minimize();
+  }
+
+  async function maximizeWindow() {
+    if (!isTauri) return;
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    getCurrentWindow().toggleMaximize();
+  }
+
+  async function closeWindow() {
+    if (!isTauri) return;
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    getCurrentWindow().close();
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="popout-container" class:near-dock={nearMainWindow}>
-  <div class="popout-toolbar">
-    <!-- Drag handle: grab this and drag over main editor to dock back -->
+  <!-- Custom title bar (replaces OS decorations) -->
+  <div class="custom-titlebar" data-tauri-drag-region>
+    <!-- Drag/dock indicator -->
     <div
-      class="drag-dock-handle"
+      class="titlebar-grip"
       class:dragging={dragHandleActive}
-      onmousedown={startDragHandle}
-      title="Drag to dock back into editor"
+      onmousedown={startDragDock}
     >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.6">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" opacity="0.4">
         <rect x="3" y="3" width="4" height="2" rx="0.5"/>
         <rect x="9" y="3" width="4" height="2" rx="0.5"/>
         <rect x="3" y="7" width="4" height="2" rx="0.5"/>
@@ -114,15 +132,45 @@
         <rect x="9" y="11" width="4" height="2" rx="0.5"/>
       </svg>
     </div>
-    <button class="dock-back-btn" onclick={dockBack} title={t('popout.dock_back')}>
-      {t('popout.dock_back')}
+
+    <!-- Panel name -->
+    <span class="titlebar-title" data-tauri-drag-region>{panelTitle}</span>
+
+    <!-- Dock Back button -->
+    <button class="titlebar-btn dock-btn" onclick={dockBack} title="Dock back into editor">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M3 3h10v2H3V3zm0 4h10v6H3V7z" opacity="0.8"/>
+      </svg>
     </button>
+
+    <!-- Spacer -->
+    <div class="titlebar-spacer" data-tauri-drag-region></div>
+
+    <!-- Dock hint during drag -->
     {#if nearMainWindow}
       <span class="dock-hint">Release to dock</span>
     {:else if dragHandleActive}
       <span class="dock-hint drag-active">Drag over editor to dock</span>
     {/if}
+
+    <!-- Window controls -->
+    <button class="titlebar-btn" onclick={minimizeWindow} title="Minimize">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M3 8h10v1H3z"/>
+      </svg>
+    </button>
+    <button class="titlebar-btn" onclick={maximizeWindow} title="Maximize">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M3 3h10v10H3V3zm1 2v7h8V5H4z"/>
+      </svg>
+    </button>
+    <button class="titlebar-btn close-btn" onclick={closeWindow} title="Close">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M4.11 3.05L8 6.94l3.89-3.89.71.71L8.71 7.65l3.89 3.89-.71.71L8 8.36l-3.89 3.89-.71-.71 3.89-3.89-3.89-3.89.71-.71z"/>
+      </svg>
+    </button>
   </div>
+
   {#if PanelComponent}
     <div class="popout-content">
       <PanelComponent />
@@ -143,58 +191,88 @@
     overflow: hidden;
   }
 
-  .popout-toolbar {
+  .custom-titlebar {
     display: flex;
     align-items: center;
-    padding: 4px 8px;
+    height: 32px;
     background: var(--color-bgHeader, #2d2d2d);
     border-bottom: 1px solid var(--color-border, #404040);
+    padding: 0 4px;
+    user-select: none;
+    -webkit-app-region: drag;
     flex-shrink: 0;
   }
 
-  .dock-back-btn {
-    background: none;
-    border: 1px solid var(--color-border, #404040);
-    border-radius: 4px;
-    color: var(--color-text, #ccc);
-    font-size: 11px;
-    padding: 3px 10px;
-    cursor: pointer;
-    transition: background 0.1s, color 0.1s;
-  }
-
-  .dock-back-btn:hover {
-    background: var(--color-accent, #007acc);
-    color: #fff;
-    border-color: var(--color-accent, #007acc);
-  }
-
-  .popout-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .drag-dock-handle {
-    cursor: grab;
+  .titlebar-grip {
     padding: 4px 6px;
-    border-radius: 4px;
+    cursor: grab;
     display: flex;
     align-items: center;
+    border-radius: 4px;
     transition: background 0.1s;
+    -webkit-app-region: no-drag;
   }
-  .drag-dock-handle:hover {
+  .titlebar-grip:hover {
     background: rgba(255, 255, 255, 0.1);
   }
-  .drag-dock-handle.dragging {
+  .titlebar-grip:hover svg {
+    opacity: 0.8;
+  }
+  .titlebar-grip.dragging {
     cursor: grabbing;
     background: var(--color-accent, #007acc);
   }
-  .drag-dock-handle.dragging svg {
+  .titlebar-grip.dragging svg {
     opacity: 1;
   }
 
+  .titlebar-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-textMuted, #999);
+    padding: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .titlebar-spacer {
+    flex: 1;
+  }
+
+  .titlebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    background: none;
+    border: none;
+    color: var(--color-textMuted, #999);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    transition: background 0.1s;
+  }
+  .titlebar-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text, #ccc);
+  }
+  .close-btn:hover {
+    background: #e81123;
+    color: white;
+  }
+  .dock-btn:hover {
+    background: var(--color-accent, #007acc);
+    color: white;
+  }
+
+  .dock-hint {
+    color: var(--color-accent, #007acc);
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 8px;
+    white-space: nowrap;
+  }
   .dock-hint.drag-active {
     color: var(--color-textMuted, #999);
   }
@@ -204,11 +282,11 @@
     outline-offset: -2px;
   }
 
-  .dock-hint {
-    color: var(--color-accent, #007acc);
-    font-size: 11px;
-    font-weight: 600;
-    margin-left: 8px;
+  .popout-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .popout-unknown {

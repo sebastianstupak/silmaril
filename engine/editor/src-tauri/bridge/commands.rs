@@ -354,6 +354,7 @@ pub async fn create_popout_window(
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
         .title(&title)
+        .decorations(false)
         .inner_size(width as f64, height as f64)
         .position(x as f64, y as f64)
         .build()
