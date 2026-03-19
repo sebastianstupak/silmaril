@@ -1,8 +1,9 @@
-//! Minimal Vulkan clear-colour renderer for the editor viewport.
+//! Minimal Vulkan renderer for the editor viewport with grid overlay.
 //!
 //! Creates a Vulkan surface from a Win32 HWND (child window), initialises
 //! instance/device/swapchain, and renders each frame by clearing to a dark
-//! background colour.  Handles swapchain recreation on resize.
+//! background colour and drawing a grid using `vkCmdClearAttachments`.
+//! Handles swapchain recreation on resize.
 //!
 //! This module intentionally does NOT depend on `engine-renderer` so that
 //! the editor stays lean and avoids pulling in the full renderer dependency
@@ -16,10 +17,25 @@ use std::ffi::CStr;
 use tracing::{debug, info};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 
-/// Clear colour for the viewport background: dark blue-gray.
-const CLEAR_COLOR: [f32; 4] = [0.08, 0.08, 0.12, 1.0];
+/// Clear colour for the viewport background: dark (#14141e).
+const CLEAR_COLOR: [f32; 4] = [0.078, 0.078, 0.118, 1.0];
 
-/// All Vulkan state needed for a minimal clear-colour renderer.
+/// Grid line colour: subtle (#1e1e2e).
+const GRID_COLOR: [f32; 4] = [0.118, 0.118, 0.180, 1.0];
+
+/// X-axis colour: red-tinted (#401515).
+const X_AXIS_COLOR: [f32; 4] = [0.251, 0.082, 0.082, 1.0];
+
+/// Y-axis colour: green-tinted (#154015).
+const Y_AXIS_COLOR: [f32; 4] = [0.082, 0.251, 0.082, 1.0];
+
+/// Grid spacing in pixels.
+const GRID_SPACING: u32 = 50;
+
+/// Axis line thickness in pixels.
+const AXIS_THICKNESS: u32 = 2;
+
+/// All Vulkan state needed for the viewport renderer with grid.
 pub struct VulkanViewport {
     _entry: ash::Entry,
     instance: ash::Instance,
@@ -32,6 +48,10 @@ pub struct VulkanViewport {
     swapchain_loader: ash::khr::swapchain::Device,
     swapchain: vk::SwapchainKHR,
     swapchain_images: Vec<vk::Image>,
+    swapchain_format: vk::Format,
+    image_views: Vec<vk::ImageView>,
+    render_pass: vk::RenderPass,
+    framebuffers: Vec<vk::Framebuffer>,
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
     image_available_semaphore: vk::Semaphore,
@@ -46,8 +66,8 @@ pub struct VulkanViewport {
 impl VulkanViewport {
     /// Initialise Vulkan for a child HWND.
     ///
-    /// Creates instance, surface, device, swapchain, command pool/buffer,
-    /// and synchronisation primitives.
+    /// Creates instance, surface, device, swapchain, render pass,
+    /// framebuffers, command pool/buffer, and synchronisation primitives.
     pub fn new(hwnd: isize, width: u32, height: u32) -> Result<Self, String> {
         // Guard against zero-size viewports
         let width = width.max(1);
@@ -72,7 +92,7 @@ impl VulkanViewport {
 
         // 6. Create swapchain
         let swapchain_loader = ash::khr::swapchain::Device::new(&instance, &device);
-        let (swapchain, swapchain_images) = create_swapchain(
+        let (swapchain, swapchain_images, swapchain_format) = create_swapchain(
             &swapchain_loader,
             &surface_loader,
             physical_device,
@@ -84,11 +104,19 @@ impl VulkanViewport {
             vk::SwapchainKHR::null(),
         )?;
 
-        // 7. Command pool + buffer
+        // 7. Render pass
+        let render_pass = create_render_pass(&device, swapchain_format)?;
+
+        // 8. Image views + framebuffers
+        let image_views = create_image_views(&device, &swapchain_images, swapchain_format)?;
+        let framebuffers =
+            create_framebuffers(&device, render_pass, &image_views, width, height)?;
+
+        // 9. Command pool + buffer
         let (command_pool, command_buffer) =
             create_command_resources(&device, graphics_queue_family)?;
 
-        // 8. Sync objects
+        // 10. Sync objects
         let (image_available_semaphore, render_finished_semaphore, in_flight_fence) =
             create_sync_objects(&device)?;
 
@@ -111,6 +139,10 @@ impl VulkanViewport {
             swapchain_loader,
             swapchain,
             swapchain_images,
+            swapchain_format,
+            image_views,
+            render_pass,
+            framebuffers,
             command_pool,
             command_buffer,
             image_available_semaphore,
@@ -136,7 +168,7 @@ impl VulkanViewport {
         }
     }
 
-    /// Render a single frame (clear to background colour).
+    /// Render a single frame (background clear + grid overlay).
     ///
     /// Returns `Ok(true)` if a frame was presented, `Ok(false)` if the
     /// swapchain was out of date and will be recreated next call.
@@ -175,7 +207,7 @@ impl VulkanViewport {
                 .map_err(|e| format!("reset_fences: {e}"))?;
 
             // Record command buffer
-            self.record_clear_commands(image_index)?;
+            self.record_frame_commands(image_index)?;
 
             // Submit
             let wait_semaphores = [self.image_available_semaphore];
@@ -216,10 +248,9 @@ impl VulkanViewport {
         Ok(true)
     }
 
-    /// Record clear-colour commands into the command buffer.
-    unsafe fn record_clear_commands(&self, image_index: u32) -> Result<(), String> {
-        let image = self.swapchain_images[image_index as usize];
-
+    /// Record frame commands: begin render pass (clears background), draw
+    /// grid lines via `vkCmdClearAttachments`, then end render pass.
+    unsafe fn record_frame_commands(&self, image_index: u32) -> Result<(), String> {
         self.device
             .reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty())
             .map_err(|e| format!("reset_command_buffer: {e}"))?;
@@ -230,78 +261,35 @@ impl VulkanViewport {
             .begin_command_buffer(self.command_buffer, &begin_info)
             .map_err(|e| format!("begin_command_buffer: {e}"))?;
 
-        // Transition UNDEFINED -> TRANSFER_DST_OPTIMAL
-        let barrier_to_transfer = vk::ImageMemoryBarrier::default()
-            .image(image)
-            .old_layout(vk::ImageLayout::UNDEFINED)
-            .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
-            .src_access_mask(vk::AccessFlags::empty())
-            .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            });
+        // Begin render pass — clears to background colour automatically
+        let clear_values = [vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: CLEAR_COLOR,
+            },
+        }];
 
-        self.device.cmd_pipeline_barrier(
+        let render_pass_info = vk::RenderPassBeginInfo::default()
+            .render_pass(self.render_pass)
+            .framebuffer(self.framebuffers[image_index as usize])
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: vk::Extent2D {
+                    width: self.width,
+                    height: self.height,
+                },
+            })
+            .clear_values(&clear_values);
+
+        self.device.cmd_begin_render_pass(
             self.command_buffer,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::DependencyFlags::empty(),
-            &[],
-            &[],
-            &[barrier_to_transfer],
+            &render_pass_info,
+            vk::SubpassContents::INLINE,
         );
 
-        // Clear
-        let clear_color = vk::ClearColorValue {
-            float32: CLEAR_COLOR,
-        };
-        let range = vk::ImageSubresourceRange {
-            aspect_mask: vk::ImageAspectFlags::COLOR,
-            base_mip_level: 0,
-            level_count: 1,
-            base_array_layer: 0,
-            layer_count: 1,
-        };
-        self.device.cmd_clear_color_image(
-            self.command_buffer,
-            image,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            &clear_color,
-            &[range],
-        );
+        // Draw grid lines using ClearAttachments
+        self.draw_grid(self.command_buffer, self.width, self.height);
 
-        // Transition TRANSFER_DST_OPTIMAL -> PRESENT_SRC_KHR
-        let barrier_to_present = vk::ImageMemoryBarrier::default()
-            .image(image)
-            .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
-            .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-            .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-            .dst_access_mask(vk::AccessFlags::empty())
-            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            });
-
-        self.device.cmd_pipeline_barrier(
-            self.command_buffer,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-            vk::DependencyFlags::empty(),
-            &[],
-            &[],
-            &[barrier_to_present],
-        );
+        self.device.cmd_end_render_pass(self.command_buffer);
 
         self.device
             .end_command_buffer(self.command_buffer)
@@ -310,7 +298,127 @@ impl VulkanViewport {
         Ok(())
     }
 
-    /// Recreate the swapchain after a resize.
+    /// Draw grid lines and centre axes using `vkCmdClearAttachments`.
+    ///
+    /// This approach requires no shaders, pipelines, or vertex buffers —
+    /// each grid line is a 1-pixel-wide clear rect, and each axis line
+    /// is a 2-pixel-wide clear rect in a distinct colour.
+    unsafe fn draw_grid(&self, cmd: vk::CommandBuffer, width: u32, height: u32) {
+        // -- Minor grid lines (every GRID_SPACING pixels) --
+        let grid_attachment = vk::ClearAttachment {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            color_attachment: 0,
+            clear_value: vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: GRID_COLOR,
+                },
+            },
+        };
+
+        let mut grid_rects = Vec::new();
+
+        // Vertical grid lines
+        let mut x = 0u32;
+        while x < width {
+            grid_rects.push(vk::ClearRect {
+                rect: vk::Rect2D {
+                    offset: vk::Offset2D { x: x as i32, y: 0 },
+                    extent: vk::Extent2D { width: 1, height },
+                },
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+            x += GRID_SPACING;
+        }
+
+        // Horizontal grid lines
+        let mut y = 0u32;
+        while y < height {
+            grid_rects.push(vk::ClearRect {
+                rect: vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: y as i32 },
+                    extent: vk::Extent2D { width, height: 1 },
+                },
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+            y += GRID_SPACING;
+        }
+
+        if !grid_rects.is_empty() {
+            self.device
+                .cmd_clear_attachments(cmd, &[grid_attachment], &grid_rects);
+        }
+
+        // -- Centre X axis (horizontal line at height/2, red-tinted) --
+        let center_y = height / 2;
+        let x_axis_attachment = vk::ClearAttachment {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            color_attachment: 0,
+            clear_value: vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: X_AXIS_COLOR,
+                },
+            },
+        };
+        // Clamp so we don't exceed image bounds
+        let x_axis_h = AXIS_THICKNESS.min(height.saturating_sub(center_y));
+        if x_axis_h > 0 {
+            self.device.cmd_clear_attachments(
+                cmd,
+                &[x_axis_attachment],
+                &[vk::ClearRect {
+                    rect: vk::Rect2D {
+                        offset: vk::Offset2D {
+                            x: 0,
+                            y: center_y as i32,
+                        },
+                        extent: vk::Extent2D {
+                            width,
+                            height: x_axis_h,
+                        },
+                    },
+                    base_array_layer: 0,
+                    layer_count: 1,
+                }],
+            );
+        }
+
+        // -- Centre Y axis (vertical line at width/2, green-tinted) --
+        let center_x = width / 2;
+        let y_axis_attachment = vk::ClearAttachment {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            color_attachment: 0,
+            clear_value: vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: Y_AXIS_COLOR,
+                },
+            },
+        };
+        let y_axis_w = AXIS_THICKNESS.min(width.saturating_sub(center_x));
+        if y_axis_w > 0 {
+            self.device.cmd_clear_attachments(
+                cmd,
+                &[y_axis_attachment],
+                &[vk::ClearRect {
+                    rect: vk::Rect2D {
+                        offset: vk::Offset2D {
+                            x: center_x as i32,
+                            y: 0,
+                        },
+                        extent: vk::Extent2D {
+                            width: y_axis_w,
+                            height,
+                        },
+                    },
+                    base_array_layer: 0,
+                    layer_count: 1,
+                }],
+            );
+        }
+    }
+
+    /// Recreate the swapchain (and dependent resources) after a resize.
     fn recreate_swapchain(&mut self) -> Result<(), String> {
         unsafe {
             self.device
@@ -318,9 +426,12 @@ impl VulkanViewport {
                 .map_err(|e| format!("device_wait_idle: {e}"))?;
         }
 
+        // Destroy old framebuffers and image views
+        self.destroy_framebuffers_and_views();
+
         let old_swapchain = self.swapchain;
 
-        let (new_swapchain, new_images) = create_swapchain(
+        let (new_swapchain, new_images, new_format) = create_swapchain(
             &self.swapchain_loader,
             &self.surface_loader,
             self.physical_device,
@@ -341,6 +452,26 @@ impl VulkanViewport {
         self.swapchain = new_swapchain;
         self.swapchain_images = new_images;
 
+        // Recreate render pass if format changed
+        if new_format != self.swapchain_format {
+            unsafe {
+                self.device.destroy_render_pass(self.render_pass, None);
+            }
+            self.render_pass = create_render_pass(&self.device, new_format)?;
+            self.swapchain_format = new_format;
+        }
+
+        // Recreate image views + framebuffers
+        self.image_views =
+            create_image_views(&self.device, &self.swapchain_images, self.swapchain_format)?;
+        self.framebuffers = create_framebuffers(
+            &self.device,
+            self.render_pass,
+            &self.image_views,
+            self.width,
+            self.height,
+        )?;
+
         debug!(
             width = self.width,
             height = self.height,
@@ -350,12 +481,30 @@ impl VulkanViewport {
 
         Ok(())
     }
+
+    /// Destroy framebuffers and image views (used before recreation and in Drop).
+    fn destroy_framebuffers_and_views(&mut self) {
+        unsafe {
+            for &fb in &self.framebuffers {
+                self.device.destroy_framebuffer(fb, None);
+            }
+            self.framebuffers.clear();
+
+            for &view in &self.image_views {
+                self.device.destroy_image_view(view, None);
+            }
+            self.image_views.clear();
+        }
+    }
 }
 
 impl Drop for VulkanViewport {
     fn drop(&mut self) {
         unsafe {
             let _ = self.device.device_wait_idle();
+
+            self.destroy_framebuffers_and_views();
+            self.device.destroy_render_pass(self.render_pass, None);
 
             self.device
                 .destroy_semaphore(self.image_available_semaphore, None);
@@ -526,6 +675,7 @@ fn create_device(
     Ok((device, queue))
 }
 
+/// Create a swapchain, returning the handle, images, and chosen format.
 #[allow(clippy::too_many_arguments)]
 fn create_swapchain(
     swapchain_loader: &ash::khr::swapchain::Device,
@@ -537,7 +687,7 @@ fn create_swapchain(
     width: u32,
     height: u32,
     old_swapchain: vk::SwapchainKHR,
-) -> Result<(vk::SwapchainKHR, Vec<vk::Image>), String> {
+) -> Result<(vk::SwapchainKHR, Vec<vk::Image>, vk::Format), String> {
     let capabilities = unsafe {
         surface_loader
             .get_physical_device_surface_capabilities(physical_device, surface)
@@ -587,7 +737,7 @@ fn create_swapchain(
         image_count = capabilities.max_image_count;
     }
 
-    // We need TRANSFER_DST for vkCmdClearColorImage
+    // We need TRANSFER_DST for vkCmdClearColorImage (kept for compatibility)
     let usage = vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST;
 
     let queue_family_indices = [queue_family];
@@ -619,7 +769,117 @@ fn create_swapchain(
             .map_err(|e| format!("get_swapchain_images: {e}"))?
     };
 
-    Ok((swapchain, images))
+    Ok((swapchain, images, format.format))
+}
+
+/// Create a render pass with a single colour attachment (LOAD_OP_CLEAR).
+fn create_render_pass(device: &ash::Device, format: vk::Format) -> Result<vk::RenderPass, String> {
+    let attachment = vk::AttachmentDescription::default()
+        .format(format)
+        .samples(vk::SampleCountFlags::TYPE_1)
+        .load_op(vk::AttachmentLoadOp::CLEAR)
+        .store_op(vk::AttachmentStoreOp::STORE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
+
+    let color_ref = vk::AttachmentReference {
+        attachment: 0,
+        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+    };
+
+    let subpass = vk::SubpassDescription::default()
+        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+        .color_attachments(std::slice::from_ref(&color_ref));
+
+    // Dependency to ensure the clear completes before presentation
+    let dependency = vk::SubpassDependency::default()
+        .src_subpass(vk::SUBPASS_EXTERNAL)
+        .dst_subpass(0)
+        .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+        .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+        .src_access_mask(vk::AccessFlags::empty())
+        .dst_access_mask(
+            vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+        );
+
+    let create_info = vk::RenderPassCreateInfo::default()
+        .attachments(std::slice::from_ref(&attachment))
+        .subpasses(std::slice::from_ref(&subpass))
+        .dependencies(std::slice::from_ref(&dependency));
+
+    unsafe {
+        device
+            .create_render_pass(&create_info, None)
+            .map_err(|e| format!("vkCreateRenderPass: {e}"))
+    }
+}
+
+/// Create an image view for each swapchain image.
+fn create_image_views(
+    device: &ash::Device,
+    images: &[vk::Image],
+    format: vk::Format,
+) -> Result<Vec<vk::ImageView>, String> {
+    images
+        .iter()
+        .enumerate()
+        .map(|(i, &image)| {
+            let create_info = vk::ImageViewCreateInfo::default()
+                .image(image)
+                .view_type(vk::ImageViewType::TYPE_2D)
+                .format(format)
+                .components(vk::ComponentMapping {
+                    r: vk::ComponentSwizzle::IDENTITY,
+                    g: vk::ComponentSwizzle::IDENTITY,
+                    b: vk::ComponentSwizzle::IDENTITY,
+                    a: vk::ComponentSwizzle::IDENTITY,
+                })
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                });
+
+            unsafe {
+                device
+                    .create_image_view(&create_info, None)
+                    .map_err(|e| format!("create_image_view[{i}]: {e}"))
+            }
+        })
+        .collect()
+}
+
+/// Create a framebuffer for each image view.
+fn create_framebuffers(
+    device: &ash::Device,
+    render_pass: vk::RenderPass,
+    image_views: &[vk::ImageView],
+    width: u32,
+    height: u32,
+) -> Result<Vec<vk::Framebuffer>, String> {
+    image_views
+        .iter()
+        .enumerate()
+        .map(|(i, &view)| {
+            let attachments = [view];
+            let create_info = vk::FramebufferCreateInfo::default()
+                .render_pass(render_pass)
+                .attachments(&attachments)
+                .width(width)
+                .height(height)
+                .layers(1);
+
+            unsafe {
+                device
+                    .create_framebuffer(&create_info, None)
+                    .map_err(|e| format!("create_framebuffer[{i}]: {e}"))
+            }
+        })
+        .collect()
 }
 
 fn create_command_resources(
