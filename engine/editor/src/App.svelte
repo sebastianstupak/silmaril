@@ -84,28 +84,59 @@
     }
   }
 
-  /** Add a panel back into the layout (e.g. when docking back from a pop-out window). */
+  /** Add a panel back into the layout with a smart position based on panel type. */
   function addPanelToLayout(panelId: string) {
-    // Add the panel as a new tab in the first tabs node of the root,
-    // or into the bottom panel if root has no tabs node.
+    const baseId = panelId.split(':')[0];
+
+    // Console goes to bottom panel
+    if (baseId === 'console') {
+      layout.bottomPanel.panels.push(panelId);
+      layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
+      layout = { ...layout };
+      saveLayout(layout);
+      return;
+    }
+
+    // For other panels, find the best tabs node based on type
     const root = layout.root;
     if (root.type === 'tabs') {
       root.panels.push(panelId);
       root.activeTab = root.panels.length - 1;
     } else {
-      // Find the first tabs node in the split
-      const firstTabs = findFirstTabsNode(root);
-      if (firstTabs) {
-        firstTabs.panels.push(panelId);
-        firstTabs.activeTab = firstTabs.panels.length - 1;
+      // Smart placement: left panels (hierarchy/assets) → first child,
+      // right panels (inspector) → last child, center (viewport) → middle
+      const allTabs = collectAllTabsNodes(root);
+      let target: import('./lib/docking/types').TabsNode | null = null;
+
+      if ((baseId === 'hierarchy' || baseId === 'assets') && allTabs.length > 0) {
+        target = allTabs[0]; // first = leftmost
+      } else if (baseId === 'inspector' && allTabs.length > 0) {
+        target = allTabs[allTabs.length - 1]; // last = rightmost
+      } else if (allTabs.length > 1) {
+        target = allTabs[Math.floor(allTabs.length / 2)]; // middle
+      } else if (allTabs.length > 0) {
+        target = allTabs[0];
+      }
+
+      if (target) {
+        target.panels.push(panelId);
+        target.activeTab = target.panels.length - 1;
       } else {
-        // Fallback: add to bottom panel
         layout.bottomPanel.panels.push(panelId);
         layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
       }
     }
     layout = { ...layout };
     saveLayout(layout);
+  }
+
+  function collectAllTabsNodes(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode[] {
+    if (node.type === 'tabs') return [node];
+    const result: import('./lib/docking/types').TabsNode[] = [];
+    for (const child of node.children) {
+      result.push(...collectAllTabsNodes(child));
+    }
+    return result;
   }
 
   function findFirstTabsNode(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode | null {

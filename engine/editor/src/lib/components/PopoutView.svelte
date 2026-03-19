@@ -45,12 +45,13 @@
   async function setupDockDetection() {
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const { invoke } = await import('@tauri-apps/api/core');
       const win = getCurrentWindow();
 
-      // Listen for window move events (fires during title bar drag)
+      // onMoved fires when the window position changes (after title bar drag ends on Windows).
+      // If the window lands on top of the main editor, auto-dock immediately.
       await win.onMoved(async ({ payload: position }) => {
         try {
-          const { invoke } = await import('@tauri-apps/api/core');
           const size = await win.innerSize();
           const result = await invoke<{ near: boolean }>('check_dock_proximity', {
             popoutX: position.x,
@@ -59,6 +60,11 @@
             popoutHeight: size.height,
           });
           nearMainWindow = result.near;
+
+          // Auto-dock: if the window was dropped over the main editor, dock back
+          if (result.near) {
+            await dockBack();
+          }
         } catch { /* ignore */ }
       });
     } catch (e) {
