@@ -38,12 +38,9 @@
   async function dockBack() {
     if (!isTauri) return;
     try {
-      // Use emitTo to target the main window specifically
-      const { emitTo } = await import('@tauri-apps/api/event');
-      await emitTo('main', 'dock-panel-back', { panelId });
-      // Close this pop-out window
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().close();
+      // Call Rust command — it emits event to main window and closes this one
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('dock_panel_back', { panelId });
     } catch (e) {
       console.error('[silmaril] dockBack error:', e);
     }
