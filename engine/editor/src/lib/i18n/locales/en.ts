@@ -172,6 +172,7 @@ const en = {
 
   // Pop-out
   'popout.unknown': 'Unknown panel',
+  'popout.dock_back': 'Dock Back',
 
   // Common
   'common.ok': 'OK',

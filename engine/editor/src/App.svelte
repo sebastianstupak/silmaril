@@ -24,6 +24,9 @@
   import ProfilerPanel from './lib/docking/panels/ProfilerPanel.svelte';
   import AssetsPanel from './lib/docking/panels/AssetsPanel.svelte';
 
+  /** Detect if running inside Tauri or standalone browser */
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
   // Pop-out panel detection via query parameter
   const popoutPanel = new URLSearchParams(window.location.search).get('panel');
 
@@ -80,6 +83,39 @@
     }
   }
 
+  /** Add a panel back into the layout (e.g. when docking back from a pop-out window). */
+  function addPanelToLayout(panelId: string) {
+    // Add the panel as a new tab in the first tabs node of the root,
+    // or into the bottom panel if root has no tabs node.
+    const root = layout.root;
+    if (root.type === 'tabs') {
+      root.panels.push(panelId);
+      root.activeTab = root.panels.length - 1;
+    } else {
+      // Find the first tabs node in the split
+      const firstTabs = findFirstTabsNode(root);
+      if (firstTabs) {
+        firstTabs.panels.push(panelId);
+        firstTabs.activeTab = firstTabs.panels.length - 1;
+      } else {
+        // Fallback: add to bottom panel
+        layout.bottomPanel.panels.push(panelId);
+        layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
+      }
+    }
+    layout = { ...layout };
+    saveLayout(layout);
+  }
+
+  function findFirstTabsNode(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode | null {
+    if (node.type === 'tabs') return node;
+    for (const child of node.children) {
+      const found = findFirstTabsNode(child);
+      if (found) return found;
+    }
+    return null;
+  }
+
   function clampBottom(h: number): number {
     return Math.max(MIN_BOTTOM, Math.min(h, window.innerHeight * MAX_BOTTOM_RATIO));
   }
@@ -111,6 +147,14 @@
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
     logInfo('Silmaril Editor started');
     editorState = await getEditorState();
+
+    // Listen for dock-panel-back events from pop-out windows
+    if (isTauri && !popoutPanel) {
+      const { listen } = await import('@tauri-apps/api/event');
+      listen<{ panelId: string }>('dock-panel-back', (event) => {
+        addPanelToLayout(event.payload.panelId);
+      });
+    }
   });
 </script>
 

@@ -67,7 +67,9 @@
           ev.clientX < editorBounds.left || ev.clientX > editorBounds.right ||
           ev.clientY < editorBounds.top || ev.clientY > editorBounds.bottom
         )) {
-          popOutPanel(panelId, ev.screenX, ev.screenY);
+          const _info = getPanelInfo(panelId);
+          const _title = _info ? t(_info.titleKey) : panelId;
+          popOutPanel(panelId, _title, ev.screenX, ev.screenY);
           if (onPopOut) {
             onPopOut(panelId);
           }
@@ -139,7 +141,9 @@
     if (!contextMenu) return;
     const pid = contextMenu.panelId;
     // Position the pop-out window near the context menu click
-    popOutPanel(pid, contextMenu.x + window.screenX, contextMenu.y + window.screenY);
+    const _info = getPanelInfo(pid);
+    const _title = _info ? t(_info.titleKey) : pid;
+    popOutPanel(pid, _title, contextMenu.x + window.screenX, contextMenu.y + window.screenY);
     if (onPopOut) {
       onPopOut(pid);
     }

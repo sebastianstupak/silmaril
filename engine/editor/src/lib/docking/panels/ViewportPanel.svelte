@@ -7,13 +7,9 @@
     subscribeContext,
   } from '$lib/stores/editor-context';
   import {
-    getViewportFrame,
-    pickViewportEntity,
     createNativeViewport,
     resizeNativeViewport,
     destroyNativeViewport,
-    type ViewportEntity,
-    type ViewportCamera,
   } from '$lib/api';
   import {
     getSceneState,
@@ -21,7 +17,6 @@
     type SceneTool,
   } from '$lib/scene/state';
   import {
-    selectEntity,
     createEntity,
     deleteEntity,
     duplicateEntity,
@@ -41,12 +36,6 @@
   } from '$lib/scene/commands';
   import type { ProjectionMode } from '$lib/scene/state';
 
-  // Entity colour palette — matches the Rust side
-  const ENTITY_COLORS = [
-    '#e06c75', '#61afef', '#98c379', '#e5c07b',
-    '#c678dd', '#56b6c2', '#d19a66', '#be5046',
-  ];
-
   const TOOL_KEYS: Record<string, SceneTool> = {
     q: 'select',
     w: 'move',
@@ -60,13 +49,12 @@
   let containerEl: HTMLDivElement | undefined = $state(undefined);
   let viewportWidth = $state(800);
   let viewportHeight = $state(600);
-  let svgContent = $state('');
   let loading = $state(true);
   /** Whether the native viewport child window has been created. */
   let nativeViewportCreated = $state(false);
 
   // Camera state (viewport-local, synced from scene state)
-  let camera: ViewportCamera = $state({ offset_x: 0, offset_y: 0, zoom: 1 });
+  let cameraZoom = $state(1);
 
   // --- Drag / interaction state ---
   type DragMode =
@@ -107,19 +95,13 @@
       viewAngleDeg = (scene.camera.viewAngle * 180) / Math.PI;
       projection = scene.camera.projection;
 
-      // Sync camera from scene state to viewport camera
-      camera = {
-        offset_x: scene.camera.target.x * 50,
-        offset_y: -scene.camera.target.z * 50,
-        zoom: scene.camera.zoom,
-      };
+      // Sync zoom from scene state
+      cameraZoom = scene.camera.zoom;
 
       // Update cursor when tool changes (and we are not dragging)
       if (!isDragging) {
         cursor = cursorForTool(activeTool);
       }
-
-      requestFrame();
     });
 
     // Observe container size
@@ -141,8 +123,6 @@
           viewportWidth = Math.round(entry.contentRect.width) || 800;
           viewportHeight = Math.round(entry.contentRect.height) || 600;
         }
-        requestFrame();
-
         // Keep native viewport child window in sync with container size
         if (isTauri && nativeViewportCreated) {
           const b = getPhysicalBounds();
@@ -151,18 +131,19 @@
       });
       observer.observe(containerEl);
 
-      // NOTE: Native Vulkan viewport disabled until it can render grid/entities/gizmos.
-      // Currently it only clears to solid color which is less useful than the SVG viewport.
-      // Uncomment when Vulkan rendering is fully implemented.
-      // if (isTauri) {
-      //   const b = getPhysicalBounds();
-      //   createNativeViewport(b.x, b.y, b.width, b.height).then(() => {
-      //     nativeViewportCreated = true;
-      //   });
-      // }
-
-      // Initial frame (SVG fallback — always rendered for now)
-      requestFrame();
+      // Create native Vulkan viewport in Tauri mode
+      if (isTauri) {
+        const b = getPhysicalBounds();
+        createNativeViewport(b.x, b.y, b.width, b.height).then(() => {
+          nativeViewportCreated = true;
+          loading = false;
+        }).catch((e) => {
+          console.error('[viewport] Vulkan init failed:', e);
+          loading = false;
+        });
+      } else {
+        loading = false;
+      }
 
       return () => {
         unsub();
@@ -174,7 +155,6 @@
       };
     }
 
-    requestFrame();
     return unsub;
   });
 
@@ -207,93 +187,8 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Viewport entity list
-  // ---------------------------------------------------------------------------
-
-  /** Build the viewport entity list from editor context entities.
-   *  Converts 3D world positions to normalised viewport coords (0–1)
-   *  using the scene camera target, zoom, and viewAngle rotation. */
-  function buildViewportEntities(): ViewportEntity[] {
-    const scene = getSceneState();
-    const cam = scene.camera;
-    const cosA = Math.cos(cam.viewAngle);
-    const sinA = Math.sin(cam.viewAngle);
-
-    return scene.entities.map((e, i) => {
-      // World-space offset from camera target
-      const wx = e.position.x - cam.target.x;
-      const wz = e.position.z - cam.target.z;
-
-      // Rotate by view angle
-      const rx = wx * cosA - wz * sinA;
-      const ry = wx * sinA + wz * cosA;
-
-      // Convert to normalised screen coords
-      const scale = cam.zoom * 50; // pixels-per-world-unit
-      const screenX = 0.5 + (rx * scale) / viewportWidth;
-      const screenY = 0.5 - (ry * scale) / viewportHeight; // Y inverted
-
-      return {
-        id: e.id,
-        name: e.name,
-        x: Math.max(0.05, Math.min(0.95, screenX)),
-        y: Math.max(0.05, Math.min(0.95, screenY)),
-        color: ENTITY_COLORS[i % ENTITY_COLORS.length],
-      };
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Frame rendering
-  // ---------------------------------------------------------------------------
-
-  /** Request a new SVG frame from the backend. */
-  async function requestFrame() {
-    try {
-      const viewEntities = buildViewportEntities();
-      const scene = getSceneState();
-      const svg = await getViewportFrame({
-        width: viewportWidth,
-        height: viewportHeight,
-        selected_entity_id: selectedEntityId,
-        camera,
-        entities: viewEntities,
-        tool: activeTool,
-        viewAngle: scene.camera.viewAngle,
-      });
-      svgContent = svg;
-      loading = false;
-    } catch {
-      loading = false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // Mouse event handlers
   // ---------------------------------------------------------------------------
-
-  /** Handle click on the viewport to pick entities. */
-  async function handleClick(event: MouseEvent) {
-    // Don't pick if we just finished a drag
-    if (isDragging) return;
-    const rect = containerEl?.getBoundingClientRect();
-    if (!rect) return;
-
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
-
-    const viewEntities = buildViewportEntities();
-    const entityId = await pickViewportEntity({
-      click_x: clickX,
-      click_y: clickY,
-      width: viewportWidth,
-      height: viewportHeight,
-      entities: viewEntities,
-      camera,
-    });
-
-    selectEntity(entityId);
-  }
 
   /** Handle mouse wheel for zoom. */
   function handleWheel(event: WheelEvent) {
@@ -383,8 +278,8 @@
 
     switch (dragMode) {
       case 'pan': {
-        const panDx = (event.clientX - dragStartX) / (camera.zoom * 50);
-        const panDy = -(event.clientY - dragStartY) / (camera.zoom * 50);
+        const panDx = (event.clientX - dragStartX) / (cameraZoom * 50);
+        const panDy = -(event.clientY - dragStartY) / (cameraZoom * 50);
         dragStartX = event.clientX;
         dragStartY = event.clientY;
         panCamera(panDx, panDy);
@@ -532,7 +427,6 @@
   aria-label={t('panel.viewport')}
   tabindex="0"
   style:cursor={cursor}
-  onclick={handleClick}
   onwheel={handleWheel}
   onmousedown={handleMouseDown}
   onmousemove={handleMouseMove}
@@ -602,16 +496,16 @@
     </div>
   </div>
 
-  <!-- SVG viewport — shown until native Vulkan rendering is fully implemented -->
-  {#if !nativeViewportCreated}
-    {#if loading}
-      <div class="viewport-loading">
-        <p>{t('viewport.loading')}</p>
-      </div>
-    {:else}
-      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-      {@html svgContent}
-    {/if}
+  <!-- In Tauri: native Vulkan child window renders here (no HTML content needed).
+       In browser: show a placeholder message. -->
+  {#if !nativeViewportCreated && !isTauri}
+    <div class="viewport-loading">
+      <p style="color: var(--color-textDim, #666);">Viewport requires Tauri desktop app</p>
+    </div>
+  {:else if !nativeViewportCreated && isTauri}
+    <div class="viewport-loading">
+      <p>{t('viewport.loading')}</p>
+    </div>
   {/if}
 
   <!-- Axis gizmo (camera orientation indicator) — clickable to snap view -->
@@ -658,7 +552,7 @@
     <span class="hud-projection">{projection === 'ortho' ? 'Ortho' : 'Persp'}</span>
     <span class="hud-separator">|</span>
     <span class="hud-zoom" title={t('viewport.zoom')}>
-      {Math.round(camera.zoom * 100)}%
+      {Math.round(cameraZoom * 100)}%
     </span>
     <button
       class="hud-btn"

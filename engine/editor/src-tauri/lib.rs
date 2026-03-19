@@ -15,8 +15,6 @@ pub fn run() {
             commands::open_project,
             commands::open_project_dialog,
             commands::scan_project_entities,
-            commands::get_viewport_frame,
-            commands::pick_viewport_entity,
             commands::scene_command,
             commands::create_native_viewport,
             commands::resize_native_viewport,

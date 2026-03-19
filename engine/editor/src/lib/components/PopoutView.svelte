@@ -13,6 +13,9 @@
 
   let { panelId }: { panelId: string } = $props();
 
+  /** Detect if running inside Tauri or standalone browser */
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
   const panels: Record<string, Component> = {
     hierarchy: HierarchyWrapper,
     inspector: InspectorWrapper,
@@ -31,11 +34,30 @@
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
   });
+
+  async function dockBack() {
+    if (!isTauri) return;
+    try {
+      const { emit } = await import('@tauri-apps/api/event');
+      await emit('dock-panel-back', { panelId });
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      getCurrentWindow().close();
+    } catch (e) {
+      console.error('[silmaril] dockBack error:', e);
+    }
+  }
 </script>
 
 <div class="popout-container">
+  <div class="popout-toolbar">
+    <button class="dock-back-btn" onclick={dockBack} title={t('popout.dock_back')}>
+      {t('popout.dock_back')}
+    </button>
+  </div>
   {#if PanelComponent}
-    <PanelComponent />
+    <div class="popout-content">
+      <PanelComponent />
+    </div>
   {:else}
     <p class="popout-unknown">{t('popout.unknown')}: {panelId}</p>
   {/if}
@@ -47,6 +69,39 @@
     height: 100vh;
     background: var(--color-bg, #1e1e1e);
     color: var(--color-text, #ccc);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .popout-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: var(--color-bgHeader, #2d2d2d);
+    border-bottom: 1px solid var(--color-border, #404040);
+    flex-shrink: 0;
+  }
+
+  .dock-back-btn {
+    background: none;
+    border: 1px solid var(--color-border, #404040);
+    border-radius: 4px;
+    color: var(--color-text, #ccc);
+    font-size: 11px;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .dock-back-btn:hover {
+    background: var(--color-accent, #007acc);
+    color: #fff;
+    border-color: var(--color-accent, #007acc);
+  }
+
+  .popout-content {
+    flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
