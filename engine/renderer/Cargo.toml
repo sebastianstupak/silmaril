@@ -25,6 +25,11 @@ engine-core = { path = "../core" }
 engine-assets = { path = "../assets" }
 engine-macros = { path = "../macros" }
 raw-window-handle = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_System_LibraryLoader",
+] }
 tracy-client = { version = "0.17", optional = true, default-features = false }
 
 # Agentic debugging dependencies (Phase 1.6.R)

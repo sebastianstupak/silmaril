@@ -2,11 +2,12 @@
 //!
 //! Creates a platform-native child window parented inside the Tauri webview
 //! window.  The child window is the target for a Vulkan surface; a render
-//! thread draws into it at ~60 fps.
+//! thread draws into it at ~60 fps using the full `engine-renderer` pipeline.
 //!
-//! The render thread creates a Vulkan swapchain on the child HWND and clears
-//! it to the editor background colour each frame.  Swapchain is automatically
-//! recreated on resize.
+//! The render thread creates a Vulkan context, surface, swapchain, render pass,
+//! depth buffer, framebuffers, command buffers, and sync objects from
+//! `engine-renderer` types, then clears to the editor background colour each
+//! frame with a grid overlay.  Swapchain is automatically recreated on resize.
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -29,8 +30,6 @@ pub struct ViewportBounds {
 #[cfg(windows)]
 mod platform {
     use super::*;
-
-    use crate::viewport::vulkan_viewport::VulkanViewport;
 
     use windows::Win32::{
         Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
@@ -106,7 +105,7 @@ mod platform {
                 // renders BEHIND the WebView2 control. The viewport panel
                 // area has a transparent background so Vulkan shows through,
                 // while menus/dropdowns/overlays naturally appear on top.
-                // HWND_BOTTOM = HWND(1) — place behind all sibling windows
+                // HWND_BOTTOM = HWND(1) -- place behind all sibling windows
                 let hwnd_bottom = HWND(1 as *mut _);
                 let _ = SetWindowPos(
                     child,
@@ -135,8 +134,8 @@ mod platform {
 
         /// Start the Vulkan render loop on a background thread.
         ///
-        /// Initialises a Vulkan swapchain on the child window and clears it
-        /// to the editor background colour each frame (~60 fps).
+        /// Initialises the engine-renderer pipeline on the child window and
+        /// clears it to the editor background colour each frame (~60 fps).
         pub fn start_rendering(&mut self) -> Result<(), String> {
             let should_stop = self.should_stop.clone();
             let bounds = self.bounds.clone();
@@ -210,25 +209,535 @@ mod platform {
         }
     }
 
-    /// Render loop: initialises Vulkan on the child HWND, then clears the
-    /// swapchain to the background colour each frame.  Falls back to a no-op
-    /// if Vulkan initialisation fails (the child window stays dark).
+    // ──────────────────────────────────────────────────────────────────────
+    // Engine-renderer based viewport state
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// Clear colour for the viewport background: dark (#14141e).
+    const CLEAR_COLOR: [f32; 4] = [0.078, 0.078, 0.118, 1.0];
+
+    /// Grid line colour: subtle (#1e1e2e).
+    const GRID_COLOR: [f32; 4] = [0.118, 0.118, 0.180, 1.0];
+
+    /// X-axis colour: red-tinted (#401515).
+    const X_AXIS_COLOR: [f32; 4] = [0.251, 0.082, 0.082, 1.0];
+
+    /// Y-axis colour: green-tinted (#154015).
+    const Y_AXIS_COLOR: [f32; 4] = [0.082, 0.251, 0.082, 1.0];
+
+    /// Grid spacing in pixels.
+    const GRID_SPACING: u32 = 50;
+
+    /// Axis line thickness in pixels.
+    const AXIS_THICKNESS: u32 = 2;
+
+    use ash::vk;
+    use engine_renderer::{
+        CommandBuffer, CommandPool, DepthBuffer, Framebuffer, RenderPass, RenderPassConfig,
+        Surface, Swapchain, VulkanContext,
+    };
+
+    /// Viewport renderer state backed by `engine-renderer` types.
+    struct ViewportRenderer {
+        context: VulkanContext,
+        surface: Surface,
+        swapchain: Swapchain,
+        render_pass: RenderPass,
+        depth_buffer: DepthBuffer,
+        framebuffers: Vec<Framebuffer>,
+        #[allow(dead_code)]
+        command_pool: CommandPool,
+        command_buffers: Vec<CommandBuffer>,
+        sync_objects: Vec<engine_renderer::FrameSyncObjects>,
+        current_frame: usize,
+        width: u32,
+        height: u32,
+        needs_recreate: bool,
+    }
+
+    impl ViewportRenderer {
+        /// Create a new viewport renderer from a raw HWND.
+        fn new(hwnd: HWND, width: u32, height: u32) -> Result<Self, String> {
+            let width = width.max(1);
+            let height = height.max(1);
+            let hwnd_raw = hwnd.0 as isize;
+
+            // 1. Create Vulkan context (headless - no surface yet)
+            let context = VulkanContext::new("SilmarilEditor", None, None)
+                .map_err(|e| format!("VulkanContext creation failed: {e}"))?;
+
+            // 2. Create surface from raw HWND using engine-renderer's Surface
+            let surface = Surface::from_raw_hwnd(&context.entry, &context.instance, hwnd_raw)
+                .map_err(|e| format!("Surface creation failed: {e}"))?;
+
+            // 3. Create swapchain
+            let swapchain = Swapchain::new(
+                &context,
+                surface.handle(),
+                surface.loader(),
+                width,
+                height,
+                None,
+            )
+            .map_err(|e| format!("Swapchain creation failed: {e}"))?;
+
+            // 4. Create depth buffer
+            let depth_buffer =
+                DepthBuffer::new(&context.device, &context.allocator, swapchain.extent)
+                    .map_err(|e| format!("DepthBuffer creation failed: {e}"))?;
+
+            // 5. Create render pass (with depth)
+            let render_pass = RenderPass::new(
+                &context.device,
+                RenderPassConfig {
+                    color_format: swapchain.format,
+                    depth_format: Some(depth_buffer.format()),
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::STORE,
+                },
+            )
+            .map_err(|e| format!("RenderPass creation failed: {e}"))?;
+
+            // 6. Create framebuffers (color + depth)
+            let framebuffers = create_viewport_framebuffers(
+                &context.device,
+                &swapchain,
+                &render_pass,
+                &depth_buffer,
+            )?;
+
+            // 7. Create command pool + buffers
+            const FRAMES_IN_FLIGHT: u32 = 2;
+
+            let command_pool = CommandPool::new(
+                &context.device,
+                context.queue_families.graphics,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+            )
+            .map_err(|e| format!("CommandPool creation failed: {e}"))?;
+
+            let command_buffers = command_pool
+                .allocate(
+                    &context.device,
+                    vk::CommandBufferLevel::PRIMARY,
+                    FRAMES_IN_FLIGHT,
+                )
+                .map_err(|e| format!("CommandBuffer allocation failed: {e}"))?
+                .into_iter()
+                .map(CommandBuffer::from_handle)
+                .collect();
+
+            // 8. Create sync objects
+            let sync_objects =
+                engine_renderer::create_sync_objects(&context.device, FRAMES_IN_FLIGHT)
+                    .map_err(|e| format!("Sync object creation failed: {e}"))?;
+
+            tracing::info!(
+                width,
+                height,
+                images = swapchain.image_count,
+                "Viewport renderer initialised with engine-renderer"
+            );
+
+            Ok(Self {
+                context,
+                surface,
+                swapchain,
+                render_pass,
+                depth_buffer,
+                framebuffers,
+                command_pool,
+                command_buffers,
+                sync_objects,
+                current_frame: 0,
+                width,
+                height,
+                needs_recreate: false,
+            })
+        }
+
+        /// Notify the renderer that the viewport has been resized.
+        fn notify_resize(&mut self, width: u32, height: u32) {
+            let width = width.max(1);
+            let height = height.max(1);
+            if width != self.width || height != self.height {
+                self.width = width;
+                self.height = height;
+                self.needs_recreate = true;
+            }
+        }
+
+        /// Render a single frame (background clear + grid overlay).
+        fn render_frame(&mut self) -> Result<bool, String> {
+            if self.needs_recreate {
+                self.recreate_swapchain()?;
+                self.needs_recreate = false;
+            }
+
+            let sync = &self.sync_objects[self.current_frame];
+
+            unsafe {
+                // Wait for previous frame
+                self.context
+                    .device
+                    .wait_for_fences(&[sync.in_flight_fence], true, u64::MAX)
+                    .map_err(|e| format!("wait_for_fences: {e}"))?;
+
+                // Acquire next image
+                let acquire_result = self.swapchain.loader.acquire_next_image(
+                    self.swapchain.swapchain,
+                    u64::MAX,
+                    sync.image_available_semaphore,
+                    vk::Fence::null(),
+                );
+
+                let image_index = match acquire_result {
+                    Ok((index, _suboptimal)) => index,
+                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                        self.needs_recreate = true;
+                        return Ok(false);
+                    }
+                    Err(e) => return Err(format!("acquire_next_image: {e}")),
+                };
+
+                self.context
+                    .device
+                    .reset_fences(&[sync.in_flight_fence])
+                    .map_err(|e| format!("reset_fences: {e}"))?;
+
+                // Record command buffer
+                let cmd = self.command_buffers[self.current_frame].handle();
+                self.record_frame_commands(cmd, image_index as usize)?;
+
+                // Submit
+                let wait_semaphores = [sync.image_available_semaphore];
+                let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+                let signal_semaphores = [sync.render_finished_semaphore];
+                let command_buffers = [cmd];
+
+                let submit_info = vk::SubmitInfo::default()
+                    .wait_semaphores(&wait_semaphores)
+                    .wait_dst_stage_mask(&wait_stages)
+                    .command_buffers(&command_buffers)
+                    .signal_semaphores(&signal_semaphores);
+
+                self.context
+                    .device
+                    .queue_submit(
+                        self.context.graphics_queue,
+                        &[submit_info],
+                        sync.in_flight_fence,
+                    )
+                    .map_err(|e| format!("queue_submit: {e}"))?;
+
+                // Present
+                let swapchains = [self.swapchain.swapchain];
+                let image_indices = [image_index];
+                let present_info = vk::PresentInfoKHR::default()
+                    .wait_semaphores(&signal_semaphores)
+                    .swapchains(&swapchains)
+                    .image_indices(&image_indices);
+
+                match self
+                    .swapchain
+                    .loader
+                    .queue_present(self.context.present_queue, &present_info)
+                {
+                    Ok(_suboptimal) => {}
+                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR) => {
+                        self.needs_recreate = true;
+                    }
+                    Err(e) => return Err(format!("queue_present: {e}")),
+                }
+            }
+
+            self.current_frame = (self.current_frame + 1) % self.sync_objects.len();
+            Ok(true)
+        }
+
+        /// Record frame commands: begin render pass, draw grid, end render pass.
+        unsafe fn record_frame_commands(
+            &self,
+            cmd: vk::CommandBuffer,
+            image_index: usize,
+        ) -> Result<(), String> {
+            self.context
+                .device
+                .reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())
+                .map_err(|e| format!("reset_command_buffer: {e}"))?;
+
+            let begin_info = vk::CommandBufferBeginInfo::default()
+                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            self.context
+                .device
+                .begin_command_buffer(cmd, &begin_info)
+                .map_err(|e| format!("begin_command_buffer: {e}"))?;
+
+            // Begin render pass with color + depth clear
+            let clear_values = [
+                vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: CLEAR_COLOR,
+                    },
+                },
+                vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                },
+            ];
+
+            let render_pass_info = vk::RenderPassBeginInfo::default()
+                .render_pass(self.render_pass.handle())
+                .framebuffer(self.framebuffers[image_index].handle())
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: self.swapchain.extent,
+                })
+                .clear_values(&clear_values);
+
+            self.context.device.cmd_begin_render_pass(
+                cmd,
+                &render_pass_info,
+                vk::SubpassContents::INLINE,
+            );
+
+            // Draw grid lines using ClearAttachments
+            draw_grid(&self.context.device, cmd, self.swapchain.extent.width, self.swapchain.extent.height);
+
+            self.context.device.cmd_end_render_pass(cmd);
+
+            self.context
+                .device
+                .end_command_buffer(cmd)
+                .map_err(|e| format!("end_command_buffer: {e}"))?;
+
+            Ok(())
+        }
+
+        /// Recreate the swapchain and dependent resources after a resize.
+        fn recreate_swapchain(&mut self) -> Result<(), String> {
+            self.context
+                .wait_idle()
+                .map_err(|e| format!("device_wait_idle: {e}"))?;
+
+            // Drop old framebuffers (they reference old image views + depth buffer)
+            self.framebuffers.clear();
+
+            // Recreate swapchain (destroys old image views internally)
+            self.swapchain
+                .recreate(
+                    &self.context,
+                    self.surface.handle(),
+                    self.surface.loader(),
+                    self.width,
+                    self.height,
+                )
+                .map_err(|e| format!("Swapchain recreation failed: {e}"))?;
+
+            // Recreate depth buffer for new extent
+            self.depth_buffer =
+                DepthBuffer::new(&self.context.device, &self.context.allocator, self.swapchain.extent)
+                    .map_err(|e| format!("DepthBuffer recreation failed: {e}"))?;
+
+            // Recreate framebuffers
+            self.framebuffers = create_viewport_framebuffers(
+                &self.context.device,
+                &self.swapchain,
+                &self.render_pass,
+                &self.depth_buffer,
+            )?;
+
+            tracing::debug!(
+                width = self.swapchain.extent.width,
+                height = self.swapchain.extent.height,
+                images = self.swapchain.images.len(),
+                "Viewport swapchain recreated"
+            );
+
+            Ok(())
+        }
+    }
+
+    impl Drop for ViewportRenderer {
+        fn drop(&mut self) {
+            // Wait for GPU to finish before cleanup
+            let _ = self.context.wait_idle();
+
+            // Drop in correct order: command buffers, framebuffers, depth buffer,
+            // render pass, swapchain, surface, context
+            self.command_buffers.clear();
+            self.framebuffers.clear();
+
+            // Remaining fields are dropped in reverse declaration order:
+            // sync_objects, command_pool, depth_buffer, render_pass,
+            // swapchain, surface, context
+        }
+    }
+
+    /// Create framebuffers with color + depth attachments using engine-renderer types.
+    fn create_viewport_framebuffers(
+        device: &ash::Device,
+        swapchain: &Swapchain,
+        render_pass: &RenderPass,
+        depth_buffer: &DepthBuffer,
+    ) -> Result<Vec<Framebuffer>, String> {
+        let mut framebuffers = Vec::with_capacity(swapchain.image_views.len());
+        for (i, &image_view) in swapchain.image_views.iter().enumerate() {
+            let attachments = [image_view, depth_buffer.image_view()];
+            let framebuffer_info = vk::FramebufferCreateInfo::default()
+                .render_pass(render_pass.handle())
+                .attachments(&attachments)
+                .width(swapchain.extent.width)
+                .height(swapchain.extent.height)
+                .layers(1);
+
+            let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None) }
+                .map_err(|e| format!("create_framebuffer[{i}]: {e}"))?;
+
+            framebuffers.push(Framebuffer::from_raw(device, framebuffer));
+        }
+        Ok(framebuffers)
+    }
+
+    /// Draw grid lines and centre axes using `vkCmdClearAttachments`.
+    ///
+    /// This approach requires no shaders, pipelines, or vertex buffers --
+    /// each grid line is a 1-pixel-wide clear rect, and each axis line
+    /// is a 2-pixel-wide clear rect in a distinct colour.
+    unsafe fn draw_grid(device: &ash::Device, cmd: vk::CommandBuffer, width: u32, height: u32) {
+        // -- Minor grid lines (every GRID_SPACING pixels) --
+        let grid_attachment = vk::ClearAttachment {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            color_attachment: 0,
+            clear_value: vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: GRID_COLOR,
+                },
+            },
+        };
+
+        let mut grid_rects = Vec::new();
+
+        // Vertical grid lines
+        let mut x = 0u32;
+        while x < width {
+            grid_rects.push(vk::ClearRect {
+                rect: vk::Rect2D {
+                    offset: vk::Offset2D { x: x as i32, y: 0 },
+                    extent: vk::Extent2D { width: 1, height },
+                },
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+            x += GRID_SPACING;
+        }
+
+        // Horizontal grid lines
+        let mut y = 0u32;
+        while y < height {
+            grid_rects.push(vk::ClearRect {
+                rect: vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: y as i32 },
+                    extent: vk::Extent2D { width, height: 1 },
+                },
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+            y += GRID_SPACING;
+        }
+
+        if !grid_rects.is_empty() {
+            device.cmd_clear_attachments(cmd, &[grid_attachment], &grid_rects);
+        }
+
+        // -- Centre X axis (horizontal line at height/2, red-tinted) --
+        let center_y = height / 2;
+        let x_axis_attachment = vk::ClearAttachment {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            color_attachment: 0,
+            clear_value: vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: X_AXIS_COLOR,
+                },
+            },
+        };
+        let x_axis_h = AXIS_THICKNESS.min(height.saturating_sub(center_y));
+        if x_axis_h > 0 {
+            device.cmd_clear_attachments(
+                cmd,
+                &[x_axis_attachment],
+                &[vk::ClearRect {
+                    rect: vk::Rect2D {
+                        offset: vk::Offset2D {
+                            x: 0,
+                            y: center_y as i32,
+                        },
+                        extent: vk::Extent2D {
+                            width,
+                            height: x_axis_h,
+                        },
+                    },
+                    base_array_layer: 0,
+                    layer_count: 1,
+                }],
+            );
+        }
+
+        // -- Centre Y axis (vertical line at width/2, green-tinted) --
+        let center_x = width / 2;
+        let y_axis_attachment = vk::ClearAttachment {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            color_attachment: 0,
+            clear_value: vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: Y_AXIS_COLOR,
+                },
+            },
+        };
+        let y_axis_w = AXIS_THICKNESS.min(width.saturating_sub(center_x));
+        if y_axis_w > 0 {
+            device.cmd_clear_attachments(
+                cmd,
+                &[y_axis_attachment],
+                &[vk::ClearRect {
+                    rect: vk::Rect2D {
+                        offset: vk::Offset2D {
+                            x: center_x as i32,
+                            y: 0,
+                        },
+                        extent: vk::Extent2D {
+                            width: y_axis_w,
+                            height,
+                        },
+                    },
+                    base_array_layer: 0,
+                    layer_count: 1,
+                }],
+            );
+        }
+    }
+
+    /// Render loop: initialises the engine-renderer pipeline on the child HWND,
+    /// then renders each frame.  Falls back to a no-op idle loop if
+    /// initialisation fails.
     fn render_loop(
         hwnd: HWND,
         should_stop: Arc<AtomicBool>,
         bounds: Arc<Mutex<ViewportBounds>>,
     ) {
         let initial_bounds = *bounds.lock().unwrap();
-        let hwnd_raw = hwnd.0 as isize;
 
-        let mut vk_state = match VulkanViewport::new(
-            hwnd_raw,
+        let mut renderer = match ViewportRenderer::new(
+            hwnd,
             initial_bounds.width,
             initial_bounds.height,
         ) {
-            Ok(state) => state,
+            Ok(r) => r,
             Err(e) => {
-                tracing::error!(error = %e, "Failed to initialise Vulkan for viewport; falling back to idle loop");
+                tracing::error!(error = %e, "Failed to initialise engine-renderer for viewport; falling back to idle loop");
                 // Fall back: just pump messages so the window stays alive
                 while !should_stop.load(Ordering::Relaxed) {
                     unsafe {
@@ -254,14 +763,14 @@ mod platform {
                 if b.width != last_width || b.height != last_height {
                     last_width = b.width;
                     last_height = b.height;
-                    vk_state.notify_resize(last_width, last_height);
+                    renderer.notify_resize(last_width, last_height);
                 }
             }
 
             // Render frame
-            if let Err(e) = vk_state.render_frame() {
-                tracing::error!(error = %e, "Vulkan render_frame failed");
-                // Don't spin — sleep before retrying
+            if let Err(e) = renderer.render_frame() {
+                tracing::error!(error = %e, "Viewport render_frame failed");
+                // Don't spin -- sleep before retrying
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 continue;
             }
@@ -280,7 +789,7 @@ mod platform {
         }
 
         // Explicit drop to ensure Vulkan cleanup before window destruction
-        drop(vk_state);
+        drop(renderer);
     }
 
     /// Window procedure for the child viewport window.
@@ -295,7 +804,7 @@ mod platform {
     ) -> LRESULT {
         match msg {
             WM_ERASEBKGND => {
-                // Prevent flicker — Vulkan owns the surface
+                // Prevent flicker -- Vulkan owns the surface
                 LRESULT(1)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),

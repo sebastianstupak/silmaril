@@ -97,6 +97,60 @@ impl Surface {
         self.surface
     }
 
+    /// Create a Vulkan surface from a raw Win32 HWND
+    ///
+    /// Used by the editor to create a surface for an externally-managed child window
+    /// (e.g. a Tauri-parented native viewport).
+    ///
+    /// # Arguments
+    ///
+    /// * `entry` - Vulkan entry point
+    /// * `instance` - Vulkan instance
+    /// * `hwnd` - Raw Win32 window handle (as isize)
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `hwnd` is a valid Win32 HWND and remains valid
+    /// for the lifetime of the returned Surface.
+    #[cfg(windows)]
+    pub fn from_raw_hwnd(
+        entry: &ash::Entry,
+        instance: &ash::Instance,
+        hwnd: isize,
+    ) -> Result<Self, SurfaceError> {
+        use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+
+        info!(hwnd = hwnd, "Creating Vulkan surface from raw HWND");
+
+        let win32_loader = ash::khr::win32_surface::Instance::new(entry, instance);
+
+        let hinstance = unsafe {
+            GetModuleHandleW(None)
+                .map_err(|e| SurfaceError::creationfailed(format!("GetModuleHandleW failed: {}", e)))?
+        };
+
+        let create_info = vk::Win32SurfaceCreateInfoKHR::default()
+            .hwnd(hwnd as vk::HWND)
+            .hinstance(hinstance.0 as vk::HINSTANCE);
+
+        let surface = unsafe {
+            win32_loader
+                .create_win32_surface(&create_info, None)
+                .map_err(|e| {
+                    SurfaceError::creationfailed(format!("vkCreateWin32SurfaceKHR failed: {}", e))
+                })?
+        };
+
+        let surface_loader = ash::khr::surface::Instance::new(entry, instance);
+
+        debug!(
+            surface = ?surface,
+            "Surface created from raw HWND successfully"
+        );
+
+        Ok(Self { surface, surface_loader })
+    }
+
     /// Get the surface loader for capability queries
     #[inline]
     pub fn loader(&self) -> &ash::khr::surface::Instance {

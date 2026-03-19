@@ -26,6 +26,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [target.'cfg(windows)'.dependencies]
+engine-renderer = { path = "../renderer" }
 windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
@@ -33,8 +34,6 @@ windows = { version = "0.61", features = [
     "Win32_System_LibraryLoader",
 ] }
 ash = { workspace = true }
-ash-window = "0.13"
-raw-window-handle = "0.6"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
