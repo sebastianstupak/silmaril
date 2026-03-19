@@ -85,12 +85,16 @@
     }
   }
 
-  /** Add a panel back into the layout as a new split area on the right side. */
-  function addPanelToLayout(panelId: string) {
-    const baseId = panelId.split(':')[0];
+  /** Add a panel back into the layout at the specified dock zone. */
+  function addPanelToLayout(panelId: string, zone: string = 'center') {
+    const newTab: import('./lib/docking/types').TabsNode = {
+      type: 'tabs',
+      activeTab: 0,
+      panels: [panelId],
+    };
 
-    // Console always goes to bottom panel
-    if (baseId === 'console') {
+    // Bottom zone → add to bottom panel
+    if (zone === 'bottom') {
       layout.bottomPanel.panels.push(panelId);
       layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
       layout = { ...layout };
@@ -98,45 +102,61 @@
       return;
     }
 
-    // Add as a new split on the appropriate side
-    const newTab: import('./lib/docking/types').TabsNode = {
-      type: 'tabs',
-      activeTab: 0,
-      panels: [panelId],
-    };
-
     const root = layout.root;
 
-    // Determine position: hierarchy/assets → left, inspector → right, others → right
-    const addToLeft = baseId === 'hierarchy' || baseId === 'assets';
-
-    if (root.type === 'tabs') {
-      // Root is a single tabs node — split it
+    if (zone === 'center') {
+      // Add as tab in the middle tabs node
+      if (root.type === 'tabs') {
+        root.panels.push(panelId);
+        root.activeTab = root.panels.length - 1;
+      } else {
+        const allTabs = collectAllTabsNodes(root);
+        const target = allTabs.length > 1 ? allTabs[Math.floor(allTabs.length / 2)] : allTabs[0];
+        if (target) {
+          target.panels.push(panelId);
+          target.activeTab = target.panels.length - 1;
+        }
+      }
+    } else if (zone === 'left' || zone === 'right') {
+      if (root.type === 'tabs') {
+        layout.root = {
+          type: 'split',
+          direction: 'horizontal',
+          sizes: zone === 'left' ? [25, 75] : [75, 25],
+          children: zone === 'left' ? [newTab, root] : [root, newTab],
+        };
+      } else {
+        const newSize = 20;
+        const scale = (100 - newSize) / 100;
+        root.sizes = root.sizes.map(s => s * scale);
+        if (zone === 'left') {
+          root.children.unshift(newTab);
+          root.sizes.unshift(newSize);
+        } else {
+          root.children.push(newTab);
+          root.sizes.push(newSize);
+        }
+      }
+    } else if (zone === 'top') {
       layout.root = {
         type: 'split',
-        direction: 'horizontal',
-        sizes: addToLeft ? [25, 75] : [75, 25],
-        children: addToLeft ? [newTab, root] : [root, newTab],
+        direction: 'vertical',
+        sizes: [25, 75],
+        children: [newTab, root],
       };
-    } else {
-      // Root is already a split — add as new child
-      if (addToLeft) {
-        root.children.unshift(newTab);
-        const newSize = 20;
-        const scale = (100 - newSize) / 100;
-        root.sizes = root.sizes.map(s => s * scale);
-        root.sizes.unshift(newSize);
-      } else {
-        root.children.push(newTab);
-        const newSize = 20;
-        const scale = (100 - newSize) / 100;
-        root.sizes = root.sizes.map(s => s * scale);
-        root.sizes.push(newSize);
-      }
     }
 
     layout = { ...layout };
     saveLayout(layout);
+  }
+
+  function collectAllTabsNodes(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode[] {
+    if (node.type === 'tabs') return [node];
+    const result: import('./lib/docking/types').TabsNode[] = [];
+    for (const child of node.children) {
+      result.push(...collectAllTabsNodes(child));
+    }
+    return result;
   }
 
   function findFirstTabsNode(node: import('./lib/docking/types').LayoutNode): import('./lib/docking/types').TabsNode | null {
@@ -186,10 +206,11 @@
         const { listen } = await import('@tauri-apps/api/event');
 
         // Panel docked back
-        await listen<{ panelId: string }>('dock-panel-back', (event) => {
+        await listen<{ panelId: string; zone?: string }>('dock-panel-back', (event) => {
           console.log('[silmaril] dock-panel-back received:', event.payload);
           popoutNearby = false;
-          addPanelToLayout(event.payload.panelId);
+          popoutDockZone = 'none';
+          addPanelToLayout(event.payload.panelId, event.payload.zone ?? 'center');
         });
 
         // Pop-out window proximity detection — show visual indicator

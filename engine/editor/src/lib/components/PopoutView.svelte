@@ -31,6 +31,7 @@
   const panelTitle = info ? t(info.titleKey) : panelId;
 
   let nearMainWindow = $state(false);
+  let currentDockZone = $state('center');
   let dragging = $state(false);
   let dragStartX = 0;
   let dragStartY = 0;
@@ -109,6 +110,9 @@
         cursorY: screenY,
       });
       nearMainWindow = result.near;
+      if (result.zone && result.zone !== 'none') {
+        currentDockZone = result.zone;
+      }
     } catch { /* ignore */ }
   }
 
@@ -116,7 +120,7 @@
     if (!isTauri) return;
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('dock_panel_back', { panelId });
+      await invoke('dock_panel_back', { panelId, zone: currentDockZone });
     } catch (e) {
       console.error('[silmaril] dockBack error:', e);
     }

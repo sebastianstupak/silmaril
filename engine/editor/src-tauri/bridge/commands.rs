@@ -370,15 +370,17 @@ pub async fn dock_panel_back(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
     panel_id: String,
+    zone: Option<String>,
 ) -> Result<(), String> {
     use tauri::{Emitter, Manager};
 
-    tracing::info!(panel = %panel_id, window = %window.label(), "Docking panel back");
+    let dock_zone = zone.unwrap_or_else(|| "center".to_string());
+    tracing::info!(panel = %panel_id, zone = %dock_zone, window = %window.label(), "Docking panel back");
 
-    // Emit event to the main window
+    // Emit event to the main window with zone info
     if let Some(main_window) = app.get_webview_window("main") {
         main_window
-            .emit("dock-panel-back", serde_json::json!({ "panelId": panel_id }))
+            .emit("dock-panel-back", serde_json::json!({ "panelId": panel_id, "zone": dock_zone }))
             .map_err(|e| format!("Failed to emit dock-panel-back: {e}"))?;
     } else {
         return Err("Main window not found".into());
