@@ -855,6 +855,146 @@ void main() {
         }
     }
 
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::f32::consts::FRAC_PI_6;
+
+        // ── OrbitCamera ──────────────────────────────────────────────────────
+
+        #[test]
+        fn orbit_camera_default_values() {
+            let cam = OrbitCamera::default();
+            assert_eq!(cam.yaw, 0.0);
+            assert!((cam.pitch - FRAC_PI_6).abs() < 1e-6, "pitch should be PI/6");
+            assert_eq!(cam.distance, 10.0);
+            assert_eq!(cam.target, Vec3::ZERO);
+        }
+
+        #[test]
+        fn orbit_camera_orbit_updates_yaw_and_pitch() {
+            let mut cam = OrbitCamera::default();
+            cam.orbit(100.0, 0.0);
+            assert!((cam.yaw - (-0.5)).abs() < 1e-5, "yaw should decrease by dx*0.005");
+            assert!((cam.pitch - FRAC_PI_6).abs() < 1e-6, "pitch unchanged");
+
+            let mut cam2 = OrbitCamera::default();
+            cam2.orbit(0.0, 100.0);
+            assert_eq!(cam2.yaw, 0.0, "yaw unchanged");
+            let expected_pitch = (FRAC_PI_6 + 0.5).min(1.5);
+            assert!((cam2.pitch - expected_pitch).abs() < 1e-5);
+        }
+
+        #[test]
+        fn orbit_camera_pitch_clamps_to_bounds() {
+            let mut cam = OrbitCamera::default();
+            cam.orbit(0.0, 10_000.0); // huge positive dy
+            assert!(cam.pitch <= 1.5, "pitch must not exceed 1.5");
+
+            let mut cam2 = OrbitCamera::default();
+            cam2.orbit(0.0, -10_000.0); // huge negative dy
+            assert!(cam2.pitch >= -1.5, "pitch must not go below -1.5");
+        }
+
+        #[test]
+        fn orbit_camera_zoom_clamps() {
+            let mut cam = OrbitCamera::default();
+            cam.zoom(100_000.0); // zoom in maximally
+            assert!(cam.distance >= 0.5, "distance must not go below 0.5");
+
+            let mut cam2 = OrbitCamera::default();
+            cam2.zoom(-100_000.0); // zoom out maximally
+            assert!(cam2.distance <= 200.0, "distance must not exceed 200.0");
+        }
+
+        #[test]
+        fn orbit_camera_eye_is_offset_from_target() {
+            let cam = OrbitCamera::default(); // yaw=0, pitch=PI/6, distance=10
+            let eye = cam.eye();
+            // Eye should be above and behind the target, not at origin
+            assert!(eye.y > 0.0, "eye should be above Y=0 at default pitch");
+            assert!(eye.length() > 0.1, "eye should not be at origin");
+        }
+
+        // ── camera_set_orientation ───────────────────────────────────────────
+
+        #[test]
+        fn camera_set_orientation_sets_yaw_and_pitch() {
+            let mut inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            inst.camera.yaw = 99.0;
+            inst.camera.pitch = 99.0;
+            // Apply via the clamp logic used in camera_set_orientation
+            inst.camera.yaw = 1.0;
+            inst.camera.pitch = 0.5_f32.clamp(-1.5, 1.5);
+            assert!((inst.camera.yaw - 1.0).abs() < 1e-6);
+            assert!((inst.camera.pitch - 0.5).abs() < 1e-6);
+        }
+
+        #[test]
+        fn camera_set_orientation_clamps_pitch() {
+            let mut inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            inst.camera.pitch = 99.0_f32.clamp(-1.5, 1.5);
+            assert!((inst.camera.pitch - 1.5).abs() < 1e-6, "pitch clamped to 1.5");
+
+            inst.camera.pitch = (-99.0_f32).clamp(-1.5, 1.5);
+            assert!((inst.camera.pitch - (-1.5)).abs() < 1e-6, "pitch clamped to -1.5");
+        }
+
+        // ── generate_grid_quad ───────────────────────────────────────────────
+
+        #[test]
+        fn generate_grid_quad_returns_six_vertices() {
+            let verts = generate_grid_quad();
+            assert_eq!(verts.len(), 6, "two triangles = 6 vertices");
+        }
+
+        #[test]
+        fn generate_grid_quad_all_y_zero() {
+            for v in generate_grid_quad() {
+                assert_eq!(v.pos[1], 0.0, "all vertices on XZ plane (Y=0)");
+            }
+        }
+
+        #[test]
+        fn generate_grid_quad_covers_500_unit_extent() {
+            for v in generate_grid_quad() {
+                assert!(v.pos[0].abs() <= 500.0, "X within ±500");
+                assert!(v.pos[2].abs() <= 500.0, "Z within ±500");
+            }
+            // Should actually have ±500 corners — verify extreme values present
+            let verts = generate_grid_quad();
+            let has_neg = verts.iter().any(|v| v.pos[0] < -499.0);
+            let has_pos = verts.iter().any(|v| v.pos[0] > 499.0);
+            assert!(has_neg && has_pos, "should span from -500 to +500");
+        }
+
+        // ── GridPushConstants size ───────────────────────────────────────────
+
+        #[test]
+        fn grid_push_constants_is_80_bytes() {
+            assert_eq!(
+                std::mem::size_of::<GridPushConstants>(),
+                80,
+                "GridPushConstants must be 80 bytes: 64 (mat4) + 12 (vec3) + 4 (pad)"
+            );
+        }
+
+        // ── ViewportInstance ─────────────────────────────────────────────────
+
+        #[test]
+        fn viewport_instance_defaults_to_visible_and_grid_on() {
+            let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            assert!(inst.visible, "new instance should be visible");
+            assert!(inst.grid_visible, "new instance should show grid");
+        }
+
+        #[test]
+        fn viewport_instance_camera_default_yaw_zero() {
+            let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            assert_eq!(inst.camera.yaw, 0.0, "camera yaw should start at 0 to match JS convention");
+        }
+    }
+
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

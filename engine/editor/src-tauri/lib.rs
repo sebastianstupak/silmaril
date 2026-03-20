@@ -6,6 +6,80 @@ pub mod world;
 
 use bridge::commands;
 
+/// Installs a custom WNDPROC that overrides tao's `WM_NCCALCSIZE` handler.
+///
+/// Root cause of the thin bar at the top:
+///   tao keeps `WS_THICKFRAME` for native resize hit-testing and its
+///   `WM_NCCALCSIZE` handler calls `calculate_window_insets()` which returns
+///   top=1 (one physical pixel) so the OS resize border is reachable.
+///   That 1px is the NC area shown as a dark bar above the WebView2.
+///   Calling `SWP_FRAMECHANGED` re-triggers tao's handler — making it worse.
+///
+/// Fix: replace the per-window WNDPROC so we intercept `WM_NCCALCSIZE`.
+///   For non-maximized windows we return 0 (client rect = full window rect).
+///   For maximized we fall through to tao so it can clamp to the work area
+///   and keep the window off the taskbar.
+#[cfg(windows)]
+static ORIG_WNDPROC: std::sync::atomic::AtomicIsize =
+    std::sync::atomic::AtomicIsize::new(0);
+
+#[cfg(windows)]
+unsafe extern "system" fn nc_wndproc(
+    hwnd: windows::Win32::Foundation::HWND,
+    msg: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::LRESULT {
+    use windows::Win32::Foundation::LRESULT;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallWindowProcW, DefWindowProcW, IsZoomed, WM_NCCALCSIZE,
+    };
+
+    if msg == WM_NCCALCSIZE && wparam.0 != 0 && !IsZoomed(hwnd).as_bool() {
+        // Returning 0 makes the entire window rect the client rect.
+        // This eliminates tao's 1px top NC inset without removing WS_THICKFRAME,
+        // so edge-resize hit-testing continues to work.
+        return LRESULT(0);
+    }
+
+    let orig = ORIG_WNDPROC.load(std::sync::atomic::Ordering::SeqCst);
+    if orig != 0 {
+        let prev_fn: unsafe extern "system" fn(
+            windows::Win32::Foundation::HWND,
+            u32,
+            windows::Win32::Foundation::WPARAM,
+            windows::Win32::Foundation::LPARAM,
+        ) -> windows::Win32::Foundation::LRESULT = std::mem::transmute(orig);
+        CallWindowProcW(Some(prev_fn), hwnd, msg, wparam, lparam)
+    } else {
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+}
+
+/// Install the NC subclass on an HWND and trigger an immediate frame
+/// recalculation so our handler fires before the window is shown.
+#[cfg(windows)]
+pub(crate) fn install_nc_subclass(hwnd: windows::Win32::Foundation::HWND) {
+    use std::sync::atomic::Ordering;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowLongPtrW, SetWindowPos, GWLP_WNDPROC,
+        SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    };
+    unsafe {
+        let old = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, nc_wndproc as *const () as isize);
+        // Store once — all tao windows share the same underlying WNDCLASS proc.
+        ORIG_WNDPROC.compare_exchange(0, old, Ordering::SeqCst, Ordering::SeqCst).ok();
+
+        // Trigger WM_NCCALCSIZE now so our handler zeroes the NC area
+        // before the window becomes visible.
+        SetWindowPos(
+            hwnd, None, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        ).ok();
+    }
+    tracing::debug!("Installed NC subclass (WM_NCCALCSIZE override)");
+}
+
 /// Apply DWM styling to a frameless window on Windows 11:
 ///   - Rounded corners (DWMWCP_ROUND) matching the OS default
 ///   - No 1px DWM border (DWMWA_COLOR_NONE)
@@ -16,6 +90,7 @@ use bridge::commands;
 pub(crate) fn apply_dwm_window_style(hwnd: windows::Win32::Foundation::HWND) {
     use std::mem::size_of;
     use windows::Win32::Graphics::Dwm::{
+        DwmExtendFrameIntoClientArea,
         DwmSetWindowAttribute,
         DWMWA_BORDER_COLOR,
         DWMWA_WINDOW_CORNER_PREFERENCE,
@@ -23,7 +98,17 @@ pub(crate) fn apply_dwm_window_style(hwnd: windows::Win32::Foundation::HWND) {
     };
 
     unsafe {
-        // Round corners — Windows 11 DWM DWMWCP_ROUND (value 2)
+        // Zero out any DWM frame extension tao may have applied (e.g. from
+        // shadow:true in a prior run). A non-zero cyTopHeight is what produces
+        // the dark 1-2px bar at the top of a frameless transparent window.
+        // MARGINS is [cxLeft, cxRight, cyTop, cyBottom] as four i32s.
+        let zero_margins: [i32; 4] = [0, 0, 0, 0];
+        let _ = DwmExtendFrameIntoClientArea(hwnd, zero_margins.as_ptr() as *const _);
+
+        // Round corners — Windows 11 DWM DWMWCP_ROUND (value 2).
+        // On Win11, DWMWCP_ROUND also re-enables the OS drop-shadow so we do
+        // not need shadow:true in tauri.conf.json (which would re-introduce the
+        // top-bar artifact via DwmExtendFrameIntoClientArea).
         let corner: u32 = DWMWCP_ROUND.0 as u32;
         let _ = DwmSetWindowAttribute(
             hwnd,
@@ -32,7 +117,7 @@ pub(crate) fn apply_dwm_window_style(hwnd: windows::Win32::Foundation::HWND) {
             size_of::<u32>() as u32,
         );
 
-        // Remove the 1px DWM border (DWMWA_COLOR_NONE = 0xFFFFFFFE)
+        // Remove the 1px DWM border (DWMWA_COLOR_NONE = 0xFFFFFFFE).
         let no_border: u32 = 0xFFFFFFFE;
         let _ = DwmSetWindowAttribute(
             hwnd,
@@ -42,7 +127,7 @@ pub(crate) fn apply_dwm_window_style(hwnd: windows::Win32::Foundation::HWND) {
         );
     }
 
-    tracing::debug!("Applied DWM rounded corners + no border");
+    tracing::debug!("Applied DWM rounded corners + no border + zeroed frame extension");
 }
 
 pub fn run() {
@@ -153,14 +238,24 @@ pub fn run() {
 
                     let hwnd = main_window.hwnd().unwrap();
                     unsafe {
-                        // Remove WS_CLIPCHILDREN so the parent HWND's Vulkan DXGI
-                        // swapchain is NOT clipped by the WebView2 child window bounds.
-                        // With clip_children=false the Vulkan surface paints everywhere,
-                        // and transparent CSS regions in WebView2 show it through.
                         let style = GetWindowLongW(hwnd, GWL_STYLE);
-                        SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_CLIPCHILDREN.0 as i32));
-                        tracing::info!("Removed WS_CLIPCHILDREN from Tauri window");
+                        // Strip WS_CAPTION + WS_SYSMENU (visual chrome) and
+                        // WS_CLIPCHILDREN (so Vulkan DXGI shows through WebView2).
+                        // Keep WS_THICKFRAME — needed for resize hit-testing and
+                        // our NC subclass relies on it being present.
+                        SetWindowLongW(
+                            hwnd,
+                            GWL_STYLE,
+                            style
+                                & !(WS_CAPTION.0 as i32)
+                                & !(WS_SYSMENU.0 as i32)
+                                & !(WS_CLIPCHILDREN.0 as i32),
+                        );
+                        tracing::info!("Stripped WS_CAPTION/WS_SYSMENU/WS_CLIPCHILDREN");
                     }
+                    // Override tao's WM_NCCALCSIZE to eliminate the 1px NC top bar.
+                    // This also triggers SWP_FRAMECHANGED so our handler fires now.
+                    install_nc_subclass(hwnd);
                     apply_dwm_window_style(hwnd);
                 }
             }
