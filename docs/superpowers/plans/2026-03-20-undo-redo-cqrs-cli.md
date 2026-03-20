@@ -88,21 +88,25 @@ git commit -m "feat(core): add TemplateEntityNotFound, TemplateComponentNotFound
 
 - [ ] **Step 1: Create `engine/ops/src/error.rs`**
 
+Use `u64` for id fields directly — do NOT import from `crate::undo` here, as that would create a circular module dependency (`undo → ipc → error → undo`).
+
 ```rust
 //! Error types for the ops layer — command execution, I/O, and state errors.
 
 use engine_core::error::{ErrorCode, ErrorSeverity};
 use engine_macros::define_error;
 
-/// Entity identifier (re-exported for use in error fields).
-pub use crate::undo::EntityId;
-
 define_error! {
     pub enum OpsError {
-        EntityNotFound { id: EntityId }
+        /// Entity with the given id was not found in the current template.
+        EntityNotFound { id: u64 }
             = ErrorCode::TemplateEntityNotFound, ErrorSeverity::Error,
-        ComponentNotFound { entity: EntityId, type_name: String }
+        /// Component with the given type_name was not found on the entity.
+        ComponentNotFound { entity: u64, type_name: String }
             = ErrorCode::TemplateComponentNotFound, ErrorSeverity::Error,
+        /// Component already exists on entity; use SetComponent to overwrite.
+        ComponentAlreadyExists { entity: u64, type_name: String }
+            = ErrorCode::TemplateAlreadyExists, ErrorSeverity::Error,
         /// Covers both read and write I/O failures on template files.
         IoFailed { path: String, reason: String }
             = ErrorCode::TemplateIo, ErrorSeverity::Error,
@@ -115,9 +119,14 @@ define_error! {
 }
 ```
 
-- [ ] **Step 2: Add proptest dev-dependency to `engine/ops/Cargo.toml`**
+- [ ] **Step 2: Add `engine-macros` and proptest to `engine/ops/Cargo.toml`**
 
-In `[dev-dependencies]`:
+In `[dependencies]` section add:
+```toml
+engine-macros = { path = "../macros" }
+```
+
+In `[dev-dependencies]` add:
 ```toml
 proptest = "1"
 ```
@@ -325,6 +334,12 @@ impl UndoStack {
     }
     pub fn redo_description(&self) -> Option<String> {
         self.undone.back().map(|a| a.description())
+    }
+
+    /// Returns descriptions for all done actions (oldest first).
+    /// Used by CommandProcessor::history_summaries() to avoid importing ipc types here.
+    pub fn done_descriptions(&self) -> Vec<String> {
+        self.done.iter().map(|a| a.description()).collect()
     }
 }
 ```
@@ -791,7 +806,8 @@ fn undo_history_persisted_and_loaded() {
     {
         let mut proc = CommandProcessor::load(path.clone()).unwrap();
         proc.execute(TemplateCommand::CreateEntity { name: Some("Saved".into()) }).unwrap();
-    } // proc dropped — .undo.json written
+        // execute() calls write_state() which writes .undo.json
+    } // proc is dropped here (not needed for the write)
     let undo_path = dir.path().join("level.undo.json");
     assert!(undo_path.exists(), ".undo.json should be written");
     // Reload and undo should work
@@ -908,11 +924,12 @@ impl CommandProcessor {
     }
 
     pub fn history_summaries(&self) -> Vec<ActionSummary> {
-        // done_ids and undo_stack.done are parallel — zip them
-        // UndoStack doesn't expose done directly; use description helpers
-        // Instead: rebuild from undo_descriptions — simplified: return can_undo info only
-        // Full impl: expose iter on UndoStack
-        self.undo_stack.history_summaries(&self.done_ids)
+        // done_descriptions() avoids importing ipc types in undo.rs (no circular dep)
+        self.undo_stack.done_descriptions()
+            .into_iter()
+            .zip(self.done_ids.iter().copied())
+            .map(|(description, action_id)| ActionSummary { action_id, description })
+            .collect()
     }
 
     pub fn can_undo(&self) -> bool { self.undo_stack.can_undo() }
@@ -988,7 +1005,7 @@ impl CommandProcessor {
             TemplateCommand::AddComponent { id, type_name, data } => {
                 let entity = self.state.find_entity_mut(id).ok_or(OpsError::EntityNotFound { id })?;
                 if entity.components.iter().any(|c| c.type_name == type_name) {
-                    return Err(OpsError::ComponentNotFound { entity: id, type_name }); // already exists
+                    return Err(OpsError::ComponentAlreadyExists { entity: id, type_name }); // use SetComponent instead
                 }
                 entity.components.push(TemplateComponent { type_name: type_name.clone(), data: data.clone() });
                 Ok(EditorAction::AddComponent { entity: id, type_name, data })
@@ -1112,16 +1129,7 @@ fn load_undo_history(path: &Path) -> Result<(UndoStack, VecDeque<ActionId>), Ops
 }
 ```
 
-Also add `history_summaries` to `UndoStack` in `undo.rs`:
-
-```rust
-/// Returns descriptions paired with external action IDs.
-pub fn history_summaries(&self, ids: &VecDeque<crate::ipc::ActionId>) -> Vec<crate::ipc::ActionSummary> {
-    self.done.iter().zip(ids.iter()).map(|(action, &id)| {
-        crate::ipc::ActionSummary { action_id: id, description: action.description() }
-    }).collect()
-}
-```
+Note: `done_descriptions()` was added to `UndoStack` in Task 3 — no additional method needed here.
 
 - [ ] **Step 4: Export processor in `engine/ops/src/lib.rs`**
 
@@ -1312,7 +1320,12 @@ Add: `pub mod template_commands;`
 
 - [ ] **Step 3: Update `engine/editor/src-tauri/lib.rs`**
 
-Add `.manage(Mutex::new(template_commands::EditorState::new()))`.
+At the top of `lib.rs` (after existing `use` statements), add:
+```rust
+use std::sync::Mutex;
+```
+
+Add `.manage(Mutex::new(commands::template_commands::EditorState::new()))` to the builder chain (after the existing `.manage(commands::NativeViewportState::new())` line).
 
 Add to `generate_handler!` list:
 ```rust
@@ -1420,66 +1433,67 @@ pub enum ComponentSubcommand {
 }
 ```
 
-- [ ] **Step 2: Add handlers in `handle_template_command` function**
+- [ ] **Step 2: Add imports and handlers in `handle_template_command` function**
 
-```rust
-TemplateCommand::Entity { template, command } => {
-    let cmd = match command {
-        EntitySubcommand::Create { name } => TemplateCommand::CreateEntity { name },
-        EntitySubcommand::Delete { id } => TemplateCommand::DeleteEntity { id },
-        EntitySubcommand::Rename { id, name } => TemplateCommand::RenameEntity { id, name: Some(name) },
-        EntitySubcommand::Duplicate { id } => TemplateCommand::DuplicateEntity { id },
-    };
-    let mut proc = CommandProcessor::load(template)?;
-    let result = proc.execute(cmd)?;
-    println!("{}", serde_json::to_string_pretty(&result.new_state).unwrap());
-}
-TemplateCommand::Component { template, command } => {
-    let cmd = match command {
-        ComponentSubcommand::Set { entity_id, type_name, data } => {
-            let data = serde_json::from_str(&data).expect("data must be valid JSON");
-            TemplateCommand::SetComponent { id: entity_id, type_name, data }
-        }
-        ComponentSubcommand::Add { entity_id, type_name, data } => {
-            let data = serde_json::from_str(&data).expect("data must be valid JSON");
-            TemplateCommand::AddComponent { id: entity_id, type_name, data }
-        }
-        ComponentSubcommand::Remove { entity_id, type_name } => {
-            TemplateCommand::RemoveComponent { id: entity_id, type_name }
-        }
-    };
-    let mut proc = CommandProcessor::load(template)?;
-    let result = proc.execute(cmd)?;
-    println!("{}", serde_json::to_string_pretty(&result.new_state).unwrap());
-}
-TemplateCommand::Undo { template } => {
-    let mut proc = CommandProcessor::load(template)?;
-    match proc.undo()? {
-        Some(id) => println!("{{\"ok\":true,\"undone_action_id\":{id}}}"),
-        None => println!("{{\"ok\":true,\"nothing_to_undo\":true}}"),
-    }
-}
-TemplateCommand::Redo { template } => {
-    let mut proc = CommandProcessor::load(template)?;
-    match proc.redo()? {
-        Some(id) => println!("{{\"ok\":true,\"redone_action_id\":{id}}}"),
-        None => println!("{{\"ok\":true,\"nothing_to_redo\":true}}"),
-    }
-}
-TemplateCommand::History { template } => {
-    let proc = CommandProcessor::load(template)?;
-    let summaries = proc.history_summaries();
-    println!("{}", serde_json::to_string_pretty(&summaries).unwrap());
-}
-```
-
-Add required imports at the top of the file:
+Add required imports at the top of `template.rs`:
 ```rust
 use engine_ops::command::TemplateCommand as OpsTemplateCommand;
 use engine_ops::processor::CommandProcessor;
 ```
 
-Note: rename the local `TemplateCommand` variant to avoid collision with `engine_ops::command::TemplateCommand`. The clap enum stays as `TemplateCommand`; use `OpsTemplateCommand` alias for ops.
+The clap enum is `TemplateCommand` (from clap). The ops enum is `OpsTemplateCommand`. Use `OpsTemplateCommand::` prefix for all ops variants in the match arms:
+
+```rust
+TemplateCommand::Entity { template, command } => {
+    let cmd = match command {
+        EntitySubcommand::Create { name } => OpsTemplateCommand::CreateEntity { name },
+        EntitySubcommand::Delete { id } => OpsTemplateCommand::DeleteEntity { id },
+        EntitySubcommand::Rename { id, name } => OpsTemplateCommand::RenameEntity { id, name: Some(name) },
+        EntitySubcommand::Duplicate { id } => OpsTemplateCommand::DuplicateEntity { id },
+    };
+    let mut proc = CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let result = proc.execute(cmd).map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("{}", serde_json::to_string_pretty(&result.new_state).unwrap());
+    // Note: println! is acceptable here — CLI stdout is machine output, not a log event.
+}
+TemplateCommand::Component { template, command } => {
+    let cmd = match command {
+        ComponentSubcommand::Set { entity_id, type_name, data } => {
+            let data = serde_json::from_str(&data).expect("data must be valid JSON");
+            OpsTemplateCommand::SetComponent { id: entity_id, type_name, data }
+        }
+        ComponentSubcommand::Add { entity_id, type_name, data } => {
+            let data = serde_json::from_str(&data).expect("data must be valid JSON");
+            OpsTemplateCommand::AddComponent { id: entity_id, type_name, data }
+        }
+        ComponentSubcommand::Remove { entity_id, type_name } => {
+            OpsTemplateCommand::RemoveComponent { id: entity_id, type_name }
+        }
+    };
+    let mut proc = CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let result = proc.execute(cmd).map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("{}", serde_json::to_string_pretty(&result.new_state).unwrap());
+}
+TemplateCommand::Undo { template } => {
+    let mut proc = CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+    match proc.undo().map_err(|e| anyhow::anyhow!("{e}"))? {
+        Some(id) => println!("{{\"ok\":true,\"undone_action_id\":{id}}}"),
+        None => println!("{{\"ok\":true,\"nothing_to_undo\":true}}"),
+    }
+}
+TemplateCommand::Redo { template } => {
+    let mut proc = CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+    match proc.redo().map_err(|e| anyhow::anyhow!("{e}"))? {
+        Some(id) => println!("{{\"ok\":true,\"redone_action_id\":{id}}}"),
+        None => println!("{{\"ok\":true,\"nothing_to_redo\":true}}"),
+    }
+}
+TemplateCommand::History { template } => {
+    let proc = CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let summaries = proc.history_summaries();
+    println!("{}", serde_json::to_string_pretty(&summaries).unwrap());
+}
+```
 
 - [ ] **Step 3: Compile check**
 
@@ -1493,8 +1507,8 @@ Expected: no errors
 
 ```bash
 cd /d/dev/maethril/silmaril
-# Create a temp template file
-echo "name: test\nentities: []" > /tmp/test_template.yaml
+# Create a temp template file (use printf for portable newline handling)
+printf 'name: test\nentities: []\n' > /tmp/test_template.yaml
 cargo run --bin silm -- template entity --template /tmp/test_template.yaml create --name Hero 2>&1 | tail -10
 ```
 
@@ -1668,13 +1682,13 @@ proptest! {
 }
 ```
 
-- [ ] **Step 3: Run proptest**
+- [ ] **Step 3: Run all processor tests (including proptest)**
 
 ```bash
-cd /d/dev/maethril/silmaril && cargo test -p engine-ops --test processor_tests proptest 2>&1 | tail -20
+cd /d/dev/maethril/silmaril && cargo test -p engine-ops --test processor_tests 2>&1 | tail -20
 ```
 
-Expected: proptest generates cases, all pass
+Expected: all tests pass, including `undo_redo_restores_state` (proptest generates 256 cases by default)
 
 - [ ] **Step 4: Commit**
 
