@@ -5,7 +5,6 @@
     expandDir,
     collapseDir,
     setSelected,
-    getFileExplorerState,
   } from '$lib/stores/file-explorer';
   import FileTreeNode from './FileTreeNode.svelte';
   import { invoke } from '@tauri-apps/api/core';
@@ -18,15 +17,17 @@
     showIgnored = false,
     selected = null,
     gitStatus = {},
+    expanded = new Set<string>(),
   }: {
     node: TreeNode;
     depth?: number;
     showIgnored?: boolean;
     selected?: string | null;
     gitStatus?: Record<string, string>;
+    expanded?: Set<string>;
   } = $props();
 
-  let isExpanded = $derived(getFileExplorerState().expanded.has(node.path));
+  let isExpanded = $derived(expanded.has(node.path));
   let isSelected = $derived(selected === node.path);
   let status = $derived(gitStatus[node.path] ?? node.git_status ?? null);
 
@@ -156,6 +157,7 @@
         {showIgnored}
         {selected}
         {gitStatus}
+        {expanded}
       />
     {/each}
   {/if}

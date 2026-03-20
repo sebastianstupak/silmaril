@@ -6,3 +6,4 @@
 pub mod commands;
 pub mod events;
 pub mod subscriptions;
+pub mod registry;
