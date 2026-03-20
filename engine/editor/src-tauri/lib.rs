@@ -212,6 +212,7 @@ pub fn run() {
             commands::viewport_camera_reset,
             commands::viewport_set_grid_visible,
             commands::viewport_camera_set_orientation,
+            commands::viewport_set_projection,
             commands::create_popout_window,
             commands::dock_panel_back,
             commands::check_dock_proximity,

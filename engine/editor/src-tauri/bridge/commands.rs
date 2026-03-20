@@ -405,7 +405,7 @@ pub async fn create_popout_window(
         .title(&title)
         .decorations(false)
         .transparent(true)
-        .shadow(true)
+        .shadow(false)
         .inner_size(width as f64, height as f64)
         .position(x as f64, y as f64)
         .build()
@@ -423,6 +423,7 @@ pub async fn create_popout_window(
             SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_CLIPCHILDREN.0 as i32));
         }
         tracing::info!(panel = %panel_id, "Removed WS_CLIPCHILDREN from pop-out window");
+        crate::install_nc_subclass(hwnd);
         crate::apply_dwm_window_style(hwnd);
     }
 
@@ -722,6 +723,20 @@ pub fn viewport_camera_set_orientation(
     Ok(())
 }
 
+/// Switch between perspective and orthographic projection for a viewport instance.
+#[tauri::command]
+pub fn viewport_set_projection(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+    is_ortho: bool,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.set_projection(&viewport_id, is_ortho);
+    }
+    Ok(())
+}
+
 /// Begin monitoring a pop-out window drag for dock-back gesture.
 ///
 /// Spawns a background thread that polls `GetAsyncKeyState(VK_LBUTTON)` to
@@ -828,11 +843,12 @@ fn dock_drag_thread(
         let near = cx >= main_rect.left && cx <= main_rect.right
                 && cy >= main_rect.top  && cy <= main_rect.bottom;
 
+        let mw = (main_rect.right - main_rect.left) as f64;
+        let mh = (main_rect.bottom - main_rect.top) as f64;
+        let rel_x = if mw > 0.0 { (cx - main_rect.left) as f64 / mw } else { 0.0 };
+        let rel_y = if mh > 0.0 { (cy - main_rect.top)  as f64 / mh } else { 0.0 };
+
         let zone = if near {
-            let mw = (main_rect.right - main_rect.left) as f64;
-            let mh = (main_rect.bottom - main_rect.top) as f64;
-            let rel_x = (cx - main_rect.left) as f64 / mw;
-            let rel_y = (cy - main_rect.top)  as f64 / mh;
             if rel_x < 0.2 { "left" }
             else if rel_x > 0.8 { "right" }
             else if rel_y < 0.15 { "top" }
@@ -842,7 +858,13 @@ fn dock_drag_thread(
             "none"
         };
 
-        let _ = main_win.emit("popout-near", serde_json::json!({ "near": near, "zone": zone }));
+        let _ = main_win.emit("popout-near", serde_json::json!({
+            "near": near,
+            "zone": zone,
+            "panelId": panel_id,
+            "relX": rel_x,
+            "relY": rel_y,
+        }));
 
         if !button_down {
             tracing::debug!(panel = %panel_id, near, zone, "dock_drag_thread: button released");
