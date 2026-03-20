@@ -108,40 +108,83 @@ export async function popOutPanel(panelId: string, title: string, x: number, y: 
 // Native viewport (child window for Vulkan rendering)
 // ---------------------------------------------------------------------------
 
-/** Create the native child window for the Vulkan viewport.
- *  Bounds are in physical (device) pixels. */
+/** Create (or reposition) a named viewport instance in the calling window.
+ *  Bounds are in physical (device) pixels. Safe to call again on remount —
+ *  the Rust side upserts so no duplicate Vulkan contexts are created. */
 export async function createNativeViewport(
+  viewportId: string,
   x: number,
   y: number,
   width: number,
   height: number,
 ): Promise<void> {
-  if (!isTauri) return; // no-op in browser mode
-  return tauriInvoke<void>('create_native_viewport', { x, y, width, height });
+  if (!isTauri) return;
+  return tauriInvoke<void>('create_native_viewport', { viewportId, x, y, width, height });
 }
 
-/** Reposition/resize the native viewport child window. */
+/** Update the scissor bounds for an existing viewport instance. */
 export async function resizeNativeViewport(
+  viewportId: string,
   x: number,
   y: number,
   width: number,
   height: number,
 ): Promise<void> {
   if (!isTauri) return;
-  return tauriInvoke<void>('resize_native_viewport', { x, y, width, height });
+  return tauriInvoke<void>('resize_native_viewport', { viewportId, x, y, width, height });
 }
 
-/** Destroy the native viewport child window. */
-export async function destroyNativeViewport(): Promise<void> {
+/** Remove a viewport instance from the registry. */
+export async function destroyNativeViewport(viewportId: string): Promise<void> {
   if (!isTauri) return;
-  return tauriInvoke<void>('destroy_native_viewport', {});
+  return tauriInvoke<void>('destroy_native_viewport', { viewportId });
 }
 
-/** Show or hide the native viewport child window.
- *  Used during drag operations so the webview drop zone overlay is visible. */
-export async function setViewportVisible(visible: boolean): Promise<void> {
+/** Show or hide a specific viewport instance. */
+export async function setViewportVisible(viewportId: string, visible: boolean): Promise<void> {
   if (!isTauri) return;
-  return tauriInvoke<void>('set_viewport_visible', { visible });
+  return tauriInvoke<void>('set_viewport_visible', { viewportId, visible });
+}
+
+/** Orbit the camera for a specific viewport instance. */
+export async function viewportCameraOrbit(viewportId: string, dx: number, dy: number): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_camera_orbit', { viewportId, dx, dy });
+}
+
+/** Pan the camera for a specific viewport instance. */
+export async function viewportCameraPan(viewportId: string, dx: number, dy: number): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_camera_pan', { viewportId, dx, dy });
+}
+
+/** Zoom the camera for a specific viewport instance. */
+export async function viewportCameraZoom(viewportId: string, delta: number): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_camera_zoom', { viewportId, delta });
+}
+
+/** Reset the camera for a specific viewport instance to its default state. */
+export async function viewportCameraReset(viewportId: string): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_camera_reset', { viewportId });
+}
+
+/** Show or hide the grid for a specific viewport instance. */
+export async function viewportSetGridVisible(viewportId: string, visible: boolean): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_set_grid_visible', { viewportId, visible });
+}
+
+/** Set absolute camera yaw and pitch for a specific viewport instance.
+ *  Used for snap-to-axis — does not apply the mouse-pixel scaling of orbit. */
+export async function viewportCameraSetOrientation(
+  viewportId: string,
+  yaw: number,
+  pitch: number,
+): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_camera_set_orientation', { viewportId, yaw, pitch });
 }
 
 // ---------------------------------------------------------------------------
