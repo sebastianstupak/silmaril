@@ -54,7 +54,9 @@ impl TemplateState {
 
     pub fn load_yaml(path: &Path) -> Result<Self, OpsError> {
         let data = std::fs::read_to_string(path).map_err(|e| OpsError::IoFailed { path: path.display().to_string(), reason: e.to_string() })?;
-        serde_yaml::from_str(&data).map_err(|e| OpsError::SerializeFailed { reason: e.to_string() })
+        let mut state: Self = serde_yaml::from_str(&data).map_err(|e| OpsError::SerializeFailed { reason: e.to_string() })?;
+        state.name = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string();
+        Ok(state)
     }
 
     pub fn save_bincode(&self, path: &Path) -> Result<(), OpsError> {
@@ -64,7 +66,9 @@ impl TemplateState {
 
     pub fn load_bincode(path: &Path) -> Result<Self, OpsError> {
         let bytes = std::fs::read(path).map_err(|e| OpsError::IoFailed { path: path.display().to_string(), reason: e.to_string() })?;
-        bincode::deserialize(&bytes).map_err(|e| OpsError::SerializeFailed { reason: e.to_string() })
+        let mut state: Self = bincode::deserialize(&bytes).map_err(|e| OpsError::SerializeFailed { reason: e.to_string() })?;
+        state.name = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string();
+        Ok(state)
     }
 
     pub fn add_entity(&mut self, entity: TemplateEntity) {

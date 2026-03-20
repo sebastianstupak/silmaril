@@ -34,7 +34,7 @@ fn add_and_remove_entity() {
 #[test]
 fn yaml_round_trip() {
     let dir = tempdir().unwrap();
-    let path = dir.path().join("level.yaml");
+    let path = dir.path().join("test_level.yaml");
     let original = sample_template();
     original.save_yaml(&path).unwrap();
     let loaded = TemplateState::load_yaml(&path).unwrap();
@@ -44,9 +44,19 @@ fn yaml_round_trip() {
 #[test]
 fn bincode_round_trip() {
     let dir = tempdir().unwrap();
-    let path = dir.path().join("level.bin");
+    let path = dir.path().join("test_level.bin");
     let original = sample_template();
     original.save_bincode(&path).unwrap();
     let loaded = TemplateState::load_bincode(&path).unwrap();
     assert_eq!(original, loaded);
+}
+
+#[test]
+fn load_yaml_sets_name_to_file_stem() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("my_level.yaml");
+    let original = sample_template();
+    original.save_yaml(&path).unwrap();
+    let loaded = TemplateState::load_yaml(&path).unwrap();
+    assert_eq!(loaded.name, "my_level");
 }
