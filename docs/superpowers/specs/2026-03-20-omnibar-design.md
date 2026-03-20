@@ -87,7 +87,7 @@ type OmnibarResult =
   | { kind: 'command';  command: EditorCommand | FrontendCommand }
   | { kind: 'entity';   id: number; name: string; components: string[] }
   | { kind: 'asset';    path: string; assetType: string }
-  | { kind: 'recent';   label: string; path: string; type: 'project' | 'scene' }
+  | { kind: 'recent';   label: string; path: string; itemType: 'project' | 'scene' }
 ```
 
 ---
@@ -102,7 +102,7 @@ type OmnibarResult =
 | Recent | `persist` store key `omnibar.recent` (max 10 entries) | Shown on empty input alongside top 5 most-used commands |
 | Keybind hints | Decorates command results | Not a standalone source |
 
-`scan_assets` is a new Tauri command added in `bridge/commands.rs`. Signature: `scan_assets(project_path: String) -> Result<Vec<AssetInfo>, String>` where `AssetInfo { path: String, asset_type: String }`. Performs a recursive scan for known extensions (`.png`, `.jpg`, `.gltf`, `.glb`, `.wav`, `.ogg`, `.toml`).
+`scan_assets` is a new Tauri command added in `bridge/commands.rs`. Signature: `scan_assets(project_path: String) -> Result<Vec<AssetInfo>, String>` where `AssetInfo { path: String, asset_type: String }`. Performs a recursive scan for known extensions (`.png`, `.jpg`, `.gltf`, `.glb`, `.wav`, `.ogg`, `.toml`). Called lazily on first `#` prefix use (not eagerly on project open) to avoid blocking startup.
 
 ---
 
@@ -133,7 +133,7 @@ Empty input shows: recent projects/scenes + top 5 most-recently-used commands.
 - `↑ / ↓` — navigate results
 - `Enter` — execute selected, dismiss
 - `Escape` — dismiss, restore previous focus
-- `Tab` — cycle between result groups
+- `Tab` — cycle between result groups (Commands → Entities → Assets → Recent); empty groups are skipped
 
 **Result row anatomy:**
 ```
