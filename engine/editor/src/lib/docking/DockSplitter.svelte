@@ -1,4 +1,9 @@
 <script lang="ts">
+  // Module-level mutex: only one DockSplitter instance may be dragging at a time.
+  // Module-level variables in .svelte files are shared across all instances
+  // in the same JS module scope, which is the intended behavior here.
+  let activeSplitter: symbol | null = null;
+
   interface Props {
     direction: 'horizontal' | 'vertical';
     onResize: (deltaPx: number) => void;
@@ -8,7 +13,14 @@
   let dragging = $state(false);
 
   function onMouseDown(e: MouseEvent) {
+    // Guard: ignore if another splitter is already dragging
+    if (activeSplitter !== null) return;
+
     e.preventDefault();
+    e.stopPropagation();
+
+    const id = Symbol();
+    activeSplitter = id;
     dragging = true;
 
     let lastX = e.clientX;
@@ -23,6 +35,7 @@
     }
 
     function onMouseUp() {
+      if (activeSplitter === id) activeSplitter = null;
       dragging = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onMouseUp);
