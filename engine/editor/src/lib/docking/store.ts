@@ -184,13 +184,8 @@ export function removePanelFromLayout(layout: EditorLayout, panelId: string): Ed
   removePanelFromNode(result.root, panelId);
   result.root = cleanNode(result.root);
 
-  const bIdx = result.bottomPanel.panels.indexOf(panelId);
-  if (bIdx !== -1) {
-    result.bottomPanel.panels.splice(bIdx, 1);
-    if (result.bottomPanel.activeTab >= result.bottomPanel.panels.length) {
-      result.bottomPanel.activeTab = Math.max(0, result.bottomPanel.panels.length - 1);
-    }
-  }
+  removePanelFromNode(result.bottomPanel, panelId);
+  result.bottomPanel = cleanNode(result.bottomPanel);
 
   return result;
 }
@@ -289,50 +284,13 @@ export function dropPanel(
   let result = removePanelFromLayout(layout, panelId);
 
   if (isBottomPanel) {
-    // Dropping into the bottom panel area
-    if (zone === 'center') {
-      result.bottomPanel.panels.push(panelId);
-      result.bottomPanel.activeTab = result.bottomPanel.panels.length - 1;
-    }
+    result.bottomPanel = insertPanelIntoTree(result.bottomPanel, targetPath, zone, panelId);
     return result;
   }
 
-  // Find the target node — tree may have been restructured by removePanelFromLayout
-  const found = findTargetNode(result.root, targetPath);
-  if (!found) return result;
-  const { node: targetNode, path: resolvedPath } = found;
-
-  if (zone === 'center' && targetNode.type === 'tabs') {
-    // Add as a new tab
-    targetNode.panels.push(panelId);
-    targetNode.activeTab = targetNode.panels.length - 1;
-    return result;
-  }
-
-  // Side drop: split the target node
-  const newPanel: TabsNode = { type: 'tabs', activeTab: 0, panels: [panelId] };
-  const direction: 'horizontal' | 'vertical' =
-    zone === 'left' || zone === 'right' ? 'horizontal' : 'vertical';
-  const insertBefore = zone === 'left' || zone === 'top';
-
-  // Clone the target to avoid reference issues
-  const targetClone: LayoutNode = JSON.parse(JSON.stringify(targetNode));
-
-  const splitNode: SplitNode = {
-    type: 'split',
-    direction,
-    children: insertBefore ? [newPanel, targetClone] : [targetClone, newPanel],
-    sizes: insertBefore ? [30, 70] : [70, 30],
-  };
-
-  // Replace target in tree
-  replaceNodeAtPath(result.root, resolvedPath, splitNode);
-
-  // If the path was empty we replaced root itself
-  if (resolvedPath.length === 0) {
-    result.root = splitNode;
-  }
-
+  // Root tree drop
+  const newRoot = insertPanelIntoTree(result.root, targetPath, zone, panelId);
+  result.root = newRoot;
   return result;
 }
 
@@ -346,6 +304,43 @@ function replaceNodeAtPath(root: LayoutNode, path: number[], replacement: Layout
   }
 }
 
+/** Insert a panel into a layout tree at the given path and zone. */
+function insertPanelIntoTree(
+  tree: LayoutNode,
+  targetPath: number[],
+  zone: DropZone,
+  panelId: string,
+): LayoutNode {
+  const found = findTargetNode(tree, targetPath);
+  if (!found) return tree;
+  const { node: targetNode, path: resolvedPath } = found;
+
+  if (zone === 'center' && targetNode.type === 'tabs') {
+    targetNode.panels.push(panelId);
+    targetNode.activeTab = targetNode.panels.length - 1;
+    return tree;
+  }
+
+  const newPanel: TabsNode = { type: 'tabs', activeTab: 0, panels: [panelId] };
+  const direction: 'horizontal' | 'vertical' =
+    zone === 'left' || zone === 'right' ? 'horizontal' : 'vertical';
+  const insertBefore = zone === 'left' || zone === 'top';
+  const targetClone: LayoutNode = JSON.parse(JSON.stringify(targetNode));
+
+  const splitNode: SplitNode = {
+    type: 'split',
+    direction,
+    children: insertBefore ? [newPanel, targetClone] : [targetClone, newPanel],
+    sizes: insertBefore ? [30, 70] : [70, 30],
+  };
+
+  if (resolvedPath.length === 0) {
+    return splitNode;
+  }
+  replaceNodeAtPath(tree, resolvedPath, splitNode);
+  return tree;
+}
+
 /** Update sizes in a split node at a given path */
 export function resizeSplit(
   layout: EditorLayout,
@@ -353,9 +348,11 @@ export function resizeSplit(
   index: number,
   deltaPx: number,
   containerSizePx: number,
+  isBottomPanel: boolean = false,
 ): EditorLayout {
   const result = cloneLayout(layout);
-  const node = getNodeAtPath(result.root, path);
+  const tree = isBottomPanel ? result.bottomPanel : result.root;
+  const node = getNodeAtPath(tree, path);
   if (!node || node.type !== 'split') return result;
   if (index < 1 || index >= node.sizes.length) return result;
 
@@ -389,7 +386,10 @@ export function setActiveTab(
 ): EditorLayout {
   const result = cloneLayout(layout);
   if (isBottomPanel) {
-    result.bottomPanel.activeTab = tabIndex;
+    const node = path.length === 0 ? result.bottomPanel : getNodeAtPath(result.bottomPanel, path);
+    if (node && node.type === 'tabs') {
+      node.activeTab = tabIndex;
+    }
     return result;
   }
   const node = getNodeAtPath(result.root, path);
@@ -397,4 +397,25 @@ export function setActiveTab(
     node.activeTab = tabIndex;
   }
   return result;
+}
+
+// ── Tab cycle (Ctrl+Tab) ──────────────────────────────────────────────────────
+//
+// The focused DockContainer registers a callback; the global Ctrl+Tab handler
+// in App.svelte calls cycleActiveTab() which delegates to that callback.
+// Using a callback (rather than storing path + querying layout) keeps the
+// cycling logic co-located with the container that owns it, and the callback
+// closes over Svelte 5 $props() signals so it always reads fresh values.
+
+type TabCycleFn = (direction: number) => void;
+let _tabCycleFn: TabCycleFn | null = null;
+
+/** Register the tab-cycle handler for the currently focused container. */
+export function registerTabCycle(fn: TabCycleFn | null): void {
+  _tabCycleFn = fn;
+}
+
+/** Cycle the active tab in the currently focused container. */
+export function cycleActiveTab(direction: number): void {
+  _tabCycleFn?.(direction);
 }
