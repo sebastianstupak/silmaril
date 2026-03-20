@@ -523,6 +523,7 @@
                 {...props}
                 class="tool-btn"
                 class:active={activeTool === tool.key}
+                aria-label={tool.label}
                 onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
               >
                 <tool.Icon width={14} height={14} />
@@ -547,6 +548,7 @@
               {...props}
               class="tool-btn"
               class:active={gridVisible}
+              aria-label="Toggle grid"
               onclick={(e: MouseEvent) => {
                 e.stopPropagation();
                 gridVisible = !gridVisible;
@@ -567,6 +569,7 @@
               {...props}
               class="tool-btn"
               class:active={snapToGrid}
+              aria-label="Snap to grid"
               onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
             >
               <Magnet width={14} height={14} />
@@ -588,6 +591,7 @@
               {...props}
               class="tool-btn"
               class:active={projection === 'ortho'}
+              aria-label={projection === 'ortho' ? 'Orthographic' : 'Perspective'}
               onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
             >
               {#if projection === 'ortho'}
@@ -614,6 +618,7 @@
             <button
               {...props}
               class="tool-btn"
+              aria-label="Add entity"
               onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
             >
               <CirclePlus width={14} height={14} />
@@ -847,7 +852,7 @@
   }
 
   .tooltip-shortcut {
-    color: #555;
+    color: #888;
     margin-left: 4px;
     font-family: monospace;
   }
