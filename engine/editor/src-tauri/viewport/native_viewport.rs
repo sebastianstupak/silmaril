@@ -1,21 +1,31 @@
-//! Native child-window viewport for Vulkan rendering.
+//! Native viewport for Vulkan rendering — parent-HWND surface approach.
 //!
-//! Creates a platform-native child window parented inside the Tauri webview
-//! window.  The child window is the target for a Vulkan surface; a render
-//! thread draws into it at ~60 fps using the full `engine-renderer` pipeline.
+//! One `NativeViewport` is created per OS window (HWND).  It owns the single
+//! Vulkan surface + swapchain for that window and renders **all** active
+//! viewport panel instances in one frame (each with its own scissor rect and
+//! orbit camera).  This lets you have duplicate viewport panels in the same
+//! window and pop-out viewports in separate windows without Vulkan surface
+//! conflicts.
 //!
-//! Features:
-//! - 3D orbit camera (right-drag=orbit, middle-drag=pan, scroll=zoom)
-//! - Infinite-style ground grid on the XZ plane via vertex shaders
-//! - Push-constant MVP matrix
-//! - GLSL→SPIR-V compilation at runtime via `naga`
+//! Architecture (bottom → top in DWM composition):
+//!   1. Parent HWND — Vulkan DXGI swapchain covers the full window.
+//!   2. WRY_WEBVIEW child — WebView2 UI on top.
+//!      Opaque panels (Hierarchy/Inspector/Console) hide Vulkan below.
+//!      Transparent `.viewport-container` CSS lets Vulkan show through.
+//!      Dropdowns, HUD, overlays all render in this layer — always on top.
+//!
+//! Requirements on the parent HWND (set in lib.rs):
+//!   - `WS_CLIPCHILDREN` must be REMOVED.
+//!   - `transparent: true` in tauri.conf.json.
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
+use std::collections::HashMap;
 
-/// Viewport bounds in physical (device) pixels.
+/// Viewport bounds in physical (device) pixels — position within the parent
+/// window client area, used as the Vulkan scissor/viewport rect.
 #[derive(Clone, Copy, Debug)]
 pub struct ViewportBounds {
     pub x: i32,
@@ -33,11 +43,8 @@ mod platform {
     use super::*;
 
     use windows::Win32::{
-        Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
-        Graphics::Gdi::HBRUSH,
-        System::LibraryLoader::GetModuleHandleW,
-        UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture},
-        UI::WindowsAndMessaging::*,
+        Foundation::{HWND, RECT},
+        UI::WindowsAndMessaging::GetClientRect,
     };
 
     /// Wrapper around HWND that is Send+Sync.
@@ -46,90 +53,77 @@ mod platform {
     unsafe impl Send for SendHwnd {}
     unsafe impl Sync for SendHwnd {}
 
-    /// State of the native Vulkan viewport (Windows).
+    // ──────────────────────────────────────────────────────────────────────
+    // Per-instance state (one per viewport panel)
+    // ──────────────────────────────────────────────────────────────────────
+
+    #[derive(Clone)]
+    struct ViewportInstance {
+        bounds: ViewportBounds,
+        camera: OrbitCamera,
+        visible: bool,
+        grid_visible: bool,
+    }
+
+    impl ViewportInstance {
+        fn new(bounds: ViewportBounds) -> Self {
+            Self { bounds, camera: OrbitCamera::default(), visible: true, grid_visible: true }
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // NativeViewport — one per OS window
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// Manages the Vulkan surface for one OS window, shared by all viewport
+    /// panel instances within that window.
     pub struct NativeViewport {
-        child_hwnd: SendHwnd,
+        parent_hwnd: SendHwnd,
+        /// All active viewport panel instances in this window.
+        instances: Arc<Mutex<HashMap<String, ViewportInstance>>>,
         renderer_thread: Option<std::thread::JoinHandle<()>>,
         should_stop: Arc<AtomicBool>,
-        bounds: Arc<Mutex<ViewportBounds>>,
+        render_active: Arc<AtomicBool>,
     }
 
     impl NativeViewport {
-        pub fn new(parent_hwnd: HWND, bounds: ViewportBounds) -> Result<Self, String> {
-            unsafe {
-                let class_name = windows::core::w!("SilmarilViewport");
-                let hinstance: HINSTANCE = GetModuleHandleW(None)
-                    .map_err(|e| format!("GetModuleHandleW failed: {e}"))?
-                    .into();
-
-                let wc = WNDCLASSEXW {
-                    cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-                    style: CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-                    lpfnWndProc: Some(viewport_wnd_proc),
-                    hInstance: hinstance,
-                    lpszClassName: class_name,
-                    hbrBackground: HBRUSH(std::ptr::null_mut()),
-                    ..Default::default()
-                };
-                RegisterClassExW(&wc);
-
-                let child = CreateWindowExW(
-                    WINDOW_EX_STYLE(0),
-                    class_name,
-                    windows::core::w!(""),
-                    WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-                    bounds.x,
-                    bounds.y,
-                    bounds.width as i32,
-                    bounds.height as i32,
-                    Some(parent_hwnd),
-                    None,
-                    Some(hinstance),
-                    None,
-                )
-                .map_err(|e| format!("CreateWindowExW failed: {e}"))?;
-
-                let _ = SetWindowPos(
-                    child,
-                    Some(HWND_TOP),
-                    0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-                );
-
-                // Store camera state pointer in the window's user data so
-                // the wndproc can access it.
-                let camera = Box::new(Mutex::new(OrbitCamera::default()));
-                let camera_ptr = Box::into_raw(camera);
-                SetWindowLongPtrW(child, GWLP_USERDATA, camera_ptr as isize);
-
-                tracing::info!(
-                    hwnd = ?child,
-                    x = bounds.x, y = bounds.y,
-                    w = bounds.width, h = bounds.height,
-                    "Native viewport child window created"
-                );
-
-                Ok(Self {
-                    child_hwnd: SendHwnd(child),
-                    renderer_thread: None,
-                    should_stop: Arc::new(AtomicBool::new(false)),
-                    bounds: Arc::new(Mutex::new(bounds)),
-                })
-            }
+        pub fn new(parent_hwnd: HWND) -> Result<Self, String> {
+            tracing::info!(hwnd = ?parent_hwnd, "NativeViewport created for window");
+            Ok(Self {
+                parent_hwnd: SendHwnd(parent_hwnd),
+                instances: Arc::new(Mutex::new(HashMap::new())),
+                renderer_thread: None,
+                should_stop: Arc::new(AtomicBool::new(false)),
+                render_active: Arc::new(AtomicBool::new(true)),
+            })
         }
 
         pub fn start_rendering(&mut self) -> Result<(), String> {
             let should_stop = self.should_stop.clone();
-            let bounds = self.bounds.clone();
-            let hwnd_raw = self.child_hwnd.0 .0 as isize;
+            let render_active = self.render_active.clone();
+            let instances = self.instances.clone();
+            let hwnd_raw = self.parent_hwnd.0 .0 as isize;
 
             let handle = std::thread::Builder::new()
                 .name("viewport-render".into())
                 .spawn(move || {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
-                    render_loop(hwnd, should_stop, bounds);
-                    tracing::info!("Viewport render thread stopped");
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        render_loop(hwnd, should_stop, render_active, instances);
+                    })) {
+                        Ok(()) => tracing::info!("Viewport render thread stopped"),
+                        Err(e) => {
+                            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                                s.to_string()
+                            } else if let Some(s) = e.downcast_ref::<String>() {
+                                s.clone()
+                            } else {
+                                "unknown panic".into()
+                            };
+                            tracing::error!(error = %msg, "Viewport render thread PANICKED");
+                        }
+                    }
                 })
                 .map_err(|e| format!("Failed to spawn render thread: {e}"))?;
 
@@ -137,48 +131,120 @@ mod platform {
             Ok(())
         }
 
-        pub fn set_bounds(&self, new_bounds: ViewportBounds) {
-            *self.bounds.lock().unwrap() = new_bounds;
-            unsafe {
-                let _ = SetWindowPos(
-                    self.child_hwnd.0,
-                    None,
-                    new_bounds.x,
-                    new_bounds.y,
-                    new_bounds.width as i32,
-                    new_bounds.height as i32,
-                    SWP_NOZORDER | SWP_NOACTIVATE,
-                );
+        /// Add a new viewport instance, or update bounds if it already exists.
+        /// Also re-activates a previously hidden instance (panel drag / tab switch).
+        pub fn upsert_instance(&self, id: String, bounds: ViewportBounds) {
+            let mut instances = self.instances.lock().unwrap();
+            instances
+                .entry(id)
+                .and_modify(|i| { i.bounds = bounds; i.visible = true; })
+                .or_insert_with(|| ViewportInstance::new(bounds));
+        }
+
+        /// Remove a viewport instance. Returns `true` if no instances remain.
+        pub fn remove_instance(&self, id: &str) -> bool {
+            let mut instances = self.instances.lock().unwrap();
+            instances.remove(id);
+            instances.is_empty()
+        }
+
+        pub fn set_instance_bounds(&self, id: &str, bounds: ViewportBounds) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.bounds = bounds;
+                }
             }
         }
 
-        #[allow(dead_code)]
-        pub fn hwnd(&self) -> HWND {
-            self.child_hwnd.0
+        pub fn set_instance_visible(&self, id: &str, visible: bool) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.visible = visible;
+                }
+            }
         }
 
-        pub fn set_visible(&self, visible: bool) {
-            unsafe {
-                let cmd = if visible { SW_SHOW } else { SW_HIDE };
-                let _ = ShowWindow(self.child_hwnd.0, cmd);
+        pub fn camera_orbit(&self, id: &str, dx: f32, dy: f32) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera.orbit(dx, dy);
+                }
+            }
+        }
+
+        pub fn camera_pan(&self, id: &str, dx: f32, dy: f32) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera.pan(dx, dy);
+                }
+            }
+        }
+
+        pub fn camera_zoom(&self, id: &str, delta: f32) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera.zoom(delta);
+                }
+            }
+        }
+
+        pub fn camera_reset(&self, id: &str) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera = OrbitCamera::default();
+                }
+            }
+        }
+
+        pub fn set_grid_visible(&self, id: &str, visible: bool) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.grid_visible = visible;
+                }
+            }
+        }
+
+        pub fn camera_set_orientation(&self, id: &str, yaw: f32, pitch: f32) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera.yaw = yaw;
+                    inst.camera.pitch = pitch.clamp(-1.5, 1.5);
+                }
+            }
+        }
+
+        /// Snapshot the camera state for a viewport instance.
+        /// Used to preserve state when the panel moves to a different OS window.
+        pub fn get_instance_camera(&self, id: &str) -> Option<CameraState> {
+            let instances = self.instances.lock().ok()?;
+            let cam = &instances.get(id)?.camera;
+            Some(CameraState {
+                target:   cam.target.to_array(),
+                distance: cam.distance,
+                yaw:      cam.yaw,
+                pitch:    cam.pitch,
+            })
+        }
+
+        /// Restore a previously saved camera state onto a viewport instance.
+        pub fn set_instance_camera(&self, id: &str, state: CameraState) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera.target   = glam::Vec3::from_array(state.target);
+                    inst.camera.distance = state.distance;
+                    inst.camera.yaw      = state.yaw;
+                    inst.camera.pitch    = state.pitch;
+                }
             }
         }
 
         pub fn destroy(&mut self) {
-            self.should_stop.store(true, Ordering::Relaxed);
+            self.render_active.store(false, Ordering::SeqCst);
+            self.should_stop.store(true, Ordering::SeqCst);
             if let Some(handle) = self.renderer_thread.take() {
                 let _ = handle.join();
             }
-            unsafe {
-                // Free the camera state stored in GWLP_USERDATA
-                let ptr = GetWindowLongPtrW(self.child_hwnd.0, GWLP_USERDATA) as *mut Mutex<OrbitCamera>;
-                if !ptr.is_null() {
-                    drop(Box::from_raw(ptr));
-                    SetWindowLongPtrW(self.child_hwnd.0, GWLP_USERDATA, 0);
-                }
-                let _ = DestroyWindow(self.child_hwnd.0);
-            }
-            tracing::info!("Native viewport destroyed");
+            tracing::info!("NativeViewport destroyed");
         }
     }
 
@@ -194,22 +260,14 @@ mod platform {
 
     use glam::{Mat4, Vec3};
 
-    /// Orbit camera that rotates around a target point.
     #[derive(Clone, Debug)]
     struct OrbitCamera {
-        /// Point the camera orbits around
         target: Vec3,
-        /// Distance from target
         distance: f32,
-        /// Horizontal angle in radians
         yaw: f32,
-        /// Vertical angle in radians (clamped to avoid gimbal lock)
         pitch: f32,
-        /// Vertical field of view in radians
         fov_y: f32,
-        /// Near clip plane
         near: f32,
-        /// Far clip plane
         far: f32,
     }
 
@@ -218,9 +276,9 @@ mod platform {
             Self {
                 target: Vec3::ZERO,
                 distance: 10.0,
-                yaw: std::f32::consts::FRAC_PI_4,        // 45°
-                pitch: std::f32::consts::FRAC_PI_6,       // 30°
-                fov_y: std::f32::consts::FRAC_PI_4,       // 45° fov
+                yaw: 0.0,
+                pitch: std::f32::consts::FRAC_PI_6,
+                fov_y: std::f32::consts::FRAC_PI_4,
                 near: 0.1,
                 far: 500.0,
             }
@@ -236,27 +294,19 @@ mod platform {
             self.target + self.distance * Vec3::new(cp * sy, sp, cp * cy)
         }
 
-        fn view_matrix(&self) -> Mat4 {
-            Mat4::look_at_rh(self.eye(), self.target, Vec3::Y)
-        }
-
-        fn projection_matrix(&self, aspect: f32) -> Mat4 {
-            Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far)
-        }
-
         fn view_projection(&self, aspect: f32) -> Mat4 {
-            self.projection_matrix(aspect) * self.view_matrix()
+            let view = Mat4::look_at_rh(self.eye(), self.target, Vec3::Y);
+            let proj = Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far);
+            proj * view
         }
 
         fn orbit(&mut self, dx: f32, dy: f32) {
             self.yaw -= dx * 0.005;
-            self.pitch += dy * 0.005;
-            // Clamp pitch to avoid flipping
-            self.pitch = self.pitch.clamp(-1.5, 1.5);
+            self.pitch = (self.pitch + dy * 0.005).clamp(-1.5, 1.5);
         }
 
         fn pan(&mut self, dx: f32, dy: f32) {
-            let view = self.view_matrix();
+            let view = Mat4::look_at_rh(self.eye(), self.target, Vec3::Y);
             let right = Vec3::new(view.col(0).x, view.col(1).x, view.col(2).x);
             let up = Vec3::new(view.col(0).y, view.col(1).y, view.col(2).y);
             let scale = self.distance * 0.002;
@@ -265,54 +315,58 @@ mod platform {
         }
 
         fn zoom(&mut self, delta: f32) {
-            self.distance *= 1.0 - delta * 0.001;
-            self.distance = self.distance.clamp(0.5, 200.0);
+            self.distance = (self.distance * (1.0 - delta * 0.001)).clamp(0.5, 200.0);
         }
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Shader compilation (GLSL → SPIR-V via naga)
+    // Shader SPIR-V (compiled once per process, cached)
     // ──────────────────────────────────────────────────────────────────────
 
-    /// Compile a GLSL shader string to SPIR-V u32 words using naga.
+    static GRID_VERT_SPIRV: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+    static GRID_FRAG_SPIRV: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+
+    fn get_or_compile_shaders() -> Result<(&'static Vec<u32>, &'static Vec<u32>), String> {
+        let vert = if let Some(v) = GRID_VERT_SPIRV.get() {
+            v
+        } else {
+            tracing::info!("Compiling grid vertex shader (once)");
+            let compiled = compile_glsl_to_spirv(GRID_VERT_GLSL, naga::ShaderStage::Vertex)?;
+            let _ = GRID_VERT_SPIRV.set(compiled);
+            GRID_VERT_SPIRV.get().unwrap()
+        };
+        let frag = if let Some(v) = GRID_FRAG_SPIRV.get() {
+            v
+        } else {
+            tracing::info!("Compiling grid fragment shader (once)");
+            let compiled = compile_glsl_to_spirv(GRID_FRAG_GLSL, naga::ShaderStage::Fragment)?;
+            let _ = GRID_FRAG_SPIRV.set(compiled);
+            GRID_FRAG_SPIRV.get().unwrap()
+        };
+        Ok((vert, frag))
+    }
+
     fn compile_glsl_to_spirv(source: &str, stage: naga::ShaderStage) -> Result<Vec<u32>, String> {
         use naga::back::spv;
         use naga::front::glsl;
         use naga::valid::{Capabilities, ValidationFlags, Validator};
 
         let mut frontend = glsl::Frontend::default();
-        let options = glsl::Options::from(stage);
-
         let module = frontend
-            .parse(&options, source)
-            .map_err(|errs| format!("GLSL parse errors: {:?}", errs))?;
-
+            .parse(&glsl::Options::from(stage), source)
+            .map_err(|e| format!("GLSL parse: {:?}", e))?;
         let info = Validator::new(ValidationFlags::all(), Capabilities::all())
             .validate(&module)
-            .map_err(|e| format!("Shader validation error: {e}"))?;
-
-        let options = spv::Options {
-            lang_version: (1, 0),
-            ..Default::default()
-        };
-
-        let spirv = spv::write_vec(&module, &info, &options, None)
-            .map_err(|e| format!("SPIR-V generation error: {e}"))?;
-
-        Ok(spirv)
+            .map_err(|e| format!("Shader validation: {e}"))?;
+        spv::write_vec(&module, &info, &spv::Options { lang_version: (1, 0), ..Default::default() }, None)
+            .map_err(|e| format!("SPIR-V gen: {e}"))
     }
 
     const GRID_VERT_GLSL: &str = r#"#version 450
-
-layout(push_constant) uniform PushConstants {
-    mat4 viewProj;
-} pc;
-
+layout(push_constant) uniform PushConstants { mat4 viewProj; } pc;
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
-
 layout(location = 0) out vec3 fragColor;
-
 void main() {
     gl_Position = pc.viewProj * vec4(inPosition, 1.0);
     fragColor = inColor;
@@ -320,65 +374,47 @@ void main() {
 "#;
 
     const GRID_FRAG_GLSL: &str = r#"#version 450
-
 layout(location = 0) in vec3 fragColor;
 layout(location = 0) out vec4 outColor;
-
-void main() {
-    outColor = vec4(fragColor, 1.0);
-}
+void main() { outColor = vec4(fragColor, 1.0); }
 "#;
 
     // ──────────────────────────────────────────────────────────────────────
-    // Grid geometry generation
+    // Grid geometry
     // ──────────────────────────────────────────────────────────────────────
 
-    /// Vertex with position and color.
     #[repr(C)]
     #[derive(Clone, Copy)]
-    struct GridVertex {
-        pos: [f32; 3],
-        col: [f32; 3],
-    }
+    struct GridVertex { pos: [f32; 3], col: [f32; 3] }
 
-    /// Generate a grid of lines on the XZ plane centered at the origin.
     fn generate_grid_vertices(half_extent: i32, spacing: f32) -> Vec<GridVertex> {
-        let grid_color = [0.25, 0.25, 0.30];
-        let x_axis_color = [0.7, 0.15, 0.15];
-        let z_axis_color = [0.15, 0.15, 0.7];
-        let y_axis_color = [0.15, 0.7, 0.15];
-
-        let mut verts = Vec::new();
-        let extent = half_extent as f32 * spacing;
-
-        // Grid lines parallel to Z (varying X)
+        let grid  = [0.25, 0.25, 0.30];
+        let x_axis = [0.7, 0.15, 0.15];
+        let z_axis = [0.15, 0.15, 0.7];
+        let y_axis = [0.15, 0.7, 0.15];
+        let mut v = Vec::new();
+        let ext = half_extent as f32 * spacing;
         for i in -half_extent..=half_extent {
             let x = i as f32 * spacing;
-            let col = if i == 0 { z_axis_color } else { grid_color };
-            verts.push(GridVertex { pos: [x, 0.0, -extent], col });
-            verts.push(GridVertex { pos: [x, 0.0,  extent], col });
+            let c = if i == 0 { z_axis } else { grid };
+            v.push(GridVertex { pos: [x, 0.0, -ext], col: c });
+            v.push(GridVertex { pos: [x, 0.0,  ext], col: c });
         }
-
-        // Grid lines parallel to X (varying Z)
         for i in -half_extent..=half_extent {
             let z = i as f32 * spacing;
-            let col = if i == 0 { x_axis_color } else { grid_color };
-            verts.push(GridVertex { pos: [-extent, 0.0, z], col });
-            verts.push(GridVertex { pos: [ extent, 0.0, z], col });
+            let c = if i == 0 { x_axis } else { grid };
+            v.push(GridVertex { pos: [-ext, 0.0, z], col: c });
+            v.push(GridVertex { pos: [ ext, 0.0, z], col: c });
         }
-
-        // Y axis (vertical green line at origin)
-        verts.push(GridVertex { pos: [0.0, 0.0, 0.0], col: y_axis_color });
-        verts.push(GridVertex { pos: [0.0, extent, 0.0], col: y_axis_color });
-
-        verts
+        v.push(GridVertex { pos: [0.0, 0.0, 0.0], col: y_axis });
+        v.push(GridVertex { pos: [0.0, ext, 0.0], col: y_axis });
+        v
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Engine-renderer based viewport state
+    // Vulkan renderer
     // ──────────────────────────────────────────────────────────────────────
 
-    /// Clear colour for the viewport background: dark (#1a1a2e).
     const CLEAR_COLOR: [f32; 4] = [0.078, 0.078, 0.118, 1.0];
 
     use ash::vk;
@@ -387,7 +423,6 @@ void main() {
         RenderPassConfig, ShaderModule, Surface, Swapchain, VulkanContext,
     };
 
-    /// Viewport renderer state backed by `engine-renderer` types.
     struct ViewportRenderer {
         context: VulkanContext,
         surface: Surface,
@@ -403,287 +438,204 @@ void main() {
         width: u32,
         height: u32,
         needs_recreate: bool,
-        // 3D grid pipeline
         grid_pipeline: vk::Pipeline,
         grid_pipeline_layout: vk::PipelineLayout,
         grid_vertex_buffer: GpuBuffer,
         grid_vertex_count: u32,
-        // Shader modules kept alive for pipeline lifetime
         _vert_shader: ShaderModule,
         _frag_shader: ShaderModule,
     }
 
     impl ViewportRenderer {
         fn new(hwnd: HWND, width: u32, height: u32) -> Result<Self, String> {
-            let width = width.max(1);
-            let height = height.max(1);
+            let (width, height) = (width.max(1), height.max(1));
             let hwnd_raw = hwnd.0 as isize;
 
             let context = VulkanContext::new("SilmarilEditor", None, None)
-                .map_err(|e| format!("VulkanContext creation failed: {e}"))?;
-
+                .map_err(|e| format!("VulkanContext: {e}"))?;
             let surface = Surface::from_raw_hwnd(&context.entry, &context.instance, hwnd_raw)
-                .map_err(|e| format!("Surface creation failed: {e}"))?;
-
-            let swapchain = Swapchain::new(
-                &context, surface.handle(), surface.loader(),
-                width, height, None,
-            ).map_err(|e| format!("Swapchain creation failed: {e}"))?;
-
+                .map_err(|e| format!("Surface: {e}"))?;
+            let swapchain = Swapchain::new(&context, surface.handle(), surface.loader(), width, height, None)
+                .map_err(|e| format!("Swapchain: {e}"))?;
             let depth_buffer = DepthBuffer::new(&context.device, &context.allocator, swapchain.extent)
-                .map_err(|e| format!("DepthBuffer creation failed: {e}"))?;
+                .map_err(|e| format!("DepthBuffer: {e}"))?;
+            let render_pass = RenderPass::new(&context.device, RenderPassConfig {
+                color_format: swapchain.format,
+                depth_format: Some(depth_buffer.format()),
+                samples: vk::SampleCountFlags::TYPE_1,
+                load_op: vk::AttachmentLoadOp::CLEAR,
+                store_op: vk::AttachmentStoreOp::STORE,
+            }).map_err(|e| format!("RenderPass: {e}"))?;
+            let framebuffers = make_framebuffers(&context.device, &swapchain, &render_pass, &depth_buffer)?;
 
-            let render_pass = RenderPass::new(
-                &context.device,
-                RenderPassConfig {
-                    color_format: swapchain.format,
-                    depth_format: Some(depth_buffer.format()),
-                    samples: vk::SampleCountFlags::TYPE_1,
-                    load_op: vk::AttachmentLoadOp::CLEAR,
-                    store_op: vk::AttachmentStoreOp::STORE,
-                },
-            ).map_err(|e| format!("RenderPass creation failed: {e}"))?;
-
-            let framebuffers = create_viewport_framebuffers(
-                &context.device, &swapchain, &render_pass, &depth_buffer,
-            )?;
-
-            const FRAMES_IN_FLIGHT: u32 = 2;
-
-            let command_pool = CommandPool::new(
-                &context.device,
-                context.queue_families.graphics,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            ).map_err(|e| format!("CommandPool creation failed: {e}"))?;
-
+            const FIF: u32 = 2;
+            let command_pool = CommandPool::new(&context.device, context.queue_families.graphics,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+                .map_err(|e| format!("CommandPool: {e}"))?;
             let command_buffers = command_pool
-                .allocate(&context.device, vk::CommandBufferLevel::PRIMARY, FRAMES_IN_FLIGHT)
-                .map_err(|e| format!("CommandBuffer allocation failed: {e}"))?
-                .into_iter()
-                .map(CommandBuffer::from_handle)
-                .collect();
+                .allocate(&context.device, vk::CommandBufferLevel::PRIMARY, FIF)
+                .map_err(|e| format!("CommandBuffers: {e}"))?
+                .into_iter().map(CommandBuffer::from_handle).collect();
+            let sync_objects = engine_renderer::create_sync_objects(&context.device, FIF)
+                .map_err(|e| format!("SyncObjects: {e}"))?;
 
-            let sync_objects =
-                engine_renderer::create_sync_objects(&context.device, FRAMES_IN_FLIGHT)
-                    .map_err(|e| format!("Sync object creation failed: {e}"))?;
+            let (vert_spirv, frag_spirv) = get_or_compile_shaders()?;
+            let vert_shader = ShaderModule::from_spirv(&context.device, vert_spirv, vk::ShaderStageFlags::VERTEX, "main")
+                .map_err(|e| format!("VertShader: {e}"))?;
+            let frag_shader = ShaderModule::from_spirv(&context.device, frag_spirv, vk::ShaderStageFlags::FRAGMENT, "main")
+                .map_err(|e| format!("FragShader: {e}"))?;
 
-            // --- Compile shaders via naga ---
-            tracing::info!("Compiling grid shaders via naga");
-            let vert_spirv = compile_glsl_to_spirv(GRID_VERT_GLSL, naga::ShaderStage::Vertex)?;
-            let frag_spirv = compile_glsl_to_spirv(GRID_FRAG_GLSL, naga::ShaderStage::Fragment)?;
+            let (grid_pipeline, grid_pipeline_layout) =
+                create_grid_pipeline(&context.device, &render_pass, &vert_shader, &frag_shader)?;
 
-            let vert_shader = ShaderModule::from_spirv(
-                &context.device, &vert_spirv, vk::ShaderStageFlags::VERTEX, "main",
-            ).map_err(|e| format!("Vertex shader creation failed: {e}"))?;
-            let frag_shader = ShaderModule::from_spirv(
-                &context.device, &frag_spirv, vk::ShaderStageFlags::FRAGMENT, "main",
-            ).map_err(|e| format!("Fragment shader creation failed: {e}"))?;
-
-            // --- Create grid pipeline ---
-            let (grid_pipeline, grid_pipeline_layout) = create_grid_pipeline(
-                &context.device, &render_pass, &vert_shader, &frag_shader,
-            )?;
-
-            // --- Generate grid vertex buffer ---
             let grid_verts = generate_grid_vertices(20, 1.0);
             let grid_vertex_count = grid_verts.len() as u32;
             let buf_size = (grid_verts.len() * std::mem::size_of::<GridVertex>()) as u64;
+            let mut grid_vertex_buffer = GpuBuffer::new(&context, buf_size,
+                vk::BufferUsageFlags::VERTEX_BUFFER, gpu_allocator::MemoryLocation::CpuToGpu)
+                .map_err(|e| format!("GridVB: {e}"))?;
+            grid_vertex_buffer.upload(&grid_verts).map_err(|e| format!("GridVB upload: {e}"))?;
 
-            let mut grid_vertex_buffer = GpuBuffer::new(
-                &context, buf_size,
-                vk::BufferUsageFlags::VERTEX_BUFFER,
-                gpu_allocator::MemoryLocation::CpuToGpu,
-            ).map_err(|e| format!("Grid vertex buffer creation failed: {e}"))?;
-            grid_vertex_buffer.upload(&grid_verts)
-                .map_err(|e| format!("Grid vertex upload failed: {e}"))?;
-
-            tracing::info!(
-                width, height,
-                images = swapchain.image_count,
-                grid_verts = grid_vertex_count,
-                "Viewport renderer initialised (3D mode)"
-            );
-
+            tracing::info!(width, height, "ViewportRenderer initialised");
             Ok(Self {
                 context, surface, swapchain, render_pass, depth_buffer,
                 framebuffers, command_pool, command_buffers, sync_objects,
                 current_frame: 0, width, height, needs_recreate: false,
-                grid_pipeline, grid_pipeline_layout, grid_vertex_buffer,
-                grid_vertex_count,
+                grid_pipeline, grid_pipeline_layout, grid_vertex_buffer, grid_vertex_count,
                 _vert_shader: vert_shader, _frag_shader: frag_shader,
             })
         }
 
-        fn notify_resize(&mut self, width: u32, height: u32) {
-            let width = width.max(1);
-            let height = height.max(1);
-            if width != self.width || height != self.height {
-                self.width = width;
-                self.height = height;
+        fn notify_resize(&mut self, w: u32, h: u32) {
+            let (w, h) = (w.max(1), h.max(1));
+            if w != self.width || h != self.height {
+                self.width = w;
+                self.height = h;
                 self.needs_recreate = true;
             }
         }
 
-        fn render_frame(&mut self, camera: &OrbitCamera) -> Result<bool, String> {
+        /// Render all visible viewport instances in one frame.
+        fn render_frame(&mut self, viewports: &[(ViewportBounds, OrbitCamera)]) -> Result<bool, String> {
             if self.needs_recreate {
                 self.recreate_swapchain()?;
                 self.needs_recreate = false;
             }
 
             let sync = &self.sync_objects[self.current_frame];
-
             unsafe {
-                self.context.device
-                    .wait_for_fences(&[sync.in_flight_fence], true, u64::MAX)
+                self.context.device.wait_for_fences(&[sync.in_flight_fence], true, u64::MAX)
                     .map_err(|e| format!("wait_for_fences: {e}"))?;
 
-                let acquire_result = self.swapchain.loader.acquire_next_image(
-                    self.swapchain.swapchain, u64::MAX,
-                    sync.image_available_semaphore, vk::Fence::null(),
-                );
-
-                let image_index = match acquire_result {
-                    Ok((index, _)) => index,
-                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                        self.needs_recreate = true;
-                        return Ok(false);
-                    }
-                    Err(e) => return Err(format!("acquire_next_image: {e}")),
+                let image_index = match self.swapchain.loader.acquire_next_image(
+                    self.swapchain.swapchain, u64::MAX, sync.image_available_semaphore, vk::Fence::null()) {
+                    Ok((idx, _)) => idx,
+                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => { self.needs_recreate = true; return Ok(false); }
+                    Err(e) => return Err(format!("acquire: {e}")),
                 };
 
-                self.context.device
-                    .reset_fences(&[sync.in_flight_fence])
+                self.context.device.reset_fences(&[sync.in_flight_fence])
                     .map_err(|e| format!("reset_fences: {e}"))?;
 
                 let cmd = self.command_buffers[self.current_frame].handle();
-                self.record_frame_commands(cmd, image_index as usize, camera)?;
+                self.record_frame(cmd, image_index as usize, viewports)?;
 
-                let wait_semaphores = [sync.image_available_semaphore];
-                let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-                let signal_semaphores = [sync.render_finished_semaphore];
-                let command_buffers = [cmd];
-
-                let submit_info = vk::SubmitInfo::default()
-                    .wait_semaphores(&wait_semaphores)
-                    .wait_dst_stage_mask(&wait_stages)
-                    .command_buffers(&command_buffers)
-                    .signal_semaphores(&signal_semaphores);
-
-                self.context.device
-                    .queue_submit(self.context.graphics_queue, &[submit_info], sync.in_flight_fence)
-                    .map_err(|e| format!("queue_submit: {e}"))?;
+                let wait = [sync.image_available_semaphore];
+                let stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+                let signal = [sync.render_finished_semaphore];
+                let cmds = [cmd];
+                self.context.device.queue_submit(self.context.graphics_queue, &[
+                    vk::SubmitInfo::default()
+                        .wait_semaphores(&wait).wait_dst_stage_mask(&stages)
+                        .command_buffers(&cmds).signal_semaphores(&signal)
+                ], sync.in_flight_fence).map_err(|e| format!("submit: {e}"))?;
 
                 let swapchains = [self.swapchain.swapchain];
-                let image_indices = [image_index];
-                let present_info = vk::PresentInfoKHR::default()
-                    .wait_semaphores(&signal_semaphores)
-                    .swapchains(&swapchains)
-                    .image_indices(&image_indices);
-
-                match self.swapchain.loader.queue_present(self.context.present_queue, &present_info) {
+                let indices = [image_index];
+                match self.swapchain.loader.queue_present(self.context.present_queue,
+                    &vk::PresentInfoKHR::default().wait_semaphores(&signal)
+                        .swapchains(&swapchains).image_indices(&indices)) {
                     Ok(_) => {}
                     Err(vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR) => {
                         self.needs_recreate = true;
                     }
-                    Err(e) => return Err(format!("queue_present: {e}")),
+                    Err(e) => return Err(format!("present: {e}")),
                 }
             }
-
             self.current_frame = (self.current_frame + 1) % self.sync_objects.len();
             Ok(true)
         }
 
-        unsafe fn record_frame_commands(
+        unsafe fn record_frame(
             &self,
             cmd: vk::CommandBuffer,
             image_index: usize,
-            camera: &OrbitCamera,
+            viewports: &[(ViewportBounds, OrbitCamera)],
         ) -> Result<(), String> {
             let device = &self.context.device;
-
             device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())
-                .map_err(|e| format!("reset_command_buffer: {e}"))?;
-
-            let begin_info = vk::CommandBufferBeginInfo::default()
-                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-            device.begin_command_buffer(cmd, &begin_info)
-                .map_err(|e| format!("begin_command_buffer: {e}"))?;
-
-            let clear_values = [
-                vk::ClearValue { color: vk::ClearColorValue { float32: CLEAR_COLOR } },
-                vk::ClearValue { depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 } },
-            ];
+                .map_err(|e| format!("reset_cb: {e}"))?;
+            device.begin_command_buffer(cmd, &vk::CommandBufferBeginInfo::default()
+                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT))
+                .map_err(|e| format!("begin_cb: {e}"))?;
 
             let extent = self.swapchain.extent;
-            let render_pass_info = vk::RenderPassBeginInfo::default()
+            device.cmd_begin_render_pass(cmd, &vk::RenderPassBeginInfo::default()
                 .render_pass(self.render_pass.handle())
                 .framebuffer(self.framebuffers[image_index].handle())
-                .render_area(vk::Rect2D {
-                    offset: vk::Offset2D { x: 0, y: 0 },
-                    extent,
-                })
-                .clear_values(&clear_values);
-
-            device.cmd_begin_render_pass(cmd, &render_pass_info, vk::SubpassContents::INLINE);
-
-            // Set dynamic viewport/scissor
-            let viewport = vk::Viewport {
-                x: 0.0, y: 0.0,
-                width: extent.width as f32,
-                height: extent.height as f32,
-                min_depth: 0.0, max_depth: 1.0,
-            };
-            device.cmd_set_viewport(cmd, 0, &[viewport]);
-            device.cmd_set_scissor(cmd, 0, &[vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent,
-            }]);
-
-            // Bind grid pipeline and draw
-            let aspect = extent.width as f32 / extent.height.max(1) as f32;
-            let vp = camera.view_projection(aspect);
-            let vp_bytes: &[u8] = std::slice::from_raw_parts(
-                vp.as_ref().as_ptr() as *const u8, 64,
-            );
+                .render_area(vk::Rect2D { offset: vk::Offset2D { x: 0, y: 0 }, extent })
+                .clear_values(&[
+                    vk::ClearValue { color: vk::ClearColorValue { float32: CLEAR_COLOR } },
+                    vk::ClearValue { depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 } },
+                ]), vk::SubpassContents::INLINE);
 
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.grid_pipeline);
-            device.cmd_push_constants(
-                cmd, self.grid_pipeline_layout,
-                vk::ShaderStageFlags::VERTEX, 0, vp_bytes,
-            );
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.grid_vertex_buffer.handle()], &[0]);
-            device.cmd_draw(cmd, self.grid_vertex_count, 1, 0, 0);
+
+            for (bounds, camera) in viewports {
+                // Clamp scissor to swapchain extent
+                let sx = bounds.x.max(0) as u32;
+                let sy = bounds.y.max(0) as u32;
+                let sw = bounds.width.min(extent.width.saturating_sub(sx)).max(1);
+                let sh = bounds.height.min(extent.height.saturating_sub(sy)).max(1);
+
+                device.cmd_set_viewport(cmd, 0, &[vk::Viewport {
+                    x: sx as f32, y: sy as f32,
+                    width: sw as f32, height: sh as f32,
+                    min_depth: 0.0, max_depth: 1.0,
+                }]);
+                device.cmd_set_scissor(cmd, 0, &[vk::Rect2D {
+                    offset: vk::Offset2D { x: sx as i32, y: sy as i32 },
+                    extent: vk::Extent2D { width: sw, height: sh },
+                }]);
+
+                let aspect = sw as f32 / sh as f32;
+                let vp_mat = camera.view_projection(aspect);
+                let vp_bytes: &[u8] = std::slice::from_raw_parts(
+                    vp_mat.as_ref().as_ptr() as *const u8, 64);
+                device.cmd_push_constants(cmd, self.grid_pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX, 0, vp_bytes);
+                device.cmd_draw(cmd, self.grid_vertex_count, 1, 0, 0);
+            }
 
             device.cmd_end_render_pass(cmd);
-            device.end_command_buffer(cmd)
-                .map_err(|e| format!("end_command_buffer: {e}"))?;
-
+            device.end_command_buffer(cmd).map_err(|e| format!("end_cb: {e}"))?;
             Ok(())
         }
 
         fn recreate_swapchain(&mut self) -> Result<(), String> {
-            self.context.wait_idle().map_err(|e| format!("device_wait_idle: {e}"))?;
-
+            self.context.wait_idle().map_err(|e| format!("wait_idle: {e}"))?;
             self.framebuffers.clear();
-
-            self.swapchain.recreate(
-                &self.context, self.surface.handle(), self.surface.loader(),
-                self.width, self.height,
-            ).map_err(|e| format!("Swapchain recreation failed: {e}"))?;
-
-            self.depth_buffer = DepthBuffer::new(
-                &self.context.device, &self.context.allocator, self.swapchain.extent,
-            ).map_err(|e| format!("DepthBuffer recreation failed: {e}"))?;
-
-            self.framebuffers = create_viewport_framebuffers(
-                &self.context.device, &self.swapchain, &self.render_pass, &self.depth_buffer,
-            )?;
-
-            tracing::debug!(
-                width = self.swapchain.extent.width,
-                height = self.swapchain.extent.height,
-                "Viewport swapchain recreated"
-            );
+            self.swapchain.recreate(&self.context, self.surface.handle(), self.surface.loader(),
+                self.width, self.height)
+                .map_err(|e| format!("swapchain recreate: {e}"))?;
+            self.depth_buffer = DepthBuffer::new(&self.context.device, &self.context.allocator,
+                self.swapchain.extent)
+                .map_err(|e| format!("depth recreate: {e}"))?;
+            self.framebuffers = make_framebuffers(&self.context.device, &self.swapchain,
+                &self.render_pass, &self.depth_buffer)?;
+            tracing::debug!(w = self.swapchain.extent.width, h = self.swapchain.extent.height,
+                "Swapchain recreated");
             Ok(())
         }
     }
@@ -700,7 +652,6 @@ void main() {
         }
     }
 
-    /// Create the grid line-drawing pipeline.
     fn create_grid_pipeline(
         device: &ash::Device,
         render_pass: &RenderPass,
@@ -708,318 +659,155 @@ void main() {
         frag: &ShaderModule,
     ) -> Result<(vk::Pipeline, vk::PipelineLayout), String> {
         let stages = [vert.stage_create_info(), frag.stage_create_info()];
-
-        // Vertex input: vec3 pos + vec3 color = 24 bytes
         let binding = vk::VertexInputBindingDescription::default()
-            .binding(0)
-            .stride(24)
-            .input_rate(vk::VertexInputRate::VERTEX);
-
+            .binding(0).stride(24).input_rate(vk::VertexInputRate::VERTEX);
         let attrs = [
             vk::VertexInputAttributeDescription::default()
-                .location(0).binding(0)
-                .format(vk::Format::R32G32B32_SFLOAT).offset(0),
+                .location(0).binding(0).format(vk::Format::R32G32B32_SFLOAT).offset(0),
             vk::VertexInputAttributeDescription::default()
-                .location(1).binding(0)
-                .format(vk::Format::R32G32B32_SFLOAT).offset(12),
+                .location(1).binding(0).format(vk::Format::R32G32B32_SFLOAT).offset(12),
         ];
-
-        let vertex_input = vk::PipelineVertexInputStateCreateInfo::default()
-            .vertex_binding_descriptions(std::slice::from_ref(&binding))
-            .vertex_attribute_descriptions(&attrs);
-
-        let input_assembly = vk::PipelineInputAssemblyStateCreateInfo::default()
-            .topology(vk::PrimitiveTopology::LINE_LIST);
-
-        let viewport = vk::Viewport::default()
-            .width(1.0).height(1.0).max_depth(1.0);
-        let scissor = vk::Rect2D::default().extent(vk::Extent2D { width: 1, height: 1 });
-        let viewport_state = vk::PipelineViewportStateCreateInfo::default()
-            .viewports(std::slice::from_ref(&viewport))
-            .scissors(std::slice::from_ref(&scissor));
-
-        let rasterization = vk::PipelineRasterizationStateCreateInfo::default()
-            .polygon_mode(vk::PolygonMode::FILL)
-            .cull_mode(vk::CullModeFlags::NONE)
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .line_width(1.0);
-
-        let multisample = vk::PipelineMultisampleStateCreateInfo::default()
-            .rasterization_samples(vk::SampleCountFlags::TYPE_1);
-
-        let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
-            .depth_test_enable(true)
-            .depth_write_enable(true)
-            .depth_compare_op(vk::CompareOp::LESS);
-
-        let color_blend_attachment = vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
-            .color_write_mask(vk::ColorComponentFlags::RGBA);
-
-        let color_blend = vk::PipelineColorBlendStateCreateInfo::default()
-            .attachments(std::slice::from_ref(&color_blend_attachment));
-
-        let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
-        let dynamic_state = vk::PipelineDynamicStateCreateInfo::default()
-            .dynamic_states(&dynamic_states);
-
-        // Push constant: mat4 viewProj = 64 bytes
+        let vp = vk::Viewport::default().width(1.0).height(1.0).max_depth(1.0);
+        let sc = vk::Rect2D::default().extent(vk::Extent2D { width: 1, height: 1 });
         let push_range = vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::VERTEX)
-            .offset(0).size(64);
-
-        let layout_info = vk::PipelineLayoutCreateInfo::default()
-            .push_constant_ranges(std::slice::from_ref(&push_range));
-
+            .stage_flags(vk::ShaderStageFlags::VERTEX).offset(0).size(64);
         let layout = unsafe {
-            device.create_pipeline_layout(&layout_info, None)
-                .map_err(|e| format!("Pipeline layout creation failed: {e}"))?
+            device.create_pipeline_layout(
+                &vk::PipelineLayoutCreateInfo::default()
+                    .push_constant_ranges(std::slice::from_ref(&push_range)), None)
+                .map_err(|e| format!("pipeline layout: {e}"))?
         };
-
-        let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
-            .stages(&stages)
-            .vertex_input_state(&vertex_input)
-            .input_assembly_state(&input_assembly)
-            .viewport_state(&viewport_state)
-            .rasterization_state(&rasterization)
-            .multisample_state(&multisample)
-            .depth_stencil_state(&depth_stencil)
-            .color_blend_state(&color_blend)
-            .dynamic_state(&dynamic_state)
-            .layout(layout)
-            .render_pass(render_pass.handle())
-            .subpass(0);
-
         let pipeline = unsafe {
-            device.create_graphics_pipelines(
-                vk::PipelineCache::null(),
-                std::slice::from_ref(&pipeline_info),
-                None,
-            ).map_err(|(_, e)| {
-                device.destroy_pipeline_layout(layout, None);
-                format!("Grid pipeline creation failed: {e}")
-            })?[0]
+            device.create_graphics_pipelines(vk::PipelineCache::null(), &[
+                vk::GraphicsPipelineCreateInfo::default()
+                    .stages(&stages)
+                    .vertex_input_state(&vk::PipelineVertexInputStateCreateInfo::default()
+                        .vertex_binding_descriptions(std::slice::from_ref(&binding))
+                        .vertex_attribute_descriptions(&attrs))
+                    .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo::default()
+                        .topology(vk::PrimitiveTopology::LINE_LIST))
+                    .viewport_state(&vk::PipelineViewportStateCreateInfo::default()
+                        .viewports(std::slice::from_ref(&vp))
+                        .scissors(std::slice::from_ref(&sc)))
+                    .rasterization_state(&vk::PipelineRasterizationStateCreateInfo::default()
+                        .polygon_mode(vk::PolygonMode::FILL)
+                        .cull_mode(vk::CullModeFlags::NONE)
+                        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+                        .line_width(1.0))
+                    .multisample_state(&vk::PipelineMultisampleStateCreateInfo::default()
+                        .rasterization_samples(vk::SampleCountFlags::TYPE_1))
+                    .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo::default()
+                        .depth_test_enable(true).depth_write_enable(true)
+                        .depth_compare_op(vk::CompareOp::LESS))
+                    .color_blend_state(&vk::PipelineColorBlendStateCreateInfo::default()
+                        .attachments(&[vk::PipelineColorBlendAttachmentState::default()
+                            .blend_enable(false)
+                            .color_write_mask(vk::ColorComponentFlags::RGBA)]))
+                    .dynamic_state(&vk::PipelineDynamicStateCreateInfo::default()
+                        .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]))
+                    .layout(layout)
+                    .render_pass(render_pass.handle())
+                    .subpass(0)
+            ], None).map_err(|(_, e)| { device.destroy_pipeline_layout(layout, None);
+                format!("pipeline: {e}") })?[0]
         };
-
         tracing::info!("Grid pipeline created");
         Ok((pipeline, layout))
     }
 
-    fn create_viewport_framebuffers(
+    fn make_framebuffers(
         device: &ash::Device,
         swapchain: &Swapchain,
         render_pass: &RenderPass,
         depth_buffer: &DepthBuffer,
     ) -> Result<Vec<Framebuffer>, String> {
-        let mut framebuffers = Vec::with_capacity(swapchain.image_views.len());
-        for (i, &image_view) in swapchain.image_views.iter().enumerate() {
-            let attachments = [image_view, depth_buffer.image_view()];
-            let info = vk::FramebufferCreateInfo::default()
-                .render_pass(render_pass.handle())
-                .attachments(&attachments)
-                .width(swapchain.extent.width)
-                .height(swapchain.extent.height)
-                .layers(1);
-            let fb = unsafe { device.create_framebuffer(&info, None) }
-                .map_err(|e| format!("create_framebuffer[{i}]: {e}"))?;
-            framebuffers.push(Framebuffer::from_raw(device, fb));
-        }
-        Ok(framebuffers)
+        swapchain.image_views.iter().enumerate().map(|(i, &iv)| {
+            let attachments = [iv, depth_buffer.image_view()];
+            let fb = unsafe { device.create_framebuffer(&vk::FramebufferCreateInfo::default()
+                .render_pass(render_pass.handle()).attachments(&attachments)
+                .width(swapchain.extent.width).height(swapchain.extent.height).layers(1), None) }
+                .map_err(|e| format!("framebuffer[{i}]: {e}"))?;
+            Ok(Framebuffer::from_raw(device, fb))
+        }).collect()
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Render loop + mouse input
+    // Render loop
     // ──────────────────────────────────────────────────────────────────────
-
-    /// Mouse state tracked across WM_* messages via the camera mutex.
-    struct MouseState {
-        dragging: bool,
-        button: u32, // 0=left, 1=middle, 2=right
-        last_x: i32,
-        last_y: i32,
-    }
-
-    static MOUSE_STATE: Mutex<MouseState> = Mutex::new(MouseState {
-        dragging: false,
-        button: 0,
-        last_x: 0,
-        last_y: 0,
-    });
 
     fn render_loop(
         hwnd: HWND,
         should_stop: Arc<AtomicBool>,
-        bounds: Arc<Mutex<ViewportBounds>>,
+        render_active: Arc<AtomicBool>,
+        instances: Arc<Mutex<HashMap<String, ViewportInstance>>>,
     ) {
-        let initial_bounds = *bounds.lock().unwrap();
-
-        tracing::info!(
-            width = initial_bounds.width,
-            height = initial_bounds.height,
-            "Render thread: initialising ViewportRenderer (3D)"
-        );
-
-        let mut renderer = match ViewportRenderer::new(hwnd, initial_bounds.width, initial_bounds.height) {
-            Ok(r) => {
-                tracing::info!("ViewportRenderer initialised successfully (3D)!");
-                r
-            }
+        let (init_w, init_h) = client_size(hwnd);
+        let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h) {
+            Ok(r) => r,
             Err(e) => {
-                tracing::error!(error = %e, "Failed to initialise viewport renderer");
+                tracing::error!(error = %e, "ViewportRenderer init failed");
                 while !should_stop.load(Ordering::Relaxed) {
-                    unsafe {
-                        let mut msg = std::mem::zeroed::<MSG>();
-                        while PeekMessageW(&mut msg, Some(hwnd), 0, 0, PM_REMOVE).as_bool() {
-                            let _ = TranslateMessage(&msg);
-                            DispatchMessageW(&msg);
-                        }
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(16));
+                    std::thread::sleep(std::time::Duration::from_millis(100));
                 }
                 return;
             }
         };
 
-        let mut last_width = initial_bounds.width;
-        let mut last_height = initial_bounds.height;
-        let mut frame_counter: u64 = 0;
-
-        while !should_stop.load(Ordering::Relaxed) {
-            // Re-assert z-order every ~60 frames
-            frame_counter += 1;
-            if frame_counter % 60 == 0 {
-                unsafe {
-                    let _ = SetWindowPos(
-                        hwnd, Some(HWND_TOP),
-                        0, 0, 0, 0,
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-                    );
-                }
-            }
-
-            // Check for resize
-            {
-                let b = bounds.lock().unwrap();
-                if b.width != last_width || b.height != last_height {
-                    last_width = b.width;
-                    last_height = b.height;
-                    renderer.notify_resize(last_width, last_height);
-                }
-            }
-
-            // Read camera from the window's user data
-            let camera_snapshot = unsafe {
-                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<OrbitCamera>;
-                if !ptr.is_null() {
-                    (*ptr).lock().unwrap().clone()
-                } else {
-                    OrbitCamera::default()
-                }
-            };
-
-            if let Err(e) = renderer.render_frame(&camera_snapshot) {
-                tracing::error!(error = %e, "Viewport render_frame failed");
-                std::thread::sleep(std::time::Duration::from_millis(100));
+        while !should_stop.load(Ordering::SeqCst) {
+            if !render_active.load(Ordering::SeqCst) {
+                std::thread::sleep(std::time::Duration::from_millis(32));
                 continue;
             }
 
-            // Pump Win32 messages
-            unsafe {
-                let mut msg = std::mem::zeroed::<MSG>();
-                while PeekMessageW(&mut msg, Some(hwnd), 0, 0, PM_REMOVE).as_bool() {
-                    let _ = TranslateMessage(&msg);
-                    DispatchMessageW(&msg);
-                }
+            let (win_w, win_h) = client_size(hwnd);
+            renderer.notify_resize(win_w, win_h);
+
+            // Snapshot visible instances for this frame
+            let viewports: Vec<(ViewportBounds, OrbitCamera)> = {
+                let lock = instances.lock().unwrap();
+                lock.values()
+                    .filter(|i| i.visible)
+                    .map(|i| (i.bounds, i.camera.clone()))
+                    .collect()
+            };
+
+            if viewports.is_empty() {
+                std::thread::sleep(std::time::Duration::from_millis(32));
+                continue;
+            }
+
+            if let Err(e) = renderer.render_frame(&viewports) {
+                tracing::error!(error = %e, "render_frame failed");
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
 
             std::thread::sleep(std::time::Duration::from_millis(16));
         }
-
         drop(renderer);
     }
 
-    /// Window procedure — handles mouse input for 3D camera control.
-    unsafe extern "system" fn viewport_wnd_proc(
-        hwnd: HWND,
-        msg: u32,
-        wparam: WPARAM,
-        lparam: LPARAM,
-    ) -> LRESULT {
-        let lo = (lparam.0 & 0xFFFF) as i16 as i32;
-        let hi = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
-
-        match msg {
-            WM_ERASEBKGND => LRESULT(1),
-
-            WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_LBUTTONDOWN => {
-                let button = match msg {
-                    WM_LBUTTONDOWN => 0,
-                    WM_MBUTTONDOWN => 1,
-                    WM_RBUTTONDOWN => 2,
-                    _ => 0,
-                };
-                let _ = SetCapture(hwnd);
-                if let Ok(mut ms) = MOUSE_STATE.lock() {
-                    ms.dragging = true;
-                    ms.button = button;
-                    ms.last_x = lo;
-                    ms.last_y = hi;
-                }
-                LRESULT(0)
-            }
-
-            WM_RBUTTONUP | WM_MBUTTONUP | WM_LBUTTONUP => {
-                let _ = ReleaseCapture();
-                if let Ok(mut ms) = MOUSE_STATE.lock() {
-                    ms.dragging = false;
-                }
-                LRESULT(0)
-            }
-
-            WM_MOUSEMOVE => {
-                let (dragging, button, last_x, last_y) = {
-                    let ms = MOUSE_STATE.lock().unwrap();
-                    (ms.dragging, ms.button, ms.last_x, ms.last_y)
-                };
-
-                if dragging {
-                    let dx = lo - last_x;
-                    let dy = hi - last_y;
-
-                    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<OrbitCamera>;
-                    if !ptr.is_null() {
-                        if let Ok(mut cam) = (*ptr).lock() {
-                            match button {
-                                2 => cam.orbit(dx as f32, dy as f32),   // Right = orbit
-                                1 => cam.pan(dx as f32, dy as f32),     // Middle = pan
-                                0 => cam.orbit(dx as f32, dy as f32),   // Left = orbit too (for now)
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    if let Ok(mut ms) = MOUSE_STATE.lock() {
-                        ms.last_x = lo;
-                        ms.last_y = hi;
-                    }
-                }
-                LRESULT(0)
-            }
-
-            WM_MOUSEWHEEL => {
-                let delta = ((wparam.0 >> 16) & 0xFFFF) as i16 as f32;
-                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<OrbitCamera>;
-                if !ptr.is_null() {
-                    if let Ok(mut cam) = (*ptr).lock() {
-                        cam.zoom(delta);
-                    }
-                }
-                LRESULT(0)
-            }
-
-            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    fn client_size(hwnd: HWND) -> (u32, u32) {
+        unsafe {
+            let mut r: RECT = std::mem::zeroed();
+            let _ = GetClientRect(hwnd, &mut r);
+            (r.right.max(1) as u32, r.bottom.max(1) as u32)
         }
     }
+
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Platform-agnostic types
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Serialisable snapshot of an orbit camera — used to preserve state when a
+/// viewport panel moves across OS windows (e.g. pop-out / dock-back).
+#[derive(Clone, Debug, Default)]
+pub struct CameraState {
+    pub target:   [f32; 3],
+    pub distance: f32,
+    pub yaw:      f32,
+    pub pitch:    f32,
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1027,22 +815,29 @@ void main() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 #[cfg(windows)]
-pub use platform::NativeViewport;
+pub use platform::NativeViewport as NativeViewport;
 
 #[cfg(not(windows))]
 pub struct NativeViewport;
 
 #[cfg(not(windows))]
 impl NativeViewport {
-    pub fn new(_parent: isize, _bounds: ViewportBounds) -> Result<Self, String> {
+    pub fn new(_parent_hwnd: isize) -> Result<Self, String> {
         Err("Native viewport not yet implemented for this platform".into())
     }
-
     pub fn start_rendering(&mut self) -> Result<(), String> {
-        Err("Native viewport not yet implemented for this platform".into())
+        Err("Not implemented".into())
     }
-
-    pub fn set_bounds(&self, _bounds: ViewportBounds) {}
-    pub fn set_visible(&self, _visible: bool) {}
+    pub fn upsert_instance(&self, _id: String, _bounds: ViewportBounds) {}
+    pub fn remove_instance(&self, _id: &str) -> bool { true }
+    pub fn set_instance_bounds(&self, _id: &str, _bounds: ViewportBounds) {}
+    pub fn set_instance_visible(&self, _id: &str, _visible: bool) {}
+    pub fn camera_orbit(&self, _id: &str, _dx: f32, _dy: f32) {}
+    pub fn camera_pan(&self, _id: &str, _dx: f32, _dy: f32) {}
+    pub fn camera_zoom(&self, _id: &str, _delta: f32) {}
+    pub fn get_instance_camera(&self, _id: &str) -> Option<CameraState> { None }
+    pub fn set_instance_camera(&self, _id: &str, _state: CameraState) {}
+    pub fn set_grid_visible(&self, _id: &str, _visible: bool) {}
+    pub fn camera_set_orientation(&self, _id: &str, _yaw: f32, _pitch: f32) {}
     pub fn destroy(&mut self) {}
 }
