@@ -22,7 +22,7 @@ export type LayoutNode = SplitNode | TabsNode;
 /** Top-level editor layout with a main area and a bottom panel */
 export interface EditorLayout {
   root: LayoutNode;
-  bottomPanel: TabsNode;
+  bottomPanel: LayoutNode;
 }
 
 /** Drop zone position relative to a target panel */
