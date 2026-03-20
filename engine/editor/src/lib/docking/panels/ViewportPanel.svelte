@@ -32,7 +32,7 @@
   import {
     MousePointer2, Move, RotateCw, Maximize2,
     Grid2X2, Magnet, Video, ScanLine,
-    CirclePlus,
+    CirclePlus, RotateCcw,
   } from '@lucide/svelte';
   import { Tooltip } from 'bits-ui';
 
@@ -638,9 +638,9 @@
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="axis-gizmo" role="group" aria-label="Camera orientation gizmo">
   {#if true}
-    {@const S = 18}
-    {@const CX = 30}
-    {@const CY = 30}
+    {@const S = 24}
+    {@const CX = 40}
+    {@const CY = 40}
     {@const cy_rot = Math.cos(-cameraYawRad)}
     {@const sy_rot = Math.sin(-cameraYawRad)}
     {@const cp_rot = Math.cos(-cameraPitchRad)}
@@ -678,7 +678,7 @@
       const ly = pts.reduce((s,p) => s + p.y, 0) / pts.length;
       return { ...f, centerZ, points, lx, ly };
     }).sort((a,b) => a.centerZ - b.centerZ)}
-    <svg width="60" height="60" viewBox="0 0 60 60">
+    <svg width="80" height="80" viewBox="0 0 80 80">
       {#each sortedFaces as face}
         {@const opacity = face.centerZ > 0 ? 1.0 : 0.25}
         {@const snapYaw = face.snapYaw}
@@ -689,7 +689,7 @@
           fill={face.color}
           fill-opacity={opacity * 0.85}
           stroke={face.color}
-          stroke-width="0.5"
+          stroke-width="0.8"
           stroke-opacity={opacity}
           style="cursor: pointer;"
           onclick={(e: MouseEvent) => {
@@ -705,7 +705,7 @@
           text-anchor="middle"
           fill="white"
           fill-opacity={opacity}
-          font-size="8"
+          font-size="10"
           font-family="sans-serif"
           font-weight="600"
           style="pointer-events: none; user-select: none;"
@@ -717,11 +717,17 @@
 
   <!-- HUD overlay -->
   <div class="viewport-hud">
-    <span class="hud-tool" title={t(`tool.${activeTool}` as any)}>
-      {activeTool.charAt(0).toUpperCase() + activeTool.slice(1)}
+    <span class="hud-tool">
+      {#if activeTool === 'select'}<MousePointer2 width={12} height={12} />
+      {:else if activeTool === 'move'}<Move width={12} height={12} />
+      {:else if activeTool === 'rotate'}<RotateCw width={12} height={12} />
+      {:else if activeTool === 'scale'}<Maximize2 width={12} height={12} />
+      {/if}
+      <span class="hud-tool-name">{activeTool.charAt(0).toUpperCase() + activeTool.slice(1)}</span>
     </span>
     <span class="hud-separator">|</span>
     <span class="hud-projection">{projection === 'ortho' ? 'Ortho' : 'Persp'}</span>
+    <span class="hud-separator">|</span>
     <button
       class="hud-btn"
       onclick={(e: MouseEvent) => {
@@ -730,9 +736,10 @@
         cameraPitchRad = Math.PI / 6;
         viewportCameraReset(viewportId);
       }}
-      title={t('viewport.reset_camera')}
+      title="Reset camera"
+      aria-label="Reset camera"
     >
-      &#8634;
+      <RotateCcw width={12} height={12} />
     </button>
   </div>
 
@@ -757,6 +764,8 @@
     height: 100%;
     overflow: hidden;
     user-select: none;
+    min-width: 240px;
+    min-height: 160px;
     /* Transparent — Vulkan child window renders on top via WS_EX_TRANSPARENT
        (click-through) child-above-WebView2 approach. */
     background: transparent;
@@ -860,10 +869,10 @@
   /* Axis gizmo */
   .axis-gizmo {
     position: absolute;
-    top: 40px;
+    top: 8px;
     right: 8px;
     pointer-events: auto;
-    opacity: 0.7;
+    opacity: 0.85;
   }
 
   .axis-gizmo:hover {
@@ -878,8 +887,10 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 3px 8px;
-    background: rgba(0, 0, 0, 0.55);
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 4px;
     font-size: 11px;
     color: #aaa;
@@ -887,12 +898,19 @@
   }
 
   .hud-tool {
-    color: #61afef;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #ccc;
     font-weight: 500;
   }
 
+  .hud-tool-name {
+    font-size: 11px;
+  }
+
   .hud-separator {
-    color: #444;
+    color: #333;
   }
 
   .hud-projection {
@@ -900,27 +918,22 @@
     font-weight: 500;
     font-size: 10px;
     text-transform: uppercase;
-  }
-
-  .hud-zoom {
-    min-width: 36px;
-    text-align: center;
+    letter-spacing: 0.04em;
   }
 
   .hud-btn {
     background: none;
-    border: 1px solid #555;
-    border-radius: 3px;
-    color: #aaa;
-    font-size: 13px;
-    padding: 1px 5px;
+    border: none;
+    color: #666;
+    padding: 0;
     cursor: pointer;
+    display: flex;
+    align-items: center;
     line-height: 1;
   }
 
   .hud-btn:hover {
-    color: #fff;
-    border-color: #888;
+    color: #ccc;
   }
 
   /* Drag-mode indicator */
