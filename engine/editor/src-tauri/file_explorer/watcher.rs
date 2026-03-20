@@ -8,6 +8,4 @@ pub fn start_file_watch(_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn stop_file_watch() -> Result<(), String> {
-    Ok(())
-}
+pub fn stop_file_watch() {}

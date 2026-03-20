@@ -8,6 +8,15 @@ pub enum NodeKind {
     Dir,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum GitStatus {
+    Modified,
+    Untracked,
+    Deleted,
+    Staged,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TreeNode {
     pub name: String,
@@ -15,7 +24,7 @@ pub struct TreeNode {
     pub kind: NodeKind,
     /// None = not yet expanded (dirs only). Some([]) = empty dir.
     pub children: Option<Vec<TreeNode>>,
-    pub git_status: Option<String>,
+    pub git_status: Option<GitStatus>,
     pub ignored: bool,
 }
 
