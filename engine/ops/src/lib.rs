@@ -10,13 +10,13 @@
 //! - [`module`] — Module management (add, remove, list)
 //! - [`build`] — Platform builds and packaging
 //! - [`undo`] — Undo/redo command pattern
-//! - [`scene`] — Scene save/load (YAML + Bincode)
+//! - [`template`] — Template save/load (YAML + Bincode)
 
 pub mod build;
 pub mod codegen;
 pub mod module;
 pub mod project;
-pub mod scene;
+pub mod template;
 pub mod error;
 pub mod undo;
 
