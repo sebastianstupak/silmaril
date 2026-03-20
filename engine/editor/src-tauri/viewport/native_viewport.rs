@@ -63,11 +63,12 @@ mod platform {
         camera: OrbitCamera,
         visible: bool,
         grid_visible: bool,
+        is_ortho: bool,
     }
 
     impl ViewportInstance {
         fn new(bounds: ViewportBounds) -> Self {
-            Self { bounds, camera: OrbitCamera::default(), visible: true, grid_visible: true }
+            Self { bounds, camera: OrbitCamera::default(), visible: true, grid_visible: true, is_ortho: false }
         }
     }
 
@@ -204,6 +205,14 @@ mod platform {
             }
         }
 
+        pub fn set_projection(&self, id: &str, is_ortho: bool) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.is_ortho = is_ortho;
+                }
+            }
+        }
+
         pub fn camera_set_orientation(&self, id: &str, yaw: f32, pitch: f32) {
             if let Ok(mut instances) = self.instances.lock() {
                 if let Some(inst) = instances.get_mut(id) {
@@ -294,10 +303,19 @@ mod platform {
             self.target + self.distance * Vec3::new(cp * sy, sp, cp * cy)
         }
 
-        fn view_projection(&self, aspect: f32) -> Mat4 {
+        fn view_projection(&self, aspect: f32, is_ortho: bool) -> Mat4 {
             let view = Mat4::look_at_rh(self.eye(), self.target, Vec3::Y);
-            let proj = Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far);
-            proj * view
+            if is_ortho {
+                // half-extent matches what perspective renders at the focus point —
+                // so toggling persp↔ortho doesn't cause a visual jump.
+                let half_h = self.distance * (self.fov_y * 0.5).tan();
+                let half_w = half_h * aspect;
+                let proj = Mat4::orthographic_rh(-half_w, half_w, -half_h, half_h, self.near, self.far * 2.0);
+                proj * view
+            } else {
+                let proj = Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far);
+                proj * view
+            }
         }
 
         fn orbit(&mut self, dx: f32, dy: f32) {
@@ -554,7 +572,7 @@ void main() {
         }
 
         /// Render all visible viewport instances in one frame.
-        fn render_frame(&mut self, viewports: &[(ViewportBounds, OrbitCamera, bool)]) -> Result<bool, String> {
+        fn render_frame(&mut self, viewports: &[(ViewportBounds, OrbitCamera, bool, bool)]) -> Result<bool, String> {
             if self.needs_recreate {
                 self.recreate_swapchain()?;
                 self.needs_recreate = false;
@@ -608,7 +626,7 @@ void main() {
             &self,
             cmd: vk::CommandBuffer,
             image_index: usize,
-            viewports: &[(ViewportBounds, OrbitCamera, bool)],
+            viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
         ) -> Result<(), String> {
             let device = &self.context.device;
             device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())
@@ -630,7 +648,7 @@ void main() {
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.grid_pipeline);
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.grid_vertex_buffer.handle()], &[0]);
 
-            for (bounds, camera, grid_visible) in viewports {
+            for (bounds, camera, grid_visible, is_ortho) in viewports {
                 let sx = bounds.x.max(0) as u32;
                 let sy = bounds.y.max(0) as u32;
                 let sw = bounds.width.min(extent.width.saturating_sub(sx)).max(1);
@@ -649,7 +667,7 @@ void main() {
                 let aspect = sw as f32 / sh as f32;
                 let eye = camera.eye();
                 let pc = GridPushConstants {
-                    view_proj: camera.view_projection(aspect).to_cols_array(),
+                    view_proj: camera.view_projection(aspect, *is_ortho).to_cols_array(),
                     camera_pos: eye.to_array(),
                     _pad: 0.0,
                 };
@@ -824,11 +842,11 @@ void main() {
             renderer.notify_resize(win_w, win_h);
 
             // Snapshot visible instances for this frame
-            let viewports: Vec<(ViewportBounds, OrbitCamera, bool)> = {
+            let viewports: Vec<(ViewportBounds, OrbitCamera, bool, bool)> = {
                 let lock = instances.lock().unwrap();
                 lock.values()
                     .filter(|i| i.visible)
-                    .map(|i| (i.bounds, i.camera.clone(), i.grid_visible))
+                    .map(|i| (i.bounds, i.camera.clone(), i.grid_visible, i.is_ortho))
                     .collect()
             };
 
@@ -1001,6 +1019,37 @@ void main() {
             let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
             assert_eq!(inst.camera.yaw, 0.0, "camera yaw should start at 0 to match JS convention");
         }
+
+        // ── Orthographic projection ──────────────────────────────────────────
+
+        #[test]
+        fn view_projection_perspective_returns_finite_values() {
+            let cam = OrbitCamera::default();
+            let mat = cam.view_projection(16.0 / 9.0, false);
+            assert!(mat.to_cols_array().iter().all(|v| v.is_finite()));
+        }
+
+        #[test]
+        fn view_projection_ortho_returns_finite_values() {
+            let cam = OrbitCamera::default();
+            let mat = cam.view_projection(16.0 / 9.0, true);
+            assert!(mat.to_cols_array().iter().all(|v| v.is_finite()));
+        }
+
+        #[test]
+        fn view_projection_ortho_differs_from_perspective() {
+            let cam = OrbitCamera::default();
+            let persp = cam.view_projection(1.0, false).to_cols_array();
+            let ortho = cam.view_projection(1.0, true).to_cols_array();
+            // Matrices must be different — ortho has no perspective divide
+            assert!(persp != ortho, "ortho and perspective matrices must differ");
+        }
+
+        #[test]
+        fn viewport_instance_defaults_to_perspective() {
+            let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            assert!(!inst.is_ortho, "new instance should default to perspective");
+        }
     }
 
 }
@@ -1049,5 +1098,6 @@ impl NativeViewport {
     pub fn set_instance_camera(&self, _id: &str, _state: CameraState) {}
     pub fn set_grid_visible(&self, _id: &str, _visible: bool) {}
     pub fn camera_set_orientation(&self, _id: &str, _yaw: f32, _pitch: f32) {}
+    pub fn set_projection(&self, _id: &str, _is_ortho: bool) {}
     pub fn destroy(&mut self) {}
 }
