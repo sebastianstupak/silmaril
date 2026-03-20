@@ -929,10 +929,23 @@ void main() {
 
         #[test]
         fn orbit_camera_pitch_clamp_at_boundary() {
-            // Verify the clamp value used in camera_set_orientation
-            assert!((99.0_f32.clamp(-1.5, 1.5) - 1.5).abs() < 1e-6);
-            assert!(((-99.0_f32).clamp(-1.5, 1.5) - (-1.5)).abs() < 1e-6);
-            assert!((0.5_f32.clamp(-1.5, 1.5) - 0.5).abs() < 1e-6);
+            // Exercise the actual orbit() clamp — large dy drives pitch to max/min
+            let orbit_scale = 0.005_f32;
+            let mut cam_high = OrbitCamera::default();
+            cam_high.orbit(0.0, 99.0 / orbit_scale); // huge positive dy
+            assert!((cam_high.pitch - 1.5).abs() < 1e-5,
+                "large positive dy should saturate pitch at 1.5, got {}", cam_high.pitch);
+
+            let mut cam_low = OrbitCamera::default();
+            cam_low.orbit(0.0, -99.0 / orbit_scale); // huge negative dy
+            assert!((cam_low.pitch - (-1.5)).abs() < 1e-5,
+                "large negative dy should saturate pitch at -1.5, got {}", cam_low.pitch);
+
+            // Mid-range value passes through unchanged
+            let mut cam_mid = OrbitCamera { pitch: 0.0, ..OrbitCamera::default() };
+            cam_mid.orbit(0.0, 0.5 / orbit_scale); // dy such that pitch moves exactly 0.5
+            assert!((cam_mid.pitch - 0.5).abs() < 1e-5,
+                "pitch should be 0.5 after small dy, got {}", cam_mid.pitch);
         }
 
         // ── generate_grid_quad ───────────────────────────────────────────────
