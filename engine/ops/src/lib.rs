@@ -19,6 +19,8 @@ pub mod project;
 pub mod template;
 pub mod error;
 pub mod undo;
+pub mod command;
+pub mod ipc;
 
 /// Trait for reporting operation progress to frontends.
 ///
