@@ -66,7 +66,8 @@
   let gridVisible = $state(true);
   let snapToGrid = $state(false);
   let projection: ProjectionMode = $state('persp');
-  let viewAngleDeg = $state(0);
+  let cameraYawRad = $state(0.0);         // radians, matches Rust OrbitCamera::yaw
+  let cameraPitchRad = $state(Math.PI / 6); // radians, matches Rust OrbitCamera::pitch default
   let cameraZoom = $state(1);
 
   // True once onMount has loaded saved settings — gates the $effect save below
@@ -77,7 +78,15 @@
   // cleanup) so the stored values are always current when the tab unmounts.
   $effect(() => {
     if (!settingsLoaded) return;
-    saveViewportSettings(viewportId, { activeTool, gridVisible, snapToGrid, projection, cameraZoom });
+    saveViewportSettings(viewportId, {
+      activeTool,
+      gridVisible,
+      snapToGrid,
+      projection,
+      cameraZoom,
+      cameraYawRad,
+      cameraPitchRad,
+    });
   });
 
   // --- Drag / interaction state ---
@@ -184,6 +193,12 @@
         }
         if (saved.cameraZoom != null && saved.cameraZoom > 0) {
           cameraZoom = saved.cameraZoom;
+        }
+        if (saved.cameraYawRad != null) {
+          cameraYawRad = saved.cameraYawRad;
+        }
+        if (saved.cameraPitchRad != null) {
+          cameraPitchRad = saved.cameraPitchRad;
         }
         cursor = cursorForTool(activeTool);
       }
@@ -337,7 +352,9 @@
         const orbitDy = event.clientY - dragStartY;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
-        viewAngleDeg = (viewAngleDeg + orbitDx * 0.5) % 360;
+        // Match Rust sign convention: yaw -= dx * 0.005, pitch += dy * 0.005 (clamped)
+        cameraYawRad -= orbitDx * 0.005;
+        cameraPitchRad = Math.max(-1.5, Math.min(1.5, cameraPitchRad + orbitDy * 0.005));
         viewportCameraOrbit(viewportId, orbitDx, orbitDy);
         break;
       }
@@ -599,7 +616,13 @@
     </span>
     <button
       class="hud-btn"
-      onclick={(e: MouseEvent) => { e.stopPropagation(); cameraZoom = 1; viewAngleDeg = 0; viewportCameraReset(viewportId); }}
+      onclick={(e: MouseEvent) => {
+        e.stopPropagation();
+        cameraZoom = 1;
+        cameraYawRad = 0.0;
+        cameraPitchRad = Math.PI / 6;
+        viewportCameraReset(viewportId);
+      }}
       title={t('viewport.reset_camera')}
     >
       &#8634;
