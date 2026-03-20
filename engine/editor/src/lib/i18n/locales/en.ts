@@ -64,6 +64,7 @@ const en = {
   'panel.console': 'Console',
   'panel.profiler': 'Profiler',
   'panel.assets': 'Assets',
+  'panel.file_explorer': 'File Explorer',
 
   // Placeholders
   'placeholder.no_project': 'No project loaded',
@@ -133,6 +134,18 @@ const en = {
   'console.error': 'Error',
   'console.debug': 'Debug',
   'console.no_logs': 'No logs',
+
+  // File explorer
+  'explorer.new_file': 'New File',
+  'explorer.new_folder': 'New Folder',
+  'explorer.rename': 'Rename',
+  'explorer.delete': 'Delete',
+  'explorer.copy_path': 'Copy Path',
+  'explorer.reveal': 'Reveal in Explorer',
+  'explorer.refresh': 'Refresh',
+  'explorer.show_ignored': 'Show Ignored Files',
+  'explorer.empty': 'No files',
+  'explorer.error': 'Could not read folder',
 
   // Hierarchy panel
   'hierarchy.search': 'Search entities...',
