@@ -1,4 +1,5 @@
 pub mod bridge;
+pub mod file_explorer;
 pub mod plugins;
 pub mod state;
 pub mod viewport;
@@ -20,8 +21,7 @@ use bridge::commands;
 ///   For maximized we fall through to tao so it can clamp to the work area
 ///   and keep the window off the taskbar.
 #[cfg(windows)]
-static ORIG_WNDPROC: std::sync::atomic::AtomicIsize =
-    std::sync::atomic::AtomicIsize::new(0);
+static ORIG_WNDPROC: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 
 #[cfg(windows)]
 unsafe extern "system" fn nc_wndproc(
@@ -62,8 +62,8 @@ unsafe extern "system" fn nc_wndproc(
 pub(crate) fn install_nc_subclass(hwnd: windows::Win32::Foundation::HWND) {
     use std::sync::atomic::Ordering;
     use windows::Win32::UI::WindowsAndMessaging::{
-        SetWindowLongPtrW, SetWindowPos, GWLP_WNDPROC,
-        SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+        SetWindowLongPtrW, SetWindowPos, GWLP_WNDPROC, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
+        SWP_NOZORDER,
     };
     unsafe {
         let old = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, nc_wndproc as *const () as isize);
@@ -73,9 +73,15 @@ pub(crate) fn install_nc_subclass(hwnd: windows::Win32::Foundation::HWND) {
         // Trigger WM_NCCALCSIZE now so our handler zeroes the NC area
         // before the window becomes visible.
         SetWindowPos(
-            hwnd, None, 0, 0, 0, 0,
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-        ).ok();
+        )
+        .ok();
     }
     tracing::debug!("Installed NC subclass (WM_NCCALCSIZE override)");
 }
@@ -90,11 +96,8 @@ pub(crate) fn install_nc_subclass(hwnd: windows::Win32::Foundation::HWND) {
 pub(crate) fn apply_dwm_window_style(hwnd: windows::Win32::Foundation::HWND) {
     use std::mem::size_of;
     use windows::Win32::Graphics::Dwm::{
-        DwmExtendFrameIntoClientArea,
-        DwmSetWindowAttribute,
-        DWMWA_BORDER_COLOR,
-        DWMWA_WINDOW_CORNER_PREFERENCE,
-        DWMWCP_ROUND,
+        DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMWA_BORDER_COLOR,
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
     };
 
     unsafe {
@@ -141,7 +144,9 @@ pub fn run() {
     // Install a panic hook that logs to tracing before the default handler runs
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let location = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
             .unwrap_or_else(|| "unknown".into());
         let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
             s.to_string()
@@ -164,9 +169,7 @@ pub fn run() {
         use windows::Win32::System::Diagnostics::Debug::{
             AddVectoredExceptionHandler, EXCEPTION_POINTERS,
         };
-        unsafe extern "system" fn crash_handler(
-            info: *mut EXCEPTION_POINTERS,
-        ) -> i32 {
+        unsafe extern "system" fn crash_handler(info: *mut EXCEPTION_POINTERS) -> i32 {
             if info.is_null() {
                 return 0; // EXCEPTION_CONTINUE_SEARCH
             }
@@ -179,12 +182,11 @@ pub fn run() {
             if code == 0xC0000005  // ACCESS_VIOLATION
                 || code == 0xC0000409  // STATUS_STACK_BUFFER_OVERRUN
                 || code == 0xC0000374  // HEAP_CORRUPTION
-                || code == 0xC00000FD  // STACK_OVERFLOW
+                || code == 0xC00000FD
+            // STACK_OVERFLOW
             {
                 let addr = (*record).ExceptionAddress as usize;
-                eprintln!(
-                    "[CRASH] SEH exception 0x{code:08X} at address 0x{addr:X}"
-                );
+                eprintln!("[CRASH] SEH exception 0x{code:08X} at address 0x{addr:X}");
             }
             0 // EXCEPTION_CONTINUE_SEARCH
         }
@@ -194,6 +196,7 @@ pub fn run() {
     tracing::info!("Silmaril Editor starting");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::NativeViewportState::new())
         .invoke_handler(tauri::generate_handler![
