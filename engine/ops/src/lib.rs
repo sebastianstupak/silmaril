@@ -17,6 +17,7 @@ pub mod codegen;
 pub mod module;
 pub mod project;
 pub mod scene;
+pub mod error;
 pub mod undo;
 
 /// Trait for reporting operation progress to frontends.

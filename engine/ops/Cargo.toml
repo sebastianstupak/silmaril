@@ -25,7 +25,9 @@ zip = "2"
 
 # Engine dependencies
 engine-core = { path = "../core" }
+engine-macros = { path = "../macros" }
 engine-templating = { path = "../templating" }
 
 [dev-dependencies]
 tempfile = "3.10"
+proptest = "1"
