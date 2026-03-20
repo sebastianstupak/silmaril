@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import path from 'path';
 
@@ -48,5 +48,12 @@ export default defineConfig({
     hmr: host
       ? { protocol: 'ws', host, port: 5174, overlay: false }
       : { overlay: false },
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
+    alias: {
+      $lib: path.resolve('./src/lib'),
+    },
   },
 });

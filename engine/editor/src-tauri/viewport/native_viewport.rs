@@ -873,15 +873,17 @@ void main() {
 
         #[test]
         fn orbit_camera_orbit_updates_yaw_and_pitch() {
+            let orbit_scale = 0.005_f32; // same constant as OrbitCamera::orbit()
             let mut cam = OrbitCamera::default();
             cam.orbit(100.0, 0.0);
-            assert!((cam.yaw - (-0.5)).abs() < 1e-5, "yaw should decrease by dx*0.005");
+            let expected_yaw = -100.0 * orbit_scale;
+            assert!((cam.yaw - expected_yaw).abs() < 1e-5, "yaw should decrease by dx*0.005");
             assert!((cam.pitch - FRAC_PI_6).abs() < 1e-6, "pitch unchanged");
 
             let mut cam2 = OrbitCamera::default();
             cam2.orbit(0.0, 100.0);
             assert_eq!(cam2.yaw, 0.0, "yaw unchanged");
-            let expected_pitch = (FRAC_PI_6 + 0.5).min(1.5);
+            let expected_pitch = (FRAC_PI_6 + 100.0 * orbit_scale).min(1.5);
             assert!((cam2.pitch - expected_pitch).abs() < 1e-5);
         }
 
@@ -919,25 +921,18 @@ void main() {
         // ── camera_set_orientation ───────────────────────────────────────────
 
         #[test]
-        fn camera_set_orientation_sets_yaw_and_pitch() {
-            let mut inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
-            inst.camera.yaw = 99.0;
-            inst.camera.pitch = 99.0;
-            // Apply via the clamp logic used in camera_set_orientation
-            inst.camera.yaw = 1.0;
-            inst.camera.pitch = 0.5_f32.clamp(-1.5, 1.5);
-            assert!((inst.camera.yaw - 1.0).abs() < 1e-6);
-            assert!((inst.camera.pitch - 0.5).abs() < 1e-6);
+        fn orbit_camera_direct_yaw_assignment() {
+            let mut cam = OrbitCamera::default();
+            cam.yaw = -std::f32::consts::FRAC_PI_2;
+            assert!((cam.yaw - (-std::f32::consts::FRAC_PI_2)).abs() < 1e-6);
         }
 
         #[test]
-        fn camera_set_orientation_clamps_pitch() {
-            let mut inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
-            inst.camera.pitch = 99.0_f32.clamp(-1.5, 1.5);
-            assert!((inst.camera.pitch - 1.5).abs() < 1e-6, "pitch clamped to 1.5");
-
-            inst.camera.pitch = (-99.0_f32).clamp(-1.5, 1.5);
-            assert!((inst.camera.pitch - (-1.5)).abs() < 1e-6, "pitch clamped to -1.5");
+        fn orbit_camera_pitch_clamp_at_boundary() {
+            // Verify the clamp value used in camera_set_orientation
+            assert!((99.0_f32.clamp(-1.5, 1.5) - 1.5).abs() < 1e-6);
+            assert!(((-99.0_f32).clamp(-1.5, 1.5) - (-1.5)).abs() < 1e-6);
+            assert!((0.5_f32.clamp(-1.5, 1.5) - 0.5).abs() < 1e-6);
         }
 
         // ── generate_grid_quad ───────────────────────────────────────────────

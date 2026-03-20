@@ -86,13 +86,14 @@ fn default_bounds() -> ViewportBounds {
 // Tests
 // ---------------------------------------------------------------------------
 
-/// Basic lifecycle: create viewport, render a few frames, destroy.
+/// Basic lifecycle: create viewport, register an instance, render a few frames, destroy.
 #[test]
 #[ignore]
 fn test_viewport_create_render_destroy() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent, default_bounds()).expect("create viewport");
+    let mut vp = NativeViewport::new(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), default_bounds());
 
     // Let the render thread run for ~5 frames
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -109,11 +110,12 @@ fn test_viewport_create_destroy_cycles() {
 
     for i in 0..10 {
         let mut vp =
-            NativeViewport::new(parent, default_bounds()).unwrap_or_else(|e| {
+            NativeViewport::new(parent).unwrap_or_else(|e| {
                 panic!("create viewport (cycle {i}): {e}")
             });
         vp.start_rendering()
             .unwrap_or_else(|e| panic!("start rendering (cycle {i}): {e}"));
+        vp.upsert_instance("main".to_string(), default_bounds());
 
         // Let it render a few frames
         std::thread::sleep(std::time::Duration::from_millis(80));
@@ -129,8 +131,9 @@ fn test_viewport_create_destroy_cycles() {
 #[ignore]
 fn test_viewport_rapid_resize() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent, default_bounds()).expect("create viewport");
+    let mut vp = NativeViewport::new(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), default_bounds());
 
     // Wait for Vulkan init
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -139,7 +142,7 @@ fn test_viewport_rapid_resize() {
     for i in 0..50 {
         let w = 200 + (i * 10);
         let h = 150 + (i * 8);
-        vp.set_bounds(ViewportBounds {
+        vp.set_instance_bounds("main", ViewportBounds {
             x: 0,
             y: 0,
             width: w,
@@ -167,8 +170,9 @@ fn test_viewport_zero_size() {
         width: 0,
         height: 0,
     };
-    let mut vp = NativeViewport::new(parent, bounds).expect("create viewport with zero size");
+    let mut vp = NativeViewport::new(parent).expect("create viewport with zero size");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), bounds);
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -187,8 +191,9 @@ fn test_viewport_one_pixel() {
         width: 1,
         height: 1,
     };
-    let mut vp = NativeViewport::new(parent, bounds).expect("create 1x1 viewport");
+    let mut vp = NativeViewport::new(parent).expect("create 1x1 viewport");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), bounds);
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -207,8 +212,9 @@ fn test_viewport_4k() {
         width: 3840,
         height: 2160,
     };
-    let mut vp = NativeViewport::new(parent, bounds).expect("create 4K viewport");
+    let mut vp = NativeViewport::new(parent).expect("create 4K viewport");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), bounds);
 
     // Let it render several frames at 4K
     std::thread::sleep(std::time::Duration::from_millis(200));
@@ -217,17 +223,18 @@ fn test_viewport_4k() {
     destroy_parent(parent);
 }
 
-/// Stress test: create, render 10 frames, destroy -- repeat 50 times.
+/// Stress test: create, register instance, render 10 frames, destroy -- repeat 50 times.
 #[test]
 #[ignore]
 fn test_viewport_lifecycle_stress() {
     let parent = create_hidden_parent();
 
     for cycle in 0..50 {
-        let mut vp = NativeViewport::new(parent, default_bounds())
+        let mut vp = NativeViewport::new(parent)
             .unwrap_or_else(|e| panic!("cycle {cycle}: create: {e}"));
         vp.start_rendering()
             .unwrap_or_else(|e| panic!("cycle {cycle}: start: {e}"));
+        vp.upsert_instance("main".to_string(), default_bounds());
 
         // ~10 frames at 16ms each
         std::thread::sleep(std::time::Duration::from_millis(160));
@@ -243,13 +250,14 @@ fn test_viewport_lifecycle_stress() {
 #[ignore]
 fn test_viewport_resize_zero_then_restore() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent, default_bounds()).expect("create viewport");
+    let mut vp = NativeViewport::new(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), default_bounds());
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Shrink to zero
-    vp.set_bounds(ViewportBounds {
+    vp.set_instance_bounds("main", ViewportBounds {
         x: 0,
         y: 0,
         width: 0,
@@ -258,7 +266,7 @@ fn test_viewport_resize_zero_then_restore() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Restore to normal
-    vp.set_bounds(default_bounds());
+    vp.set_instance_bounds("main", default_bounds());
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     vp.destroy();
@@ -272,8 +280,9 @@ fn test_viewport_drop_cleanup() {
     let parent = create_hidden_parent();
 
     {
-        let mut vp = NativeViewport::new(parent, default_bounds()).expect("create viewport");
+        let mut vp = NativeViewport::new(parent).expect("create viewport");
         vp.start_rendering().expect("start rendering");
+        vp.upsert_instance("main".to_string(), default_bounds());
         std::thread::sleep(std::time::Duration::from_millis(100));
         // vp goes out of scope here -- Drop should clean up
     }
@@ -282,13 +291,15 @@ fn test_viewport_drop_cleanup() {
     destroy_parent(parent);
 }
 
-/// Multiple viewports simultaneously (different child windows of same parent).
+/// Multiple viewport instances within a single NativeViewport (same parent HWND).
 #[test]
 #[ignore]
 fn test_viewport_multiple_simultaneous() {
     let parent = create_hidden_parent();
+    let mut vp = NativeViewport::new(parent).expect("create viewport");
+    vp.start_rendering().expect("start rendering");
 
-    let mut viewports = Vec::new();
+    // Register 3 viewport instances side by side
     for i in 0..3 {
         let bounds = ViewportBounds {
             x: (i as i32) * 200,
@@ -296,21 +307,13 @@ fn test_viewport_multiple_simultaneous() {
             width: 200,
             height: 200,
         };
-        let mut vp = NativeViewport::new(parent, bounds)
-            .unwrap_or_else(|e| panic!("create viewport {i}: {e}"));
-        vp.start_rendering()
-            .unwrap_or_else(|e| panic!("start viewport {i}: {e}"));
-        viewports.push(vp);
+        vp.upsert_instance(format!("vp-{i}"), bounds);
     }
 
     // Let them all render
     std::thread::sleep(std::time::Duration::from_millis(200));
 
-    // Destroy in reverse order
-    for mut vp in viewports.into_iter().rev() {
-        vp.destroy();
-    }
-
+    vp.destroy();
     destroy_parent(parent);
 }
 
@@ -319,12 +322,13 @@ fn test_viewport_multiple_simultaneous() {
 #[ignore]
 fn test_viewport_extreme_aspect_ratios() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent, default_bounds()).expect("create viewport");
+    let mut vp = NativeViewport::new(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
+    vp.upsert_instance("main".to_string(), default_bounds());
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Very wide
-    vp.set_bounds(ViewportBounds {
+    vp.set_instance_bounds("main", ViewportBounds {
         x: 0,
         y: 0,
         width: 2000,
@@ -333,7 +337,7 @@ fn test_viewport_extreme_aspect_ratios() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Very tall
-    vp.set_bounds(ViewportBounds {
+    vp.set_instance_bounds("main", ViewportBounds {
         x: 0,
         y: 0,
         width: 10,
@@ -342,7 +346,7 @@ fn test_viewport_extreme_aspect_ratios() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Back to normal
-    vp.set_bounds(default_bounds());
+    vp.set_instance_bounds("main", default_bounds());
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     vp.destroy();
