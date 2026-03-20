@@ -8,14 +8,14 @@
   } from '$lib/stores/editor-context';
   import {
     createNativeViewport,
-    resizeNativeViewport,
     destroyNativeViewport,
+    viewportCameraOrbit,
+    viewportCameraPan,
+    viewportCameraZoom,
+    viewportCameraReset,
+    viewportSetGridVisible,
   } from '$lib/api';
-  import {
-    getSceneState,
-    subscribeScene,
-    type SceneTool,
-  } from '$lib/scene/state';
+  import type { SceneTool, ProjectionMode } from '$lib/scene/state';
   import {
     createEntity,
     deleteEntity,
@@ -23,18 +23,9 @@
     translateEntity,
     rotateEntityBy,
     scaleEntityBy,
-    panCamera,
-    orbitCamera,
-    zoomCamera,
     focusEntity,
-    resetCamera,
-    setActiveTool,
-    setViewAngle,
-    toggleGrid,
-    toggleSnapToGrid,
-    toggleProjection,
   } from '$lib/scene/commands';
-  import type { ProjectionMode } from '$lib/scene/state';
+  import { saveViewportSettings, loadViewportSettings } from '$lib/viewport-settings';
 
   const TOOL_KEYS: Record<string, SceneTool> = {
     q: 'select',
@@ -43,6 +34,10 @@
     r: 'scale',
   };
 
+  // Dock panel ID passed from DockContainer — stable across remounts so the
+  // Rust registry can preserve camera state on panel drag / tab switch.
+  let { panelId = '' }: { panelId?: string } = $props();
+
   /** Detect if running inside Tauri or standalone browser */
   // Check at runtime, not module load — __TAURI_INTERNALS__ may not be set yet
   function checkIsTauri(): boolean {
@@ -50,15 +45,40 @@
   }
   let isTauri = checkIsTauri();
 
+  // Use the stable dock panel ID as the Rust registry key so camera state is
+  // preserved across panel drag / tab switches.  Fall back to a random ID
+  // only when no panelId is provided (e.g. pop-out or dev/browser mode).
+  const viewportId = panelId || `vp-${Date.now()}-${Math.floor(Math.random() * 0xffff).toString(16)}`;
+
   let containerEl: HTMLDivElement | undefined = $state(undefined);
   let viewportWidth = $state(800);
   let viewportHeight = $state(600);
   let loading = $state(true);
-  /** Whether the native viewport child window has been created. */
+  /** Set synchronously before calling createNativeViewport so cleanup can
+   *  always call destroyNativeViewport — even if the async create hasn't
+   *  resolved yet when the component unmounts (fast tab switch). */
+  let viewportRegistered = false;
+  /** Reactive flag for UI — set true once the async create resolves. */
   let nativeViewportCreated = $state(false);
 
-  // Camera state (viewport-local, synced from scene state)
+  // Per-viewport UI state — fully local, NOT shared with other viewports.
+  let activeTool: SceneTool = $state('select');
+  let gridVisible = $state(true);
+  let snapToGrid = $state(false);
+  let projection: ProjectionMode = $state('persp');
+  let viewAngleDeg = $state(0);
   let cameraZoom = $state(1);
+
+  // True once onMount has loaded saved settings — gates the $effect save below
+  // so we don't overwrite localStorage with defaults on first render.
+  let settingsLoaded = false;
+
+  // Save to localStorage reactively on every settings change (not just on
+  // cleanup) so the stored values are always current when the tab unmounts.
+  $effect(() => {
+    if (!settingsLoaded) return;
+    saveViewportSettings(viewportId, { activeTool, gridVisible, snapToGrid, projection, cameraZoom });
+  });
 
   // --- Drag / interaction state ---
   type DragMode =
@@ -78,39 +98,21 @@
   /** Cursor CSS value — reactive, recalculated on every relevant state change. */
   let cursor = $state('default');
 
-  // Scene state mirror
+  // Shared editor state (entities, selection — truly global across all panels)
   let entities = $state(getEditorContext().entities);
   let selectedEntityId: number | null = $state(getEditorContext().selectedEntityId);
-  let activeTool: SceneTool = $state(getSceneState().activeTool);
-  let gridVisible = $state(getSceneState().gridVisible);
-  let snapToGrid = $state(getSceneState().snapToGrid);
-  let viewAngleDeg = $state(0);
-  let projection: ProjectionMode = $state(getSceneState().camera.projection);
 
   onMount(() => {
-    const unsub = subscribeScene(() => {
+    // Subscribe only for shared state: entities and selection.
+    const unsub = subscribeContext(() => {
       const ctx = getEditorContext();
-      const scene = getSceneState();
       entities = ctx.entities;
       selectedEntityId = ctx.selectedEntityId;
-      activeTool = scene.activeTool;
-      gridVisible = scene.gridVisible;
-      snapToGrid = scene.snapToGrid;
-      viewAngleDeg = (scene.camera.viewAngle * 180) / Math.PI;
-      projection = scene.camera.projection;
-
-      // Sync zoom from scene state
-      cameraZoom = scene.camera.zoom;
-
-      // Update cursor when tool changes (and we are not dragging)
-      if (!isDragging) {
-        cursor = cursorForTool(activeTool);
-      }
     });
 
     // Observe container size
     if (containerEl) {
-      /** Compute physical-pixel bounds of the viewport container. */
+      /** Compute physical-pixel bounds of the viewport panel container. */
       function getPhysicalBounds(): { x: number; y: number; width: number; height: number } {
         const rect = containerEl!.getBoundingClientRect();
         const sf = window.devicePixelRatio || 1;
@@ -118,7 +120,7 @@
           x: Math.round(rect.left * sf),
           y: Math.round(rect.top * sf),
           width: Math.round(rect.width * sf),
-          height: Math.round(rect.height * sf),
+          height: Math.max(1, Math.round(rect.height * sf)),
         };
       }
 
@@ -127,10 +129,15 @@
           viewportWidth = Math.round(entry.contentRect.width) || 800;
           viewportHeight = Math.round(entry.contentRect.height) || 600;
         }
-        // Keep native viewport child window in sync with container size
-        if (isTauri && nativeViewportCreated) {
+        // Skip when hidden (display:none gives 0 bounds) — we don't want to
+        // register the viewport with wrong dimensions. When the slot becomes
+        // visible again the observer fires with correct bounds and we register.
+        if (isTauri) {
           const b = getPhysicalBounds();
-          resizeNativeViewport(b.x, b.y, b.width, b.height);
+          if (b.width > 0 && b.height > 0) {
+            viewportRegistered = true;
+            createNativeViewport(viewportId, b.x, b.y, b.width, b.height);
+          }
         }
       });
       observer.observe(containerEl);
@@ -139,29 +146,56 @@
       isTauri = checkIsTauri();
       console.log('[viewport] isTauri =', isTauri);
 
-      // Create native Vulkan viewport in Tauri mode
+      // Create (or update bounds of) this viewport instance in Tauri mode.
+      // createNativeViewport is idempotent — safe to call on every mount
+      // including remounts after panel drag to a new dock zone.
       if (isTauri) {
         const bounds = getPhysicalBounds();
-        console.log('[viewport] Creating native viewport at', bounds);
-        const b = getPhysicalBounds();
-        createNativeViewport(bounds.x, bounds.y, bounds.width, bounds.height).then(() => {
-          nativeViewportCreated = true;
+        // Skip initial registration if panel is hidden (display:none → 0 bounds).
+        // The ResizeObserver will register it when the slot becomes visible.
+        if (bounds.width > 0 && bounds.height > 0) {
+          console.log('[viewport] Upserting native viewport', viewportId, 'at', bounds);
+          viewportRegistered = true;
+          createNativeViewport(viewportId, bounds.x, bounds.y, bounds.width, bounds.height).then(() => {
+            nativeViewportCreated = true;
+            loading = false;
+            // Sync grid visibility to Rust on mount — restores persisted state
+            viewportSetGridVisible(viewportId, gridVisible);
+            console.log('[viewport] Viewport instance ready:', viewportId);
+          }).catch((e) => {
+            console.error('[viewport] Vulkan init FAILED:', e);
+            loading = false;
+          });
+        } else {
           loading = false;
-          console.log('[viewport] Native viewport created successfully!');
-        }).catch((e) => {
-          console.error('[viewport] Vulkan init FAILED:', e);
-          loading = false;
-        });
+        }
       } else {
         loading = false;
       }
 
+      // Restore persisted per-viewport settings from a previous session.
+      const saved = loadViewportSettings(viewportId);
+      if (saved) {
+        if (saved.activeTool) activeTool = saved.activeTool as SceneTool;
+        gridVisible = saved.gridVisible;
+        snapToGrid = saved.snapToGrid;
+        if (saved.projection === 'persp' || saved.projection === 'ortho') {
+          projection = saved.projection;
+        }
+        if (saved.cameraZoom != null && saved.cameraZoom > 0) {
+          cameraZoom = saved.cameraZoom;
+        }
+        cursor = cursorForTool(activeTool);
+      }
+      // Allow $effect to start saving now that defaults have been overwritten.
+      settingsLoaded = true;
+
       return () => {
         unsub();
         observer.disconnect();
-        if (isTauri && nativeViewportCreated) {
-          destroyNativeViewport();
-          nativeViewportCreated = false;
+        // Remove this instance from the Rust registry on unmount.
+        if (isTauri && viewportRegistered) {
+          destroyNativeViewport(viewportId);
         }
       };
     }
@@ -205,7 +239,8 @@
   function handleWheel(event: WheelEvent) {
     event.preventDefault();
     const delta = event.deltaY > 0 ? -0.1 : 0.1;
-    zoomCamera(delta);
+    cameraZoom = Math.max(0.01, cameraZoom + delta);
+    viewportCameraZoom(viewportId, -event.deltaY);
   }
 
   /** Start a drag interaction based on button / modifier.
@@ -223,7 +258,7 @@
    *    R (Scale)   : Left click + drag  = scale entity
    */
   function handleMouseDown(event: MouseEvent) {
-    const tool = getSceneState().activeTool;
+    const tool = activeTool;
 
     // Middle mouse → pan
     if (event.button === 1) {
@@ -289,28 +324,29 @@
 
     switch (dragMode) {
       case 'pan': {
-        const panDx = (event.clientX - dragStartX) / (cameraZoom * 50);
-        const panDy = -(event.clientY - dragStartY) / (cameraZoom * 50);
+        const rawDx = event.clientX - dragStartX;
+        const rawDy = event.clientY - dragStartY;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
-        panCamera(panDx, panDy);
+        viewportCameraPan(viewportId, rawDx, rawDy);
         break;
       }
 
       case 'orbit': {
-        const orbitDx = (event.clientX - dragStartX);
-        const orbitDy = (event.clientY - dragStartY);
+        const orbitDx = event.clientX - dragStartX;
+        const orbitDy = event.clientY - dragStartY;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
-        orbitCamera(orbitDx * 0.5, orbitDy * 0.5);
+        viewAngleDeg = (viewAngleDeg + orbitDx * 0.5) % 360;
+        viewportCameraOrbit(viewportId, orbitDx, orbitDy);
         break;
       }
 
       case 'zoom': {
-        const zoomDelta = -dy * 0.005;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
-        zoomCamera(zoomDelta);
+        cameraZoom = Math.max(0.01, cameraZoom + (-dy * 0.005));
+        viewportCameraZoom(viewportId, dy * -5);
         break;
       }
 
@@ -372,7 +408,8 @@
     const toolKey = TOOL_KEYS[event.key.toLowerCase()];
     if (toolKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
-      setActiveTool(toolKey);
+      activeTool = toolKey;
+      cursor = cursorForTool(toolKey);
       return;
     }
 
@@ -400,23 +437,23 @@
     }
 
     // Arrow keys — pan camera
-    const PAN_STEP = 0.5;
+    const PAN_STEP = 30;
     switch (event.key) {
       case 'ArrowLeft':
         event.preventDefault();
-        panCamera(-PAN_STEP, 0);
+        viewportCameraPan(viewportId, -PAN_STEP, 0);
         return;
       case 'ArrowRight':
         event.preventDefault();
-        panCamera(PAN_STEP, 0);
+        viewportCameraPan(viewportId, PAN_STEP, 0);
         return;
       case 'ArrowUp':
         event.preventDefault();
-        panCamera(0, PAN_STEP);
+        viewportCameraPan(viewportId, 0, -PAN_STEP);
         return;
       case 'ArrowDown':
         event.preventDefault();
-        panCamera(0, -PAN_STEP);
+        viewportCameraPan(viewportId, 0, PAN_STEP);
         return;
     }
   }
@@ -454,7 +491,7 @@
           class="tool-btn"
           class:active={activeTool === tool.key}
           title={t(tool.label)}
-          onclick={(e: MouseEvent) => { e.stopPropagation(); setActiveTool(tool.key); }}
+          onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
         >
           <span class="tool-icon">{tool.shortcut}</span>
         </button>
@@ -468,7 +505,11 @@
         class="tool-btn"
         class:active={gridVisible}
         title={t('viewport.grid')}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); toggleGrid(); }}
+        onclick={(e: MouseEvent) => {
+          e.stopPropagation();
+          gridVisible = !gridVisible;
+          viewportSetGridVisible(viewportId, gridVisible);
+        }}
       >
         <span class="tool-icon">#</span>
       </button>
@@ -476,7 +517,7 @@
         class="tool-btn"
         class:active={snapToGrid}
         title={t('viewport.snap')}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); toggleSnapToGrid(); }}
+        onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
       >
         <span class="tool-icon">&#8982;</span>
       </button>
@@ -488,7 +529,7 @@
       <button
         class="tool-btn"
         title={projection === 'ortho' ? 'Switch to Perspective' : 'Switch to Orthographic'}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
+        onclick={(e: MouseEvent) => { e.stopPropagation(); projection = projection === 'ortho' ? 'persp' : 'ortho'; }}
       >
         <span class="tool-icon">{projection === 'ortho' ? '\u229E' : '\u25CE'}</span>
       </button>
@@ -518,29 +559,29 @@
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <line x1="30" y1="30" x2="50" y2="30" stroke="#e06c75" stroke-width="2"
               style="cursor: pointer; pointer-events: stroke;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(0); }} />
+              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 0; }} />
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <text x="52" y="34" fill="#e06c75" font-size="10" font-family="sans-serif"
               style="cursor: pointer; pointer-events: auto;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(0); }}>X</text>
+              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 0; }}>X</text>
 
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <line x1="30" y1="30" x2="30" y2="10" stroke="#98c379" stroke-width="2"
               style="cursor: pointer; pointer-events: stroke;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(-Math.PI / 2); }} />
+              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = -90; }} />
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <text x="27" y="8" fill="#98c379" font-size="10" font-family="sans-serif"
               style="cursor: pointer; pointer-events: auto;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(-Math.PI / 2); }}>Y</text>
+              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = -90; }}>Y</text>
 
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <line x1="30" y1="30" x2="16" y2="42" stroke="#61afef" stroke-width="2"
               style="cursor: pointer; pointer-events: stroke;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(Math.PI / 2); }} />
+              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 90; }} />
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <text x="8" y="48" fill="#61afef" font-size="10" font-family="sans-serif"
               style="cursor: pointer; pointer-events: auto;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); setViewAngle(Math.PI / 2); }}>Z</text>
+              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 90; }}>Z</text>
       </g>
     </svg>
   </div>
@@ -558,7 +599,7 @@
     </span>
     <button
       class="hud-btn"
-      onclick={(e: MouseEvent) => { e.stopPropagation(); resetCamera(); }}
+      onclick={(e: MouseEvent) => { e.stopPropagation(); cameraZoom = 1; viewAngleDeg = 0; viewportCameraReset(viewportId); }}
       title={t('viewport.reset_camera')}
     >
       &#8634;
@@ -586,7 +627,8 @@
     height: 100%;
     overflow: hidden;
     user-select: none;
-    /* Transparent — Vulkan renders behind the webview */
+    /* Transparent — Vulkan child window renders on top via WS_EX_TRANSPARENT
+       (click-through) child-above-WebView2 approach. */
     background: transparent;
     outline: none;
     z-index: 0;
