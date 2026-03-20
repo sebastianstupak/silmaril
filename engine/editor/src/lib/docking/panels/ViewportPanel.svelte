@@ -14,6 +14,7 @@
     viewportCameraZoom,
     viewportCameraReset,
     viewportSetGridVisible,
+    viewportCameraSetOrientation,
   } from '$lib/api';
   import type { SceneTool, ProjectionMode } from '$lib/scene/state';
   import {
@@ -568,38 +569,82 @@
   <!-- No fallback content. In Tauri, the Vulkan child window renders behind
        this transparent area. In browser mode, it's just empty/transparent. -->
 
-  <!-- Axis gizmo (camera orientation indicator) — clickable to snap view -->
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
-  <div class="axis-gizmo" role="group" aria-label="Axis gizmo">
+  <!-- Axis gizmo — 3D projected cube showing camera orientation -->
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="axis-gizmo" role="group" aria-label="Camera orientation gizmo">
+    {@const S = 18}
+    {@const CX = 30}
+    {@const CY = 30}
+    {@const cy_rot = Math.cos(-cameraYawRad)}
+    {@const sy_rot = Math.sin(-cameraYawRad)}
+    {@const cp_rot = Math.cos(-cameraPitchRad)}
+    {@const sp_rot = Math.sin(-cameraPitchRad)}
+    {@const project = (vx: number, vy: number, vz: number) => {
+      // Rotate around Y (-yaw)
+      const rx = cy_rot * vx + sy_rot * vz;
+      const ry = vy;
+      const rz = -sy_rot * vx + cy_rot * vz;
+      // Rotate around X (-pitch)
+      const px = rx;
+      const py = cp_rot * ry - sp_rot * rz;
+      const pz = sp_rot * ry + cp_rot * rz;
+      return { x: CX + px * S, y: CY - py * S, z: pz };
+    }}
+    {@const VERTS: [number,number,number][] = [
+      [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
+      [-1,-1, 1],[1,-1, 1],[1,1, 1],[-1,1, 1],
+    ]}
+    {@const FACES: { vi: number[]; label: string; color: string; snapYaw: number; snapPitch: number }[] = [
+      { vi:[1,2,6,5], label:'X',  color:'#e06c75', snapYaw:-Math.PI/2, snapPitch:0      },
+      { vi:[0,4,7,3], label:'-X', color:'#7a3040', snapYaw: Math.PI/2, snapPitch:0      },
+      { vi:[3,2,6,7], label:'Y',  color:'#98c379', snapYaw:0,          snapPitch:-1.5   },
+      { vi:[0,1,5,4], label:'-Y', color:'#3d6130', snapYaw:0,          snapPitch: 1.5   },
+      { vi:[4,5,6,7], label:'Z',  color:'#61afef', snapYaw:0,          snapPitch:0      },
+      { vi:[0,1,2,3], label:'-Z', color:'#2a4d7a', snapYaw:Math.PI,    snapPitch:0      },
+    ]}
+    {@const projected = VERTS.map(([x,y,z]) => project(x,y,z))}
+    {@const sortedFaces = FACES.map(f => {
+      const pts = f.vi.map(i => projected[i]);
+      const centerZ = pts.reduce((s,p) => s + p.z, 0) / pts.length;
+      const points = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+      // Centroid for label
+      const lx = pts.reduce((s,p) => s + p.x, 0) / pts.length;
+      const ly = pts.reduce((s,p) => s + p.y, 0) / pts.length;
+      return { ...f, centerZ, points, lx, ly };
+    }).sort((a,b) => a.centerZ - b.centerZ)}
     <svg width="60" height="60" viewBox="0 0 60 60">
-      <g transform="rotate({-viewAngleDeg}, 30, 30)">
+      {#each sortedFaces as face}
+        {@const opacity = face.centerZ > 0 ? 1.0 : 0.25}
+        {@const snapYaw = face.snapYaw}
+        {@const snapPitch = face.snapPitch}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <line x1="30" y1="30" x2="50" y2="30" stroke="#e06c75" stroke-width="2"
-              style="cursor: pointer; pointer-events: stroke;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 0; }} />
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <text x="52" y="34" fill="#e06c75" font-size="10" font-family="sans-serif"
-              style="cursor: pointer; pointer-events: auto;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 0; }}>X</text>
-
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <line x1="30" y1="30" x2="30" y2="10" stroke="#98c379" stroke-width="2"
-              style="cursor: pointer; pointer-events: stroke;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = -90; }} />
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <text x="27" y="8" fill="#98c379" font-size="10" font-family="sans-serif"
-              style="cursor: pointer; pointer-events: auto;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = -90; }}>Y</text>
-
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <line x1="30" y1="30" x2="16" y2="42" stroke="#61afef" stroke-width="2"
-              style="cursor: pointer; pointer-events: stroke;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 90; }} />
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <text x="8" y="48" fill="#61afef" font-size="10" font-family="sans-serif"
-              style="cursor: pointer; pointer-events: auto;"
-              onclick={(e: MouseEvent) => { e.stopPropagation(); viewAngleDeg = 90; }}>Z</text>
-      </g>
+        <polygon
+          points={face.points}
+          fill={face.color}
+          fill-opacity={opacity * 0.85}
+          stroke={face.color}
+          stroke-width="0.5"
+          stroke-opacity={opacity}
+          style="cursor: pointer;"
+          onclick={(e: MouseEvent) => {
+            e.stopPropagation();
+            cameraYawRad = snapYaw;
+            cameraPitchRad = snapPitch;
+            viewportCameraSetOrientation(viewportId, snapYaw, snapPitch);
+          }}
+        />
+        <text
+          x={face.lx}
+          y={face.ly + 3.5}
+          text-anchor="middle"
+          fill="white"
+          fill-opacity={opacity}
+          font-size="8"
+          font-family="sans-serif"
+          font-weight="600"
+          style="pointer-events: none; user-select: none;"
+        >{face.label}</text>
+      {/each}
     </svg>
   </div>
 
