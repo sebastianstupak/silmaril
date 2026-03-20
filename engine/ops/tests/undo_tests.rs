@@ -6,7 +6,7 @@ fn set_component_undo_restores_old_value() {
     let mut stack = UndoStack::new(100);
     let action = EditorAction::SetComponent {
         entity: 1,
-        name: "Health".into(),
+        type_name: "Health".into(),
         old: json!(100),
         new: json!(50),
     };
@@ -25,11 +25,11 @@ fn set_component_undo_restores_old_value() {
 #[test]
 fn create_entity_undo_returns_action() {
     let mut stack = UndoStack::new(100);
-    stack.push(EditorAction::CreateEntity { id: 42 });
+    stack.push(EditorAction::CreateEntity { id: 42, name: None });
 
     let undone = stack.undo().unwrap();
     match undone {
-        EditorAction::CreateEntity { id } => assert_eq!(id, 42),
+        EditorAction::CreateEntity { id, .. } => assert_eq!(id, 42),
         _ => panic!("Expected CreateEntity"),
     }
     assert!(!stack.can_undo());
@@ -40,6 +40,7 @@ fn delete_entity_undo_restores_snapshot() {
     let mut stack = UndoStack::new(100);
     let snapshot = EntitySnapshot {
         id: 7,
+        name: None,
         components: vec![
             ("Health".into(), json!(100)),
             ("Position".into(), json!({"x": 1.0, "y": 2.0})),
@@ -67,7 +68,7 @@ fn redo_after_undo_reapplies_action() {
     let mut stack = UndoStack::new(100);
     stack.push(EditorAction::SetComponent {
         entity: 1,
-        name: "Health".into(),
+        type_name: "Health".into(),
         old: json!(100),
         new: json!(50),
     });
@@ -87,14 +88,14 @@ fn redo_after_undo_reapplies_action() {
 #[test]
 fn new_action_clears_redo_stack() {
     let mut stack = UndoStack::new(100);
-    stack.push(EditorAction::CreateEntity { id: 1 });
-    stack.push(EditorAction::CreateEntity { id: 2 });
+    stack.push(EditorAction::CreateEntity { id: 1, name: None });
+    stack.push(EditorAction::CreateEntity { id: 2, name: None });
 
     stack.undo().unwrap();
     assert!(stack.can_redo());
 
     // Pushing a new action should clear redo
-    stack.push(EditorAction::CreateEntity { id: 3 });
+    stack.push(EditorAction::CreateEntity { id: 3, name: None });
     assert!(!stack.can_redo());
 }
 
@@ -106,13 +107,13 @@ fn batch_undo_reverses_all_in_one_step() {
         actions: vec![
             EditorAction::SetComponent {
                 entity: 1,
-                name: "Position".into(),
+                type_name: "Position".into(),
                 old: json!({"x": 0}),
                 new: json!({"x": 10}),
             },
             EditorAction::SetComponent {
                 entity: 1,
-                name: "Scale".into(),
+                type_name: "Scale".into(),
                 old: json!(1.0),
                 new: json!(2.0),
             },
@@ -133,10 +134,10 @@ fn batch_undo_reverses_all_in_one_step() {
 #[test]
 fn max_depth_evicts_oldest() {
     let mut stack = UndoStack::new(3);
-    stack.push(EditorAction::CreateEntity { id: 1 });
-    stack.push(EditorAction::CreateEntity { id: 2 });
-    stack.push(EditorAction::CreateEntity { id: 3 });
-    stack.push(EditorAction::CreateEntity { id: 4 });
+    stack.push(EditorAction::CreateEntity { id: 1, name: None });
+    stack.push(EditorAction::CreateEntity { id: 2, name: None });
+    stack.push(EditorAction::CreateEntity { id: 3, name: None });
+    stack.push(EditorAction::CreateEntity { id: 4, name: None });
 
     // Only 3 should remain; id=1 was evicted
     let a1 = stack.undo().unwrap();
@@ -145,15 +146,15 @@ fn max_depth_evicts_oldest() {
     assert!(stack.undo().is_err());
 
     match a1 {
-        EditorAction::CreateEntity { id } => assert_eq!(id, 4),
+        EditorAction::CreateEntity { id, .. } => assert_eq!(id, 4),
         _ => panic!("Expected CreateEntity"),
     }
     match a2 {
-        EditorAction::CreateEntity { id } => assert_eq!(id, 3),
+        EditorAction::CreateEntity { id, .. } => assert_eq!(id, 3),
         _ => panic!("Expected CreateEntity"),
     }
     match a3 {
-        EditorAction::CreateEntity { id } => assert_eq!(id, 2),
+        EditorAction::CreateEntity { id, .. } => assert_eq!(id, 2),
         _ => panic!("Expected CreateEntity"),
     }
 }
