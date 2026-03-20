@@ -187,6 +187,13 @@ export async function viewportCameraSetOrientation(
   return tauriInvoke<void>('viewport_camera_set_orientation', { viewportId, yaw, pitch });
 }
 
+/** Switch between perspective (isOrtho=false) and orthographic (isOrtho=true)
+ *  projection for a specific viewport instance. */
+export async function viewportSetProjection(viewportId: string, isOrtho: boolean): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('viewport_set_projection', { viewportId, isOrtho });
+}
+
 // ---------------------------------------------------------------------------
 // Scene commands (AI agent API)
 // ---------------------------------------------------------------------------

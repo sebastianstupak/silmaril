@@ -70,7 +70,7 @@ describe('viewport-settings', () => {
       activeTool: 'select',
       gridVisible: true,
       snapToGrid: false,
-      projection: 'persp',
+      projection: 'perspective',
       cameraYawRad: -0.785,
       cameraPitchRad: 0.523,
     };
@@ -85,7 +85,7 @@ describe('viewport-settings', () => {
       activeTool: 'select',
       gridVisible: true,
       snapToGrid: false,
-      projection: 'persp',
+      projection: 'perspective',
     };
     saveViewportSettings('viewport', s);
     const loaded = loadViewportSettings('viewport');

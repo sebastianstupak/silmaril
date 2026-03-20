@@ -10,7 +10,6 @@ export interface ViewportUISettings {
   gridVisible: boolean;
   snapToGrid: boolean;
   projection: string;
-  cameraZoom?: number;
   cameraYawRad?: number;
   cameraPitchRad?: number;
 }
