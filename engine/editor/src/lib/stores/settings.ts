@@ -8,6 +8,7 @@ export interface EditorSettings {
   bottomPanelHeight: number;
   fontSize: number;
   autoSave: 'off' | 'on_focus_change' | 'after_delay';
+  compactMenu: boolean;
 }
 
 const STORAGE_KEY = 'silmaril-editor-settings';
@@ -20,6 +21,7 @@ const defaults: EditorSettings = {
   bottomPanelHeight: 200,
   fontSize: 13,
   autoSave: 'off',
+  compactMenu: false,
 };
 
 export function loadSettings(): EditorSettings {
