@@ -1,8 +1,9 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::viewport::native_viewport::{NativeViewport, ViewportBounds};
+use crate::viewport::native_viewport::{NativeViewport, ViewportBounds, CameraState};
 
 #[derive(Serialize)]
 pub struct EditorStateResponse {
@@ -229,107 +230,146 @@ pub fn scene_command(command: String, args: String) -> Result<serde_json::Value,
 }
 
 // ---------------------------------------------------------------------------
-// Native viewport (child window for Vulkan rendering)
+// Native viewport (Vulkan rendering — parent-HWND surface approach)
 // ---------------------------------------------------------------------------
 
-/// Managed state holding the optional native viewport.
-pub struct NativeViewportState(pub Mutex<Option<NativeViewport>>);
+/// Registry of NativeViewport objects, one per OS window (HWND).
+/// Tracks which `viewport_id` belongs to which HWND so commands can be
+/// routed to the right Vulkan context regardless of which window they came from.
+pub struct ViewportRegistry {
+    by_hwnd: HashMap<isize, NativeViewport>,
+    hwnd_by_id: HashMap<String, isize>,
+    /// Camera state saved when a viewport is hidden (tab switch / panel move /
+    /// pop-out).  Restored when the same ID is mounted in any window — even a
+    /// different HWND — so the camera survives across pop-out and dock-back.
+    saved_cameras: HashMap<String, CameraState>,
+}
 
-/// Create a native child window for the Vulkan viewport.
+impl ViewportRegistry {
+    pub fn new() -> Self {
+        Self { by_hwnd: HashMap::new(), hwnd_by_id: HashMap::new(), saved_cameras: HashMap::new() }
+    }
+
+    fn get_for_id(&self, id: &str) -> Option<&NativeViewport> {
+        let hwnd = self.hwnd_by_id.get(id)?;
+        self.by_hwnd.get(hwnd)
+    }
+}
+
+pub struct NativeViewportState(pub Mutex<ViewportRegistry>);
+
+impl NativeViewportState {
+    pub fn new() -> Self {
+        Self(Mutex::new(ViewportRegistry::new()))
+    }
+}
+
+/// Upsert a viewport instance for the calling window.
 ///
-/// The child window is parented to the Tauri main window.  Svelte passes in
-/// the desired bounds (in physical/device pixels).  Once created, a render
-/// thread starts drawing into the child window.
+/// If no `NativeViewport` exists for the caller's HWND yet, one is created and
+/// its render thread is started.  Then the named instance is added (or its
+/// bounds updated).  This is the only entry-point needed for both initial
+/// creation and panel-drag repositioning.
 #[tauri::command]
 pub fn create_native_viewport(
-    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
     x: i32,
     y: i32,
     width: u32,
     height: u32,
 ) -> Result<(), String> {
-    // Don't create a second viewport if one already exists.
-    {
-        let guard = viewport_state.0.lock().unwrap();
-        if guard.is_some() {
-            tracing::warn!("Native viewport already exists; ignoring create_native_viewport");
-            return Ok(());
-        }
-    }
-
-    let bounds = ViewportBounds {
-        x,
-        y,
-        width,
-        height,
-    };
+    let bounds = ViewportBounds { x, y, width, height };
 
     #[cfg(windows)]
     {
-        use tauri::Manager;
-
-        let window = app
-            .get_webview_window("main")
-            .ok_or("main window not found")?;
         let parent_hwnd = window.hwnd().map_err(|e| format!("Failed to get HWND: {e}"))?;
+        let hwnd_isize = parent_hwnd.0 as isize;
 
-        tracing::info!(hwnd = ?parent_hwnd, x, y, width, height, "Creating native viewport");
+        let mut registry = viewport_state.0.lock().unwrap();
 
-        let mut vp = NativeViewport::new(parent_hwnd, bounds).map_err(|e| {
-            tracing::error!(error = %e, "NativeViewport::new failed");
-            e
-        })?;
-        vp.start_rendering().map_err(|e| {
-            tracing::error!(error = %e, "start_rendering failed");
-            e
-        })?;
+        // Create a NativeViewport for this HWND if one doesn't exist yet.
+        if !registry.by_hwnd.contains_key(&hwnd_isize) {
+            tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
+            let mut vp = NativeViewport::new(parent_hwnd)
+                .map_err(|e| { tracing::error!(error = %e, "NativeViewport::new failed"); e })?;
+            vp.start_rendering()
+                .map_err(|e| { tracing::error!(error = %e, "start_rendering failed"); e })?;
+            registry.by_hwnd.insert(hwnd_isize, vp);
+        }
 
-        tracing::info!("Native viewport created and rendering started");
-        *viewport_state.0.lock().unwrap() = Some(vp);
+        // Map viewport_id → hwnd for future lookups.
+        registry.hwnd_by_id.insert(viewport_id.clone(), hwnd_isize);
+
+        // Pull saved camera before borrowing vp (avoids simultaneous mutable + immutable borrow).
+        let saved_cam = registry.saved_cameras.remove(&viewport_id);
+
+        // Upsert the instance (create or update bounds).
+        if let Some(vp) = registry.by_hwnd.get(&hwnd_isize) {
+            vp.upsert_instance(viewport_id.clone(), bounds);
+            if let Some(cam) = saved_cam {
+                vp.set_instance_camera(&viewport_id, cam);
+                tracing::info!(id = %viewport_id, "Camera state restored for viewport instance");
+            }
+            tracing::info!(id = %viewport_id, x, y, width, height, "Viewport instance upserted");
+        }
     }
 
     #[cfg(not(windows))]
     {
-        let _ = (app, bounds);
+        let _ = (window, bounds, viewport_id);
         return Err("Native viewport not yet implemented for this platform".into());
     }
 
     Ok(())
 }
 
-/// Reposition/resize the native viewport child window.
-///
-/// Called by Svelte whenever the viewport container's bounds change (e.g.
-/// panel resize, window resize).
+/// Update the scissor bounds for an existing viewport instance.
 #[tauri::command]
 pub fn resize_native_viewport(
     viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
     x: i32,
     y: i32,
     width: u32,
     height: u32,
 ) -> Result<(), String> {
-    let guard = viewport_state.0.lock().unwrap();
-    if let Some(ref vp) = *guard {
-        vp.set_bounds(ViewportBounds {
-            x,
-            y,
-            width,
-            height,
-        });
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.set_instance_bounds(&viewport_id, ViewportBounds { x, y, width, height });
     }
     Ok(())
 }
 
-/// Stop the render thread and destroy the native viewport child window.
+/// Hide a viewport instance (panel unmounted — tab switch or panel drag).
+///
+/// Marks the instance invisible so Vulkan stops rendering it, but keeps the
+/// instance alive in the registry to preserve camera state.  The HWND mapping
+/// is removed so `create_native_viewport` can re-register the same ID later.
+///
+/// The `NativeViewport` (Vulkan context) for the window is never torn down
+/// here — only when the OS window itself is closed.
 #[tauri::command]
 pub fn destroy_native_viewport(
     viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
 ) -> Result<(), String> {
-    let mut guard = viewport_state.0.lock().unwrap();
-    if let Some(mut vp) = guard.take() {
-        vp.destroy();
+    let mut registry = viewport_state.0.lock().unwrap();
+    // .copied() gives an owned isize — releases the borrow on hwnd_by_id before the block.
+    if let Some(hwnd) = registry.hwnd_by_id.get(&viewport_id).copied() {
+        // Save camera (owned return value, borrow of by_hwnd ends after .and_then).
+        let saved_cam = registry.by_hwnd.get(&hwnd)
+            .and_then(|vp| vp.get_instance_camera(&viewport_id));
+        if let Some(cam) = saved_cam {
+            registry.saved_cameras.insert(viewport_id.clone(), cam);
+        }
+        // Mark invisible — keeps the Vulkan instance alive in the registry.
+        if let Some(vp) = registry.by_hwnd.get(&hwnd) {
+            vp.set_instance_visible(&viewport_id, false);
+        }
+        // Remove HWND mapping so create_native_viewport can re-register cleanly.
+        registry.hwnd_by_id.remove(&viewport_id);
     }
     Ok(())
 }
@@ -361,13 +401,33 @@ pub async fn create_popout_window(
 
     tracing::info!(label = %label, panel = %panel_id, url = %url, "Creating pop-out window");
 
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+    let popout = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
         .title(&title)
         .decorations(false)
+        .transparent(true)
+        .shadow(true)
         .inner_size(width as f64, height as f64)
         .position(x as f64, y as f64)
         .build()
         .map_err(|e| format!("Failed to create pop-out window: {e}"))?;
+
+    // Remove WS_CLIPCHILDREN so the Vulkan parent-HWND surface shows through
+    // transparent WebView2 regions — same setup as the main window.
+    // Also apply DWM rounded corners + no border to match the main window.
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        let hwnd = popout.hwnd().map_err(|e| format!("Failed to get pop-out HWND: {e}"))?;
+        unsafe {
+            let style = GetWindowLongW(hwnd, GWL_STYLE);
+            SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_CLIPCHILDREN.0 as i32));
+        }
+        tracing::info!(panel = %panel_id, "Removed WS_CLIPCHILDREN from pop-out window");
+        crate::apply_dwm_window_style(hwnd);
+    }
+
+    #[cfg(not(windows))]
+    let _ = popout;
 
     Ok(())
 }
@@ -378,6 +438,7 @@ pub async fn create_popout_window(
 pub async fn dock_panel_back(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
+    viewport_state: tauri::State<'_, NativeViewportState>,
     panel_id: String,
     zone: Option<String>,
 ) -> Result<(), String> {
@@ -385,6 +446,25 @@ pub async fn dock_panel_back(
 
     let dock_zone = zone.unwrap_or_else(|| "center".to_string());
     tracing::info!(panel = %panel_id, zone = %dock_zone, window = %window.label(), "Docking panel back");
+
+    // Save viewport camera and deregister the ID BEFORE emitting the event.
+    // This prevents a race where the main window's createNativeViewport runs
+    // before the pop-out's destroyNativeViewport cleanup, missing the camera.
+    // Deregistering also makes the subsequent destroyNativeViewport a no-op so
+    // it can't accidentally hide the instance in the main window.
+    #[cfg(windows)]
+    if let Ok(hwnd) = window.hwnd() {
+        let hwnd_isize = hwnd.0 as isize;
+        let mut registry = viewport_state.0.lock().unwrap();
+        let saved_cam = registry.by_hwnd.get(&hwnd_isize)
+            .and_then(|vp: &NativeViewport| vp.get_instance_camera(&panel_id));
+        if let Some(cam) = saved_cam {
+            registry.saved_cameras.insert(panel_id.clone(), cam);
+            tracing::info!(panel = %panel_id, "Camera saved for dock-back");
+        }
+        // Deregister — pop-out cleanup's destroyNativeViewport becomes no-op.
+        registry.hwnd_by_id.remove(&panel_id);
+    }
 
     // Emit event to the main window with zone info
     if let Some(main_window) = app.get_webview_window("main") {
@@ -401,6 +481,75 @@ pub async fn dock_panel_back(
         .map_err(|e| format!("Failed to close pop-out window: {e}"))?;
 
     Ok(())
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Pop-out window controls — called via invoke() from the pop-out webview.
+//
+// These exist because the JS WebviewWindow API (plugin:window|*) can fail to
+// route correctly from dynamically-created webviews in Tauri 2.  Custom
+// commands registered in invoke_handler receive the calling WebviewWindow
+// directly from Tauri, which is always reliable.
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Minimize the window that invokes this command.
+#[tauri::command]
+pub fn window_minimize(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+/// Toggle maximize/restore the window that invokes this command.
+#[tauri::command]
+pub fn window_toggle_maximize(window: tauri::WebviewWindow) -> Result<(), String> {
+    // Tauri 2 has no toggle_maximize(); check state and call the right method.
+    if window.is_maximized().map_err(|e| e.to_string())? {
+        window.unmaximize().map_err(|e| e.to_string())
+    } else {
+        window.maximize().map_err(|e| e.to_string())
+    }
+}
+
+/// Destroy (close) the window that invokes this command.
+/// Uses destroy() to avoid a Tauri/Windows bug where close() silently fails
+/// after a minimize/maximize cycle (tauri-apps/tauri#9504).
+#[tauri::command]
+pub fn window_close(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.destroy().map_err(|e| e.to_string())
+}
+
+/// Start a window drag from the calling window.
+///
+/// On Windows this uses the standard Win32 custom-titlebar technique:
+///   ReleaseCapture() frees mouse capture from WebView2, then
+///   PostMessageW(WM_NCLBUTTONDOWN, HTCAPTION) tells the OS to begin a
+///   window-move operation.  PostMessage returns immediately; the OS move
+///   loop runs in the message pump while the user holds the button down.
+///
+/// On other platforms falls back to Tauri's start_dragging().
+#[tauri::command]
+pub fn window_start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+        use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            PostMessageW, HTCAPTION, WM_NCLBUTTONDOWN,
+        };
+        let raw = window.hwnd().map_err(|e| format!("get HWND: {e}"))?;
+        // Reconstruct HWND from the raw pointer to match our local windows crate type.
+        let hwnd = HWND(raw.0);
+        unsafe {
+            // Release WebView2's mouse capture so the OS can take over drag tracking.
+            let _ = ReleaseCapture();
+            // PostMessage (async) queues WM_NCLBUTTONDOWN/HTCAPTION; returns
+            // immediately while the OS handles the move loop.
+            let _ = PostMessageW(Some(hwnd), WM_NCLBUTTONDOWN, WPARAM(HTCAPTION as usize), LPARAM(0));
+        }
+        return Ok(());
+    }
+
+    #[cfg(not(windows))]
+    window.start_dragging().map_err(|e| e.to_string())
 }
 
 /// Check if a pop-out window cursor is over the main editor window.
@@ -471,17 +620,265 @@ pub async fn check_dock_proximity(
     )
 }
 
-/// Show or hide the native viewport child window.
-/// Used to temporarily hide during panel drag operations so the
-/// webview drop zone overlay is visible.
+/// Show or hide a viewport instance.
 #[tauri::command]
 pub fn set_viewport_visible(
     viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
     visible: bool,
 ) -> Result<(), String> {
-    let guard = viewport_state.0.lock().unwrap();
-    if let Some(ref vp) = *guard {
-        vp.set_visible(visible);
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.set_instance_visible(&viewport_id, visible);
     }
     Ok(())
+}
+
+/// Orbit the camera for a specific viewport instance.
+#[tauri::command]
+pub fn viewport_camera_orbit(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+    dx: f32,
+    dy: f32,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.camera_orbit(&viewport_id, dx, dy);
+    }
+    Ok(())
+}
+
+/// Pan the camera for a specific viewport instance.
+#[tauri::command]
+pub fn viewport_camera_pan(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+    dx: f32,
+    dy: f32,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.camera_pan(&viewport_id, dx, dy);
+    }
+    Ok(())
+}
+
+/// Zoom the camera for a specific viewport instance.
+#[tauri::command]
+pub fn viewport_camera_zoom(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+    delta: f32,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.camera_zoom(&viewport_id, delta);
+    }
+    Ok(())
+}
+
+/// Reset the camera for a specific viewport instance to its default state.
+#[tauri::command]
+pub fn viewport_camera_reset(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.camera_reset(&viewport_id);
+    }
+    Ok(())
+}
+
+/// Show or hide the grid for a specific viewport instance.
+#[tauri::command]
+pub fn viewport_set_grid_visible(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+    visible: bool,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.set_grid_visible(&viewport_id, visible);
+    }
+    Ok(())
+}
+
+/// Set absolute camera yaw and pitch for a specific viewport instance.
+/// Used for snap-to-axis from the gizmo — bypasses the pixel-delta scaling
+/// of `viewport_camera_orbit`.
+#[tauri::command]
+pub fn viewport_camera_set_orientation(
+    viewport_state: tauri::State<NativeViewportState>,
+    viewport_id: String,
+    yaw: f32,
+    pitch: f32,
+) -> Result<(), String> {
+    let registry = viewport_state.0.lock().unwrap();
+    if let Some(vp) = registry.get_for_id(&viewport_id) {
+        vp.camera_set_orientation(&viewport_id, yaw, pitch);
+    }
+    Ok(())
+}
+
+/// Begin monitoring a pop-out window drag for dock-back gesture.
+///
+/// Spawns a background thread that polls `GetAsyncKeyState(VK_LBUTTON)` to
+/// detect button release — JS `mouseup` does not fire during the OS window-move
+/// loop started by `PostMessage(WM_NCLBUTTONDOWN, HTCAPTION)`.
+///
+/// While the button is held the thread emits `popout-near` events to the main
+/// window so it can show the dock-zone overlay.  On release:
+///   • cursor over main editor → save camera, emit `dock-panel-back`, destroy pop-out
+///   • cursor elsewhere        → clear the overlay
+#[tauri::command]
+pub fn start_dock_drag(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    panel_id: String,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use tauri::Manager;
+        let popout_hwnd_raw = window.hwnd().map_err(|e| format!("get pop-out HWND: {e}"))?.0 as isize;
+        let window_label = window.label().to_string();
+
+        // Obtain the main HWND here on the command thread (Tauri runtime), not
+        // inside the background polling thread where hwnd() may be unsafe to call.
+        let main_hwnd_raw = app
+            .get_webview_window("main")
+            .ok_or("main window not found")?
+            .hwnd()
+            .map_err(|e| format!("get main HWND: {e}"))?.0 as isize;
+
+        std::thread::spawn(move || {
+            dock_drag_thread(app, window_label, panel_id, popout_hwnd_raw, main_hwnd_raw);
+        });
+    }
+    #[cfg(not(windows))]
+    let _ = (app, window, panel_id);
+    Ok(())
+}
+
+/// Broadcast a settings change to every open window.
+///
+/// JS `emit()` from `@tauri-apps/api/event` only delivers events to the current
+/// window's own IPC channel.  `AppHandle::emit()` here broadcasts to the Rust
+/// event bus which re-delivers to ALL registered frontend listeners, including
+/// pop-out windows.
+#[tauri::command]
+pub fn broadcast_settings(
+    app: tauri::AppHandle,
+    theme: String,
+    font_size: f64,
+    language: String,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    app.emit(
+        "settings-changed",
+        serde_json::json!({ "theme": theme, "fontSize": font_size, "language": language }),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn dock_drag_thread(
+    app: tauri::AppHandle,
+    window_label: String,
+    panel_id: String,
+    popout_hwnd_raw: isize,
+    main_hwnd_raw: isize,
+) {
+    use tauri::{Emitter, Manager};
+    use windows::Win32::Foundation::{HWND, POINT, RECT};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+    use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowRect};
+
+    // Brief delay so the OS drag loop is running before we start polling.
+    std::thread::sleep(std::time::Duration::from_millis(60));
+
+    let main_win = match app.get_webview_window("main") {
+        Some(w) => w,
+        None => return,
+    };
+
+    // HWND was obtained on the command thread and passed in — safe to use here.
+    let main_hwnd = HWND(main_hwnd_raw as *mut _);
+
+    tracing::debug!(panel = %panel_id, "dock_drag_thread: polling started");
+
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(33)); // ~30 fps polling
+
+        // Bit 15: key currently pressed (GetAsyncKeyState is thread-safe).
+        let button_down =
+            unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000 != 0 };
+
+        let mut cursor = POINT::default();
+        unsafe { let _ = GetCursorPos(&mut cursor); }
+        let cx = cursor.x;
+        let cy = cursor.y;
+
+        // GetWindowRect uses the same Win32 screen coordinate system as GetCursorPos,
+        // avoiding any Tauri PhysicalPosition / DPI conversion mismatch.
+        let mut main_rect = RECT::default();
+        unsafe { let _ = GetWindowRect(main_hwnd, &mut main_rect); }
+
+        let near = cx >= main_rect.left && cx <= main_rect.right
+                && cy >= main_rect.top  && cy <= main_rect.bottom;
+
+        let zone = if near {
+            let mw = (main_rect.right - main_rect.left) as f64;
+            let mh = (main_rect.bottom - main_rect.top) as f64;
+            let rel_x = (cx - main_rect.left) as f64 / mw;
+            let rel_y = (cy - main_rect.top)  as f64 / mh;
+            if rel_x < 0.2 { "left" }
+            else if rel_x > 0.8 { "right" }
+            else if rel_y < 0.15 { "top" }
+            else if rel_y > 0.85 { "bottom" }
+            else { "center" }
+        } else {
+            "none"
+        };
+
+        let _ = main_win.emit("popout-near", serde_json::json!({ "near": near, "zone": zone }));
+
+        if !button_down {
+            tracing::debug!(panel = %panel_id, near, zone, "dock_drag_thread: button released");
+            if near {
+                // Save viewport camera before notifying main so it's available when
+                // createNativeViewport is called after the dock-panel-back event.
+                let vp_state = app.state::<NativeViewportState>();
+                {
+                    let mut registry = vp_state.0.lock().unwrap();
+                    let saved_cam = registry
+                        .by_hwnd
+                        .get(&popout_hwnd_raw)
+                        .and_then(|vp| vp.get_instance_camera(&panel_id));
+                    if let Some(cam) = saved_cam {
+                        registry.saved_cameras.insert(panel_id.clone(), cam);
+                        tracing::info!(panel = %panel_id, "Camera saved via drag-dock");
+                    }
+                    // Deregister so the pop-out's destroyNativeViewport cleanup is a no-op.
+                    registry.hwnd_by_id.remove(&panel_id);
+                }
+
+                let _ = main_win.emit(
+                    "dock-panel-back",
+                    serde_json::json!({ "panelId": panel_id, "zone": zone }),
+                );
+                if let Some(popout_win) = app.get_webview_window(&window_label) {
+                    let _ = popout_win.destroy();
+                }
+            } else {
+                // Drag ended away from main window — clear the overlay.
+                let _ = main_win.emit(
+                    "popout-near",
+                    serde_json::json!({ "near": false, "zone": "none" }),
+                );
+            }
+            break;
+        }
+    }
 }
