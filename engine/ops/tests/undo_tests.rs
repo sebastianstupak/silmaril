@@ -167,3 +167,119 @@ fn empty_undo_redo_returns_error() {
     assert!(stack.undo().is_err());
     assert!(stack.redo().is_err());
 }
+
+#[test]
+fn add_component_undo_removes_then_redo_restores() {
+    let mut stack = UndoStack::new(100);
+    let data = json!({"current": 100});
+    stack.push(EditorAction::AddComponent {
+        entity: 1,
+        type_name: "Health".into(),
+        data: data.clone(),
+    });
+
+    let undone = stack.undo().unwrap();
+    match undone {
+        EditorAction::AddComponent {
+            entity,
+            type_name,
+            data: undone_data,
+        } => {
+            assert_eq!(entity, 1);
+            assert_eq!(type_name, "Health");
+            assert_eq!(undone_data, data);
+        }
+        _ => panic!("Expected AddComponent"),
+    }
+    assert!(!stack.can_undo());
+    assert!(stack.can_redo());
+
+    let redone = stack.redo().unwrap();
+    match redone {
+        EditorAction::AddComponent {
+            entity,
+            type_name,
+            data: redone_data,
+        } => {
+            assert_eq!(entity, 1);
+            assert_eq!(type_name, "Health");
+            assert_eq!(redone_data, data);
+        }
+        _ => panic!("Expected AddComponent on redo"),
+    }
+    assert!(stack.can_undo());
+    assert!(!stack.can_redo());
+}
+
+#[test]
+fn remove_component_undo_restores_snapshot() {
+    let mut stack = UndoStack::new(100);
+    let snapshot = json!({"x": 0, "y": 1});
+    stack.push(EditorAction::RemoveComponent {
+        entity: 1,
+        type_name: "Transform".into(),
+        snapshot: snapshot.clone(),
+    });
+
+    let undone = stack.undo().unwrap();
+    match undone {
+        EditorAction::RemoveComponent {
+            entity,
+            type_name,
+            snapshot: undone_snapshot,
+        } => {
+            assert_eq!(entity, 1);
+            assert_eq!(type_name, "Transform");
+            assert_eq!(undone_snapshot, snapshot);
+        }
+        _ => panic!("Expected RemoveComponent"),
+    }
+}
+
+#[test]
+fn rename_entity_option_string_round_trips() {
+    let mut stack = UndoStack::new(100);
+    stack.push(EditorAction::RenameEntity {
+        id: 5,
+        old_name: None,
+        new_name: Some("Player".into()),
+    });
+
+    let undone = stack.undo().unwrap();
+    match undone {
+        EditorAction::RenameEntity {
+            id,
+            old_name,
+            new_name,
+        } => {
+            assert_eq!(id, 5);
+            assert_eq!(old_name, None);
+            assert_eq!(new_name, Some("Player".into()));
+        }
+        _ => panic!("Expected RenameEntity"),
+    }
+}
+
+#[test]
+fn rename_entity_both_some_round_trips() {
+    let mut stack = UndoStack::new(100);
+    stack.push(EditorAction::RenameEntity {
+        id: 5,
+        old_name: Some("Hero".into()),
+        new_name: Some("Legend".into()),
+    });
+
+    let undone = stack.undo().unwrap();
+    match undone {
+        EditorAction::RenameEntity {
+            id,
+            old_name,
+            new_name,
+        } => {
+            assert_eq!(id, 5);
+            assert_eq!(old_name, Some("Hero".into()));
+            assert_eq!(new_name, Some("Legend".into()));
+        }
+        _ => panic!("Expected RenameEntity"),
+    }
+}
