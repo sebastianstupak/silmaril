@@ -3,20 +3,19 @@
   import { getEditorState, openProjectDialog, openProject, scanProjectEntities, type EditorState } from './lib/api';
   import { t } from './lib/i18n';
   import { setLocale } from './lib/i18n';
-  import MenuBar from './lib/components/MenuBar.svelte';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import PopoutView from './lib/components/PopoutView.svelte';
   import ViewportOverlay from './lib/components/ViewportOverlay.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
-  import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
+  import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
   import { logInfo, logWarn } from './lib/stores/console';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
   import DragOverlay from './lib/docking/DragOverlay.svelte';
   import TitleBar from './lib/components/TitleBar.svelte';
-  import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit, cycleActiveTab } from './lib/docking/store';
-  import type { EditorLayout } from './lib/docking/types';
+  import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
+  import type { EditorLayout, LayoutNode } from './lib/docking/types';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -42,9 +41,28 @@
 
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
-  let popoutNearby = $state(false);
-  let popoutDockZone = $state('none');
   let bottomHeight = $state(loadSettings().bottomPanelHeight);
+
+  function _collectPanels(node: LayoutNode, out: Set<string>) {
+    if (node.type === 'tabs') { for (const p of node.panels) out.add(p); }
+    else { for (const c of node.children) _collectPanels(c, out); }
+  }
+  let activePanels = $derived.by(() => {
+    const s = new Set<string>();
+    _collectPanels(layout.root, s);
+    _collectPanels(layout.bottomPanel, s);
+    return s;
+  });
+
+  // ── Saved layouts ──────────────────────────────────────────────────────────
+  let savedLayouts: SavedLayout[] = $state(loadSavedLayouts());
+  let activeLayoutId: string | null = $state(savedLayouts[0]?.id ?? null);
+  let isDirty = $derived.by(() => {
+    if (!activeLayoutId) return false;
+    const slot = savedLayouts.find(s => s.id === activeLayoutId);
+    if (!slot) return false;
+    return JSON.stringify(layout) !== JSON.stringify(slot.layout);
+  });
   const MIN_BOTTOM = 150;
   const MAX_BOTTOM_RATIO = 0.6;
 
@@ -84,11 +102,75 @@
   }
 
   function handleLayoutSelect(template: string) {
+    // Map legacy template names to saved layout builtin IDs
+    const builtinMap: Record<string, string> = {
+      default: 'builtin-edit',
+      tall:    'builtin-assets',
+      wide:    'builtin-review',
+    };
+    const id = builtinMap[template];
+    if (id) { applyLayout(id); return; }
+    // Fallback: apply from layoutTemplates without slot tracking
     const tmpl = layoutTemplates[template];
-    if (tmpl) {
-      layout = JSON.parse(JSON.stringify(tmpl));
-      saveLayout(layout);
-    }
+    if (tmpl) { layout = JSON.parse(JSON.stringify(tmpl)); saveLayout(layout); }
+  }
+
+  // ── Saved layout handlers ──────────────────────────────────────────────────
+  function applyLayout(id: string) {
+    const slot = savedLayouts.find(s => s.id === id);
+    if (!slot) return;
+    layout = JSON.parse(JSON.stringify(slot.layout));
+    activeLayoutId = id;
+    saveLayout(layout);
+  }
+
+  function saveToSlot(id: string) {
+    savedLayouts = savedLayouts.map(s =>
+      s.id === id ? { ...s, layout: JSON.parse(JSON.stringify(layout)) } : s
+    );
+    saveSavedLayouts(savedLayouts);
+  }
+
+  function resetSlot(id: string) {
+    const slot = savedLayouts.find(s => s.id === id);
+    if (!slot) return;
+    layout = JSON.parse(JSON.stringify(slot.layout));
+    saveLayout(layout);
+  }
+
+  function renameSlot(id: string, name: string) {
+    savedLayouts = savedLayouts.map(s => s.id === id ? { ...s, name } : s);
+    saveSavedLayouts(savedLayouts);
+  }
+
+  function duplicateSlot(id: string) {
+    const slot = savedLayouts.find(s => s.id === id);
+    if (!slot) return;
+    const newSlot: SavedLayout = {
+      id: `layout-${Date.now()}`,
+      name: `${slot.name} Copy`,
+      layout: JSON.parse(JSON.stringify(slot.layout)),
+    };
+    savedLayouts = [...savedLayouts, newSlot];
+    saveSavedLayouts(savedLayouts);
+  }
+
+  function deleteSlot(id: string) {
+    if (savedLayouts.length <= 1) return;
+    savedLayouts = savedLayouts.filter(s => s.id !== id);
+    if (activeLayoutId === id) activeLayoutId = savedLayouts[0]?.id ?? null;
+    saveSavedLayouts(savedLayouts);
+  }
+
+  function createLayout(name: string) {
+    const newSlot: SavedLayout = {
+      id: `layout-${Date.now()}`,
+      name,
+      layout: JSON.parse(JSON.stringify(layout)),
+    };
+    savedLayouts = [...savedLayouts, newSlot];
+    activeLayoutId = newSlot.id;
+    saveSavedLayouts(savedLayouts);
   }
 
   /** Add a panel back into the layout at the specified dock zone. */
@@ -192,12 +274,18 @@
     bottomHeight = clampBottom(bottomHeight - delta);
   }
 
-  // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused panel container.
+  // Keyboard shortcuts: Ctrl+Tab (tab cycle) + layout keybinds (per-slot).
   $effect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Tab' && e.ctrlKey) {
         e.preventDefault();
         cycleActiveTab(e.shiftKey ? -1 : 1);
+        return;
+      }
+      // Layout slot keybinds — format "ctrl+1", "ctrl+2", etc.
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        const slot = savedLayouts.find(s => s.keybind === `ctrl+${e.key}`);
+        if (slot) { e.preventDefault(); applyLayout(slot.id); }
       }
     }
     document.addEventListener('keydown', handleKeyDown);
@@ -214,25 +302,34 @@
   // Persist settings on change (debounced) and broadcast to pop-out windows.
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   $effect(() => {
-    const { theme, fontSize, language, autoSave } = settings;
+    // Access properties explicitly so the effect re-runs when any of these change.
+    settings.theme; settings.fontSize; settings.language; settings.autoSave; settings.compactMenu;
     bottomHeight;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveSettings({ ...settings, bottomPanelHeight: bottomHeight });
     }, 300);
-
-    // Use the Rust broadcast_settings command — AppHandle::emit() broadcasts to
-    // ALL open webviews (main + every pop-out). The JS emit() API only reaches
-    // the current window's IPC channel and does NOT cross Tauri window boundaries.
-    if (isTauri && !popoutPanel && !isViewportOverlay) {
-      import('@tauri-apps/api/core').then(({ invoke }) => {
-        invoke('broadcast_settings', { theme, fontSize, language }).catch(() => {});
-      });
-    }
   });
 
   function handleSettingsChange(updated: EditorSettings) {
     settings = updated;
+    // Broadcast directly here rather than inside $effect — the call is triggered
+    // synchronously from the settings dialog callback so the values are always fresh.
+    // AppHandle::emit() on the Rust side broadcasts to ALL open webviews.
+    if (isTauri && !popoutPanel && !isViewportOverlay) {
+      import('@tauri-apps/api/core').then(({ invoke }) => {
+        invoke('broadcast_settings', {
+          theme: updated.theme,
+          fontSize: updated.fontSize,
+          language: updated.language,
+        }).catch((e) => console.error('[silmaril] broadcast_settings error:', e));
+      });
+    }
+  }
+
+  function updateLayoutKeybind(id: string, keybind: string | undefined) {
+    savedLayouts = savedLayouts.map(s => s.id === id ? { ...s, keybind } : s);
+    saveSavedLayouts(savedLayouts);
   }
 
   onMount(async () => {
@@ -242,23 +339,47 @@
     logInfo('Silmaril Editor started');
     editorState = await getEditorState();
 
+    // Hydrate from tauri-plugin-store (durable, OS app-data directory).
+    // This runs after the initial render so the UI is not blocked.
+    if (isTauri) {
+      const [hydratedSettings, hydratedLayout, hydratedLayouts] = await Promise.all([
+        hydrateSettings(),
+        hydrateLayout(),
+        hydrateSavedLayouts(),
+      ]);
+      settings = hydratedSettings;
+      if (hydratedLayout) layout = hydratedLayout;
+      if (hydratedLayouts) savedLayouts = hydratedLayouts;
+    }
+
     // Listen for events from pop-out windows
     if (isTauri && !popoutPanel) {
       try {
         const { listen } = await import('@tauri-apps/api/event');
 
-        // Panel docked back
+        // Panel docked back — use the per-panel drop target tracked by DockDropZone,
+        // falling back to the whole-window zone from Rust if no panel was hovered.
         await listen<{ panelId: string; zone?: string }>('dock-panel-back', (event) => {
-          console.log('[silmaril] dock-panel-back received:', event.payload);
-          popoutNearby = false;
-          popoutDockZone = 'none';
-          addPanelToLayout(event.payload.panelId, event.payload.zone ?? 'center');
+          const { dropPath, dropZone, dropIsBottom } = getDragState();
+          endDrag();
+          if (dropPath !== null && dropZone !== null) {
+            const newLayout = dropPanel(layout, event.payload.panelId, dropPath, dropZone, dropIsBottom);
+            layout = newLayout;
+            saveLayout(layout);
+          } else {
+            addPanelToLayout(event.payload.panelId, event.payload.zone ?? 'center');
+          }
         });
 
-        // Pop-out window proximity detection — show visual indicator
-        await listen<{ near: boolean; zone: string }>('popout-near', (event) => {
-          popoutNearby = event.payload.near;
-          popoutDockZone = event.payload.zone ?? 'none';
+        // Pop-out proximity — drive the shared drag store so DockDropZone
+        // instances in each panel show their zones exactly like internal drag.
+        await listen<{ near: boolean; panelId: string; relX: number; relY: number }>('popout-near', (event) => {
+          const { near, panelId, relX, relY } = event.payload;
+          if (near) {
+            startDrag(panelId, relX * window.innerWidth, relY * window.innerHeight, true);
+          } else {
+            endDrag();
+          }
         });
       } catch (e) {
         console.error('[silmaril] Failed to listen for pop-out events:', e);
@@ -275,16 +396,26 @@
 <main class="editor-shell">
   <!-- Title Bar (custom, replaces native OS decorations) -->
   {#if isTauri}
-    <TitleBar onLayoutSelect={handleLayoutSelect} />
+    <TitleBar
+        {savedLayouts}
+        {activeLayoutId}
+        {isDirty}
+        {activePanels}
+        onApplyLayout={applyLayout}
+        onSaveToSlot={saveToSlot}
+        onResetSlot={resetSlot}
+        onRenameSlot={renameSlot}
+        onDuplicateSlot={duplicateSlot}
+        onDeleteSlot={deleteSlot}
+        onCreateLayout={createLayout}
+        onAddPanel={(id) => addPanelToLayout(id)}
+        onSettingsOpen={() => showSettings = true}
+        onOpenProject={handleOpenProject}
+        onLayoutReset={handleLayoutReset}
+        onLayoutSelect={handleLayoutSelect}
+        compactMenu={settings.compactMenu}
+      />
   {/if}
-
-  <!-- Menu Bar -->
-  <MenuBar
-    onSettingsOpen={() => showSettings = true}
-    onOpenProject={handleOpenProject}
-    onLayoutReset={handleLayoutReset}
-    onLayoutSelect={handleLayoutSelect}
-  />
 
   <!-- Toolbar -->
   <div class="toolbar">
@@ -339,7 +470,9 @@
   <SettingsDialog
     bind:open={showSettings}
     {settings}
+    {savedLayouts}
     onSettingsChange={handleSettingsChange}
+    onUpdateLayoutKeybind={updateLayoutKeybind}
   />
 
   <!-- Main content area: docked panels + bottom panel -->
@@ -371,27 +504,6 @@
   <!-- Drag overlay (ghost tab + backdrop during panel drag) -->
   <DragOverlay />
 
-  <!-- Pop-out window dock indicator -->
-  <!-- Pop-out dock zone overlay — shows where the panel will land -->
-  {#if popoutNearby}
-    <div class="dock-proximity-indicator">
-      <div class="dock-zone zone-left" class:active={popoutDockZone === 'left'}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M14 7l-5 5 5 5V7z"/></svg>
-      </div>
-      <div class="dock-zone zone-right" class:active={popoutDockZone === 'right'}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M10 17l5-5-5-5v10z"/></svg>
-      </div>
-      <div class="dock-zone zone-top" class:active={popoutDockZone === 'top'}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M7 14l5-5 5 5H7z"/></svg>
-      </div>
-      <div class="dock-zone zone-bottom" class:active={popoutDockZone === 'bottom'}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.8"><path d="M7 10l5 5 5-5H7z"/></svg>
-      </div>
-      <div class="dock-zone zone-center" class:active={popoutDockZone === 'center'}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" opacity="0.8"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-      </div>
-    </div>
-  {/if}
 
   <!-- Status bar -->
   <div class="status-bar">
@@ -547,37 +659,6 @@
     overflow: hidden;
   }
 
-  /* Pop-out drag-to-dock overlay */
-  .dock-proximity-indicator {
-    position: fixed;
-    inset: 0;
-    z-index: 99998;
-    pointer-events: none;
-    /* Dim the editor content so the zones stand out */
-    background: rgba(0, 0, 0, 0.35);
-  }
-  .dock-zone {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, var(--color-accent, #007acc) 18%, transparent);
-    border: 2px solid color-mix(in srgb, var(--color-accent, #007acc) 50%, transparent);
-    border-radius: 6px;
-    transition: background 0.12s, border-color 0.12s;
-  }
-  .dock-zone svg { opacity: 0.5; transition: opacity 0.12s; }
-  .dock-zone.active {
-    background: color-mix(in srgb, var(--color-accent, #007acc) 45%, transparent);
-    border-color: var(--color-accent, #007acc);
-    box-shadow: 0 0 0 1px var(--color-accent, #007acc) inset;
-  }
-  .dock-zone.active svg { opacity: 1; }
-  .zone-left   { left: 0;   top: 10%;  width: 20%;  height: 80%; }
-  .zone-right  { right: 0;  top: 10%;  width: 20%;  height: 80%; }
-  .zone-top    { top: 0;    left: 10%; width: 80%;  height: 15%; }
-  .zone-bottom { bottom: 0; left: 10%; width: 80%;  height: 15%; }
-  .zone-center { top: 25%;  left: 25%; width: 50%;  height: 50%; }
 
   .status-bar {
     height: 24px;
