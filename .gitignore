@@ -246,3 +246,4 @@ coverage/
 *.lcov
 tarpaulin-report.html
 editor_screenshot.png
+.worktrees/
