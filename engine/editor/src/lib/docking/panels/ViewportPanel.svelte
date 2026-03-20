@@ -526,7 +526,7 @@
                 aria-label={tool.label}
                 onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
               >
-                <tool.Icon width={14} height={14} />
+                <tool.Icon width={12} height={12} />
               </button>
             {/snippet}
           </Tooltip.Trigger>
@@ -555,7 +555,7 @@
                 viewportSetGridVisible(viewportId, gridVisible);
               }}
             >
-              <Grid2X2 width={14} height={14} />
+              <Grid2X2 width={12} height={12} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -572,7 +572,7 @@
               aria-label="Snap to grid"
               onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
             >
-              <Magnet width={14} height={14} />
+              <Magnet width={12} height={12} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -595,9 +595,9 @@
               onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
             >
               {#if projection === 'ortho'}
-                <ScanLine width={14} height={14} />
+                <ScanLine width={12} height={12} />
               {:else}
-                <Video width={14} height={14} />
+                <Video width={12} height={12} />
               {/if}
             </button>
           {/snippet}
@@ -621,7 +621,7 @@
               aria-label="Add entity"
               onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
             >
-              <CirclePlus width={14} height={14} />
+              <CirclePlus width={12} height={12} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -638,9 +638,9 @@
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="axis-gizmo" role="group" aria-label="Camera orientation gizmo">
   {#if true}
-    {@const S = 24}
-    {@const CX = 40}
-    {@const CY = 40}
+    {@const S = 18}
+    {@const CX = 30}
+    {@const CY = 30}
     {@const cy_rot = Math.cos(-cameraYawRad)}
     {@const sy_rot = Math.sin(-cameraYawRad)}
     {@const cp_rot = Math.cos(-cameraPitchRad)}
@@ -678,7 +678,7 @@
       const ly = pts.reduce((s,p) => s + p.y, 0) / pts.length;
       return { ...f, centerZ, points, lx, ly };
     }).sort((a,b) => a.centerZ - b.centerZ)}
-    <svg width="80" height="80" viewBox="0 0 80 80">
+    <svg width="60" height="60" viewBox="0 0 60 60">
       {#each sortedFaces as face}
         {@const opacity = face.centerZ > 0 ? 1.0 : 0.25}
         {@const snapYaw = face.snapYaw}
@@ -689,9 +689,8 @@
           fill={face.color}
           fill-opacity={opacity * 0.85}
           stroke={face.color}
-          stroke-width="0.8"
+          stroke-width="0.6"
           stroke-opacity={opacity}
-          style="cursor: pointer;"
           onclick={(e: MouseEvent) => {
             e.stopPropagation();
             cameraYawRad = snapYaw;
@@ -705,7 +704,7 @@
           text-anchor="middle"
           fill="white"
           fill-opacity={opacity}
-          font-size="10"
+          font-size="8"
           font-family="sans-serif"
           font-weight="600"
           style="pointer-events: none; user-select: none;"
@@ -778,15 +777,8 @@
     outline-offset: -1px;
   }
 
-  /* Gizmo and HUD icon SVGs must not be stretched by the global rule below.
-     The global rule was originally for a full-viewport SVG (removed); keep it
-     scoped away from overlay elements. */
-  .axis-gizmo :global(svg) {
-    display: block;
-    width: auto;
-    height: auto;
-  }
-
+  /* HUD and toolbar SVG icons must not be stretched (no global svg rule active,
+     but kept explicit to guard against future reintroduction). */
   .viewport-hud :global(svg) {
     display: block;
     width: auto;
@@ -830,21 +822,21 @@
 
   .toolbar-separator {
     width: 1px;
-    height: 18px;
-    background: #444;
-    margin: 0 4px;
+    height: 14px;
+    background: #333;
+    margin: 0 3px;
   }
 
   .tool-btn {
     background: none;
     border: 1px solid transparent;
-    border-radius: 4px;
-    color: #777;
+    border-radius: 3px;
+    color: #666;
     padding: 0;
     cursor: pointer;
     line-height: 1;
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -887,11 +879,30 @@
     top: 8px;
     right: 8px;
     pointer-events: auto;
-    opacity: 0.85;
+    opacity: 0.8;
+    transition: opacity 0.15s ease;
   }
 
   .axis-gizmo:hover {
     opacity: 1;
+  }
+
+  /* Drop-shadow on the SVG itself for depth */
+  .axis-gizmo :global(svg) {
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+    display: block;
+    width: auto;
+    height: auto;
+  }
+
+  /* Per-face hover: brighten the hovered face */
+  .axis-gizmo :global(polygon) {
+    transition: filter 0.1s ease;
+    cursor: pointer;
+  }
+
+  .axis-gizmo :global(polygon:hover) {
+    filter: brightness(1.6) saturate(1.2);
   }
 
   /* HUD */
