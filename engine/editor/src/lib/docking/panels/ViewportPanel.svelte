@@ -28,6 +28,13 @@
     focusEntity,
   } from '$lib/scene/commands';
   import { saveViewportSettings, loadViewportSettings } from '$lib/viewport-settings';
+  import type { Component } from 'svelte';
+  import {
+    MousePointer2, Move, RotateCw, Maximize2,
+    Grid2X2, Magnet, Video, ScanLine,
+    CirclePlus,
+  } from '@lucide/svelte';
+  import { Tooltip } from 'bits-ui';
 
   const TOOL_KEYS: Record<string, SceneTool> = {
     q: 'select',
@@ -479,11 +486,11 @@
   }
 
   /** Tool button data. */
-  const tools: { key: SceneTool; label: string; shortcut: string }[] = [
-    { key: 'select', label: 'tool.select', shortcut: 'Q' },
-    { key: 'move',   label: 'tool.move',   shortcut: 'W' },
-    { key: 'rotate', label: 'tool.rotate', shortcut: 'E' },
-    { key: 'scale',  label: 'tool.scale',  shortcut: 'R' },
+  const tools: { key: SceneTool; label: string; shortcut: string; Icon: Component }[] = [
+    { key: 'select', label: 'Select',  shortcut: 'Q', Icon: MousePointer2 },
+    { key: 'move',   label: 'Move',    shortcut: 'W', Icon: Move },
+    { key: 'rotate', label: 'Rotate',  shortcut: 'E', Icon: RotateCw },
+    { key: 'scale',  label: 'Scale',   shortcut: 'R', Icon: Maximize2 },
   ];
 </script>
 
@@ -504,69 +511,120 @@
   onkeydown={handleKeyDown}
 >
   <!-- Toolbar -->
+  <Tooltip.Provider delayDuration={400} closeDelay={0}>
   <div class="viewport-toolbar">
+    <!-- Transform tools -->
     <div class="toolbar-group">
       {#each tools as tool}
-        <button
-          class="tool-btn"
-          class:active={activeTool === tool.key}
-          title={t(tool.label)}
-          onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
-        >
-          <span class="tool-icon">{tool.shortcut}</span>
-        </button>
+        <Tooltip.Root>
+          <Tooltip.Trigger>
+            {#snippet child({ props })}
+              <button
+                {...props}
+                class="tool-btn"
+                class:active={activeTool === tool.key}
+                onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
+              >
+                <tool.Icon width={14} height={14} />
+              </button>
+            {/snippet}
+          </Tooltip.Trigger>
+          <Tooltip.Content class="tooltip-content">
+            {tool.label} <span class="tooltip-shortcut">{tool.shortcut}</span>
+          </Tooltip.Content>
+        </Tooltip.Root>
       {/each}
     </div>
 
     <div class="toolbar-separator"></div>
 
+    <!-- Grid / Snap -->
     <div class="toolbar-group">
-      <button
-        class="tool-btn"
-        class:active={gridVisible}
-        title={t('viewport.grid')}
-        onclick={(e: MouseEvent) => {
-          e.stopPropagation();
-          gridVisible = !gridVisible;
-          viewportSetGridVisible(viewportId, gridVisible);
-        }}
-      >
-        <span class="tool-icon">#</span>
-      </button>
-      <button
-        class="tool-btn"
-        class:active={snapToGrid}
-        title={t('viewport.snap')}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
-      >
-        <span class="tool-icon">&#8982;</span>
-      </button>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <button
+              {...props}
+              class="tool-btn"
+              class:active={gridVisible}
+              onclick={(e: MouseEvent) => {
+                e.stopPropagation();
+                gridVisible = !gridVisible;
+                viewportSetGridVisible(viewportId, gridVisible);
+              }}
+            >
+              <Grid2X2 width={14} height={14} />
+            </button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content class="tooltip-content">Grid</Tooltip.Content>
+      </Tooltip.Root>
+
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <button
+              {...props}
+              class="tool-btn"
+              class:active={snapToGrid}
+              onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
+            >
+              <Magnet width={14} height={14} />
+            </button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content class="tooltip-content">Snap to Grid</Tooltip.Content>
+      </Tooltip.Root>
     </div>
 
     <div class="toolbar-separator"></div>
 
+    <!-- Projection toggle -->
     <div class="toolbar-group">
-      <button
-        class="tool-btn"
-        title={projection === 'ortho' ? 'Switch to Perspective' : 'Switch to Orthographic'}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
-      >
-        <span class="tool-icon">{projection === 'ortho' ? '\u229E' : '\u25CE'}</span>
-      </button>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <button
+              {...props}
+              class="tool-btn"
+              class:active={projection === 'ortho'}
+              onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
+            >
+              {#if projection === 'ortho'}
+                <ScanLine width={14} height={14} />
+              {:else}
+                <Video width={14} height={14} />
+              {/if}
+            </button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content class="tooltip-content">
+          {projection === 'ortho' ? 'Orthographic' : 'Perspective'} <span class="tooltip-shortcut">P</span>
+        </Tooltip.Content>
+      </Tooltip.Root>
     </div>
 
     <div class="toolbar-separator"></div>
 
+    <!-- Add entity -->
     <div class="toolbar-group">
-      <button
-        class="tool-btn"
-        title={t('scene.create_entity')}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
-      >
-        <span class="tool-icon">+</span>
-      </button>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <button
+              {...props}
+              class="tool-btn"
+              onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
+            >
+              <CirclePlus width={14} height={14} />
+            </button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content class="tooltip-content">Add Entity</Tooltip.Content>
+      </Tooltip.Root>
     </div>
   </div>
+  </Tooltip.Provider>
 
   <!-- No fallback content. In Tauri, the Vulkan child window renders behind
        this transparent area. In browser mode, it's just empty/transparent. -->
@@ -751,31 +809,47 @@
   .tool-btn {
     background: none;
     border: 1px solid transparent;
-    border-radius: 3px;
-    color: #999;
-    font-size: 12px;
-    font-family: monospace;
-    padding: 2px 6px;
+    border-radius: 4px;
+    color: #777;
+    padding: 0;
     cursor: pointer;
-    line-height: 1.2;
-    min-width: 24px;
-    text-align: center;
+    line-height: 1;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
   }
 
   .tool-btn:hover {
-    color: #fff;
-    border-color: #555;
-    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .tool-btn.active {
     color: #61afef;
-    border-color: #61afef;
-    background: rgba(97, 175, 239, 0.1);
+    border-color: rgba(97, 175, 239, 0.4);
+    background: rgba(97, 175, 239, 0.12);
   }
 
-  .tool-icon {
-    display: inline-block;
+  :global(.tooltip-content) {
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #ccc;
+    font-size: 11px;
+    padding: 4px 8px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 100;
+  }
+
+  .tooltip-shortcut {
+    color: #555;
+    margin-left: 4px;
+    font-family: monospace;
   }
 
   /* Axis gizmo */
