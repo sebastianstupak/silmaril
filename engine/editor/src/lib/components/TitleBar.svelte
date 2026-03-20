@@ -180,6 +180,7 @@
   }
 
   function minimize() { invoke('window_minimize').catch(() => {}); }
+  function maximize() { invoke('window_toggle_maximize').catch(() => {}); }
   function close()    { invoke('window_close').catch(() => {}); }
 
   // buildMinimap and buildIcon are imported from ../docking/minimap
@@ -567,7 +568,7 @@
       <button class="wc-btn wc-minimize" onclick={minimize} title="Minimize" aria-label="Minimize">
         <svg width="10" height="1" viewBox="0 0 10 1" aria-hidden="true"><rect width="10" height="1" fill="currentColor"/></svg>
       </button>
-      <button class="wc-btn wc-maximize" onclick={onTitlebarDblclick} title="Maximize / Restore" aria-label="Maximize">
+      <button class="wc-btn wc-maximize" onclick={maximize} title="Maximize / Restore" aria-label="Maximize">
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
           <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/>
         </svg>

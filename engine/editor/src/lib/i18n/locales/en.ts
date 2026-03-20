@@ -91,6 +91,8 @@ const en = {
   'settings.auto_save.off': 'Off',
   'settings.auto_save.on_focus_change': 'On Focus Change',
   'settings.auto_save.after_delay': 'After Delay',
+  'settings.compact_menu': 'Compact menu',
+  'settings.compact_menu.description': 'Show icons only in the title bar menu',
 
   // Keybindings tab
   'keybindings.layout_slots': 'Layout Slots',

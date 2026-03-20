@@ -206,8 +206,8 @@
       <Tabs.Content value="editor" class="flex-1 pt-1 space-y-4">
         <div class="flex items-center justify-between gap-4">
           <div class="flex flex-col gap-0.5">
-            <Label>Compact menu</Label>
-            <p class="text-xs text-muted-foreground">Show icons only in the title bar menu</p>
+            <Label>{t('settings.compact_menu')}</Label>
+            <p class="text-xs text-muted-foreground">{t('settings.compact_menu.description')}</p>
           </div>
           <button
             role="switch"
