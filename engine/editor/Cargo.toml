@@ -18,8 +18,9 @@ path = "src-tauri/main.rs"
 [dependencies]
 engine-ops = { path = "../ops" }
 engine-core = { path = "../core" }
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
 anyhow = "1.0"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -28,6 +29,9 @@ gpu-allocator = { version = "0.28", features = ["vulkan"] }
 naga = { version = "24", features = ["glsl-in", "spv-out"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+notify = "6"
+trash = "5"
+ignore = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 engine-renderer = { path = "../renderer" }
@@ -36,7 +40,11 @@ windows = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_UI_Controls",
     "Win32_System_LibraryLoader",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Kernel",
 ] }
 ash = { workspace = true }
 
