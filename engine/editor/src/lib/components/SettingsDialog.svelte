@@ -212,6 +212,8 @@
           <button
             role="switch"
             aria-checked={settings.compactMenu}
+            title="Toggle compact menu"
+            aria-label="Toggle compact menu"
             class="w-9 h-5 rounded-full border border-[var(--color-border,#404040)] relative transition-colors
               {settings.compactMenu
                 ? 'bg-[var(--color-accent,#007acc)]'
@@ -219,7 +221,8 @@
             onclick={() => updateSetting('compactMenu', !settings.compactMenu)}
           >
             <span class="block w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform
-              {settings.compactMenu ? 'translate-x-4' : 'translate-x-0.5'}">
+              {settings.compactMenu ? 'translate-x-4' : 'translate-x-0.5'}"
+              aria-hidden="true">
             </span>
           </button>
         </div>
