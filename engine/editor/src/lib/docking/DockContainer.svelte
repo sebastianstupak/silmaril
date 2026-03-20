@@ -6,7 +6,7 @@
   import DockTabBar from './DockTabBar.svelte';
   import DockSplitter from './DockSplitter.svelte';
   import DockDropZone from './DockDropZone.svelte';
-  import { dropPanel, resizeSplit, setActiveTab, removePanelFromLayout, endDrag, getDragState, subscribeDrag } from './store';
+  import { dropPanel, resizeSplit, setActiveTab, removePanelFromLayout, endDrag, getDragState, subscribeDrag, registerTabCycle } from './store';
   import { popOutPanel, setViewportVisible } from '$lib/api';
   import type { EditorLayout } from './types';
   import { onMount } from 'svelte';
@@ -37,12 +37,6 @@
     let wasDragging = false;
     const unsub = subscribeDrag(() => {
       isDragging = getDragState().active;
-      // Hide native Vulkan viewport during drag so webview overlay is visible
-      if (isDragging && !wasDragging) {
-        setViewportVisible(false);
-      } else if (!isDragging && wasDragging) {
-        setViewportVisible(true);
-      }
       wasDragging = isDragging;
     });
     return unsub;
@@ -53,7 +47,7 @@
     const size = node.type === 'split' && node.direction === 'horizontal'
       ? containerEl.clientWidth
       : containerEl.clientHeight;
-    const newLayout = resizeSplit(layout, path, index, deltaPx, size);
+    const newLayout = resizeSplit(layout, path, index, deltaPx, size, isBottomPanel);
     onLayoutChange(newLayout);
   }
 
@@ -112,6 +106,32 @@
     onLayoutChange(newLayout);
   }
 
+  // When focus enters this tabs container (or any descendant), register it as
+  // the target for Ctrl+Tab cycling. The callback closes over $props() signals
+  // so it always reads the current node/layout at call time (Svelte 5 runes).
+  function handleContainerFocus() {
+    if (node.type !== 'tabs') return;
+    registerTabCycle((dir: number) => {
+      const count = node.panels.length;
+      if (count <= 1) return;
+      const next = ((node.activeTab + dir) + count) % count;
+      onLayoutChange(setActiveTab(layout, path, next, isBottomPanel));
+    });
+  }
+
+  // Pause Vulkan rendering for hidden viewport tabs.
+  // Viewport panel IDs follow the pattern 'viewport', 'viewport:2', etc.
+  // The Rust registry key equals the panel ID, so we can call setViewportVisible
+  // directly from here without needing an isActive prop on ViewportPanel.
+  $effect(() => {
+    if (node.type !== 'tabs') return;
+    node.panels.forEach((panelId, i) => {
+      if (getBasePanelId(panelId) === 'viewport') {
+        setViewportVisible(panelId, i === node.activeTab);
+      }
+    });
+  });
+
   /** Resolve panel component, supporting instance IDs like 'viewport:2' */
   function resolveComponent(id: string): Component | undefined {
     return panelComponents[id] ?? panelComponents[getBasePanelId(id)];
@@ -139,12 +159,13 @@
           path={[...path, i]}
           {panelComponents}
           {onLayoutChange}
+          {isBottomPanel}
         />
       </div>
     {/each}
   </div>
 {:else if node.type === 'tabs'}
-  <div class="dock-tabs" bind:this={containerEl}>
+  <div class="dock-tabs" bind:this={containerEl} onfocusin={handleContainerFocus} onmousedown={handleContainerFocus}>
     <DockTabBar
       panels={node.panels}
       activeTab={node.activeTab}
@@ -157,16 +178,23 @@
       onPopOut={handlePopOut}
     />
     <div class="dock-tab-content">
-      {#if node.panels[node.activeTab]}
-        {@const Comp = resolveComponent(node.panels[node.activeTab])}
-        {#if Comp}
-          <Comp />
-        {:else}
-          <div class="dock-panel-placeholder">
-            <span>{node.panels[node.activeTab]}</span>
-          </div>
-        {/if}
-      {:else}
+      <!-- All panels stay mounted to preserve state across tab switches.
+           CSS hides inactive ones; the active panel gets display:flex.
+           Viewport panels need setViewportVisible() to pause GPU rendering
+           when hidden — handled by the $effect below. -->
+      {#each node.panels as panelId, i (panelId)}
+        {@const Comp = resolveComponent(panelId)}
+        <div class="dock-panel-slot" class:active={i === node.activeTab}>
+          {#if Comp}
+            <Comp {panelId} />
+          {:else}
+            <div class="dock-panel-placeholder">
+              <span>{panelId}</span>
+            </div>
+          {/if}
+        </div>
+      {/each}
+      {#if node.panels.length === 0}
         <div class="dock-panel-empty"></div>
       {/if}
 
@@ -212,6 +240,19 @@
     /* Transparent so Vulkan viewport can show through.
        Non-viewport panels set their own opaque background. */
     background: transparent;
+  }
+  /* Each panel slot is hidden by default; only the active one is shown.
+     Keeping all panels mounted preserves their state across tab switches. */
+  .dock-panel-slot {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+  }
+  .dock-panel-slot.active {
+    display: flex;
   }
   .dock-panel-placeholder {
     display: flex;
