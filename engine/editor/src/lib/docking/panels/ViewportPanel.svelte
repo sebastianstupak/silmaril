@@ -154,7 +154,6 @@
 
       // Re-check at mount time in case __TAURI_INTERNALS__ wasn't ready at script eval
       isTauri = checkIsTauri();
-      console.log('[viewport] isTauri =', isTauri);
 
       // Create (or update bounds of) this viewport instance in Tauri mode.
       // createNativeViewport is idempotent — safe to call on every mount
@@ -164,16 +163,13 @@
         // Skip initial registration if panel is hidden (display:none → 0 bounds).
         // The ResizeObserver will register it when the slot becomes visible.
         if (bounds.width > 0 && bounds.height > 0) {
-          console.log('[viewport] Upserting native viewport', viewportId, 'at', bounds);
           viewportRegistered = true;
           createNativeViewport(viewportId, bounds.x, bounds.y, bounds.width, bounds.height).then(() => {
             nativeViewportCreated = true;
             loading = false;
             // Sync grid visibility to Rust on mount — restores persisted state
             viewportSetGridVisible(viewportId, gridVisible);
-            console.log('[viewport] Viewport instance ready:', viewportId);
-          }).catch((e) => {
-            console.error('[viewport] Vulkan init FAILED:', e);
+          }).catch((_e) => {
             loading = false;
           });
         } else {
@@ -335,7 +331,6 @@
   function handleMouseMove(event: MouseEvent) {
     if (!isDragging) return;
 
-    const dx = event.clientX - dragStartX;
     const dy = event.clientY - dragStartY;
 
     switch (dragMode) {
@@ -572,6 +567,7 @@
   <!-- Axis gizmo — 3D projected cube showing camera orientation -->
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="axis-gizmo" role="group" aria-label="Camera orientation gizmo">
+  {#if true}
     {@const S = 18}
     {@const CX = 30}
     {@const CY = 30}
@@ -646,6 +642,7 @@
         >{face.label}</text>
       {/each}
     </svg>
+  {/if}
   </div>
 
   <!-- HUD overlay -->
