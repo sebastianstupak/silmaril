@@ -6,6 +6,7 @@
   import MenuBar from './lib/components/MenuBar.svelte';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import PopoutView from './lib/components/PopoutView.svelte';
+  import ViewportOverlay from './lib/components/ViewportOverlay.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
@@ -13,7 +14,8 @@
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
   import DragOverlay from './lib/docking/DragOverlay.svelte';
-  import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit } from './lib/docking/store';
+  import TitleBar from './lib/components/TitleBar.svelte';
+  import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit, cycleActiveTab } from './lib/docking/store';
   import type { EditorLayout } from './lib/docking/types';
 
   // Panel components (no-prop wrappers for docking)
@@ -29,6 +31,10 @@
 
   // Pop-out panel detection via query parameter
   const popoutPanel = new URLSearchParams(window.location.search).get('panel');
+
+  // Viewport overlay detection — rendered in a separate transparent WebView2
+  // that sits above the Vulkan child window in the sandwich architecture.
+  const isViewportOverlay = new URLSearchParams(window.location.search).get('overlay') === 'viewport';
 
   let editorState: EditorState | null = $state(null);
   let settings: EditorSettings = $state(loadSettings());
@@ -95,8 +101,13 @@
 
     // Bottom zone → add to bottom panel
     if (zone === 'bottom') {
-      layout.bottomPanel.panels.push(panelId);
-      layout.bottomPanel.activeTab = layout.bottomPanel.panels.length - 1;
+      const target = findFirstTabsNode(layout.bottomPanel);
+      if (target) {
+        target.panels.push(panelId);
+        target.activeTab = target.panels.length - 1;
+      } else {
+        layout.bottomPanel = { type: 'tabs', activeTab: 0, panels: [panelId] };
+      }
       layout = { ...layout };
       saveLayout(layout);
       return;
@@ -168,6 +179,11 @@
     return null;
   }
 
+  function hasAnyPanels(node: import('./lib/docking/types').LayoutNode): boolean {
+    if (node.type === 'tabs') return node.panels.length > 0;
+    return node.children.some(hasAnyPanels);
+  }
+
   function clampBottom(h: number): number {
     return Math.max(MIN_BOTTOM, Math.min(h, window.innerHeight * MAX_BOTTOM_RATIO));
   }
@@ -176,17 +192,43 @@
     bottomHeight = clampBottom(bottomHeight - delta);
   }
 
-  // Persist settings on change (debounced)
+  // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused panel container.
+  $effect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Tab' && e.ctrlKey) {
+        e.preventDefault();
+        cycleActiveTab(e.shiftKey ? -1 : 1);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  });
+
+  // Apply theme/locale whenever settings change (main window reactive update).
+  $effect(() => {
+    applyTheme(themes[settings.theme] ?? themes.dark);
+    document.documentElement.style.fontSize = `${settings.fontSize}px`;
+    setLocale(settings.language);
+  });
+
+  // Persist settings on change (debounced) and broadcast to pop-out windows.
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   $effect(() => {
-    bottomHeight; settings.theme; settings.fontSize; settings.language; settings.autoSave;
+    const { theme, fontSize, language, autoSave } = settings;
+    bottomHeight;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      saveSettings({
-        ...settings,
-        bottomPanelHeight: bottomHeight,
-      });
+      saveSettings({ ...settings, bottomPanelHeight: bottomHeight });
     }, 300);
+
+    // Use the Rust broadcast_settings command — AppHandle::emit() broadcasts to
+    // ALL open webviews (main + every pop-out). The JS emit() API only reaches
+    // the current window's IPC channel and does NOT cross Tauri window boundaries.
+    if (isTauri && !popoutPanel && !isViewportOverlay) {
+      import('@tauri-apps/api/core').then(({ invoke }) => {
+        invoke('broadcast_settings', { theme, fontSize, language }).catch(() => {});
+      });
+    }
   });
 
   function handleSettingsChange(updated: EditorSettings) {
@@ -225,10 +267,17 @@
   });
 </script>
 
-{#if popoutPanel}
+{#if isViewportOverlay}
+  <ViewportOverlay />
+{:else if popoutPanel}
   <PopoutView panelId={popoutPanel} />
 {:else}
 <main class="editor-shell">
+  <!-- Title Bar (custom, replaces native OS decorations) -->
+  {#if isTauri}
+    <TitleBar onLayoutSelect={handleLayoutSelect} />
+  {/if}
+
   <!-- Menu Bar -->
   <MenuBar
     onSettingsOpen={() => showSettings = true}
@@ -304,7 +353,7 @@
       />
     </div>
 
-    {#if layout.bottomPanel.panels.length > 0}
+    {#if hasAnyPanels(layout.bottomPanel)}
       <DockSplitter direction="vertical" onResize={onResizeBottom} />
 
       <div class="bottom-bar" style="height: {bottomHeight}px">
@@ -369,6 +418,10 @@
     background: transparent;
     color: var(--color-text, #cccccc);
     font-family: var(--font-body, system-ui, -apple-system, sans-serif);
+    /* Clip all child content (panels, title bar) to the OS window corner radius
+       so solid backgrounds don't bleed into the transparent corner regions. */
+    border-radius: 8px;
+    overflow: hidden;
   }
 
   /* Toolbar */
@@ -494,33 +547,37 @@
     overflow: hidden;
   }
 
-  /* Status bar */
+  /* Pop-out drag-to-dock overlay */
   .dock-proximity-indicator {
     position: fixed;
     inset: 0;
     z-index: 99998;
     pointer-events: none;
+    /* Dim the editor content so the zones stand out */
+    background: rgba(0, 0, 0, 0.35);
   }
   .dock-zone {
     position: absolute;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.15;
-    background: var(--color-accent, #007acc);
-    transition: opacity 0.15s, background 0.15s;
-    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-accent, #007acc) 18%, transparent);
+    border: 2px solid color-mix(in srgb, var(--color-accent, #007acc) 50%, transparent);
+    border-radius: 6px;
+    transition: background 0.12s, border-color 0.12s;
   }
+  .dock-zone svg { opacity: 0.5; transition: opacity 0.12s; }
   .dock-zone.active {
-    opacity: 0.4;
-    outline: 2px solid var(--color-accent, #007acc);
-    outline-offset: -2px;
+    background: color-mix(in srgb, var(--color-accent, #007acc) 45%, transparent);
+    border-color: var(--color-accent, #007acc);
+    box-shadow: 0 0 0 1px var(--color-accent, #007acc) inset;
   }
-  .zone-left   { left: 0; top: 10%; width: 20%; height: 80%; }
-  .zone-right  { right: 0; top: 10%; width: 20%; height: 80%; }
-  .zone-top    { top: 0; left: 10%; width: 80%; height: 15%; }
-  .zone-bottom { bottom: 0; left: 10%; width: 80%; height: 15%; }
-  .zone-center { top: 25%; left: 25%; width: 50%; height: 50%; }
+  .dock-zone.active svg { opacity: 1; }
+  .zone-left   { left: 0;   top: 10%;  width: 20%;  height: 80%; }
+  .zone-right  { right: 0;  top: 10%;  width: 20%;  height: 80%; }
+  .zone-top    { top: 0;    left: 10%; width: 80%;  height: 15%; }
+  .zone-bottom { bottom: 0; left: 10%; width: 80%;  height: 15%; }
+  .zone-center { top: 25%;  left: 25%; width: 50%;  height: 50%; }
 
   .status-bar {
     height: 24px;
