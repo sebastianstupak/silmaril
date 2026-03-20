@@ -815,7 +815,7 @@ pub struct CameraState {
 // ──────────────────────────────────────────────────────────────────────────────
 
 #[cfg(windows)]
-pub use platform::NativeViewport as NativeViewport;
+pub use platform::NativeViewport;
 
 #[cfg(not(windows))]
 pub struct NativeViewport;
@@ -835,6 +835,7 @@ impl NativeViewport {
     pub fn camera_orbit(&self, _id: &str, _dx: f32, _dy: f32) {}
     pub fn camera_pan(&self, _id: &str, _dx: f32, _dy: f32) {}
     pub fn camera_zoom(&self, _id: &str, _delta: f32) {}
+    pub fn camera_reset(&self, _id: &str) {}
     pub fn get_instance_camera(&self, _id: &str) -> Option<CameraState> { None }
     pub fn set_instance_camera(&self, _id: &str, _state: CameraState) {}
     pub fn set_grid_visible(&self, _id: &str, _visible: bool) {}
