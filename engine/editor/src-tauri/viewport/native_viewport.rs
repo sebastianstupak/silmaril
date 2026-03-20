@@ -363,20 +363,60 @@ mod platform {
     }
 
     const GRID_VERT_GLSL: &str = r#"#version 450
-layout(push_constant) uniform PushConstants { mat4 viewProj; } pc;
+layout(push_constant) uniform PushConstants {
+    mat4 viewProj;
+    vec3 cameraPos;
+    float _pad;
+} pc;
 layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inColor;
-layout(location = 0) out vec3 fragColor;
+layout(location = 0) out vec2 fragWorldXZ;
 void main() {
     gl_Position = pc.viewProj * vec4(inPosition, 1.0);
-    fragColor = inColor;
+    fragWorldXZ = inPosition.xz;
 }
 "#;
 
     const GRID_FRAG_GLSL: &str = r#"#version 450
-layout(location = 0) in vec3 fragColor;
+layout(push_constant) uniform PushConstants {
+    mat4 viewProj;
+    vec3 cameraPos;
+    float _pad;
+} pc;
+layout(location = 0) in vec2 fragWorldXZ;
 layout(location = 0) out vec4 outColor;
-void main() { outColor = vec4(fragColor, 1.0); }
+
+float gridLines(vec2 pos, float spacing) {
+    vec2 p = pos / spacing;
+    vec2 g = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+    return 1.0 - clamp(min(g.x, g.y), 0.0, 1.0);
+}
+
+void main() {
+    vec2 pos = fragWorldXZ;
+    float dist = length(pos - pc.cameraPos.xz);
+    float fade = 1.0 - smoothstep(60.0, 80.0, dist);
+    if (fade < 0.001) discard;
+
+    float minor = gridLines(pos, 1.0);
+    float major = gridLines(pos, 10.0);
+
+    vec2 d = fwidth(pos);
+    // X axis: line at world Z=0 (fragWorldXZ.y near 0) -> red
+    float xAxisLine = 1.0 - clamp(abs(pos.y) / max(d.y, 0.0001), 0.0, 1.0);
+    // Z axis: line at world X=0 (fragWorldXZ.x near 0) -> blue
+    float zAxisLine = 1.0 - clamp(abs(pos.x) / max(d.x, 0.0001), 0.0, 1.0);
+
+    vec3 col = vec3(0.0);
+    float a = 0.0;
+
+    if (minor > 0.01)          { col = vec3(0.28);               a = minor * 0.35; }
+    if (major > minor)         { col = vec3(0.45);               a = max(a, major * 0.55); }
+    if (xAxisLine > 0.01)      { col = vec3(0.70, 0.25, 0.25);   a = max(a, xAxisLine * 0.85); }
+    if (zAxisLine > 0.01)      { col = vec3(0.25, 0.25, 0.70);   a = max(a, zAxisLine * 0.85); }
+
+    if (a < 0.001) discard;
+    outColor = vec4(col, a * fade);
+}
 "#;
 
     // ──────────────────────────────────────────────────────────────────────
@@ -385,30 +425,28 @@ void main() { outColor = vec4(fragColor, 1.0); }
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    struct GridVertex { pos: [f32; 3], col: [f32; 3] }
+    struct GridVertex { pos: [f32; 3] }
 
-    fn generate_grid_vertices(half_extent: i32, spacing: f32) -> Vec<GridVertex> {
-        let grid  = [0.25, 0.25, 0.30];
-        let x_axis = [0.7, 0.15, 0.15];
-        let z_axis = [0.15, 0.15, 0.7];
-        let y_axis = [0.15, 0.7, 0.15];
-        let mut v = Vec::new();
-        let ext = half_extent as f32 * spacing;
-        for i in -half_extent..=half_extent {
-            let x = i as f32 * spacing;
-            let c = if i == 0 { z_axis } else { grid };
-            v.push(GridVertex { pos: [x, 0.0, -ext], col: c });
-            v.push(GridVertex { pos: [x, 0.0,  ext], col: c });
-        }
-        for i in -half_extent..=half_extent {
-            let z = i as f32 * spacing;
-            let c = if i == 0 { x_axis } else { grid };
-            v.push(GridVertex { pos: [-ext, 0.0, z], col: c });
-            v.push(GridVertex { pos: [ ext, 0.0, z], col: c });
-        }
-        v.push(GridVertex { pos: [0.0, 0.0, 0.0], col: y_axis });
-        v.push(GridVertex { pos: [0.0, ext, 0.0], col: y_axis });
-        v
+    /// Six vertices (two triangles) forming a quad on the XZ plane, Y=0.
+    fn generate_grid_quad() -> Vec<GridVertex> {
+        let e = 500.0f32;
+        vec![
+            GridVertex { pos: [-e, 0.0, -e] },
+            GridVertex { pos: [ e, 0.0, -e] },
+            GridVertex { pos: [ e, 0.0,  e] },
+            GridVertex { pos: [-e, 0.0, -e] },
+            GridVertex { pos: [ e, 0.0,  e] },
+            GridVertex { pos: [-e, 0.0,  e] },
+        ]
+    }
+
+    /// Push constant layout for the grid shaders — 80 bytes.
+    /// Both VERTEX (viewProj) and FRAGMENT (cameraPos for fade) stages use this.
+    #[repr(C)]
+    struct GridPushConstants {
+        view_proj: [f32; 16],  // 64 bytes
+        camera_pos: [f32; 3],  // 12 bytes
+        _pad: f32,             //  4 bytes — aligns to 80, within 128-byte guarantee
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -488,7 +526,7 @@ void main() { outColor = vec4(fragColor, 1.0); }
             let (grid_pipeline, grid_pipeline_layout) =
                 create_grid_pipeline(&context.device, &render_pass, &vert_shader, &frag_shader)?;
 
-            let grid_verts = generate_grid_vertices(20, 1.0);
+            let grid_verts = generate_grid_quad();
             let grid_vertex_count = grid_verts.len() as u32;
             let buf_size = (grid_verts.len() * std::mem::size_of::<GridVertex>()) as u64;
             let mut grid_vertex_buffer = GpuBuffer::new(&context, buf_size,
@@ -516,7 +554,7 @@ void main() { outColor = vec4(fragColor, 1.0); }
         }
 
         /// Render all visible viewport instances in one frame.
-        fn render_frame(&mut self, viewports: &[(ViewportBounds, OrbitCamera)]) -> Result<bool, String> {
+        fn render_frame(&mut self, viewports: &[(ViewportBounds, OrbitCamera, bool)]) -> Result<bool, String> {
             if self.needs_recreate {
                 self.recreate_swapchain()?;
                 self.needs_recreate = false;
@@ -570,7 +608,7 @@ void main() { outColor = vec4(fragColor, 1.0); }
             &self,
             cmd: vk::CommandBuffer,
             image_index: usize,
-            viewports: &[(ViewportBounds, OrbitCamera)],
+            viewports: &[(ViewportBounds, OrbitCamera, bool)],
         ) -> Result<(), String> {
             let device = &self.context.device;
             device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())
@@ -592,8 +630,7 @@ void main() { outColor = vec4(fragColor, 1.0); }
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.grid_pipeline);
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.grid_vertex_buffer.handle()], &[0]);
 
-            for (bounds, camera) in viewports {
-                // Clamp scissor to swapchain extent
+            for (bounds, camera, grid_visible) in viewports {
                 let sx = bounds.x.max(0) as u32;
                 let sy = bounds.y.max(0) as u32;
                 let sw = bounds.width.min(extent.width.saturating_sub(sx)).max(1);
@@ -610,12 +647,23 @@ void main() { outColor = vec4(fragColor, 1.0); }
                 }]);
 
                 let aspect = sw as f32 / sh as f32;
-                let vp_mat = camera.view_projection(aspect);
-                let vp_bytes: &[u8] = std::slice::from_raw_parts(
-                    vp_mat.as_ref().as_ptr() as *const u8, 64);
+                let eye = camera.eye();
+                let pc = GridPushConstants {
+                    view_proj: camera.view_projection(aspect).to_cols_array(),
+                    camera_pos: eye.to_array(),
+                    _pad: 0.0,
+                };
+                let pc_bytes = std::slice::from_raw_parts(
+                    &pc as *const GridPushConstants as *const u8,
+                    std::mem::size_of::<GridPushConstants>(),
+                );
                 device.cmd_push_constants(cmd, self.grid_pipeline_layout,
-                    vk::ShaderStageFlags::VERTEX, 0, vp_bytes);
-                device.cmd_draw(cmd, self.grid_vertex_count, 1, 0, 0);
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT, 0, pc_bytes);
+
+                // Skip draw if grid hidden — push constants still set for next viewport correctness
+                if *grid_visible {
+                    device.cmd_draw(cmd, self.grid_vertex_count, 1, 0, 0);
+                }
             }
 
             device.cmd_end_render_pass(cmd);
@@ -660,23 +708,37 @@ void main() { outColor = vec4(fragColor, 1.0); }
     ) -> Result<(vk::Pipeline, vk::PipelineLayout), String> {
         let stages = [vert.stage_create_info(), frag.stage_create_info()];
         let binding = vk::VertexInputBindingDescription::default()
-            .binding(0).stride(24).input_rate(vk::VertexInputRate::VERTEX);
+            .binding(0).stride(12).input_rate(vk::VertexInputRate::VERTEX); // stride=12: vec3 pos only
         let attrs = [
             vk::VertexInputAttributeDescription::default()
                 .location(0).binding(0).format(vk::Format::R32G32B32_SFLOAT).offset(0),
-            vk::VertexInputAttributeDescription::default()
-                .location(1).binding(0).format(vk::Format::R32G32B32_SFLOAT).offset(12),
+            // No inColor attribute — color computed in fragment shader
         ];
         let vp = vk::Viewport::default().width(1.0).height(1.0).max_depth(1.0);
         let sc = vk::Rect2D::default().extent(vk::Extent2D { width: 1, height: 1 });
+        // Push constants used by both vertex (viewProj) and fragment (cameraPos) shaders
         let push_range = vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::VERTEX).offset(0).size(64);
+            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+            .offset(0)
+            .size(80); // GridPushConstants: 64 (mat4) + 12 (vec3) + 4 (pad) = 80
         let layout = unsafe {
             device.create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::default()
                     .push_constant_ranges(std::slice::from_ref(&push_range)), None)
                 .map_err(|e| format!("pipeline layout: {e}"))?
         };
+
+        // Standard src-alpha / one-minus-src-alpha blending for the grid fade
+        let blend_attachment = vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(vk::ColorComponentFlags::RGBA);
+
         let pipeline = unsafe {
             device.create_graphics_pipelines(vk::PipelineCache::null(), &[
                 vk::GraphicsPipelineCreateInfo::default()
@@ -685,7 +747,7 @@ void main() { outColor = vec4(fragColor, 1.0); }
                         .vertex_binding_descriptions(std::slice::from_ref(&binding))
                         .vertex_attribute_descriptions(&attrs))
                     .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo::default()
-                        .topology(vk::PrimitiveTopology::LINE_LIST))
+                        .topology(vk::PrimitiveTopology::TRIANGLE_LIST)) // quad = 2 triangles
                     .viewport_state(&vk::PipelineViewportStateCreateInfo::default()
                         .viewports(std::slice::from_ref(&vp))
                         .scissors(std::slice::from_ref(&sc)))
@@ -697,12 +759,11 @@ void main() { outColor = vec4(fragColor, 1.0); }
                     .multisample_state(&vk::PipelineMultisampleStateCreateInfo::default()
                         .rasterization_samples(vk::SampleCountFlags::TYPE_1))
                     .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo::default()
-                        .depth_test_enable(true).depth_write_enable(true)
+                        .depth_test_enable(true)
+                        .depth_write_enable(false) // false: don't write depth for transparent grid
                         .depth_compare_op(vk::CompareOp::LESS))
                     .color_blend_state(&vk::PipelineColorBlendStateCreateInfo::default()
-                        .attachments(&[vk::PipelineColorBlendAttachmentState::default()
-                            .blend_enable(false)
-                            .color_write_mask(vk::ColorComponentFlags::RGBA)]))
+                        .attachments(std::slice::from_ref(&blend_attachment)))
                     .dynamic_state(&vk::PipelineDynamicStateCreateInfo::default()
                         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]))
                     .layout(layout)
@@ -711,7 +772,7 @@ void main() { outColor = vec4(fragColor, 1.0); }
             ], None).map_err(|(_, e)| { device.destroy_pipeline_layout(layout, None);
                 format!("pipeline: {e}") })?[0]
         };
-        tracing::info!("Grid pipeline created");
+        tracing::info!("Grid pipeline created (infinite shader-based)");
         Ok((pipeline, layout))
     }
 
@@ -763,11 +824,11 @@ void main() { outColor = vec4(fragColor, 1.0); }
             renderer.notify_resize(win_w, win_h);
 
             // Snapshot visible instances for this frame
-            let viewports: Vec<(ViewportBounds, OrbitCamera)> = {
+            let viewports: Vec<(ViewportBounds, OrbitCamera, bool)> = {
                 let lock = instances.lock().unwrap();
                 lock.values()
                     .filter(|i| i.visible)
-                    .map(|i| (i.bounds, i.camera.clone()))
+                    .map(|i| (i.bounds, i.camera.clone(), i.grid_visible))
                     .collect()
             };
 
