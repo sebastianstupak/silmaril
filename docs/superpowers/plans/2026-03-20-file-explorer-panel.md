@@ -55,6 +55,8 @@ trash = "5"
 ignore = "0.4"
 ```
 
+Note: `tempfile` is already present under `[dev-dependencies]` — do not add it again.
+
 - [ ] **Step 2: Verify crates resolve**
 
 ```bash
@@ -126,6 +128,18 @@ mod tests {
     }
 
     #[test]
+    fn test_file_nodes_have_null_children() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        fs::write(root.join("file.txt"), "").unwrap();
+
+        let nodes = read_dir_one_level(root).unwrap();
+        let file_node = nodes.iter().find(|n| n.kind == NodeKind::File).unwrap();
+        // Files must have children = None (not Some([]))
+        assert!(file_node.children.is_none());
+    }
+
+    #[test]
     fn test_expand_dir_returns_children() {
         let dir = TempDir::new().unwrap();
         let root = dir.path();
@@ -152,7 +166,7 @@ mod tests {
 cd engine/editor && cargo test file_explorer::tree 2>&1 | head -20
 ```
 
-Expected: compile error — `read_dir_one_level` and `NodeKind` not found.
+Expected: compile error — `read_dir_one_level` and `NodeKind` not found (4 tests declared).
 
 - [ ] **Step 4: Implement tree.rs**
 
@@ -201,7 +215,7 @@ pub fn read_dir_one_level(dir: &Path) -> Result<Vec<TreeNode>, String> {
                 name: e.file_name().to_string_lossy().into_owned(),
                 path: e.path().to_string_lossy().into_owned(),
                 kind: if is_dir { NodeKind::Dir } else { NodeKind::File },
-                children: if is_dir { None } else { Some(vec![]) },
+                children: None, // always None on initial load; expand_dir populates dirs lazily
                 git_status: None,
                 ignored: false,
             }
@@ -231,7 +245,7 @@ mod tests {
 cd engine/editor && cargo test file_explorer::tree
 ```
 
-Expected: 3 tests pass.
+Expected: 4 tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -386,7 +400,7 @@ use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 pub struct FileWatcherState {
     watcher: Mutex<Option<RecommendedWatcher>>,
@@ -407,26 +421,43 @@ pub fn start_file_watch(
     let app_clone = app.clone();
     let root_clone = root.clone();
 
-    // Debounce: only emit after 300ms of quiet
+    // Debounce: track the last event time with an Arc<Mutex<Instant>>.
+    // A single background thread re-checks after 300ms; if no newer event
+    // has arrived it emits. This avoids spawning unbounded threads under
+    // heavy FS activity (e.g. cargo build writing hundreds of files).
     let last_event: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
-    let last_event_clone = last_event.clone();
+    let last_event_watcher = last_event.clone();
+    let pending = Arc::new(Mutex::new(false));
+    let pending_watcher = pending.clone();
 
     let mut watcher = RecommendedWatcher::new(
         move |_res: notify::Result<notify::Event>| {
-            let mut last = last_event_clone.lock().unwrap();
+            let mut last = last_event_watcher.lock().unwrap();
             *last = Some(Instant::now());
-            let app2 = app_clone.clone();
-            let root2 = root_clone.clone();
-            let last2 = last_event_clone.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(300));
-                let guard = last2.lock().unwrap();
-                if let Some(t) = *guard {
-                    if t.elapsed() >= Duration::from_millis(299) {
+            let already_pending = {
+                let mut p = pending_watcher.lock().unwrap();
+                let was = *p;
+                *p = true;
+                was
+            };
+            if !already_pending {
+                let app2 = app_clone.clone();
+                let root2 = root_clone.clone();
+                let last2 = last_event_watcher.clone();
+                let pending2 = pending_watcher.clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(Duration::from_millis(300));
+                    let elapsed = {
+                        let guard = last2.lock().unwrap();
+                        guard.map(|t| t.elapsed()).unwrap_or(Duration::MAX)
+                    };
+                    if elapsed >= Duration::from_millis(280) {
+                        *pending2.lock().unwrap() = false;
                         let _ = app2.emit("file-tree-changed", serde_json::json!({ "root": root2 }));
+                        break;
                     }
-                }
-            });
+                });
+            }
         },
         Config::default(),
     )
@@ -581,6 +612,9 @@ pub fn open_in_editor(path: String) -> Result<(), String> {
             .map(|_| ())
             .map_err(|e| format!("Could not open file — configure an editor in Settings ({e})"))
     }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    Err("Open in editor not supported on this platform".to_string())
 }
 
 #[tauri::command]
@@ -745,7 +779,8 @@ git commit -m "feat(editor): add file explorer i18n keys"
 
 ```typescript
 // engine/editor/src/lib/stores/file-explorer.ts
-import { invoke, listen } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+// Note: `listen` is NOT imported here — event listening is done in FileExplorerWrapper.svelte
 
 export interface TreeNode {
   name: string;
@@ -888,6 +923,7 @@ git commit -m "feat(editor): file explorer store — tree state, expansion, git 
   } from '$lib/stores/file-explorer';
   import { invoke } from '@tauri-apps/api/core';
   import { t } from '$lib/i18n';
+  import { logError } from '$lib/stores/console';
 
   let {
     node,
@@ -922,9 +958,8 @@ git commit -m "feat(editor): file explorer store — tree state, expansion, git 
     if (node.kind === 'dir') {
       isExpanded ? collapseDir(node.path) : expandDir(node.path);
     } else {
-      invoke('open_in_editor', { path: node.path }).catch((e: string) => {
-        // Toast handled in wrapper
-        console.error(e);
+      invoke('open_in_editor', { path: node.path }).catch((e: unknown) => {
+        logError(`Could not open file: ${e}`);
       });
     }
   }
@@ -958,13 +993,17 @@ git commit -m "feat(editor): file explorer store — tree state, expansion, git 
     }
     if (action === 'new_folder') {
       const name = prompt(t('explorer.new_folder'));
-      if (name) await invoke('create_dir', { path: node.path + '/' + name }).catch(console.error);
+      if (name) await invoke('create_dir', { path: node.path + '/' + name }).catch((e: unknown) => logError(String(e)));
+    }
+    if (action === 'reveal') {
+      // Deferred: OS reveal requires a Tauri shell command — implement in follow-up
+      logError('Reveal in Explorer not yet implemented');
     }
   }
 
   // Placeholder — replaced with a proper context menu component in a follow-up
   async function showContextMenu(_node: TreeNode): Promise<string | null> {
-    const options = ['rename', 'delete', 'copy_path'];
+    const options = ['rename', 'delete', 'copy_path', 'reveal'];
     if (_node.kind === 'dir') options.unshift('new_file', 'new_folder');
     return prompt('Action: ' + options.join(', ')) ?? null;
   }
@@ -1254,6 +1293,8 @@ git commit -m "feat(editor): FileExplorerPanel — panel shell with header and t
   import { onMount, onDestroy } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
   import { invoke } from '@tauri-apps/api/core';
+  // Note: `listen` lives in @tauri-apps/api/event (not /core) — first use of this path in codebase
+  import { listen } from '@tauri-apps/api/event';
   import FileExplorerPanel from './FileExplorerPanel.svelte';
   import {
     getFileExplorerState,
@@ -1262,6 +1303,7 @@ git commit -m "feat(editor): FileExplorerPanel — panel shell with header and t
     refreshTree,
     type FileExplorerState,
   } from '$lib/stores/file-explorer';
+  import { logWarn } from '$lib/stores/console';
 
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
@@ -1285,7 +1327,7 @@ git commit -m "feat(editor): FileExplorerPanel — panel shell with header and t
         await loadTree(editorState.project_path);
       }
     } catch (e) {
-      console.warn('FileExplorerWrapper: could not load initial project state', e);
+      logWarn(`FileExplorerWrapper: could not load initial project state — ${e}`);
     }
 
     // Listen for file system changes from Rust watcher
