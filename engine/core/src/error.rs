@@ -282,6 +282,12 @@ pub enum ErrorCode {
     TemplateIo = 2005,
     /// Template serialization error
     TemplateSerialization = 2006,
+    /// Entity not found in template during command execution.
+    TemplateEntityNotFound = 2007,
+    /// Component not found on entity during command execution.
+    TemplateComponentNotFound = 2008,
+    /// No template is currently open in the CommandProcessor.
+    TemplateNoTemplateOpen = 2011,
 
     // Dev Tools (2100-2199)
     /// DevReloadServer failed to bind TCP port
