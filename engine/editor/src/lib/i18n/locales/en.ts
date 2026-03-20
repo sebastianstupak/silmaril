@@ -11,6 +11,7 @@ const en = {
   'menu.file.save_scene_as': 'Save Scene As...',
   'menu.file.new_scene': 'New Scene',
   'menu.file.recent_projects': 'Recent Projects',
+  'menu.file.no_recent_projects': 'No recent projects',
   'menu.file.exit': 'Exit',
 
   'menu.edit': 'Edit',
@@ -90,6 +91,13 @@ const en = {
   'settings.auto_save.off': 'Off',
   'settings.auto_save.on_focus_change': 'On Focus Change',
   'settings.auto_save.after_delay': 'After Delay',
+
+  // Keybindings tab
+  'keybindings.layout_slots': 'Layout Slots',
+  'keybindings.press_key': 'Press a key…',
+  'keybindings.conflict': 'Already used by "{name}"',
+  'keybindings.clear': 'Clear',
+  'keybindings.none': 'None',
 
   // Modes
   'mode.edit': 'Edit',

@@ -229,7 +229,7 @@
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger>{t('menu.file.recent_projects')}</DropdownMenu.SubTrigger>
             <DropdownMenu.SubContent>
-              <DropdownMenu.Item disabled>No recent projects</DropdownMenu.Item>
+              <DropdownMenu.Item disabled>{t('menu.file.no_recent_projects')}</DropdownMenu.Item>
             </DropdownMenu.SubContent>
           </DropdownMenu.Sub>
           <DropdownMenu.Separator />
