@@ -530,7 +530,7 @@
               </button>
             {/snippet}
           </Tooltip.Trigger>
-          <Tooltip.Content class="tooltip-content">
+          <Tooltip.Content class="tooltip-content" side="bottom" sideOffset={6}>
             {tool.label} <span class="tooltip-shortcut">{tool.shortcut}</span>
           </Tooltip.Content>
         </Tooltip.Root>
@@ -559,7 +559,7 @@
             </button>
           {/snippet}
         </Tooltip.Trigger>
-        <Tooltip.Content class="tooltip-content">Grid</Tooltip.Content>
+        <Tooltip.Content class="tooltip-content" side="bottom" sideOffset={6}>Grid</Tooltip.Content>
       </Tooltip.Root>
 
       <Tooltip.Root>
@@ -576,7 +576,7 @@
             </button>
           {/snippet}
         </Tooltip.Trigger>
-        <Tooltip.Content class="tooltip-content">Snap to Grid</Tooltip.Content>
+        <Tooltip.Content class="tooltip-content" side="bottom" sideOffset={6}>Snap to Grid</Tooltip.Content>
       </Tooltip.Root>
     </div>
 
@@ -602,7 +602,7 @@
             </button>
           {/snippet}
         </Tooltip.Trigger>
-        <Tooltip.Content class="tooltip-content">
+        <Tooltip.Content class="tooltip-content" side="bottom" sideOffset={6}>
           {projection === 'ortho' ? 'Orthographic' : 'Perspective'} <span class="tooltip-shortcut">P</span>
         </Tooltip.Content>
       </Tooltip.Root>
@@ -625,7 +625,7 @@
             </button>
           {/snippet}
         </Tooltip.Trigger>
-        <Tooltip.Content class="tooltip-content">Add Entity</Tooltip.Content>
+        <Tooltip.Content class="tooltip-content" side="bottom" sideOffset={6}>Add Entity</Tooltip.Content>
       </Tooltip.Root>
     </div>
   </div>
@@ -872,7 +872,7 @@
     padding: 4px 8px;
     pointer-events: none;
     white-space: nowrap;
-    z-index: 100;
+    z-index: 9999;
   }
 
   :global(.tooltip-shortcut) {
