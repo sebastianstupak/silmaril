@@ -875,7 +875,7 @@
     z-index: 100;
   }
 
-  .tooltip-shortcut {
+  :global(.tooltip-shortcut) {
     color: #888;
     margin-left: 4px;
     font-family: monospace;

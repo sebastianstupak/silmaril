@@ -5,7 +5,6 @@
   import { setLocale } from './lib/i18n';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import PopoutView from './lib/components/PopoutView.svelte';
-  import ViewportOverlay from './lib/components/ViewportOverlay.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
@@ -30,10 +29,6 @@
 
   // Pop-out panel detection via query parameter
   const popoutPanel = new URLSearchParams(window.location.search).get('panel');
-
-  // Viewport overlay detection — rendered in a separate transparent WebView2
-  // that sits above the Vulkan child window in the sandwich architecture.
-  const isViewportOverlay = new URLSearchParams(window.location.search).get('overlay') === 'viewport';
 
   let editorState: EditorState | null = $state(null);
   let settings: EditorSettings = $state(loadSettings());
@@ -388,9 +383,7 @@
   });
 </script>
 
-{#if isViewportOverlay}
-  <ViewportOverlay />
-{:else if popoutPanel}
+{#if popoutPanel}
   <PopoutView panelId={popoutPanel} />
 {:else}
 <main class="editor-shell">
