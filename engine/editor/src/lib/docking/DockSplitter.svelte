@@ -47,20 +47,26 @@
 <style>
   .dock-splitter {
     flex-shrink: 0;
-    background: transparent;
-    transition: background 0.15s;
+    background: var(--color-bg, #1e1e1e);
     z-index: 10;
     position: relative;
-  }
-  .dock-splitter:hover, .dock-splitter.dragging {
-    background: var(--color-accent, #007acc);
+    box-sizing: border-box;
+    transition: border-color 0.15s;
   }
   .dock-splitter.horizontal {
-    width: 4px;
+    width: 8px;
     cursor: col-resize;
+    border-left: 1px solid var(--color-border, #404040);
+    border-right: 1px solid var(--color-border, #404040);
   }
   .dock-splitter.vertical {
-    height: 4px;
+    height: 8px;
     cursor: row-resize;
+    border-top: 1px solid var(--color-border, #404040);
+    border-bottom: 1px solid var(--color-border, #404040);
+  }
+  .dock-splitter:hover,
+  .dock-splitter.dragging {
+    border-color: var(--color-accent, #007acc);
   }
 </style>
