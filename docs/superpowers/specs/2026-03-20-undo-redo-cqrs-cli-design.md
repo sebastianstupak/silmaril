@@ -13,7 +13,7 @@ Implement a unified command system (CQRS) for the editor's template editing oper
 - **Project** — the `game.toml` root; owns zero or more templates
 - **EntityId** — `u64`, already defined in `engine/ops/src/undo.rs`
 
-**Migration of `scene.rs`**: Rename `Scene → TemplateState`, `SceneEntity → TemplateEntity`, `SceneComponent → TemplateComponent` in-place. No structural changes except the `name` field — see Section 3.
+**Migration of `scene.rs`**: Rename `Scene → TemplateState`, `SceneEntity → TemplateEntity`, `SceneComponent → TemplateComponent` in-place. No structural changes; existing `save_yaml`/`load_yaml`/`save_bincode`/`load_bincode` methods are kept and renamed accordingly. `TemplateState::name` is set to the file stem on load (`path.file_stem().unwrap_or_default()`).
 
 All code, IPC commands, CLI subcommands, and docs use "template" not "scene".
 
@@ -25,13 +25,13 @@ All code, IPC commands, CLI subcommands, and docs use "template" not "scene".
 
 | Command | Notes |
 |---|---|
-| `CreateEntity` | Initial name stored in action |
+| `CreateEntity` | Initial name stored; `EditorAction::CreateEntity` gains `name: Option<String>` |
 | `DeleteEntity` | Stores full `EntitySnapshot` (incl. name) for restoration |
 | `DuplicateEntity` | Decomposes to `Batch(CreateEntity + N AddComponent)` internally |
-| `RenameEntity` | Old name stored in action |
-| `SetComponent` | Old value stored in action (includes Transform for move/rotate/scale) |
-| `AddComponent` | `EditorAction::AddComponent` stores the full `data: Value` for redo |
-| `RemoveComponent` | Full component data stored for restoration |
+| `RenameEntity` | Old name stored in action; both old and new are `Option<String>` |
+| `SetComponent` | Old value stored; `EditorAction::SetComponent.name` renamed to `type_name` |
+| `AddComponent` | `EditorAction::AddComponent` gains `data: Value`; `name` renamed to `type_name` |
+| `RemoveComponent` | Full component data stored; `EditorAction::RemoveComponent.name` renamed to `type_name` |
 
 ### Not Undoable (bypass CommandProcessor)
 
@@ -41,7 +41,7 @@ All code, IPC commands, CLI subcommands, and docs use "template" not "scene".
 | Projection toggle (ortho/persp) | Viewport preference, localStorage |
 | Grid/snap/tool settings | Viewport preference |
 | Open/close template | Filesystem operation |
-| New template | Filesystem operation (creates file) — not reversible |
+| New template | Filesystem operation — not reversible |
 
 ---
 
@@ -49,29 +49,15 @@ All code, IPC commands, CLI subcommands, and docs use "template" not "scene".
 
 ### Error Type
 
-Existing `ErrorCode` entries for the 2000–2099 range (Template System):
-
-```
-TemplateNotFound         = 2000
-TemplateAlreadyExists    = 2001
-TemplateInvalidYaml      = 2002
-TemplateUnknownComponent = 2003
-TemplateCircularReference = 2004
-TemplateIo               = 2005
-TemplateSerialization    = 2006
-```
-
-New entries to add (2007–2011):
+Existing `ErrorCode` entries for Template System (2000–2006) stay unchanged. New entries to add at 2007–2009:
 
 ```
 TemplateEntityNotFound    = 2007
 TemplateComponentNotFound = 2008
-TemplateUndoEmpty         = 2009
-TemplateRedoEmpty         = 2010
 TemplateNoTemplateOpen    = 2011
 ```
 
-`OpsError` definition:
+`OpsError::UndoEmpty` and `OpsError::RedoEmpty` are NOT added — empty-stack is handled at the `CommandProcessor` layer by returning `Ok(None)`, never as an error.
 
 ```rust
 // engine/ops/src/error.rs
@@ -81,49 +67,67 @@ define_error! {
     pub enum OpsError {
         EntityNotFound { id: EntityId }
             = ErrorCode::TemplateEntityNotFound, ErrorSeverity::Error,
-        ComponentNotFound { entity: EntityId, component_type: String }
+        ComponentNotFound { entity: EntityId, type_name: String }
             = ErrorCode::TemplateComponentNotFound, ErrorSeverity::Error,
-        WriteFailed { path: String, reason: String }
+        // Covers both read and write I/O failures
+        IoFailed { path: String, reason: String }
             = ErrorCode::TemplateIo, ErrorSeverity::Error,
-        YamlFailed { reason: String }
+        // Covers both serialization (YAML write) and deserialization (YAML/Bincode read) failures
+        SerializeFailed { reason: String }
             = ErrorCode::TemplateSerialization, ErrorSeverity::Error,
-        UndoEmpty
-            = ErrorCode::TemplateUndoEmpty, ErrorSeverity::Warning,
-        RedoEmpty
-            = ErrorCode::TemplateRedoEmpty, ErrorSeverity::Warning,
         NoTemplateOpen
             = ErrorCode::TemplateNoTemplateOpen, ErrorSeverity::Error,
     }
 }
 ```
 
-**Migration**: `undo.rs` currently uses `anyhow::Result`. Replace `bail!("Nothing to undo")` with `Err(OpsError::UndoEmpty)` and likewise for redo. Remove `anyhow` dependency from `engine/ops`.
+**Migration**: `scene.rs` and `undo.rs` both use `anyhow::Result`. Replace all `anyhow` usage with `OpsError`. Remove `anyhow` dependency from `engine/ops/Cargo.toml`.
 
-### TemplateState
+### IpcError and Conversion
+
+```rust
+#[derive(Debug, Serialize)]
+pub struct IpcError {
+    pub code: u32,
+    pub message: String,
+}
+
+impl From<OpsError> for IpcError {
+    fn from(e: OpsError) -> Self {
+        IpcError {
+            code: e.code() as u32,
+            message: e.to_string(),
+        }
+    }
+}
+```
+
+### TemplateState (renamed from Scene)
 
 ```rust
 // engine/ops/src/template.rs  (renamed from scene.rs)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// Keep json_as_string mod as-is — required for Bincode compatibility
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemplateState {
     pub name: String,
     pub entities: Vec<TemplateEntity>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemplateEntity {
     pub id: EntityId,
-    pub name: Option<String>,   // keeps parity with existing SceneEntity
+    pub name: Option<String>,
     pub components: Vec<TemplateComponent>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemplateComponent {
     pub type_name: String,
+    #[serde(with = "json_as_string")]  // keep — required for Bincode round-trip
     pub data: serde_json::Value,
 }
 ```
-
-`TemplateCommand::CreateEntity { name: Option<String> }` — empty string and `None` are both valid.
 
 ### ActionId
 
@@ -131,38 +135,64 @@ pub struct TemplateComponent {
 pub type ActionId = u64;  // monotonically incrementing per CommandProcessor instance
 ```
 
-Serializes as a JSON number over IPC. Frontend uses it to label undo/redo buttons.
+Serializes as JSON number over IPC. `undo()` returns the `ActionId` of the action that was popped from the done stack (i.e., the action that was reversed). Frontend uses this to label undo/redo buttons.
 
-### EditorAction changes
+### EditorAction Changes
 
-`AddComponent` gains a `data` field to enable redo (re-adding the exact component):
-
-```rust
-/// Before (existing):
-AddComponent { entity: EntityId, name: String }
-
-/// After:
-AddComponent { entity: EntityId, name: String, data: serde_json::Value }
-```
-
-`EntitySnapshot` gains a `name` field so `DeleteEntity` undo can restore the entity's display name:
+All three changes are in `engine/ops/src/undo.rs`. **Standardize on `type_name` (not `name`) for component identifiers throughout**:
 
 ```rust
-/// Before (existing):
-pub struct EntitySnapshot {
-    pub id: EntityId,
-    pub components: Vec<(String, Value)>,
+// Before → After for each variant:
+
+SetComponent {
+    entity: EntityId,
+    name: String,     // RENAME → type_name: String
+    old: Value,
+    new: Value,
 }
 
-/// After:
+AddComponent {
+    entity: EntityId,
+    name: String,     // RENAME → type_name: String
+                      // ADD   → data: Value  (for redo restoration)
+}
+
+RemoveComponent {
+    entity: EntityId,
+    name: String,     // RENAME → type_name: String
+    snapshot: Value,
+}
+
+CreateEntity {
+    id: EntityId,
+                      // ADD → name: Option<String>
+}
+
+RenameEntity {
+    id: EntityId,
+    old_name: String, // CHANGE → old_name: Option<String>
+    new_name: String, // CHANGE → new_name: Option<String>
+}
+// DeleteEntity, Batch — unchanged
+```
+
+### EntitySnapshot Changes
+
+Add `name` field so `DeleteEntity` undo can restore the entity's display name:
+
+```rust
 pub struct EntitySnapshot {
     pub id: EntityId,
-    pub name: Option<String>,
+    pub name: Option<String>,          // ADD
     pub components: Vec<(String, Value)>,
 }
 ```
 
-`UndoStack` internals: replace `Vec<EditorAction>` with `VecDeque<EditorAction>` so trimming at max depth is O(1). Add `#[derive(Serialize, Deserialize)]` to `UndoStack`, `EditorAction`, `EntitySnapshot` for `.undo.json` persistence. `EditorAction::Batch` serializes recursively — this is intentional.
+### UndoStack Changes
+
+1. Replace `Vec<EditorAction>` (both `done` and `undone`) with `VecDeque<EditorAction>` for O(1) front-pop when trimming at max depth. Serde serializes `VecDeque` identically to `Vec` for non-wrapped sequences — no custom serde needed.
+2. Add `#[derive(Serialize, Deserialize)]` to `UndoStack`, `EditorAction`, `EntitySnapshot` for `.undo.json` persistence.
+3. Keep `UndoStack::undo()`/`redo()` returning `Err` on empty stack (existing behavior, existing tests pass). Only `CommandProcessor` translates this to `Ok(None)`.
 
 ### TemplateCommand
 
@@ -180,9 +210,9 @@ pub enum TemplateCommand {
 }
 ```
 
-`DuplicateEntity` does NOT appear in `EditorAction`. `execute()` decomposes it into `EditorAction::Batch { label: "Duplicate Entity", actions: [CreateEntity, AddComponent×N] }`.
+`DuplicateEntity` does NOT appear in `EditorAction`. `execute()` decomposes it into `EditorAction::Batch { label: "Duplicate Entity <id>", actions: [CreateEntity { id: new_id, name: copied_name }, AddComponent×N] }`.
 
-### CommandResult & IPC Error Envelope
+### CommandResult & ActionSummary
 
 ```rust
 #[derive(Debug, Serialize)]
@@ -191,22 +221,15 @@ pub struct CommandResult {
     pub new_state: TemplateState,   // full state, MVP scope — acknowledged cost
 }
 
+// Used by history IPC endpoint; EditorAction is NOT exposed over IPC
 #[derive(Debug, Serialize)]
 pub struct ActionSummary {
     pub action_id: ActionId,
     pub description: String,   // from EditorAction::description()
 }
-
-#[derive(Debug, Serialize)]
-pub struct IpcError {
-    pub code: u32,
-    pub message: String,
-}
 ```
 
-`CommandResult` returns full `TemplateState` on every mutation. This is O(entities × components) per command and is acceptable for MVP. Optimization (delta events) is deferred.
-
-`history()` is a Rust-internal method. The IPC/CLI surface uses `Vec<ActionSummary>` (described below) so `EditorAction` does not need to be a public IPC type.
+Returning full `TemplateState` on every command is O(entities × components). Acceptable for MVP; delta events are deferred.
 
 ---
 
@@ -243,25 +266,36 @@ pub struct CommandProcessor {
     state: TemplateState,
     undo_stack: UndoStack,
     template_path: PathBuf,
+    next_action_id: ActionId,
 }
 
 impl CommandProcessor {
+    /// Load template YAML from disk; load .undo.json if present (missing = empty stack).
     pub fn load(path: PathBuf) -> Result<Self, OpsError>;
+
+    /// Execute a command. Returns the assigned ActionId and updated TemplateState.
     pub fn execute(&mut self, cmd: TemplateCommand) -> Result<CommandResult, OpsError>;
-    // Returns Ok(None) when stack is empty (not an error — caller checks can_undo first)
+
+    /// Undo last action. Returns Ok(None) when nothing to undo.
+    /// Returns Ok(Some(action_id)) where action_id is the action that was reversed.
     pub fn undo(&mut self) -> Result<Option<ActionId>, OpsError>;
+
+    /// Redo last undone action. Returns Ok(None) when nothing to redo.
     pub fn redo(&mut self) -> Result<Option<ActionId>, OpsError>;
+
+    /// Summaries for history display. Internal EditorAction not exposed.
     pub fn history_summaries(&self) -> Vec<ActionSummary>;
+
     pub fn can_undo(&self) -> bool;
     pub fn can_redo(&self) -> bool;
 }
 ```
 
-`undo()` returns `Ok(None)` when nothing to undo. `OpsError::UndoEmpty` / `RedoEmpty` are reserved for internal assertion failures only.
+`CommandProcessor::load()` fails with `OpsError::IoFailed` if the YAML file cannot be read, or `OpsError::SerializeFailed` if it cannot be parsed. Missing `.undo.json` is not an error — the stack starts empty.
 
 ### Multi-Template Support in Tauri
 
-Multiple templates can be open simultaneously (one per tab). Tauri state holds a map keyed by template path:
+Multiple templates can be open simultaneously (one per tab):
 
 ```rust
 pub struct EditorState {
@@ -291,7 +325,7 @@ async fn template_history(state, template_path: String) -> Result<Vec<ActionSumm
 
 ### silm CLI
 
-`engine/ops` is a library crate shared by both Tauri backend and `silm`. CLI adds a `template` subcommand group. All commands take `--template <path>` to specify the target YAML file explicitly (required for scripting/agent use):
+`engine/ops` is shared between Tauri backend and `silm`. All commands take `--template <path>` (required for scripting/agent use):
 
 ```bash
 silm template --template templates/world.yaml entity create "Player"
@@ -313,10 +347,10 @@ All commands print JSON results to stdout.
 ```
 templates/
 ├── world.yaml               ← template file (source of truth)
-├── world.undo.json          ← serialized UndoStack (auto-managed, never commit)
+├── world.undo.json          ← serialized UndoStack (never commit)
 ```
 
-`*.undo.json` is added to the generated `.gitignore` by `silm new` (update `BasicTemplate::gitignore()` in `project.rs`).
+Add `*.undo.json` to the root-level `.gitignore` generated by `silm new` (update `BasicTemplate::gitignore()` in `project.rs`). This pattern applies at all directory depths — any `.undo.json` file anywhere in the project tree is excluded, which is the desired behavior.
 
 ---
 
@@ -324,34 +358,37 @@ templates/
 
 ### Tier 1 — Unit Tests (`engine/ops/tests/`)
 
-- `UndoStack`: push → undo → redo cycle; new command after undo clears redo stack; max depth enforcement (100); `VecDeque` O(1) trim verified
-- `CommandProcessor::execute`: each `TemplateCommand` variant produces the correct `EditorAction` variant
-- Inverse correctness: `undo(execute(cmd))` → state equals pre-command state (all 7 command variants)
+All tests here are single-crate (`engine_ops` only). Filesystem tests use `tempfile` crate (dev-dependency).
+
+- `UndoStack`: push → undo → redo cycle; new command after undo clears redo stack; max depth at 100 trims oldest; `VecDeque` O(1) trim
+- `UndoStack::undo()` / `redo()` return `Err` on empty (existing tests must still pass)
+- `CommandProcessor::execute`: each `TemplateCommand` variant produces correct `EditorAction` variant with correct field names (`type_name`, not `name`)
+- `CommandProcessor::undo()` / `redo()` return `Ok(None)` on empty (translation layer above `UndoStack`)
+- Inverse correctness: `undo(execute(cmd))` → state equals pre-command state (all 7 variants)
 - `DuplicateEntity` produces `EditorAction::Batch` with correct sub-actions; single undo reverts all
-- `AddComponent` undo removes component; `AddComponent` redo restores exact data
-- `DeleteEntity` undo restores name + components via `EntitySnapshot`
-- `undo()` returns `Ok(None)` on empty stack (not error)
-- Property-based (proptest, uses `tempfile` — still single crate):
+- `AddComponent` undo removes component; redo restores exact `data`
+- `DeleteEntity` undo restores `name` + all components via `EntitySnapshot`
+- `RenameEntity` with `Option<String>` old/new names round-trips correctly
+- Persistence (uses `tempfile`): write `.undo.json` → create fresh `CommandProcessor::load()` → undo still works
+- Round-trip (uses `tempfile`): execute command → assert YAML written → undo → assert YAML restored to original
+- Property-based (proptest, uses `tempfile`):
   - For any sequence of N commands: `undo` N times → `redo` N times → final state equals post-command state
   - YAML file is always valid after any command or undo/redo
 
 ### Tier 2 — Integration Tests (`engine/shared/tests/`)
 
-- Full round-trip: execute command → assert YAML written → undo → assert YAML restored to original content
-- Persistence: write `.undo.json` → create fresh `CommandProcessor::load()` → undo still works
-- Error cases: `DeleteEntity` on non-existent id returns `OpsError::EntityNotFound`
-- Multi-template: two `CommandProcessor` instances on different paths operate independently
+Only if tests import from 2+ engine crates. At present, no Tier 2 tests are planned for this feature — all cross-system integration is done at Tier 3.
 
 ### Tier 3 — E2E Tests (`scripts/e2e-tests/`)
 
-- `silm` CLI subprocess: pre-built binary required (CI builds before running Tier 3)
-  - `silm template --template x.yaml entity create "X"` → read YAML → assert entity present
-  - `silm template --template x.yaml undo` → read YAML → assert entity absent
-  - `silm template --template x.yaml redo` → read YAML → assert entity present
+- Pre-built `silm` binary required (CI builds before running Tier 3)
+- `silm template --template x.yaml entity create "X"` → read YAML → assert entity present
+- `silm template --template x.yaml undo` → read YAML → assert entity absent
+- `silm template --template x.yaml redo` → read YAML → assert entity present
 
 ### AI-Agent Testability
 
-`silm` CLI + JSON output + file-authoritative state: an agent can script full regression suites — no UI, no mocks, no Tauri.
+`silm` CLI + JSON output + file-authoritative YAML: an agent can script complete regression suites with no UI, no mocks, no Tauri.
 
 ---
 
@@ -361,5 +398,5 @@ templates/
 - **No network sync of undo history**: undo is local to the editor session
 - **No undo of filesystem operations**: open/close/new template
 - **Max undo depth**: 100 actions (configurable in `editor.toml`)
-- **Full state on every command**: `CommandResult` returns complete `TemplateState` — MVP scope, optimization deferred
+- **Full state on every command**: `CommandResult` returns complete `TemplateState` — MVP scope, delta optimization deferred
 - **Frontend state**: `scene/state.ts` and `scene/commands.ts` replaced by IPC calls; no duplicated state on the JS side
