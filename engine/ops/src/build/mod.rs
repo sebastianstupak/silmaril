@@ -333,10 +333,8 @@ fn preflight_checks(project_root: &Path, platform: &Platform) -> Result<()> {
         BuildTool::Cross => {
             check_tool("cross")?;
             check_docker()?;
-            if platform.name().starts_with("macos-") {
-                if std::env::var("MACOS_SDK_URL").is_err() {
-                    bail!("macOS cross-build requires MACOS_SDK_URL");
-                }
+            if platform.name().starts_with("macos-") && std::env::var("MACOS_SDK_URL").is_err() {
+                bail!("macOS cross-build requires MACOS_SDK_URL");
             }
         }
         BuildTool::Cargo => {

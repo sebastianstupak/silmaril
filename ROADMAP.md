@@ -294,8 +294,9 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
   - [ ] Real-time updates
 
 - [ ] **EDITOR.6:** Additional panels
-  - [ ] Assets panel (file tree)
-  - [ ] Console panel (log streaming)
+  - [ ] Assets panel (asset browser, thumbnails, drag-to-scene)
+  - [ ] File Explorer panel (raw project file tree, VSCode-style — distinct from asset browser)
+  - [ ] Console panel (log streaming, filter by level, timestamps, clear)
   - [ ] AI Chat panel (basic UI, full features in Phase 4.9)
 
 - [ ] **EDITOR.7:** Playback controls
@@ -796,7 +797,7 @@ Following modern editor UX patterns (VSCode, Sublime), Silmaril uses a **directo
 
 **Status:** ⚪ Not Started (0%)
 
-**Time Estimate:** 3-4 weeks (20-25 working days)
+**Time Estimate:** 5-7 weeks (30-45 working days)
 
 **Core Features:**
 - [ ] **ADV.1:** Drag-drop entity manipulation (4 days)
@@ -836,12 +837,29 @@ Following modern editor UX patterns (VSCode, Sublime), Silmaril uses a **directo
   - [ ] Memory profiling
   - [ ] Export to Chrome Tracing
 
-- [ ] **ADV.6:** Integration & Polish (5 days)
+- [ ] **ADV.6:** Terminal & Output panels (4 days)
+  - [ ] Integrated terminal panel (PTY via Tauri shell plugin, runs in project root)
+  - [ ] Output / Build Log panel (cargo build/test/run stdout, separate from runtime console)
+  - [ ] Tasks / Run Configs panel (named run configs: `cargo run`, `cargo test`, custom scripts — execute without opening a terminal)
+
+- [ ] **ADV.7:** Source control panel (4 days)
+  - [ ] Git status sidebar (modified/staged/untracked files)
+  - [ ] Stage/unstage individual files
+  - [ ] Commit message UI
+  - [ ] Diff viewer (inline or side-by-side)
+  - [ ] Branch display in status bar
+
+- [ ] **ADV.8:** Shader editor panel (3 days)
+  - [ ] WGSL syntax highlighting
+  - [ ] Edit shaders inline without leaving the editor
+  - [ ] Hot-reload shader on save
+
+- [ ] **ADV.9:** Integration & Polish (5 days)
   - [ ] Save/load editor layouts
   - [ ] Comprehensive keyboard shortcuts
   - [ ] Context menus
-  - [ ] Command palette (Ctrl+P)
-  - [ ] Search (global, assets, entities)
+  - [ ] Command palette (Ctrl+P — keyboard-first, every action reachable)
+  - [ ] Cross-project search (Ctrl+Shift+F — code, assets, entities)
   - [ ] Themes
 
 **Why LOW priority:**
@@ -856,6 +874,10 @@ Following modern editor UX patterns (VSCode, Sublime), Silmaril uses a **directo
 - [ ] Asset import functional
 - [ ] Material editor creates materials
 - [ ] Profiler visualizes data
+- [ ] Terminal + Output panels functional
+- [ ] Git source control panel operational
+- [ ] Shader editor with hot-reload
+- [ ] Command palette covers all editor actions
 - [ ] Polished UX
 
 ---

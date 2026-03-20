@@ -1,0 +1,74 @@
+<h2>How does the omnibar appear?</h2>
+<p class="subtitle">Two fundamentally different feel/interaction models</p>
+
+<div class="split" style="gap:20px;align-items:flex-start;">
+
+  <div class="mockup" style="flex:1;cursor:pointer;" data-choice="a" onclick="toggleSelect(this)">
+    <div class="mockup-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>A — Always Visible (VS Code style)</span>
+      <span style="font-size:11px;color:#a6e3a1;">Click or Ctrl+K to focus</span>
+    </div>
+    <div class="mockup-body" style="padding:0;">
+      <!-- Toolbar mockup -->
+      <div style="background:#1e1e2e;height:38px;display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid #313244;">
+        <span style="font-size:11px;color:#6c7086;flex:1;">MyProject &rsaquo; Scene1</span>
+        <!-- Omnibar always in center -->
+        <div style="flex:1.5;display:flex;justify-content:center;">
+          <div style="background:#181825;border:1px solid #45475a;border-radius:6px;height:24px;width:240px;display:flex;align-items:center;padding:0 8px;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#6c7086"><circle cx="6" cy="6" r="4.5" stroke="#6c7086" stroke-width="1.5" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#6c7086" stroke-width="1.5"/></svg>
+            <span style="font-size:11px;color:#45475a;">Search commands, entities, assets…</span>
+            <span style="margin-left:auto;font-size:10px;color:#313244;border:1px solid #313244;padding:1px 4px;border-radius:3px;">Ctrl K</span>
+          </div>
+        </div>
+        <span style="font-size:10px;background:#89b4fa;color:#1e1e2e;padding:2px 8px;border-radius:3px;flex:1;text-align:right;max-width:80px;">EDIT</span>
+      </div>
+      <div style="padding:12px;font-size:12px;color:#6c7086;">
+        <p style="margin:0 0 8px;">✓ Always discoverable — new users see it immediately</p>
+        <p style="margin:0 0 8px;">✓ Doubles as project/scene name display when idle</p>
+        <p style="margin:0;">✓ AI agents can see search state at a glance</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup" style="flex:1;cursor:pointer;" data-choice="b" onclick="toggleSelect(this)">
+    <div class="mockup-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>B — Summoned Overlay (Ctrl+P)</span>
+      <span style="font-size:11px;color:#f38ba8;">Hidden until triggered</span>
+    </div>
+    <div class="mockup-body" style="padding:0;">
+      <!-- Toolbar with no omnibar -->
+      <div style="background:#1e1e2e;height:38px;display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid #313244;">
+        <span style="font-size:11px;color:#6c7086;flex:1;">MyProject &rsaquo; Scene1</span>
+        <div style="display:flex;gap:4px;">
+          <div style="background:#181825;border:1px solid #313244;border-radius:4px;width:28px;height:24px;display:flex;align-items:center;justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#6c7086"><path d="M4 2l10 6-10 6V2z"/></svg>
+          </div>
+          <div style="background:#181825;border:1px solid #313244;border-radius:4px;width:28px;height:24px;display:flex;align-items:center;justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#6c7086"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>
+          </div>
+        </div>
+        <span style="font-size:10px;background:#89b4fa;color:#1e1e2e;padding:2px 8px;border-radius:3px;">EDIT</span>
+      </div>
+      <!-- Overlay palette drops from top center -->
+      <div style="position:relative;height:140px;background:#11111b;overflow:hidden;">
+        <div style="position:absolute;left:50%;transform:translateX(-50%);top:8px;width:90%;background:#1e1e2e;border:1px solid #45475a;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="display:flex;align-items:center;padding:8px 12px;gap:8px;border-bottom:1px solid #313244;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="#6c7086"><circle cx="6" cy="6" r="4.5" stroke="#6c7086" stroke-width="1.5" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#6c7086" stroke-width="1.5"/></svg>
+            <span style="font-size:12px;color:#cdd6f4;">&gt; Toggle Grid</span>
+          </div>
+          <div style="padding:4px 0;">
+            <div style="padding:6px 12px;background:#313244;font-size:11px;color:#cdd6f4;">Toggle Grid Visibility</div>
+            <div style="padding:6px 12px;font-size:11px;color:#6c7086;">Open Project…</div>
+            <div style="padding:6px 12px;font-size:11px;color:#6c7086;">Set Tool: Move</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px;font-size:12px;color:#6c7086;">
+        <p style="margin:0 0 8px;">✓ Full-width dropdown — more room for results</p>
+        <p style="margin:0 0 8px;">✓ Toolbar stays uncluttered</p>
+        <p style="margin:0;">— Must know the shortcut to discover it</p>
+      </div>
+    </div>
+  </div>
+
+</div>

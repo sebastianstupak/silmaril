@@ -1,0 +1,44 @@
+<h2>What should the center bar primarily do?</h2>
+<p class="subtitle">VS Code's center bar started as a command palette trigger. We have design freedom to define ours. Pick the primary role:</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Command Palette</h3>
+      <p>Run any editor action — open settings, toggle grid, change tool, switch layout, etc. Like VS Code's <strong>Ctrl+Shift+P</strong>. Great for keyboard-first power users and AI agent automation.</p>
+      <div style="margin-top:10px;padding:8px 12px;background:#1e1e2e;border-radius:6px;font-family:monospace;font-size:12px;color:#cdd6f4;">
+        <span style="color:#6c7086;">&gt;</span> <span style="color:#89b4fa;">Toggle Grid</span><br>
+        <span style="color:#6c7086;">&gt;</span> <span style="color:#89b4fa;">Open Project…</span><br>
+        <span style="color:#6c7086;">&gt;</span> <span style="color:#89b4fa;">Set Tool: Move</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Scene Search / Navigation</h3>
+      <p>Jump to entities, assets, components by name. Select and focus. Like a scene-scoped quick-open. Great for large scenes with many entities.</p>
+      <div style="margin-top:10px;padding:8px 12px;background:#1e1e2e;border-radius:6px;font-family:monospace;font-size:12px;color:#cdd6f4;">
+        <span style="color:#6c7086;">@</span> <span style="color:#a6e3a1;">Player</span><br>
+        <span style="color:#6c7086;">@</span> <span style="color:#a6e3a1;">EnemySpawner_01</span><br>
+        <span style="color:#6c7086;">@</span> <span style="color:#a6e3a1;">MainCamera</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Unified Omnibar</h3>
+      <p>One input, everything. Prefix characters route to different modes — <strong>&gt;</strong> for commands, <strong>@</strong> for entities, <strong>#</strong> for assets, no prefix = fuzzy search all. Exactly what VS Code does with its search bar in newer versions.</p>
+      <div style="margin-top:10px;padding:8px 12px;background:#1e1e2e;border-radius:6px;font-family:monospace;font-size:12px;color:#cdd6f4;">
+        <span style="color:#f38ba8;">&gt;</span> commands &nbsp;
+        <span style="color:#a6e3a1;">@</span> entities &nbsp;
+        <span style="color:#89dceb;">#</span> assets &nbsp;
+        <span style="color:#cba6f7;">?</span> help
+      </div>
+    </div>
+  </div>
+</div>

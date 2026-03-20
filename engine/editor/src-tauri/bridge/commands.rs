@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::viewport::native_viewport::{NativeViewport, ViewportBounds, CameraState};
+use crate::viewport::native_viewport::{CameraState, NativeViewport, ViewportBounds};
 
 #[derive(Serialize)]
 pub struct EditorStateResponse {
@@ -21,11 +21,7 @@ pub struct EntityInfo {
 
 #[tauri::command]
 pub fn get_editor_state() -> EditorStateResponse {
-    EditorStateResponse {
-        mode: "edit".to_string(),
-        project_name: None,
-        project_path: None,
-    }
+    EditorStateResponse { mode: "edit".to_string(), project_name: None, project_path: None }
 }
 
 #[tauri::command]
@@ -35,8 +31,8 @@ pub fn open_project(path: String) -> Result<EditorStateResponse, String> {
         return Err("No game.toml found in selected directory".to_string());
     }
 
-    let game_toml = std::fs::read_to_string(project_root.join("game.toml"))
-        .map_err(|e| e.to_string())?;
+    let game_toml =
+        std::fs::read_to_string(project_root.join("game.toml")).map_err(|e| e.to_string())?;
     let name = engine_ops::build::parse_project_name(&game_toml)
         .unwrap_or_else(|| "Unknown Project".to_string());
 
@@ -51,11 +47,7 @@ pub fn open_project(path: String) -> Result<EditorStateResponse, String> {
 pub async fn open_project_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
-    let folder = app
-        .dialog()
-        .file()
-        .set_title("Open Silmaril Project")
-        .blocking_pick_folder();
+    let folder = app.dialog().file().set_title("Open Silmaril Project").blocking_pick_folder();
 
     Ok(folder.map(|f| f.to_string()))
 }
@@ -172,17 +164,12 @@ pub fn scene_command(command: String, args: String) -> Result<serde_json::Value,
             Ok(serde_json::json!({ "ok": true, "command": "select_entity" }))
         }
         "create_entity" => {
-            let name = parsed
-                .get("name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("New Entity");
+            let name = parsed.get("name").and_then(|v| v.as_str()).unwrap_or("New Entity");
             Ok(serde_json::json!({ "ok": true, "command": "create_entity", "name": name }))
         }
         "delete_entity" => {
-            let id = parsed
-                .get("id")
-                .and_then(|v| v.as_u64())
-                .ok_or("delete_entity requires 'id'")?;
+            let id =
+                parsed.get("id").and_then(|v| v.as_u64()).ok_or("delete_entity requires 'id'")?;
             Ok(serde_json::json!({ "ok": true, "command": "delete_entity", "id": id }))
         }
         "duplicate_entity" => {
@@ -193,11 +180,14 @@ pub fn scene_command(command: String, args: String) -> Result<serde_json::Value,
             Ok(serde_json::json!({ "ok": true, "command": "duplicate_entity", "id": id }))
         }
         "move_entity" => {
-            let id = parsed.get("id").and_then(|v| v.as_u64()).ok_or("move_entity requires 'id'")?;
+            let id =
+                parsed.get("id").and_then(|v| v.as_u64()).ok_or("move_entity requires 'id'")?;
             let x = parsed.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let y = parsed.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let z = parsed.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            Ok(serde_json::json!({ "ok": true, "command": "move_entity", "id": id, "x": x, "y": y, "z": z }))
+            Ok(
+                serde_json::json!({ "ok": true, "command": "move_entity", "id": id, "x": x, "y": y, "z": z }),
+            )
         }
         "pan_camera" => {
             let dx = parsed.get("dx").and_then(|v| v.as_f64()).unwrap_or(0.0);
@@ -209,22 +199,15 @@ pub fn scene_command(command: String, args: String) -> Result<serde_json::Value,
             Ok(serde_json::json!({ "ok": true, "command": "zoom_camera", "delta": delta }))
         }
         "focus_entity" => {
-            let id = parsed
-                .get("id")
-                .and_then(|v| v.as_u64())
-                .ok_or("focus_entity requires 'id'")?;
+            let id =
+                parsed.get("id").and_then(|v| v.as_u64()).ok_or("focus_entity requires 'id'")?;
             Ok(serde_json::json!({ "ok": true, "command": "focus_entity", "id": id }))
         }
         "set_tool" => {
-            let tool = parsed
-                .get("tool")
-                .and_then(|v| v.as_str())
-                .unwrap_or("select");
+            let tool = parsed.get("tool").and_then(|v| v.as_str()).unwrap_or("select");
             Ok(serde_json::json!({ "ok": true, "command": "set_tool", "tool": tool }))
         }
-        "get_state" => {
-            Ok(serde_json::json!({ "ok": true, "command": "get_state" }))
-        }
+        "get_state" => Ok(serde_json::json!({ "ok": true, "command": "get_state" })),
         _ => Err(format!("Unknown scene command: {command}")),
     }
 }
@@ -236,6 +219,7 @@ pub fn scene_command(command: String, args: String) -> Result<serde_json::Value,
 /// Registry of NativeViewport objects, one per OS window (HWND).
 /// Tracks which `viewport_id` belongs to which HWND so commands can be
 /// routed to the right Vulkan context regardless of which window they came from.
+#[derive(Default)]
 pub struct ViewportRegistry {
     by_hwnd: HashMap<isize, NativeViewport>,
     hwnd_by_id: HashMap<String, isize>,
@@ -247,7 +231,7 @@ pub struct ViewportRegistry {
 
 impl ViewportRegistry {
     pub fn new() -> Self {
-        Self { by_hwnd: HashMap::new(), hwnd_by_id: HashMap::new(), saved_cameras: HashMap::new() }
+        Self::default()
     }
 
     fn get_for_id(&self, id: &str) -> Option<&NativeViewport> {
@@ -258,9 +242,15 @@ impl ViewportRegistry {
 
 pub struct NativeViewportState(pub Mutex<ViewportRegistry>);
 
+impl Default for NativeViewportState {
+    fn default() -> Self {
+        Self(Mutex::new(ViewportRegistry::new()))
+    }
+}
+
 impl NativeViewportState {
     pub fn new() -> Self {
-        Self(Mutex::new(ViewportRegistry::new()))
+        Self::default()
     }
 }
 
@@ -290,13 +280,17 @@ pub fn create_native_viewport(
         let mut registry = viewport_state.0.lock().unwrap();
 
         // Create a NativeViewport for this HWND if one doesn't exist yet.
-        if !registry.by_hwnd.contains_key(&hwnd_isize) {
+        if let std::collections::hash_map::Entry::Vacant(e) = registry.by_hwnd.entry(hwnd_isize) {
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
-            let mut vp = NativeViewport::new(parent_hwnd)
-                .map_err(|e| { tracing::error!(error = %e, "NativeViewport::new failed"); e })?;
-            vp.start_rendering()
-                .map_err(|e| { tracing::error!(error = %e, "start_rendering failed"); e })?;
-            registry.by_hwnd.insert(hwnd_isize, vp);
+            let mut vp = NativeViewport::new(parent_hwnd).map_err(|e| {
+                tracing::error!(error = %e, "NativeViewport::new failed");
+                e
+            })?;
+            vp.start_rendering().map_err(|e| {
+                tracing::error!(error = %e, "start_rendering failed");
+                e
+            })?;
+            e.insert(vp);
         }
 
         // Map viewport_id → hwnd for future lookups.
@@ -359,8 +353,8 @@ pub fn destroy_native_viewport(
     // .copied() gives an owned isize — releases the borrow on hwnd_by_id before the block.
     if let Some(hwnd) = registry.hwnd_by_id.get(&viewport_id).copied() {
         // Save camera (owned return value, borrow of by_hwnd ends after .and_then).
-        let saved_cam = registry.by_hwnd.get(&hwnd)
-            .and_then(|vp| vp.get_instance_camera(&viewport_id));
+        let saved_cam =
+            registry.by_hwnd.get(&hwnd).and_then(|vp| vp.get_instance_camera(&viewport_id));
         if let Some(cam) = saved_cam {
             registry.saved_cameras.insert(viewport_id.clone(), cam);
         }
@@ -457,7 +451,9 @@ pub async fn dock_panel_back(
     if let Ok(hwnd) = window.hwnd() {
         let hwnd_isize = hwnd.0 as isize;
         let mut registry = viewport_state.0.lock().unwrap();
-        let saved_cam = registry.by_hwnd.get(&hwnd_isize)
+        let saved_cam = registry
+            .by_hwnd
+            .get(&hwnd_isize)
             .and_then(|vp: &NativeViewport| vp.get_instance_camera(&panel_id));
         if let Some(cam) = saved_cam {
             registry.saved_cameras.insert(panel_id.clone(), cam);
@@ -477,9 +473,7 @@ pub async fn dock_panel_back(
     }
 
     // Close the pop-out window
-    window
-        .close()
-        .map_err(|e| format!("Failed to close pop-out window: {e}"))?;
+    window.close().map_err(|e| format!("Failed to close pop-out window: {e}"))?;
 
     Ok(())
 }
@@ -533,9 +527,7 @@ pub fn window_start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
     {
         use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
         use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
-        use windows::Win32::UI::WindowsAndMessaging::{
-            PostMessageW, HTCAPTION, WM_NCLBUTTONDOWN,
-        };
+        use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, HTCAPTION, WM_NCLBUTTONDOWN};
         let raw = window.hwnd().map_err(|e| format!("get HWND: {e}"))?;
         // Reconstruct HWND from the raw pointer to match our local windows crate type.
         let hwnd = HWND(raw.0);
@@ -544,9 +536,10 @@ pub fn window_start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
             let _ = ReleaseCapture();
             // PostMessage (async) queues WM_NCLBUTTONDOWN/HTCAPTION; returns
             // immediately while the OS handles the move loop.
-            let _ = PostMessageW(Some(hwnd), WM_NCLBUTTONDOWN, WPARAM(HTCAPTION as usize), LPARAM(0));
+            let _ =
+                PostMessageW(Some(hwnd), WM_NCLBUTTONDOWN, WPARAM(HTCAPTION as usize), LPARAM(0));
         }
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(windows))]
@@ -568,9 +561,7 @@ pub async fn check_dock_proximity(
 ) -> Result<serde_json::Value, String> {
     use tauri::{Emitter, Manager};
 
-    let main = app
-        .get_webview_window("main")
-        .ok_or("main window not found")?;
+    let main = app.get_webview_window("main").ok_or("main window not found")?;
 
     let main_pos = main.outer_position().map_err(|e| e.to_string())?;
     let main_size = main.outer_size().map_err(|e| e.to_string())?;
@@ -611,14 +602,10 @@ pub async fn check_dock_proximity(
 
     // Emit to main window
     if let Some(main_win) = app.get_webview_window("main") {
-        let _ = main_win.emit(
-            "popout-near",
-            serde_json::json!({ "near": near, "zone": zone }),
-        );
+        let _ = main_win.emit("popout-near", serde_json::json!({ "near": near, "zone": zone }));
     }
 
-    Ok(serde_json::json!({ "near": near, "zone": zone })
-    )
+    Ok(serde_json::json!({ "near": near, "zone": zone }))
 }
 
 /// Show or hide a viewport instance.
@@ -756,7 +743,8 @@ pub fn start_dock_drag(
     #[cfg(windows)]
     {
         use tauri::Manager;
-        let popout_hwnd_raw = window.hwnd().map_err(|e| format!("get pop-out HWND: {e}"))?.0 as isize;
+        let popout_hwnd_raw =
+            window.hwnd().map_err(|e| format!("get pop-out HWND: {e}"))?.0 as isize;
         let window_label = window.label().to_string();
 
         // Obtain the main HWND here on the command thread (Tauri runtime), not
@@ -765,7 +753,8 @@ pub fn start_dock_drag(
             .get_webview_window("main")
             .ok_or("main window not found")?
             .hwnd()
-            .map_err(|e| format!("get main HWND: {e}"))?.0 as isize;
+            .map_err(|e| format!("get main HWND: {e}"))?
+            .0 as isize;
 
         std::thread::spawn(move || {
             dock_drag_thread(app, window_label, panel_id, popout_hwnd_raw, main_hwnd_raw);
@@ -827,44 +816,58 @@ fn dock_drag_thread(
         std::thread::sleep(std::time::Duration::from_millis(33)); // ~30 fps polling
 
         // Bit 15: key currently pressed (GetAsyncKeyState is thread-safe).
-        let button_down =
-            unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000 != 0 };
+        let button_down = unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000 != 0 };
 
         let mut cursor = POINT::default();
-        unsafe { let _ = GetCursorPos(&mut cursor); }
+        unsafe {
+            let _ = GetCursorPos(&mut cursor);
+        }
         let cx = cursor.x;
         let cy = cursor.y;
 
         // GetWindowRect uses the same Win32 screen coordinate system as GetCursorPos,
         // avoiding any Tauri PhysicalPosition / DPI conversion mismatch.
         let mut main_rect = RECT::default();
-        unsafe { let _ = GetWindowRect(main_hwnd, &mut main_rect); }
+        unsafe {
+            let _ = GetWindowRect(main_hwnd, &mut main_rect);
+        }
 
-        let near = cx >= main_rect.left && cx <= main_rect.right
-                && cy >= main_rect.top  && cy <= main_rect.bottom;
+        let near = cx >= main_rect.left
+            && cx <= main_rect.right
+            && cy >= main_rect.top
+            && cy <= main_rect.bottom;
 
         let mw = (main_rect.right - main_rect.left) as f64;
         let mh = (main_rect.bottom - main_rect.top) as f64;
         let rel_x = if mw > 0.0 { (cx - main_rect.left) as f64 / mw } else { 0.0 };
-        let rel_y = if mh > 0.0 { (cy - main_rect.top)  as f64 / mh } else { 0.0 };
+        let rel_y = if mh > 0.0 { (cy - main_rect.top) as f64 / mh } else { 0.0 };
 
         let zone = if near {
-            if rel_x < 0.2 { "left" }
-            else if rel_x > 0.8 { "right" }
-            else if rel_y < 0.15 { "top" }
-            else if rel_y > 0.85 { "bottom" }
-            else { "center" }
+            if rel_x < 0.2 {
+                "left"
+            } else if rel_x > 0.8 {
+                "right"
+            } else if rel_y < 0.15 {
+                "top"
+            } else if rel_y > 0.85 {
+                "bottom"
+            } else {
+                "center"
+            }
         } else {
             "none"
         };
 
-        let _ = main_win.emit("popout-near", serde_json::json!({
-            "near": near,
-            "zone": zone,
-            "panelId": panel_id,
-            "relX": rel_x,
-            "relY": rel_y,
-        }));
+        let _ = main_win.emit(
+            "popout-near",
+            serde_json::json!({
+                "near": near,
+                "zone": zone,
+                "panelId": panel_id,
+                "relX": rel_x,
+                "relY": rel_y,
+            }),
+        );
 
         if !button_down {
             tracing::debug!(panel = %panel_id, near, zone, "dock_drag_thread: button released");
@@ -895,10 +898,8 @@ fn dock_drag_thread(
                 }
             } else {
                 // Drag ended away from main window — clear the overlay.
-                let _ = main_win.emit(
-                    "popout-near",
-                    serde_json::json!({ "near": false, "zone": "none" }),
-                );
+                let _ = main_win
+                    .emit("popout-near", serde_json::json!({ "near": false, "zone": "none" }));
             }
             break;
         }

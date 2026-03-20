@@ -34,13 +34,16 @@ pub struct SubscriptionManager {
     next_id: SubscriptionId,
 }
 
+impl Default for SubscriptionManager {
+    fn default() -> Self {
+        Self { subscriptions: HashMap::new(), next_id: 1 }
+    }
+}
+
 impl SubscriptionManager {
     /// Creates a new empty subscription manager.
     pub fn new() -> Self {
-        Self {
-            subscriptions: HashMap::new(),
-            next_id: 1,
-        }
+        Self::default()
     }
 
     /// Registers a new subscription and returns its identifier.
@@ -77,9 +80,6 @@ impl SubscriptionManager {
 
     /// Returns all subscriptions for a given channel.
     pub fn get_channel_subscriptions(&self, channel: &str) -> Vec<&Subscription> {
-        self.subscriptions
-            .values()
-            .filter(|s| s.channel == channel)
-            .collect()
+        self.subscriptions.values().filter(|s| s.channel == channel).collect()
     }
 }

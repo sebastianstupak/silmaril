@@ -1,0 +1,104 @@
+<h2>Where do transport controls go?</h2>
+<p class="subtitle">The omnibar takes center stage — transport (play/pause/stop) needs a new home</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Transport moves to toolbar right</h3>
+      <div style="margin:10px 0;background:#1e1e2e;border-radius:6px;overflow:hidden;">
+        <div style="background:#181825;height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;border-bottom:1px solid #313244;">
+          <span style="font-size:10px;color:#6c7086;flex:0.8;">MyProject &rsaquo; Scene1</span>
+          <div style="flex:1.4;display:flex;justify-content:center;">
+            <div style="background:#11111b;border:1px solid #45475a;border-radius:5px;height:22px;width:220px;display:flex;align-items:center;padding:0 7px;gap:5px;">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="#6c7086"><circle cx="6" cy="6" r="4.5" stroke="#6c7086" stroke-width="1.5" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#6c7086" stroke-width="1.5"/></svg>
+              <span style="font-size:10px;color:#45475a;">Search…</span>
+              <span style="margin-left:auto;font-size:9px;color:#313244;border:1px solid #313244;padding:1px 3px;border-radius:2px;">⌘K</span>
+            </div>
+          </div>
+          <!-- Transport on right -->
+          <div style="display:flex;align-items:center;gap:0;border:1px solid #313244;border-radius:4px;overflow:hidden;flex-shrink:0;">
+            <div style="background:#11111b;width:26px;height:22px;display:flex;align-items:center;justify-content:center;border-right:1px solid #313244;">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="#a6e3a1"><path d="M4 2l10 6-10 6V2z"/></svg>
+            </div>
+            <div style="background:#11111b;width:26px;height:22px;display:flex;align-items:center;justify-content:center;border-right:1px solid #313244;">
+              <svg width="9" height="9" viewBox="0 0 16 16" fill="#6c7086"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>
+            </div>
+            <div style="background:#11111b;width:26px;height:22px;display:flex;align-items:center;justify-content:center;">
+              <svg width="9" height="9" viewBox="0 0 16 16" fill="#6c7086"><rect x="3" y="3" width="10" height="10"/></svg>
+            </div>
+          </div>
+          <span style="font-size:9px;background:#89b4fa;color:#1e1e2e;padding:1px 6px;border-radius:2px;flex-shrink:0;">EDIT</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#6c7086;margin:4px 0 0;">Keeps toolbar self-contained. Transport less prominent but still in main toolbar row.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Transport moves to TitleBar (next to menus)</h3>
+      <div style="margin:10px 0;background:#1e1e2e;border-radius:6px;overflow:hidden;">
+        <!-- TitleBar row -->
+        <div style="background:#12121c;height:30px;display:flex;align-items:center;padding:0 10px;gap:8px;border-bottom:1px solid #1e1e2e;">
+          <span style="font-size:10px;color:#cdd6f4;font-weight:600;">silmaril</span>
+          <span style="font-size:10px;color:#6c7086;">File Edit View Entity Build</span>
+          <!-- Transport here -->
+          <div style="margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid #313244;border-radius:4px;overflow:hidden;">
+            <div style="background:#1e1e2e;width:24px;height:20px;display:flex;align-items:center;justify-content:center;border-right:1px solid #313244;">
+              <svg width="9" height="9" viewBox="0 0 16 16" fill="#a6e3a1"><path d="M4 2l10 6-10 6V2z"/></svg>
+            </div>
+            <div style="background:#1e1e2e;width:24px;height:20px;display:flex;align-items:center;justify-content:center;border-right:1px solid #313244;">
+              <svg width="8" height="8" viewBox="0 0 16 16" fill="#6c7086"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>
+            </div>
+            <div style="background:#1e1e2e;width:24px;height:20px;display:flex;align-items:center;justify-content:center;">
+              <svg width="8" height="8" viewBox="0 0 16 16" fill="#6c7086"><rect x="3" y="3" width="10" height="10"/></svg>
+            </div>
+          </div>
+          <div style="width:60px;height:20px;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
+            <div style="width:12px;height:12px;border-radius:50%;background:#313244;"></div>
+            <div style="width:12px;height:12px;border-radius:50%;background:#313244;"></div>
+            <div style="width:12px;height:12px;border-radius:50%;background:#f38ba8;"></div>
+          </div>
+        </div>
+        <!-- Toolbar with full-width omnibar -->
+        <div style="background:#181825;height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;">
+          <span style="font-size:10px;color:#6c7086;">MyProject &rsaquo; Scene1</span>
+          <div style="flex:1;display:flex;justify-content:center;">
+            <div style="background:#11111b;border:1px solid #45475a;border-radius:5px;height:22px;width:260px;display:flex;align-items:center;padding:0 7px;gap:5px;">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="#6c7086"><circle cx="6" cy="6" r="4.5" stroke="#6c7086" stroke-width="1.5" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#6c7086" stroke-width="1.5"/></svg>
+              <span style="font-size:10px;color:#45475a;">Search…</span>
+              <span style="margin-left:auto;font-size:9px;color:#313244;border:1px solid #313244;padding:1px 3px;border-radius:2px;">⌘K</span>
+            </div>
+          </div>
+          <span style="font-size:9px;background:#89b4fa;color:#1e1e2e;padding:1px 6px;border-radius:2px;">EDIT</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#6c7086;margin:4px 0 0;">Transport lives with window chrome. Omnibar toolbar becomes cleaner. Transport slightly less visible.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Omnibar replaces transport — play is a command</h3>
+      <div style="margin:10px 0;background:#1e1e2e;border-radius:6px;overflow:hidden;">
+        <div style="background:#181825;height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;">
+          <span style="font-size:10px;color:#6c7086;flex:0.8;">MyProject &rsaquo; Scene1</span>
+          <div style="flex:1.4;display:flex;justify-content:center;">
+            <div style="background:#11111b;border:1px solid #45475a;border-radius:5px;height:22px;width:220px;display:flex;align-items:center;padding:0 7px;gap:5px;">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="#6c7086"><circle cx="6" cy="6" r="4.5" stroke="#6c7086" stroke-width="1.5" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#6c7086" stroke-width="1.5"/></svg>
+              <span style="font-size:10px;color:#45475a;">Search…</span>
+              <span style="margin-left:auto;font-size:9px;color:#313244;border:1px solid #313244;padding:1px 3px;border-radius:2px;">⌘K</span>
+            </div>
+          </div>
+          <span style="font-size:9px;background:#89b4fa;color:#1e1e2e;padding:1px 6px;border-radius:2px;flex-shrink:0;">EDIT</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#6c7086;margin:4px 0 0;">Minimal. Play/pause/stop become <code style="background:#313244;padding:1px 4px;border-radius:3px;">&gt; Play Scene</code> commands. Bold move — requires discipline to use. Good for AI agent workflows; less good for quick manual iteration.</p>
+    </div>
+  </div>
+
+</div>

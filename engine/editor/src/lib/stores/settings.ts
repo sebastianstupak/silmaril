@@ -1,4 +1,6 @@
-// Editor settings — persisted to localStorage (Tauri has access)
+// Editor settings — persisted via tauri-plugin-store (primary) + localStorage (fallback/cache)
+
+import { persistLoad, persistSave } from './persist';
 
 export interface EditorSettings {
   theme: string;
@@ -12,8 +14,9 @@ export interface EditorSettings {
 }
 
 const STORAGE_KEY = 'silmaril-editor-settings';
+const PERSIST_KEY = 'settings';
 
-const defaults: EditorSettings = {
+export const defaultSettings: EditorSettings = {
   theme: 'dark',
   language: 'en',
   leftPanelWidth: 250,
@@ -24,22 +27,38 @@ const defaults: EditorSettings = {
   compactMenu: false,
 };
 
+/** Synchronous load from localStorage cache — used for initial $state() hydration. */
 export function loadSettings(): EditorSettings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return { ...defaults, ...JSON.parse(stored) };
+      return { ...defaultSettings, ...JSON.parse(stored) };
     }
   } catch {
     // ignore parse errors
   }
-  return { ...defaults };
+  return { ...defaultSettings };
 }
 
+/** Save to localStorage (instant) and tauri-plugin-store (async, durable). */
 export function saveSettings(settings: EditorSettings) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
     // ignore storage errors
   }
+  persistSave(PERSIST_KEY, settings);
+}
+
+/**
+ * Load from tauri-plugin-store and update the localStorage cache.
+ * Call in onMount to hydrate from the durable store after initial render.
+ */
+export async function hydrateSettings(): Promise<EditorSettings> {
+  const stored = await persistLoad<EditorSettings>(PERSIST_KEY, loadSettings());
+  const merged = { ...defaultSettings, ...stored };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+  } catch { /* ignore */ }
+  return merged;
 }

@@ -1,5 +1,6 @@
 // Docking layout state management with persistence and templates
 import type { EditorLayout, LayoutNode, TabsNode, SplitNode, DropZone } from './types';
+import { persistLoad, persistSave } from '../stores/persist';
 
 const STORAGE_KEY = 'silmaril-editor-layout';
 
@@ -72,12 +73,6 @@ export const wideLayout: EditorLayout = {
   bottomPanel: { type: 'tabs', activeTab: 0, panels: [] },
 };
 
-export const layoutTemplates: Record<string, EditorLayout> = {
-  default: defaultLayout,
-  tall: tallLayout,
-  wide: wideLayout,
-};
-
 // ---------------------------------------------------------------------------
 // Deep clone utility
 // ---------------------------------------------------------------------------
@@ -115,7 +110,18 @@ export function saveLayout(layout: EditorLayout) {
     } catch {
       // ignore storage errors
     }
+    persistSave('layout', layout);
   }, 300);
+}
+
+/** Load layout from tauri-plugin-store and update the localStorage cache. */
+export async function hydrateLayout(): Promise<EditorLayout | null> {
+  const stored = await persistLoad<EditorLayout>('layout', null as any);
+  if (stored?.root && stored?.bottomPanel) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch { /* ignore */ }
+    return stored;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,9 +133,20 @@ export interface DragState {
   active: boolean;
   mouseX: number;
   mouseY: number;
+  /** True when activated by a pop-out window drag, not an internal tab drag. */
+  popout: boolean;
+  /** The layout path of the DockDropZone panel currently being hovered (popout drag only). */
+  dropPath: number[] | null;
+  /** The zone within that panel currently being hovered. */
+  dropZone: DropZone | null;
+  /** Whether the hovered panel is in the bottom panel area. */
+  dropIsBottom: boolean;
 }
 
-let _dragState: DragState = { panelId: '', active: false, mouseX: 0, mouseY: 0 };
+let _dragState: DragState = {
+  panelId: '', active: false, mouseX: 0, mouseY: 0, popout: false,
+  dropPath: null, dropZone: null, dropIsBottom: false,
+};
 let _dragListeners: Array<() => void> = [];
 
 export function getDragState(): DragState {
@@ -147,8 +164,10 @@ function notifyDragListeners() {
   for (const l of _dragListeners) l();
 }
 
-export function startDrag(panelId: string, x: number, y: number) {
-  _dragState = { panelId, active: true, mouseX: x, mouseY: y };
+export function startDrag(panelId: string, x: number, y: number, popout = false) {
+  // Reset dropPath/dropZone on each tick so stale values don't persist when the
+  // cursor moves into a gap between panels. DockDropZone re-sets them if hovered.
+  _dragState = { panelId, active: true, mouseX: x, mouseY: y, popout, dropPath: null, dropZone: null, dropIsBottom: false };
   notifyDragListeners();
 }
 
@@ -158,8 +177,17 @@ export function updateDrag(x: number, y: number) {
 }
 
 export function endDrag() {
-  _dragState = { panelId: '', active: false, mouseX: 0, mouseY: 0 };
+  _dragState = {
+    panelId: '', active: false, mouseX: 0, mouseY: 0, popout: false,
+    dropPath: null, dropZone: null, dropIsBottom: false,
+  };
   notifyDragListeners();
+}
+
+/** Called by DockDropZone to report which panel+zone the cursor is currently over. */
+export function updateDropTarget(path: number[] | null, zone: DropZone | null, isBottom: boolean) {
+  _dragState = { ..._dragState, dropPath: path, dropZone: zone, dropIsBottom: isBottom };
+  // No listener notification needed — this is for querying at drop time only.
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +439,63 @@ export function setActiveTab(
     node.activeTab = tabIndex;
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Saved Layouts (named, persistent, per-slot keybinds)
+// ---------------------------------------------------------------------------
+
+export interface SavedLayout {
+  id: string;
+  name: string;
+  layout: EditorLayout;
+  /** Keybind string, e.g. "ctrl+1". Stored with the slot so it follows reorder. */
+  keybind?: string;
+}
+
+const SAVED_LAYOUTS_KEY = 'silmaril-saved-layouts';
+
+export const initialSavedLayouts: SavedLayout[] = [
+  { id: 'builtin-edit',   name: 'Edit',   layout: defaultLayout, keybind: 'ctrl+1' },
+  { id: 'builtin-assets', name: 'Assets', layout: tallLayout,    keybind: 'ctrl+2' },
+  { id: 'builtin-review', name: 'Review', layout: wideLayout,    keybind: 'ctrl+3' },
+];
+
+export function loadSavedLayouts(): SavedLayout[] {
+  try {
+    const stored = localStorage.getItem(SAVED_LAYOUTS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as SavedLayout[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return JSON.parse(JSON.stringify(initialSavedLayouts));
+}
+
+let _saveLayoutsTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function saveSavedLayouts(layouts: SavedLayout[]) {
+  if (_saveLayoutsTimer) clearTimeout(_saveLayoutsTimer);
+  _saveLayoutsTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(SAVED_LAYOUTS_KEY, JSON.stringify(layouts));
+    } catch {
+      // ignore storage errors
+    }
+    persistSave('savedLayouts', layouts);
+  }, 300);
+}
+
+/** Load saved layouts from tauri-plugin-store and update the localStorage cache. */
+export async function hydrateSavedLayouts(): Promise<SavedLayout[] | null> {
+  const stored = await persistLoad<SavedLayout[]>('savedLayouts', null as any);
+  if (Array.isArray(stored) && stored.length > 0) {
+    try { localStorage.setItem(SAVED_LAYOUTS_KEY, JSON.stringify(stored)); } catch { /* ignore */ }
+    return stored;
+  }
+  return null;
 }
 
 // ── Tab cycle (Ctrl+Tab) ──────────────────────────────────────────────────────

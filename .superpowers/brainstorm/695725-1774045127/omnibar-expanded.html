@@ -1,0 +1,108 @@
+<h2>Omnibar — expanded state</h2>
+<p class="subtitle">How it looks in the TitleBar when focused, with grouped results</p>
+
+<div class="mockup">
+  <div class="mockup-header">TitleBar — omnibar active (typed "tog")</div>
+  <div class="mockup-body" style="padding:0;background:#12121c;">
+
+    <!-- TitleBar row -->
+    <div style="background:#12121c;height:32px;display:flex;align-items:center;padding:0 12px;gap:10px;position:relative;z-index:10;">
+      <div style="display:flex;align-items:center;gap:6px;flex:1;">
+        <span style="font-size:11px;color:#cdd6f4;font-weight:600;">silmaril</span>
+        <span style="font-size:11px;color:#6c7086;">File</span>
+        <span style="font-size:11px;color:#6c7086;">Edit</span>
+        <span style="font-size:11px;color:#6c7086;">View</span>
+        <span style="font-size:11px;color:#6c7086;">Entity</span>
+        <span style="font-size:11px;color:#6c7086;">Build</span>
+      </div>
+
+      <!-- Omnibar — expanded/focused state -->
+      <div style="position:relative;flex:1.2;display:flex;justify-content:center;">
+        <div style="width:320px;position:relative;">
+          <!-- Input -->
+          <div style="background:#1e1e2e;border:1px solid #89b4fa;border-radius:6px 6px 0 0;height:26px;display:flex;align-items:center;padding:0 8px;gap:6px;box-shadow:0 0 0 2px rgba(137,180,250,0.15);">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="#89b4fa"><circle cx="6" cy="6" r="4.5" stroke="#89b4fa" stroke-width="1.5" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#89b4fa" stroke-width="1.5"/></svg>
+            <span style="font-size:12px;color:#cdd6f4;flex:1;">tog</span>
+            <span style="font-size:10px;color:#45475a;border:1px solid #313244;padding:1px 4px;border-radius:3px;">Esc</span>
+          </div>
+
+          <!-- Dropdown -->
+          <div style="position:absolute;top:26px;left:0;right:0;background:#1e1e2e;border:1px solid #45475a;border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 32px rgba(0,0,0,0.7);z-index:100;max-height:260px;overflow-y:auto;">
+
+            <!-- Commands group -->
+            <div style="padding:6px 10px 2px;font-size:10px;color:#45475a;text-transform:uppercase;letter-spacing:0.08em;">Commands</div>
+
+            <!-- Result rows -->
+            <div style="padding:5px 10px;display:flex;align-items:center;gap:8px;background:#313244;border-left:2px solid #89b4fa;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="#89b4fa" style="flex-shrink:0;"><path d="M2 4h12M2 8h8M2 12h5" stroke="#89b4fa" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+              <span style="font-size:12px;color:#cdd6f4;flex:1;"><strong style="color:#89b4fa;">Tog</strong>gle Grid</span>
+              <span style="font-size:10px;color:#6c7086;background:#181825;padding:1px 5px;border-radius:3px;">View</span>
+              <span style="font-size:10px;color:#45475a;border:1px solid #313244;padding:1px 4px;border-radius:3px;">Ctrl+G</span>
+            </div>
+
+            <div style="padding:5px 10px;display:flex;align-items:center;gap:8px;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="#6c7086" style="flex-shrink:0;"><path d="M2 4h12M2 8h8M2 12h5" stroke="#6c7086" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+              <span style="font-size:12px;color:#a6adc8;flex:1;"><strong style="color:#89b4fa;">Tog</strong>gle Snap to Grid</span>
+              <span style="font-size:10px;color:#6c7086;background:#181825;padding:1px 5px;border-radius:3px;">View</span>
+              <span style="font-size:10px;color:#45475a;border:1px solid #313244;padding:1px 4px;border-radius:3px;">Ctrl+Shift+G</span>
+            </div>
+
+            <div style="padding:5px 10px;display:flex;align-items:center;gap:8px;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="#6c7086" style="flex-shrink:0;"><circle cx="8" cy="8" r="5" stroke="#6c7086" stroke-width="1.5" fill="none"/></svg>
+              <span style="font-size:12px;color:#a6adc8;flex:1;"><strong style="color:#89b4fa;">Tog</strong>gle Projection</span>
+              <span style="font-size:10px;color:#6c7086;background:#181825;padding:1px 5px;border-radius:3px;">View</span>
+            </div>
+
+            <!-- Entities group -->
+            <div style="padding:8px 10px 2px;font-size:10px;color:#45475a;text-transform:uppercase;letter-spacing:0.08em;border-top:1px solid #1e1e2e;">Scene Template Entities</div>
+
+            <div style="padding:5px 10px;display:flex;align-items:center;gap:8px;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="#6c7086" style="flex-shrink:0;"><rect x="2" y="2" width="12" height="12" rx="2" stroke="#6c7086" stroke-width="1.5" fill="none"/></svg>
+              <span style="font-size:12px;color:#a6adc8;flex:1;">Enemy<strong style="color:#89b4fa;">Tog</strong>gleAI</span>
+              <span style="font-size:10px;color:#6c7086;">Transform, AI</span>
+            </div>
+
+            <!-- No more results hint -->
+            <div style="padding:6px 10px 8px;font-size:10px;color:#313244;text-align:center;">
+              Tip: prefix <code style="background:#181825;padding:1px 4px;border-radius:3px;color:#45475a;">&gt;</code> to filter commands only, <code style="background:#181825;padding:1px 4px;border-radius:3px;color:#45475a;">@</code> for entities
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;">
+        <div style="width:12px;height:12px;border-radius:50%;background:#313244;"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#313244;"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#f38ba8;"></div>
+      </div>
+    </div>
+
+    <!-- Rest of editor (blurred/dimmed) -->
+    <div style="height:160px;background:#11111b;opacity:0.4;display:flex;flex-direction:column;">
+      <div style="height:36px;background:#181825;border-bottom:1px solid #1e1e2e;display:flex;align-items:center;padding:0 12px;gap:8px;">
+        <span style="font-size:10px;color:#313244;">MyProject › Scene_01</span>
+        <div style="display:flex;gap:4px;margin:0 auto;">
+          <div style="width:26px;height:22px;background:#1e1e2e;border-radius:4px;border:1px solid #313244;"></div>
+          <div style="width:26px;height:22px;background:#1e1e2e;border-radius:4px;border:1px solid #313244;"></div>
+          <div style="width:26px;height:22px;background:#1e1e2e;border-radius:4px;border:1px solid #313244;"></div>
+        </div>
+      </div>
+      <div style="flex:1;background:#11111b;"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>Interaction rules</h3>
+  <ul style="font-size:13px;color:#a6adc8;line-height:1.8;padding-left:20px;">
+    <li><strong>Ctrl+K</strong> — open omnibar from anywhere</li>
+    <li><strong>Arrow keys</strong> — navigate results</li>
+    <li><strong>Enter</strong> — execute selected, dismiss</li>
+    <li><strong>Escape</strong> — dismiss, return focus to previous element</li>
+    <li><strong>Tab</strong> — cycle between result groups</li>
+    <li>Prefix <code style="background:#313244;padding:1px 5px;border-radius:3px;">&gt;</code> — commands only &nbsp; <code style="background:#313244;padding:1px 5px;border-radius:3px;">@</code> — entities only &nbsp; <code style="background:#313244;padding:1px 5px;border-radius:3px;">#</code> — assets only</li>
+    <li>Empty input — shows recent projects/scenes + most-used commands</li>
+    <li>Clicking outside or pressing Escape — dismisses with no action</li>
+  </ul>
+</div>

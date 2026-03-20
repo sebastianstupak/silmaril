@@ -1,0 +1,48 @@
+<h2>What does the omnibar surface?</h2>
+<p class="subtitle">When you type, what should appear in the dropdown? Select all that apply.</p>
+
+<div class="options" data-multiselect>
+
+  <div class="option" data-choice="commands" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Editor Commands</h3>
+      <p>Run any action: <em>Toggle Grid, Open Settings, Set Tool: Move, Switch Layout, New Scene…</em> — like VS Code's <strong>&gt;</strong> prefix. The power-user backbone.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="entities" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Scene Entities</h3>
+      <p>Find and select/focus entities by name: <em>Player, EnemySpawner_01, MainCamera…</em> — equivalent to VS Code's <strong>@</strong> symbol jump. Essential for large scenes.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="keybinds" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Keybind Discovery</h3>
+      <p>Show shortcuts inline: <em>"Toggle Grid — Ctrl+G"</em>, <em>"Play — F5"</em>. Doubles as a help system — you can find the action and learn the shortcut at the same time.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="recent" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Recent Projects / Scenes</h3>
+      <p>Quick-switch: <em>Open recent project, load a saved scene.</em> Appears when search is empty — like VS Code's recent files on empty Ctrl+P.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="assets" onclick="toggleSelect(this)">
+    <div class="letter">5</div>
+    <div class="content">
+      <h3>Assets</h3>
+      <p>Find textures, meshes, scripts, prefabs by name when a project is open. Like VS Code's file quick-open but for game assets.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">You can select multiple. The more you select, the richer (and more complex) the results view becomes.</p>

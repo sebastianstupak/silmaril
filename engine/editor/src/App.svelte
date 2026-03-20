@@ -5,6 +5,7 @@
   import { setLocale } from './lib/i18n';
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import PopoutView from './lib/components/PopoutView.svelte';
+  import ViewportOverlay from './lib/components/ViewportOverlay.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
@@ -13,7 +14,7 @@
   import DockSplitter from './lib/docking/DockSplitter.svelte';
   import DragOverlay from './lib/docking/DragOverlay.svelte';
   import TitleBar from './lib/components/TitleBar.svelte';
-  import { loadLayout, saveLayout, defaultLayout, layoutTemplates, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
+  import { loadLayout, saveLayout, defaultLayout, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
 
   // Panel components (no-prop wrappers for docking)
@@ -30,13 +31,20 @@
   // Pop-out panel detection via query parameter
   const popoutPanel = new URLSearchParams(window.location.search).get('panel');
 
+  // Viewport overlay detection — rendered in a separate transparent WebView2
+  // that sits above the Vulkan child window in the sandwich architecture.
+  const isViewportOverlay = new URLSearchParams(window.location.search).get('overlay') === 'viewport';
+
   let editorState: EditorState | null = $state(null);
-  let settings: EditorSettings = $state(loadSettings());
+
+  // Load settings once; reuse for both the reactive state and the initial bottomHeight.
+  const _initial = loadSettings();
+  let settings: EditorSettings = $state(_initial);
   let showSettings = $state(false);
 
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
-  let bottomHeight = $state(loadSettings().bottomPanelHeight);
+  let bottomHeight = $state(_initial.bottomPanelHeight);
 
   function _collectPanels(node: LayoutNode, out: Set<string>) {
     if (node.type === 'tabs') { for (const p of node.panels) out.add(p); }
@@ -94,20 +102,6 @@
   function handleLayoutReset() {
     layout = JSON.parse(JSON.stringify(defaultLayout));
     saveLayout(layout);
-  }
-
-  function handleLayoutSelect(template: string) {
-    // Map legacy template names to saved layout builtin IDs
-    const builtinMap: Record<string, string> = {
-      default: 'builtin-edit',
-      tall:    'builtin-assets',
-      wide:    'builtin-review',
-    };
-    const id = builtinMap[template];
-    if (id) { applyLayout(id); return; }
-    // Fallback: apply from layoutTemplates without slot tracking
-    const tmpl = layoutTemplates[template];
-    if (tmpl) { layout = JSON.parse(JSON.stringify(tmpl)); saveLayout(layout); }
   }
 
   // ── Saved layout handlers ──────────────────────────────────────────────────
@@ -277,6 +271,12 @@
         cycleActiveTab(e.shiftKey ? -1 : 1);
         return;
       }
+      // Settings: Ctrl+,
+      if (e.key === ',' && e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        showSettings = true;
+        return;
+      }
       // Layout slot keybinds — format "ctrl+1", "ctrl+2", etc.
       if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
         const slot = savedLayouts.find(s => s.keybind === `ctrl+${e.key}`);
@@ -343,6 +343,7 @@
         hydrateSavedLayouts(),
       ]);
       settings = hydratedSettings;
+      bottomHeight = hydratedSettings.bottomPanelHeight;
       if (hydratedLayout) layout = hydratedLayout;
       if (hydratedLayouts) savedLayouts = hydratedLayouts;
     }
@@ -383,7 +384,9 @@
   });
 </script>
 
-{#if popoutPanel}
+{#if isViewportOverlay}
+  <ViewportOverlay />
+{:else if popoutPanel}
   <PopoutView panelId={popoutPanel} />
 {:else}
 <main class="editor-shell">
@@ -405,7 +408,6 @@
         onSettingsOpen={() => showSettings = true}
         onOpenProject={handleOpenProject}
         onLayoutReset={handleLayoutReset}
-        onLayoutSelect={handleLayoutSelect}
         compactMenu={settings.compactMenu}
       />
   {/if}
@@ -447,15 +449,9 @@
       </div>
     </div>
 
-    <!-- Right: mode + settings -->
+    <!-- Right: mode badge -->
     <div class="toolbar-right">
       <span class="mode-badge">{editorState?.mode ?? '...'}</span>
-      <button class="toolbar-btn" onclick={() => showSettings = true} title={t('settings.title')}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-          <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.421 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.421-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.116l.094-.318z"/>
-        </svg>
-      </button>
     </div>
   </div>
 

@@ -1,6 +1,6 @@
 # Viewport Grid & Axis Gizmo Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the disconnected fixed-geometry grid with a shader-based infinite grid (toggle wired to Rust) and replace the flat SVG axis compass with a proper 3D projected cube gizmo that tracks both yaw and pitch.
 
@@ -46,7 +46,7 @@ In the `platform` mod (Windows implementation):
 
 ### Steps
 
-- [ ] **Step 1: Add `grid_visible` to `ViewportInstance` and update `new()`**
+- [x] **Step 1: Add `grid_visible` to `ViewportInstance` and update `new()`**
 
 In the `platform` mod, find `struct ViewportInstance` and its `new()`:
 
@@ -66,7 +66,7 @@ impl ViewportInstance {
 }
 ```
 
-- [ ] **Step 2: Add `set_grid_visible` and `camera_set_orientation` to `NativeViewport`**
+- [x] **Step 2: Add `set_grid_visible` and `camera_set_orientation` to `NativeViewport`**
 
 After the existing `camera_reset` method:
 
@@ -89,7 +89,7 @@ pub fn camera_set_orientation(&self, id: &str, yaw: f32, pitch: f32) {
 }
 ```
 
-- [ ] **Step 3: Change `OrbitCamera::default()` yaw to `0.0`**
+- [x] **Step 3: Change `OrbitCamera::default()` yaw to `0.0`**
 
 ```rust
 impl Default for OrbitCamera {
@@ -107,7 +107,7 @@ impl Default for OrbitCamera {
 }
 ```
 
-- [ ] **Step 4: Add non-Windows stubs at the bottom of the file**
+- [x] **Step 4: Add non-Windows stubs at the bottom of the file**
 
 Find the `#[cfg(not(windows))] impl NativeViewport` block near the bottom of the file. It ends with `pub fn destroy(&mut self) {}` followed by a closing `}`. Add the two new stubs **before that closing `}`**:
 
@@ -118,7 +118,7 @@ pub fn camera_set_orientation(&self, _id: &str, _yaw: f32, _pitch: f32) {}
 
 Note: this block has no `camera_reset` method — do not search for it here. The anchor is the end of the block.
 
-- [ ] **Step 5: Compile**
+- [x] **Step 5: Compile**
 
 ```bash
 cd engine/editor && cargo build 2>&1 | head -50
@@ -126,7 +126,7 @@ cd engine/editor && cargo build 2>&1 | head -50
 
 Expected: no errors. Fix any before continuing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add engine/editor/src-tauri/viewport/native_viewport.rs
@@ -141,7 +141,7 @@ git commit -m "feat(editor): add grid_visible + camera_set_orientation to Viewpo
 - Modify: `engine/editor/src-tauri/bridge/commands.rs`
 - Modify: `engine/editor/src-tauri/lib.rs`
 
-- [ ] **Step 1: Add `viewport_set_grid_visible` command to `commands.rs`**
+- [x] **Step 1: Add `viewport_set_grid_visible` command to `commands.rs`**
 
 After the `viewport_camera_reset` command:
 
@@ -161,7 +161,7 @@ pub fn viewport_set_grid_visible(
 }
 ```
 
-- [ ] **Step 2: Add `viewport_camera_set_orientation` command to `commands.rs`**
+- [x] **Step 2: Add `viewport_camera_set_orientation` command to `commands.rs`**
 
 Immediately after `viewport_set_grid_visible`:
 
@@ -184,7 +184,7 @@ pub fn viewport_camera_set_orientation(
 }
 ```
 
-- [ ] **Step 3: Register both commands in `lib.rs`**
+- [x] **Step 3: Register both commands in `lib.rs`**
 
 In `lib.rs` at `invoke_handler`, add after `commands::viewport_camera_reset,`:
 
@@ -193,7 +193,7 @@ commands::viewport_set_grid_visible,
 commands::viewport_camera_set_orientation,
 ```
 
-- [ ] **Step 4: Compile**
+- [x] **Step 4: Compile**
 
 ```bash
 cd engine/editor && cargo build 2>&1 | head -50
@@ -201,7 +201,7 @@ cd engine/editor && cargo build 2>&1 | head -50
 
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add engine/editor/src-tauri/bridge/commands.rs engine/editor/src-tauri/lib.rs
@@ -217,7 +217,7 @@ git commit -m "feat(editor): add viewport_set_grid_visible and viewport_camera_s
 - Modify: `engine/editor/src/lib/viewport-settings.ts`
 - Modify: `engine/editor/src/lib/viewport-settings.test.ts`
 
-- [ ] **Step 1: Add failing tests for new settings fields**
+- [x] **Step 1: Add failing tests for new settings fields**
 
 In `viewport-settings.test.ts`, add after the existing tests:
 
@@ -251,7 +251,7 @@ it('loads settings without cameraYawRad/cameraPitchRad gracefully', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd engine/editor && npx vitest run src/lib/viewport-settings.test.ts
@@ -259,7 +259,7 @@ cd engine/editor && npx vitest run src/lib/viewport-settings.test.ts
 
 Expected: the two new tests FAIL (TypeScript compile error — fields don't exist yet).
 
-- [ ] **Step 3: Add fields to `ViewportUISettings` interface**
+- [x] **Step 3: Add fields to `ViewportUISettings` interface**
 
 In `viewport-settings.ts`, update the interface:
 
@@ -275,7 +275,7 @@ export interface ViewportUISettings {
 }
 ```
 
-- [ ] **Step 4: Run tests — all should pass**
+- [x] **Step 4: Run tests — all should pass**
 
 ```bash
 cd engine/editor && npx vitest run src/lib/viewport-settings.test.ts
@@ -283,7 +283,7 @@ cd engine/editor && npx vitest run src/lib/viewport-settings.test.ts
 
 Expected: all 9 tests PASS.
 
-- [ ] **Step 5: Add API wrappers in `api.ts`**
+- [x] **Step 5: Add API wrappers in `api.ts`**
 
 After `viewportCameraReset`:
 
@@ -306,7 +306,7 @@ export async function viewportCameraSetOrientation(
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add engine/editor/src/lib/api.ts engine/editor/src/lib/viewport-settings.ts engine/editor/src/lib/viewport-settings.test.ts
@@ -332,7 +332,7 @@ This is the largest single task. Make all changes in one edit so the file stays 
 
 ### Steps
 
-- [ ] **Step 1: Replace the shader GLSL strings**
+- [x] **Step 1: Replace the shader GLSL strings**
 
 Replace both `GRID_VERT_GLSL` and `GRID_FRAG_GLSL` constants:
 
@@ -395,7 +395,7 @@ void main() {
 "#;
 ```
 
-- [ ] **Step 2: Replace `GridVertex` and the quad generator**
+- [x] **Step 2: Replace `GridVertex` and the quad generator**
 
 Replace the existing `GridVertex` struct and `generate_grid_vertices` function:
 
@@ -418,7 +418,7 @@ fn generate_grid_quad() -> Vec<GridVertex> {
 }
 ```
 
-- [ ] **Step 3: Add `GridPushConstants` struct**
+- [x] **Step 3: Add `GridPushConstants` struct**
 
 Add after the `GridVertex` definition:
 
@@ -433,7 +433,7 @@ struct GridPushConstants {
 }
 ```
 
-- [ ] **Step 4: Update `ViewportRenderer::new()` — replace the grid buffer upload**
+- [x] **Step 4: Update `ViewportRenderer::new()` — replace the grid buffer upload**
 
 In `ViewportRenderer::new()`, find the `generate_grid_vertices` call and replace:
 
@@ -448,7 +448,7 @@ let mut grid_vertex_buffer = GpuBuffer::new(&context, buf_size,
 grid_vertex_buffer.upload(&grid_verts).map_err(|e| format!("GridVB upload: {e}"))?;
 ```
 
-- [ ] **Step 5: Update `create_grid_pipeline`**
+- [x] **Step 5: Update `create_grid_pipeline`**
 
 Replace the entire function body with the following. Key changes: stride 12 (pos only), no inColor attr, `TRIANGLE_LIST`, alpha blend, `depth_write_enable: false`, push range 80 bytes with `VERTEX | FRAGMENT` stage flags:
 
@@ -530,7 +530,7 @@ fn create_grid_pipeline(
 }
 ```
 
-- [ ] **Step 6: Update `record_frame` — push 80-byte constants and skip draw per grid_visible**
+- [x] **Step 6: Update `record_frame` — push 80-byte constants and skip draw per grid_visible**
 
 In `record_frame`, the signature currently takes `viewports: &[(ViewportBounds, OrbitCamera)]`. Update the render loop section to include grid_visible and push the new constants.
 
@@ -606,7 +606,7 @@ for (bounds, camera, grid_visible) in viewports {
 }
 ```
 
-- [ ] **Step 7: Compile**
+- [x] **Step 7: Compile**
 
 ```bash
 cd engine/editor && cargo build 2>&1 | head -80
@@ -616,7 +616,7 @@ Expected: no errors. Common issues to watch for:
 - `to_cols_array()` is on `glam::Mat4` — it exists, but double-check if `to_array()` is the correct method name (it may be `.to_cols_array()` or `.as_ref()`; check the glam version in use)
 - `eye.to_array()` on `glam::Vec3` — exists in glam 0.24+
 
-- [ ] **Step 8: Visual verify**
+- [x] **Step 8: Visual verify**
 
 Run the editor (`cargo tauri dev` in `engine/editor/`). The grid should now:
 - Show a large infinite-looking grid fading at the edges
@@ -625,7 +625,7 @@ Run the editor (`cargo tauri dev` in `engine/editor/`). The grid should now:
 
 If the grid appears all-white or invisible, check that alpha blending is working (most likely the clear color issue).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add engine/editor/src-tauri/viewport/native_viewport.rs
@@ -639,7 +639,7 @@ git commit -m "feat(editor): infinite shader-based grid with fwidth AA, distance
 **Files:**
 - Modify: `engine/editor/src/lib/docking/panels/ViewportPanel.svelte`
 
-- [ ] **Step 1: Import `viewportSetGridVisible`**
+- [x] **Step 1: Import `viewportSetGridVisible`**
 
 At the top of the `<script>` block, add only `viewportSetGridVisible` to the existing import from `$lib/api` (do NOT add `viewportCameraSetOrientation` yet — it is added in Task 7 to avoid an unused-import lint error):
 
@@ -655,7 +655,7 @@ import {
 } from '$lib/api';
 ```
 
-- [ ] **Step 2: Wire grid toggle button to call Rust**
+- [x] **Step 2: Wire grid toggle button to call Rust**
 
 Find the grid toggle button `onclick` handler:
 
@@ -673,7 +673,7 @@ onclick={(e: MouseEvent) => {
 }}
 ```
 
-- [ ] **Step 3: Call `viewportSetGridVisible` on mount**
+- [x] **Step 3: Call `viewportSetGridVisible` on mount**
 
 In `onMount`, find the `.then()` block after `createNativeViewport`:
 
@@ -699,11 +699,11 @@ createNativeViewport(viewportId, bounds.x, bounds.y, bounds.width, bounds.height
 
 Note: `gridVisible` is already at its restored value here because `loadViewportSettings` runs synchronously before `createNativeViewport` is called.
 
-- [ ] **Step 4: Visual verify**
+- [x] **Step 4: Visual verify**
 
 Run `cargo tauri dev`. Click the `#` grid button — the grid should appear and disappear. Reload the editor — the grid state should persist correctly.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add engine/editor/src/lib/docking/panels/ViewportPanel.svelte
@@ -721,7 +721,7 @@ git commit -m "feat(editor): wire grid toggle to Vulkan renderer, sync on mount"
 
 `viewAngleDeg` currently tracks yaw in degrees with `+= orbitDx * 0.5` (right = positive). Rust does `yaw -= dx * 0.005` (right = negative radians). The signs are opposite and the units differ. We rename, fix the sign, and add pitch.
 
-- [ ] **Step 1: Rename `viewAngleDeg` to `cameraYawRad` and add `cameraPitchRad`**
+- [x] **Step 1: Rename `viewAngleDeg` to `cameraYawRad` and add `cameraPitchRad`**
 
 Replace the state declarations:
 
@@ -734,7 +734,7 @@ let cameraYawRad = $state(0.0);         // radians, matches Rust OrbitCamera::ya
 let cameraPitchRad = $state(Math.PI / 6); // radians, matches Rust OrbitCamera::pitch default
 ```
 
-- [ ] **Step 2: Fix orbit handler sign convention**
+- [x] **Step 2: Fix orbit handler sign convention**
 
 In `handleMouseMove`, `case 'orbit'`:
 
@@ -752,7 +752,7 @@ case 'orbit': {
 }
 ```
 
-- [ ] **Step 3: Update the `$effect` save to include both new fields**
+- [x] **Step 3: Update the `$effect` save to include both new fields**
 
 ```typescript
 $effect(() => {
@@ -769,7 +769,7 @@ $effect(() => {
 });
 ```
 
-- [ ] **Step 4: Update `onMount` restore to read back both fields**
+- [x] **Step 4: Update `onMount` restore to read back both fields**
 
 In the restore block (after `loadViewportSettings`):
 
@@ -795,7 +795,7 @@ if (saved) {
 }
 ```
 
-- [ ] **Step 5: Fix the reset button**
+- [x] **Step 5: Fix the reset button**
 
 Find the HUD reset button `onclick`:
 
@@ -815,7 +815,7 @@ onclick={(e: MouseEvent) => {
 }}
 ```
 
-- [ ] **Step 6: Check for any remaining `viewAngleDeg` references**
+- [x] **Step 6: Check for any remaining `viewAngleDeg` references**
 
 The old SVG gizmo uses `viewAngleDeg` in `rotate({-viewAngleDeg}, 30, 30)`. Since the gizmo is replaced in Task 7, leave the old SVG for now — it will be removed. Just make sure there are no other references outside the SVG block.
 
@@ -825,7 +825,7 @@ grep -n "viewAngleDeg" engine/editor/src/lib/docking/panels/ViewportPanel.svelte
 
 Expected: only references inside the axis-gizmo `<div>` block that will be replaced in Task 7.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add engine/editor/src/lib/docking/panels/ViewportPanel.svelte
@@ -851,7 +851,7 @@ Project orthographically: SVG x = center + projected.x * scale, SVG y = center -
 
 Faces are sorted back-to-front by their center's projected Z value (painter's algorithm). Faces with Z > 0 (facing viewer) get full opacity; faces with Z ≤ 0 get 25% opacity.
 
-- [ ] **Step 1: Replace the axis-gizmo SVG block**
+- [x] **Step 1: Replace the axis-gizmo SVG block**
 
 Find and remove the entire `<!-- Axis gizmo ... -->` section (the `<div class="axis-gizmo">` block with its old SVG). Replace it with:
 
@@ -936,7 +936,7 @@ Find and remove the entire `<!-- Axis gizmo ... -->` section (the `<div class="a
 </div>
 ```
 
-- [ ] **Step 2: Add `viewportCameraSetOrientation` to the import**
+- [x] **Step 2: Add `viewportCameraSetOrientation` to the import**
 
 Add it to the existing `$lib/api` import block (the gizmo snap uses it):
 
@@ -953,7 +953,7 @@ import {
 } from '$lib/api';
 ```
 
-- [ ] **Step 3: Verify no remaining `viewAngleDeg` references**
+- [x] **Step 3: Verify no remaining `viewAngleDeg` references**
 
 ```bash
 grep -n "viewAngleDeg" engine/editor/src/lib/docking/panels/ViewportPanel.svelte
@@ -961,7 +961,7 @@ grep -n "viewAngleDeg" engine/editor/src/lib/docking/panels/ViewportPanel.svelte
 
 Expected: 0 results.
 
-- [ ] **Step 4: Visual verify — cube orientation**
+- [x] **Step 4: Visual verify — cube orientation**
 
 Run `cargo tauri dev`. The gizmo should:
 - Show a 3D cube in the top-right corner
@@ -972,13 +972,13 @@ Run `cargo tauri dev`. The gizmo should:
 
 If the cube appears mirrored horizontally, negate `sy_rot` in the Y-rotation step. If pitch appears inverted, negate `sp_rot` in the X-rotation step.
 
-- [ ] **Step 5: Visual verify — grid toggle + persistence**
+- [x] **Step 5: Visual verify — grid toggle + persistence**
 
 1. Toggle the grid off → grid disappears
 2. Close and reopen editor → grid remains off
 3. Orbit to a non-zero yaw/pitch → close → reopen → gizmo shows same orientation
 
-- [ ] **Step 6: Run full TypeScript test suite**
+- [x] **Step 6: Run full TypeScript test suite**
 
 ```bash
 cd engine/editor && npx vitest run
@@ -986,7 +986,7 @@ cd engine/editor && npx vitest run
 
 Expected: all tests pass.
 
-- [ ] **Step 7: Final compile check**
+- [x] **Step 7: Final compile check**
 
 ```bash
 cd engine/editor && cargo build
@@ -994,7 +994,7 @@ cd engine/editor && cargo build
 
 Expected: no errors.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add engine/editor/src/lib/docking/panels/ViewportPanel.svelte

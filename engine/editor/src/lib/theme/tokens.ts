@@ -11,6 +11,7 @@ export const darkTheme: Theme = {
   name: 'dark',
   colors: {
     bg: '#1e1e1e',
+    bgTitleBar: '#141414',
     bgPanel: '#252525',
     bgHeader: '#2d2d2d',
     bgInput: '#333333',
@@ -46,6 +47,7 @@ export const lightTheme: Theme = {
   name: 'light',
   colors: {
     bg: '#f5f5f5',
+    bgTitleBar: '#d0d0d0',
     bgPanel: '#ffffff',
     bgHeader: '#e8e8e8',
     bgInput: '#ffffff',

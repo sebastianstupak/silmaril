@@ -1,0 +1,106 @@
+<h2>File Explorer Panel — Layout Model</h2>
+<p class="subtitle">Which interaction style fits best? These are shown at panel width (~240px), docked left or in a tab.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a1a;padding:0;font-family:monospace;font-size:12px;line-height:1.6;color:#ccc;">
+      <div style="background:#252525;padding:4px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;border-bottom:1px solid #333;">Explorer</div>
+      <div style="padding:4px 0;">
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#e2b96f;font-weight:600;">
+          <span>▼</span><span>📁</span><span>my-game</span>
+        </div>
+        <div style="padding:2px 8px 2px 24px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span>▼</span><span>📁</span><span>src</span>
+        </div>
+        <div style="padding:2px 8px 2px 40px;display:flex;align-items:center;gap:4px;background:#2a3f5f;color:#fff;">
+          <span style="width:12px"></span><span>📄</span><span>main.rs</span>
+        </div>
+        <div style="padding:2px 8px 2px 40px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span style="width:12px"></span><span>📄</span><span>player.rs</span>
+        </div>
+        <div style="padding:2px 8px 2px 40px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span style="width:12px"></span><span>📄</span><span>enemy.rs</span>
+        </div>
+        <div style="padding:2px 8px 2px 24px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span>▶</span><span>📁</span><span>assets</span>
+        </div>
+        <div style="padding:2px 8px 2px 24px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span>▶</span><span>📁</span><span>shaders</span>
+        </div>
+        <div style="padding:2px 8px 2px 24px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span style="width:12px"></span><span>📄</span><span>game.toml</span>
+        </div>
+        <div style="padding:2px 8px 2px 24px;display:flex;align-items:center;gap:4px;color:#aaa;">
+          <span style="width:12px"></span><span>📄</span><span>Cargo.toml</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — VSCode Tree</h3>
+      <p>Indented folder tree, expand/collapse, single file selected. Right-click context menu for new file/folder, rename, delete. Familiar to any VSCode user.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a1a;padding:0;font-family:monospace;font-size:12px;line-height:1.6;color:#ccc;">
+      <div style="background:#252525;padding:4px 8px;font-size:11px;color:#888;border-bottom:1px solid #333;display:flex;gap:4px;align-items:center;">
+        <span style="color:#e2b96f">my-game</span><span>/</span><span>src</span>
+      </div>
+      <div style="display:flex;height:180px;">
+        <div style="width:50%;border-right:1px solid #333;padding:4px 0;overflow:hidden;">
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📁 src</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📁 assets</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📁 shaders</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📄 game.toml</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📄 Cargo.toml</div>
+        </div>
+        <div style="width:50%;padding:4px 0;overflow:hidden;">
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;background:#2a3f5f;color:#fff;font-size:11px;">📄 main.rs</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📄 player.rs</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📄 enemy.rs</div>
+          <div style="padding:2px 8px;display:flex;align-items:center;gap:4px;color:#aaa;font-size:11px;">📄 world.rs</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Miller Columns</h3>
+      <p>Two-pane column view. Left shows parent folder contents, right shows selected folder contents. Breadcrumb at top. Good for wide exploration but tight in narrow panels.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a1a;padding:0;font-family:monospace;font-size:12px;line-height:1.6;color:#ccc;">
+      <div style="background:#252525;padding:4px 8px;font-size:11px;color:#888;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;">
+        <span><span style="color:#888">▶ </span><span style="color:#e2b96f">my-game</span> / src</span>
+        <span style="cursor:pointer;color:#666">⬆</span>
+      </div>
+      <div style="padding:4px 0;">
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:6px;color:#aaa;">
+          <span>📁</span><span>assets</span>
+        </div>
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:6px;color:#aaa;">
+          <span>📁</span><span>shaders</span>
+        </div>
+        <div style="height:1px;background:#333;margin:4px 0;"></div>
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:6px;background:#2a3f5f;color:#fff;">
+          <span>📄</span><span>main.rs</span>
+        </div>
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:6px;color:#aaa;">
+          <span>📄</span><span>player.rs</span>
+        </div>
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:6px;color:#aaa;">
+          <span>📄</span><span>enemy.rs</span>
+        </div>
+        <div style="padding:2px 8px;display:flex;align-items:center;gap:6px;color:#aaa;">
+          <span>📄</span><span>world.rs</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Flat List + Breadcrumb</h3>
+      <p>Shows one folder at a time. Breadcrumb header to navigate up. Folders and files separated by divider. Simpler, works well in narrow panels. Less overview at a glance.</p>
+    </div>
+  </div>
+
+</div>

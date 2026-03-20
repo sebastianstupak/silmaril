@@ -221,7 +221,7 @@ impl TemplateValidator {
     }
 
     /// Recursively counts child entities.
-    #[allow(clippy::only_used_in_recursion)]
+    #[allow(clippy::self_only_used_in_recursion)]
     fn count_entity_children(&self, entity: &EntityDefinition) -> usize {
         let mut count = 0;
         for child in entity.children.values() {
@@ -408,7 +408,7 @@ impl TemplateValidator {
     }
 
     /// Recursively collects all template references from an entity definition.
-    #[allow(clippy::only_used_in_recursion)]
+    #[allow(clippy::self_only_used_in_recursion)]
     fn collect_template_references(&self, entity: &EntityDefinition, references: &mut Vec<String>) {
         if let EntitySource::Reference { template } = &entity.source {
             references.push(template.clone());

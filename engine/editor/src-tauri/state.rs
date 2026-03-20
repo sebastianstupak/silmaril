@@ -23,14 +23,19 @@ pub struct EditorState {
     pub project_name: Option<String>,
 }
 
-impl EditorState {
-    /// Creates a new editor state with defaults.
-    pub fn new() -> Self {
+impl Default for EditorState {
+    fn default() -> Self {
         Self {
             mode: EditorMode::Edit,
             selected_entity: None,
             project_path: None,
             project_name: None,
         }
+    }
+}
+
+impl EditorState {
+    pub fn new() -> Self {
+        Self::default()
     }
 }

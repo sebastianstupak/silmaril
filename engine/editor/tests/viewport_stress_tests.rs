@@ -74,12 +74,7 @@ fn destroy_parent(hwnd: HWND) {
 }
 
 fn default_bounds() -> ViewportBounds {
-    ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 800,
-        height: 600,
-    }
+    ViewportBounds { x: 0, y: 0, width: 800, height: 600 }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,10 +104,8 @@ fn test_viewport_create_destroy_cycles() {
     let parent = create_hidden_parent();
 
     for i in 0..10 {
-        let mut vp =
-            NativeViewport::new(parent).unwrap_or_else(|e| {
-                panic!("create viewport (cycle {i}): {e}")
-            });
+        let mut vp = NativeViewport::new(parent)
+            .unwrap_or_else(|e| panic!("create viewport (cycle {i}): {e}"));
         vp.start_rendering()
             .unwrap_or_else(|e| panic!("start rendering (cycle {i}): {e}"));
         vp.upsert_instance("main".to_string(), default_bounds());
@@ -142,12 +135,7 @@ fn test_viewport_rapid_resize() {
     for i in 0..50 {
         let w = 200 + (i * 10);
         let h = 150 + (i * 8);
-        vp.set_instance_bounds("main", ViewportBounds {
-            x: 0,
-            y: 0,
-            width: w,
-            height: h,
-        });
+        vp.set_instance_bounds("main", ViewportBounds { x: 0, y: 0, width: w, height: h });
         // Small delay to let a frame or two render at each size
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
@@ -164,12 +152,7 @@ fn test_viewport_rapid_resize() {
 #[ignore]
 fn test_viewport_zero_size() {
     let parent = create_hidden_parent();
-    let bounds = ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-    };
+    let bounds = ViewportBounds { x: 0, y: 0, width: 0, height: 0 };
     let mut vp = NativeViewport::new(parent).expect("create viewport with zero size");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), bounds);
@@ -185,12 +168,7 @@ fn test_viewport_zero_size() {
 #[ignore]
 fn test_viewport_one_pixel() {
     let parent = create_hidden_parent();
-    let bounds = ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 1,
-        height: 1,
-    };
+    let bounds = ViewportBounds { x: 0, y: 0, width: 1, height: 1 };
     let mut vp = NativeViewport::new(parent).expect("create 1x1 viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), bounds);
@@ -206,12 +184,7 @@ fn test_viewport_one_pixel() {
 #[ignore]
 fn test_viewport_4k() {
     let parent = create_hidden_parent();
-    let bounds = ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 3840,
-        height: 2160,
-    };
+    let bounds = ViewportBounds { x: 0, y: 0, width: 3840, height: 2160 };
     let mut vp = NativeViewport::new(parent).expect("create 4K viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), bounds);
@@ -230,10 +203,9 @@ fn test_viewport_lifecycle_stress() {
     let parent = create_hidden_parent();
 
     for cycle in 0..50 {
-        let mut vp = NativeViewport::new(parent)
-            .unwrap_or_else(|e| panic!("cycle {cycle}: create: {e}"));
-        vp.start_rendering()
-            .unwrap_or_else(|e| panic!("cycle {cycle}: start: {e}"));
+        let mut vp =
+            NativeViewport::new(parent).unwrap_or_else(|e| panic!("cycle {cycle}: create: {e}"));
+        vp.start_rendering().unwrap_or_else(|e| panic!("cycle {cycle}: start: {e}"));
         vp.upsert_instance("main".to_string(), default_bounds());
 
         // ~10 frames at 16ms each
@@ -257,12 +229,7 @@ fn test_viewport_resize_zero_then_restore() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Shrink to zero
-    vp.set_instance_bounds("main", ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-    });
+    vp.set_instance_bounds("main", ViewportBounds { x: 0, y: 0, width: 0, height: 0 });
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Restore to normal
@@ -301,12 +268,7 @@ fn test_viewport_multiple_simultaneous() {
 
     // Register 3 viewport instances side by side
     for i in 0..3 {
-        let bounds = ViewportBounds {
-            x: (i as i32) * 200,
-            y: 0,
-            width: 200,
-            height: 200,
-        };
+        let bounds = ViewportBounds { x: (i as i32) * 200, y: 0, width: 200, height: 200 };
         vp.upsert_instance(format!("vp-{i}"), bounds);
     }
 
@@ -328,21 +290,11 @@ fn test_viewport_extreme_aspect_ratios() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Very wide
-    vp.set_instance_bounds("main", ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 2000,
-        height: 10,
-    });
+    vp.set_instance_bounds("main", ViewportBounds { x: 0, y: 0, width: 2000, height: 10 });
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Very tall
-    vp.set_instance_bounds("main", ViewportBounds {
-        x: 0,
-        y: 0,
-        width: 10,
-        height: 2000,
-    });
+    vp.set_instance_bounds("main", ViewportBounds { x: 0, y: 0, width: 10, height: 2000 });
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Back to normal

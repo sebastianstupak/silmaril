@@ -3,6 +3,7 @@
   import type { SavedLayout } from '../docking/store';
   import type { EditorLayout } from '../docking/types';
   import { buildMinimap, buildIcon } from '../docking/minimap';
+  import { formatKeybindDisplay } from '../keybind-utils';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { t } from '$lib/i18n';
 
@@ -33,7 +34,6 @@
     onSettingsOpen?: () => void;
     onOpenProject?: () => void;
     onLayoutReset?: () => void;
-    onLayoutSelect?: (template: string) => void;
     compactMenu?: boolean;
   }
 
@@ -53,7 +53,6 @@
     onSettingsOpen,
     onOpenProject,
     onLayoutReset,
-    onLayoutSelect,
     compactMenu = false,
   }: Props = $props();
 
@@ -183,12 +182,7 @@
   function maximize() { invoke('window_toggle_maximize').catch(() => {}); }
   function close()    { invoke('window_close').catch(() => {}); }
 
-  // buildMinimap and buildIcon are imported from ../docking/minimap
-
-  // ── Keybind formatting ─────────────────────────────────────────────────────
-  function fmtKeybind(kb: string): string {
-    return kb.split('+').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('+');
-  }
+  // buildMinimap, buildIcon, and formatKeybindDisplay are imported above
 </script>
 
 <div
@@ -281,6 +275,11 @@
             {t('menu.edit.select_all')}
             <DropdownMenu.Shortcut>Ctrl+A</DropdownMenu.Shortcut>
           </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item onclick={() => onSettingsOpen?.()}>
+            {t('settings.title')}
+            <DropdownMenu.Shortcut>Ctrl+,</DropdownMenu.Shortcut>
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
 
@@ -296,9 +295,9 @@
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger>{t('menu.view.layout')}</DropdownMenu.SubTrigger>
             <DropdownMenu.SubContent>
-              <DropdownMenu.Item onclick={() => onLayoutSelect?.('default')}>{t('layout.default')}</DropdownMenu.Item>
-              <DropdownMenu.Item onclick={() => onLayoutSelect?.('tall')}>{t('layout.tall')}</DropdownMenu.Item>
-              <DropdownMenu.Item onclick={() => onLayoutSelect?.('wide')}>{t('layout.wide')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-edit')}>{t('layout.default')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-assets')}>{t('layout.tall')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-review')}>{t('layout.wide')}</DropdownMenu.Item>
             </DropdownMenu.SubContent>
           </DropdownMenu.Sub>
           <DropdownMenu.Separator />
@@ -367,8 +366,6 @@
         <DropdownMenu.Content align="start" sideOffset={4} class="min-w-[200px]">
           <DropdownMenu.Item>{t('menu.help.documentation')}</DropdownMenu.Item>
           <DropdownMenu.Separator />
-          <DropdownMenu.Item onclick={() => onSettingsOpen?.()}>{t('settings.title')}</DropdownMenu.Item>
-          <DropdownMenu.Separator />
           <DropdownMenu.Item>{t('menu.help.about')}</DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
@@ -408,7 +405,7 @@
             class:dirty={isDirtySlot}
             onclick={() => onApplyLayout?.(slot.id)}
             oncontextmenu={(e) => openContextMenu(e, slot.id)}
-            title={slot.keybind ? fmtKeybind(slot.keybind) : slot.name}
+            title={slot.keybind ? formatKeybindDisplay(slot.keybind) : slot.name}
             aria-pressed={isActive}
           >
             <span class="slot-icon" aria-hidden="true">{@html buildIcon(slot.layout, 16, 11)}</span>
@@ -433,7 +430,7 @@
             <div class="hover-card-header">
               <span class="hover-card-name">{slot.name}</span>
               {#if slot.keybind}
-                <span class="hover-card-keybind">{fmtKeybind(slot.keybind)}</span>
+                <span class="hover-card-keybind">{formatKeybindDisplay(slot.keybind)}</span>
               {/if}
             </div>
             <div class="hover-card-minimap">
@@ -478,7 +475,7 @@
                 >
                   <span class="overflow-item-name">{slot.name}</span>
                   {#if slot.keybind}
-                    <span class="overflow-item-keybind">{fmtKeybind(slot.keybind)}</span>
+                    <span class="overflow-item-keybind">{formatKeybindDisplay(slot.keybind)}</span>
                   {/if}
                 </button>
               {/each}
@@ -562,6 +559,19 @@
         </div>
       {/if}
     </div>
+
+    <!-- ── Settings shortcut ── -->
+    <button
+      class="icon-btn settings-btn"
+      onclick={() => onSettingsOpen?.()}
+      title="{t('settings.title')} (Ctrl+,)"
+      aria-label={t('settings.title')}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+        <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/>
+      </svg>
+    </button>
 
     <!-- ── Window controls ── -->
     <div class="window-controls" aria-label="Window controls">

@@ -12,7 +12,8 @@
   onMount(() => {
     const unsub = subscribeDrag(() => {
       const s = getDragState();
-      active = s.active;
+      // Don't show ghost/backdrop during popout-window drags — only internal tab drags.
+      active = s.active && !s.popout;
       mouseX = s.mouseX;
       mouseY = s.mouseY;
       panelId = s.panelId;

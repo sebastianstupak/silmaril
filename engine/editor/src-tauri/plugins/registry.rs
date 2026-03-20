@@ -45,6 +45,7 @@ pub struct SchemaField {
 }
 
 /// Registry of all available editor panels.
+#[derive(Default)]
 pub struct PanelRegistry {
     panels: HashMap<String, PanelSource>,
 }
@@ -52,9 +53,7 @@ pub struct PanelRegistry {
 impl PanelRegistry {
     /// Creates a new empty registry.
     pub fn new() -> Self {
-        Self {
-            panels: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Registers a panel by name.

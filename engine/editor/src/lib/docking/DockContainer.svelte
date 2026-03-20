@@ -199,7 +199,7 @@
       {/if}
 
       <!-- Drop zone overlay for side splits -->
-      <DockDropZone onDrop={handleZoneDrop} />
+      <DockDropZone onDrop={handleZoneDrop} {path} {isBottomPanel} />
     </div>
   </div>
 {/if}

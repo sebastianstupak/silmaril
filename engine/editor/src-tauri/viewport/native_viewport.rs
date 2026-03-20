@@ -18,11 +18,11 @@
 //!   - `WS_CLIPCHILDREN` must be REMOVED.
 //!   - `transparent: true` in tauri.conf.json.
 
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
-use std::collections::HashMap;
 
 /// Viewport bounds in physical (device) pixels — position within the parent
 /// window client area, used as the Vulkan scissor/viewport rect.
@@ -68,7 +68,13 @@ mod platform {
 
     impl ViewportInstance {
         fn new(bounds: ViewportBounds) -> Self {
-            Self { bounds, camera: OrbitCamera::default(), visible: true, grid_visible: true, is_ortho: false }
+            Self {
+                bounds,
+                camera: OrbitCamera::default(),
+                visible: true,
+                grid_visible: true,
+                is_ortho: false,
+            }
         }
     }
 
@@ -138,7 +144,10 @@ mod platform {
             let mut instances = self.instances.lock().unwrap();
             instances
                 .entry(id)
-                .and_modify(|i| { i.bounds = bounds; i.visible = true; })
+                .and_modify(|i| {
+                    i.bounds = bounds;
+                    i.visible = true;
+                })
                 .or_insert_with(|| ViewportInstance::new(bounds));
         }
 
@@ -228,10 +237,10 @@ mod platform {
             let instances = self.instances.lock().ok()?;
             let cam = &instances.get(id)?.camera;
             Some(CameraState {
-                target:   cam.target.to_array(),
+                target: cam.target.to_array(),
                 distance: cam.distance,
-                yaw:      cam.yaw,
-                pitch:    cam.pitch,
+                yaw: cam.yaw,
+                pitch: cam.pitch,
             })
         }
 
@@ -239,10 +248,10 @@ mod platform {
         pub fn set_instance_camera(&self, id: &str, state: CameraState) {
             if let Ok(mut instances) = self.instances.lock() {
                 if let Some(inst) = instances.get_mut(id) {
-                    inst.camera.target   = glam::Vec3::from_array(state.target);
+                    inst.camera.target = glam::Vec3::from_array(state.target);
                     inst.camera.distance = state.distance;
-                    inst.camera.yaw      = state.yaw;
-                    inst.camera.pitch    = state.pitch;
+                    inst.camera.yaw = state.yaw;
+                    inst.camera.pitch = state.pitch;
                 }
             }
         }
@@ -310,7 +319,14 @@ mod platform {
                 // so toggling persp↔ortho doesn't cause a visual jump.
                 let half_h = self.distance * (self.fov_y * 0.5).tan();
                 let half_w = half_h * aspect;
-                let proj = Mat4::orthographic_rh(-half_w, half_w, -half_h, half_h, self.near, self.far * 2.0);
+                let proj = Mat4::orthographic_rh(
+                    -half_w,
+                    half_w,
+                    -half_h,
+                    half_h,
+                    self.near,
+                    self.far * 2.0,
+                );
                 proj * view
             } else {
                 let proj = Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far);
@@ -376,8 +392,13 @@ mod platform {
         let info = Validator::new(ValidationFlags::all(), Capabilities::all())
             .validate(&module)
             .map_err(|e| format!("Shader validation: {e}"))?;
-        spv::write_vec(&module, &info, &spv::Options { lang_version: (1, 0), ..Default::default() }, None)
-            .map_err(|e| format!("SPIR-V gen: {e}"))
+        spv::write_vec(
+            &module,
+            &info,
+            &spv::Options { lang_version: (1, 0), ..Default::default() },
+            None,
+        )
+        .map_err(|e| format!("SPIR-V gen: {e}"))
     }
 
     const GRID_VERT_GLSL: &str = r#"#version 450
@@ -443,18 +464,20 @@ void main() {
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    struct GridVertex { pos: [f32; 3] }
+    struct GridVertex {
+        pos: [f32; 3],
+    }
 
     /// Six vertices (two triangles) forming a quad on the XZ plane, Y=0.
     fn generate_grid_quad() -> Vec<GridVertex> {
         let e = 500.0f32;
         vec![
             GridVertex { pos: [-e, 0.0, -e] },
-            GridVertex { pos: [ e, 0.0, -e] },
-            GridVertex { pos: [ e, 0.0,  e] },
+            GridVertex { pos: [e, 0.0, -e] },
+            GridVertex { pos: [e, 0.0, e] },
             GridVertex { pos: [-e, 0.0, -e] },
-            GridVertex { pos: [ e, 0.0,  e] },
-            GridVertex { pos: [-e, 0.0,  e] },
+            GridVertex { pos: [e, 0.0, e] },
+            GridVertex { pos: [-e, 0.0, e] },
         ]
     }
 
@@ -462,9 +485,9 @@ void main() {
     /// Both VERTEX (viewProj) and FRAGMENT (cameraPos for fade) stages use this.
     #[repr(C)]
     struct GridPushConstants {
-        view_proj: [f32; 16],  // 64 bytes
-        camera_pos: [f32; 3],  // 12 bytes
-        _pad: f32,             //  4 bytes — aligns to 80, within 128-byte guarantee
+        view_proj: [f32; 16], // 64 bytes
+        camera_pos: [f32; 3], // 12 bytes
+        _pad: f32,            //  4 bytes — aligns to 80, within 128-byte guarantee
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -511,35 +534,57 @@ void main() {
                 .map_err(|e| format!("VulkanContext: {e}"))?;
             let surface = Surface::from_raw_hwnd(&context.entry, &context.instance, hwnd_raw)
                 .map_err(|e| format!("Surface: {e}"))?;
-            let swapchain = Swapchain::new(&context, surface.handle(), surface.loader(), width, height, None)
-                .map_err(|e| format!("Swapchain: {e}"))?;
-            let depth_buffer = DepthBuffer::new(&context.device, &context.allocator, swapchain.extent)
-                .map_err(|e| format!("DepthBuffer: {e}"))?;
-            let render_pass = RenderPass::new(&context.device, RenderPassConfig {
-                color_format: swapchain.format,
-                depth_format: Some(depth_buffer.format()),
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                store_op: vk::AttachmentStoreOp::STORE,
-            }).map_err(|e| format!("RenderPass: {e}"))?;
-            let framebuffers = make_framebuffers(&context.device, &swapchain, &render_pass, &depth_buffer)?;
+            let swapchain =
+                Swapchain::new(&context, surface.handle(), surface.loader(), width, height, None)
+                    .map_err(|e| format!("Swapchain: {e}"))?;
+            let depth_buffer =
+                DepthBuffer::new(&context.device, &context.allocator, swapchain.extent)
+                    .map_err(|e| format!("DepthBuffer: {e}"))?;
+            let render_pass = RenderPass::new(
+                &context.device,
+                RenderPassConfig {
+                    color_format: swapchain.format,
+                    depth_format: Some(depth_buffer.format()),
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::STORE,
+                },
+            )
+            .map_err(|e| format!("RenderPass: {e}"))?;
+            let framebuffers =
+                make_framebuffers(&context.device, &swapchain, &render_pass, &depth_buffer)?;
 
             const FIF: u32 = 2;
-            let command_pool = CommandPool::new(&context.device, context.queue_families.graphics,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-                .map_err(|e| format!("CommandPool: {e}"))?;
+            let command_pool = CommandPool::new(
+                &context.device,
+                context.queue_families.graphics,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+            )
+            .map_err(|e| format!("CommandPool: {e}"))?;
             let command_buffers = command_pool
                 .allocate(&context.device, vk::CommandBufferLevel::PRIMARY, FIF)
                 .map_err(|e| format!("CommandBuffers: {e}"))?
-                .into_iter().map(CommandBuffer::from_handle).collect();
+                .into_iter()
+                .map(CommandBuffer::from_handle)
+                .collect();
             let sync_objects = engine_renderer::create_sync_objects(&context.device, FIF)
                 .map_err(|e| format!("SyncObjects: {e}"))?;
 
             let (vert_spirv, frag_spirv) = get_or_compile_shaders()?;
-            let vert_shader = ShaderModule::from_spirv(&context.device, vert_spirv, vk::ShaderStageFlags::VERTEX, "main")
-                .map_err(|e| format!("VertShader: {e}"))?;
-            let frag_shader = ShaderModule::from_spirv(&context.device, frag_spirv, vk::ShaderStageFlags::FRAGMENT, "main")
-                .map_err(|e| format!("FragShader: {e}"))?;
+            let vert_shader = ShaderModule::from_spirv(
+                &context.device,
+                vert_spirv,
+                vk::ShaderStageFlags::VERTEX,
+                "main",
+            )
+            .map_err(|e| format!("VertShader: {e}"))?;
+            let frag_shader = ShaderModule::from_spirv(
+                &context.device,
+                frag_spirv,
+                vk::ShaderStageFlags::FRAGMENT,
+                "main",
+            )
+            .map_err(|e| format!("FragShader: {e}"))?;
 
             let (grid_pipeline, grid_pipeline_layout) =
                 create_grid_pipeline(&context.device, &render_pass, &vert_shader, &frag_shader)?;
@@ -547,18 +592,38 @@ void main() {
             let grid_verts = generate_grid_quad();
             let grid_vertex_count = grid_verts.len() as u32;
             let buf_size = (grid_verts.len() * std::mem::size_of::<GridVertex>()) as u64;
-            let mut grid_vertex_buffer = GpuBuffer::new(&context, buf_size,
-                vk::BufferUsageFlags::VERTEX_BUFFER, gpu_allocator::MemoryLocation::CpuToGpu)
-                .map_err(|e| format!("GridVB: {e}"))?;
-            grid_vertex_buffer.upload(&grid_verts).map_err(|e| format!("GridVB upload: {e}"))?;
+            let mut grid_vertex_buffer = GpuBuffer::new(
+                &context,
+                buf_size,
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+                gpu_allocator::MemoryLocation::CpuToGpu,
+            )
+            .map_err(|e| format!("GridVB: {e}"))?;
+            grid_vertex_buffer
+                .upload(&grid_verts)
+                .map_err(|e| format!("GridVB upload: {e}"))?;
 
             tracing::info!(width, height, "ViewportRenderer initialised");
             Ok(Self {
-                context, surface, swapchain, render_pass, depth_buffer,
-                framebuffers, command_pool, command_buffers, sync_objects,
-                current_frame: 0, width, height, needs_recreate: false,
-                grid_pipeline, grid_pipeline_layout, grid_vertex_buffer, grid_vertex_count,
-                _vert_shader: vert_shader, _frag_shader: frag_shader,
+                context,
+                surface,
+                swapchain,
+                render_pass,
+                depth_buffer,
+                framebuffers,
+                command_pool,
+                command_buffers,
+                sync_objects,
+                current_frame: 0,
+                width,
+                height,
+                needs_recreate: false,
+                grid_pipeline,
+                grid_pipeline_layout,
+                grid_vertex_buffer,
+                grid_vertex_count,
+                _vert_shader: vert_shader,
+                _frag_shader: frag_shader,
             })
         }
 
@@ -572,7 +637,10 @@ void main() {
         }
 
         /// Render all visible viewport instances in one frame.
-        fn render_frame(&mut self, viewports: &[(ViewportBounds, OrbitCamera, bool, bool)]) -> Result<bool, String> {
+        fn render_frame(
+            &mut self,
+            viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
+        ) -> Result<bool, String> {
             if self.needs_recreate {
                 self.recreate_swapchain()?;
                 self.needs_recreate = false;
@@ -580,17 +648,28 @@ void main() {
 
             let sync = &self.sync_objects[self.current_frame];
             unsafe {
-                self.context.device.wait_for_fences(&[sync.in_flight_fence], true, u64::MAX)
+                self.context
+                    .device
+                    .wait_for_fences(&[sync.in_flight_fence], true, u64::MAX)
                     .map_err(|e| format!("wait_for_fences: {e}"))?;
 
                 let image_index = match self.swapchain.loader.acquire_next_image(
-                    self.swapchain.swapchain, u64::MAX, sync.image_available_semaphore, vk::Fence::null()) {
+                    self.swapchain.swapchain,
+                    u64::MAX,
+                    sync.image_available_semaphore,
+                    vk::Fence::null(),
+                ) {
                     Ok((idx, _)) => idx,
-                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => { self.needs_recreate = true; return Ok(false); }
+                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                        self.needs_recreate = true;
+                        return Ok(false);
+                    }
                     Err(e) => return Err(format!("acquire: {e}")),
                 };
 
-                self.context.device.reset_fences(&[sync.in_flight_fence])
+                self.context
+                    .device
+                    .reset_fences(&[sync.in_flight_fence])
                     .map_err(|e| format!("reset_fences: {e}"))?;
 
                 let cmd = self.command_buffers[self.current_frame].handle();
@@ -600,17 +679,28 @@ void main() {
                 let stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
                 let signal = [sync.render_finished_semaphore];
                 let cmds = [cmd];
-                self.context.device.queue_submit(self.context.graphics_queue, &[
-                    vk::SubmitInfo::default()
-                        .wait_semaphores(&wait).wait_dst_stage_mask(&stages)
-                        .command_buffers(&cmds).signal_semaphores(&signal)
-                ], sync.in_flight_fence).map_err(|e| format!("submit: {e}"))?;
+                self.context
+                    .device
+                    .queue_submit(
+                        self.context.graphics_queue,
+                        &[vk::SubmitInfo::default()
+                            .wait_semaphores(&wait)
+                            .wait_dst_stage_mask(&stages)
+                            .command_buffers(&cmds)
+                            .signal_semaphores(&signal)],
+                        sync.in_flight_fence,
+                    )
+                    .map_err(|e| format!("submit: {e}"))?;
 
                 let swapchains = [self.swapchain.swapchain];
                 let indices = [image_index];
-                match self.swapchain.loader.queue_present(self.context.present_queue,
-                    &vk::PresentInfoKHR::default().wait_semaphores(&signal)
-                        .swapchains(&swapchains).image_indices(&indices)) {
+                match self.swapchain.loader.queue_present(
+                    self.context.present_queue,
+                    &vk::PresentInfoKHR::default()
+                        .wait_semaphores(&signal)
+                        .swapchains(&swapchains)
+                        .image_indices(&indices),
+                ) {
                     Ok(_) => {}
                     Err(vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR) => {
                         self.needs_recreate = true;
@@ -629,21 +719,32 @@ void main() {
             viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
         ) -> Result<(), String> {
             let device = &self.context.device;
-            device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())
+            device
+                .reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())
                 .map_err(|e| format!("reset_cb: {e}"))?;
-            device.begin_command_buffer(cmd, &vk::CommandBufferBeginInfo::default()
-                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT))
+            device
+                .begin_command_buffer(
+                    cmd,
+                    &vk::CommandBufferBeginInfo::default()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
                 .map_err(|e| format!("begin_cb: {e}"))?;
 
             let extent = self.swapchain.extent;
-            device.cmd_begin_render_pass(cmd, &vk::RenderPassBeginInfo::default()
-                .render_pass(self.render_pass.handle())
-                .framebuffer(self.framebuffers[image_index].handle())
-                .render_area(vk::Rect2D { offset: vk::Offset2D { x: 0, y: 0 }, extent })
-                .clear_values(&[
-                    vk::ClearValue { color: vk::ClearColorValue { float32: CLEAR_COLOR } },
-                    vk::ClearValue { depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 } },
-                ]), vk::SubpassContents::INLINE);
+            device.cmd_begin_render_pass(
+                cmd,
+                &vk::RenderPassBeginInfo::default()
+                    .render_pass(self.render_pass.handle())
+                    .framebuffer(self.framebuffers[image_index].handle())
+                    .render_area(vk::Rect2D { offset: vk::Offset2D { x: 0, y: 0 }, extent })
+                    .clear_values(&[
+                        vk::ClearValue { color: vk::ClearColorValue { float32: CLEAR_COLOR } },
+                        vk::ClearValue {
+                            depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
+                        },
+                    ]),
+                vk::SubpassContents::INLINE,
+            );
 
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.grid_pipeline);
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.grid_vertex_buffer.handle()], &[0]);
@@ -654,15 +755,26 @@ void main() {
                 let sw = bounds.width.min(extent.width.saturating_sub(sx)).max(1);
                 let sh = bounds.height.min(extent.height.saturating_sub(sy)).max(1);
 
-                device.cmd_set_viewport(cmd, 0, &[vk::Viewport {
-                    x: sx as f32, y: sy as f32,
-                    width: sw as f32, height: sh as f32,
-                    min_depth: 0.0, max_depth: 1.0,
-                }]);
-                device.cmd_set_scissor(cmd, 0, &[vk::Rect2D {
-                    offset: vk::Offset2D { x: sx as i32, y: sy as i32 },
-                    extent: vk::Extent2D { width: sw, height: sh },
-                }]);
+                device.cmd_set_viewport(
+                    cmd,
+                    0,
+                    &[vk::Viewport {
+                        x: sx as f32,
+                        y: sy as f32,
+                        width: sw as f32,
+                        height: sh as f32,
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    }],
+                );
+                device.cmd_set_scissor(
+                    cmd,
+                    0,
+                    &[vk::Rect2D {
+                        offset: vk::Offset2D { x: sx as i32, y: sy as i32 },
+                        extent: vk::Extent2D { width: sw, height: sh },
+                    }],
+                );
 
                 let aspect = sw as f32 / sh as f32;
                 let eye = camera.eye();
@@ -675,8 +787,13 @@ void main() {
                     &pc as *const GridPushConstants as *const u8,
                     std::mem::size_of::<GridPushConstants>(),
                 );
-                device.cmd_push_constants(cmd, self.grid_pipeline_layout,
-                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT, 0, pc_bytes);
+                device.cmd_push_constants(
+                    cmd,
+                    self.grid_pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    pc_bytes,
+                );
 
                 // Skip draw if grid hidden — push constants still set for next viewport correctness
                 if *grid_visible {
@@ -692,16 +809,32 @@ void main() {
         fn recreate_swapchain(&mut self) -> Result<(), String> {
             self.context.wait_idle().map_err(|e| format!("wait_idle: {e}"))?;
             self.framebuffers.clear();
-            self.swapchain.recreate(&self.context, self.surface.handle(), self.surface.loader(),
-                self.width, self.height)
+            self.swapchain
+                .recreate(
+                    &self.context,
+                    self.surface.handle(),
+                    self.surface.loader(),
+                    self.width,
+                    self.height,
+                )
                 .map_err(|e| format!("swapchain recreate: {e}"))?;
-            self.depth_buffer = DepthBuffer::new(&self.context.device, &self.context.allocator,
-                self.swapchain.extent)
-                .map_err(|e| format!("depth recreate: {e}"))?;
-            self.framebuffers = make_framebuffers(&self.context.device, &self.swapchain,
-                &self.render_pass, &self.depth_buffer)?;
-            tracing::debug!(w = self.swapchain.extent.width, h = self.swapchain.extent.height,
-                "Swapchain recreated");
+            self.depth_buffer = DepthBuffer::new(
+                &self.context.device,
+                &self.context.allocator,
+                self.swapchain.extent,
+            )
+            .map_err(|e| format!("depth recreate: {e}"))?;
+            self.framebuffers = make_framebuffers(
+                &self.context.device,
+                &self.swapchain,
+                &self.render_pass,
+                &self.depth_buffer,
+            )?;
+            tracing::debug!(
+                w = self.swapchain.extent.width,
+                h = self.swapchain.extent.height,
+                "Swapchain recreated"
+            );
             Ok(())
         }
     }
@@ -726,10 +859,15 @@ void main() {
     ) -> Result<(vk::Pipeline, vk::PipelineLayout), String> {
         let stages = [vert.stage_create_info(), frag.stage_create_info()];
         let binding = vk::VertexInputBindingDescription::default()
-            .binding(0).stride(12).input_rate(vk::VertexInputRate::VERTEX); // stride=12: vec3 pos only
+            .binding(0)
+            .stride(12)
+            .input_rate(vk::VertexInputRate::VERTEX); // stride=12: vec3 pos only
         let attrs = [
             vk::VertexInputAttributeDescription::default()
-                .location(0).binding(0).format(vk::Format::R32G32B32_SFLOAT).offset(0),
+                .location(0)
+                .binding(0)
+                .format(vk::Format::R32G32B32_SFLOAT)
+                .offset(0),
             // No inColor attribute — color computed in fragment shader
         ];
         let vp = vk::Viewport::default().width(1.0).height(1.0).max_depth(1.0);
@@ -740,9 +878,12 @@ void main() {
             .offset(0)
             .size(80); // GridPushConstants: 64 (mat4) + 12 (vec3) + 4 (pad) = 80
         let layout = unsafe {
-            device.create_pipeline_layout(
-                &vk::PipelineLayoutCreateInfo::default()
-                    .push_constant_ranges(std::slice::from_ref(&push_range)), None)
+            device
+                .create_pipeline_layout(
+                    &vk::PipelineLayoutCreateInfo::default()
+                        .push_constant_ranges(std::slice::from_ref(&push_range)),
+                    None,
+                )
                 .map_err(|e| format!("pipeline layout: {e}"))?
         };
 
@@ -758,37 +899,61 @@ void main() {
             .color_write_mask(vk::ColorComponentFlags::RGBA);
 
         let pipeline = unsafe {
-            device.create_graphics_pipelines(vk::PipelineCache::null(), &[
-                vk::GraphicsPipelineCreateInfo::default()
-                    .stages(&stages)
-                    .vertex_input_state(&vk::PipelineVertexInputStateCreateInfo::default()
-                        .vertex_binding_descriptions(std::slice::from_ref(&binding))
-                        .vertex_attribute_descriptions(&attrs))
-                    .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo::default()
-                        .topology(vk::PrimitiveTopology::TRIANGLE_LIST)) // quad = 2 triangles
-                    .viewport_state(&vk::PipelineViewportStateCreateInfo::default()
-                        .viewports(std::slice::from_ref(&vp))
-                        .scissors(std::slice::from_ref(&sc)))
-                    .rasterization_state(&vk::PipelineRasterizationStateCreateInfo::default()
-                        .polygon_mode(vk::PolygonMode::FILL)
-                        .cull_mode(vk::CullModeFlags::NONE)
-                        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-                        .line_width(1.0))
-                    .multisample_state(&vk::PipelineMultisampleStateCreateInfo::default()
-                        .rasterization_samples(vk::SampleCountFlags::TYPE_1))
-                    .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo::default()
-                        .depth_test_enable(true)
-                        .depth_write_enable(false) // false: don't write depth for transparent grid
-                        .depth_compare_op(vk::CompareOp::LESS))
-                    .color_blend_state(&vk::PipelineColorBlendStateCreateInfo::default()
-                        .attachments(std::slice::from_ref(&blend_attachment)))
-                    .dynamic_state(&vk::PipelineDynamicStateCreateInfo::default()
-                        .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]))
-                    .layout(layout)
-                    .render_pass(render_pass.handle())
-                    .subpass(0)
-            ], None).map_err(|(_, e)| { device.destroy_pipeline_layout(layout, None);
-                format!("pipeline: {e}") })?[0]
+            device
+                .create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    &[vk::GraphicsPipelineCreateInfo::default()
+                        .stages(&stages)
+                        .vertex_input_state(
+                            &vk::PipelineVertexInputStateCreateInfo::default()
+                                .vertex_binding_descriptions(std::slice::from_ref(&binding))
+                                .vertex_attribute_descriptions(&attrs),
+                        )
+                        .input_assembly_state(
+                            &vk::PipelineInputAssemblyStateCreateInfo::default()
+                                .topology(vk::PrimitiveTopology::TRIANGLE_LIST),
+                        ) // quad = 2 triangles
+                        .viewport_state(
+                            &vk::PipelineViewportStateCreateInfo::default()
+                                .viewports(std::slice::from_ref(&vp))
+                                .scissors(std::slice::from_ref(&sc)),
+                        )
+                        .rasterization_state(
+                            &vk::PipelineRasterizationStateCreateInfo::default()
+                                .polygon_mode(vk::PolygonMode::FILL)
+                                .cull_mode(vk::CullModeFlags::NONE)
+                                .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+                                .line_width(1.0),
+                        )
+                        .multisample_state(
+                            &vk::PipelineMultisampleStateCreateInfo::default()
+                                .rasterization_samples(vk::SampleCountFlags::TYPE_1),
+                        )
+                        .depth_stencil_state(
+                            &vk::PipelineDepthStencilStateCreateInfo::default()
+                                .depth_test_enable(true)
+                                .depth_write_enable(false) // false: don't write depth for transparent grid
+                                .depth_compare_op(vk::CompareOp::LESS),
+                        )
+                        .color_blend_state(
+                            &vk::PipelineColorBlendStateCreateInfo::default()
+                                .attachments(std::slice::from_ref(&blend_attachment)),
+                        )
+                        .dynamic_state(
+                            &vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&[
+                                vk::DynamicState::VIEWPORT,
+                                vk::DynamicState::SCISSOR,
+                            ]),
+                        )
+                        .layout(layout)
+                        .render_pass(render_pass.handle())
+                        .subpass(0)],
+                    None,
+                )
+                .map_err(|(_, e)| {
+                    device.destroy_pipeline_layout(layout, None);
+                    format!("pipeline: {e}")
+                })?[0]
         };
         tracing::info!("Grid pipeline created (infinite shader-based)");
         Ok((pipeline, layout))
@@ -800,14 +965,27 @@ void main() {
         render_pass: &RenderPass,
         depth_buffer: &DepthBuffer,
     ) -> Result<Vec<Framebuffer>, String> {
-        swapchain.image_views.iter().enumerate().map(|(i, &iv)| {
-            let attachments = [iv, depth_buffer.image_view()];
-            let fb = unsafe { device.create_framebuffer(&vk::FramebufferCreateInfo::default()
-                .render_pass(render_pass.handle()).attachments(&attachments)
-                .width(swapchain.extent.width).height(swapchain.extent.height).layers(1), None) }
+        swapchain
+            .image_views
+            .iter()
+            .enumerate()
+            .map(|(i, &iv)| {
+                let attachments = [iv, depth_buffer.image_view()];
+                let fb = unsafe {
+                    device.create_framebuffer(
+                        &vk::FramebufferCreateInfo::default()
+                            .render_pass(render_pass.handle())
+                            .attachments(&attachments)
+                            .width(swapchain.extent.width)
+                            .height(swapchain.extent.height)
+                            .layers(1),
+                        None,
+                    )
+                }
                 .map_err(|e| format!("framebuffer[{i}]: {e}"))?;
-            Ok(Framebuffer::from_raw(device, fb))
-        }).collect()
+                Ok(Framebuffer::from_raw(device, fb))
+            })
+            .collect()
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -951,19 +1129,28 @@ void main() {
             let orbit_scale = 0.005_f32;
             let mut cam_high = OrbitCamera::default();
             cam_high.orbit(0.0, 99.0 / orbit_scale); // huge positive dy
-            assert!((cam_high.pitch - 1.5).abs() < 1e-5,
-                "large positive dy should saturate pitch at 1.5, got {}", cam_high.pitch);
+            assert!(
+                (cam_high.pitch - 1.5).abs() < 1e-5,
+                "large positive dy should saturate pitch at 1.5, got {}",
+                cam_high.pitch
+            );
 
             let mut cam_low = OrbitCamera::default();
             cam_low.orbit(0.0, -99.0 / orbit_scale); // huge negative dy
-            assert!((cam_low.pitch - (-1.5)).abs() < 1e-5,
-                "large negative dy should saturate pitch at -1.5, got {}", cam_low.pitch);
+            assert!(
+                (cam_low.pitch - (-1.5)).abs() < 1e-5,
+                "large negative dy should saturate pitch at -1.5, got {}",
+                cam_low.pitch
+            );
 
             // Mid-range value passes through unchanged
             let mut cam_mid = OrbitCamera { pitch: 0.0, ..OrbitCamera::default() };
             cam_mid.orbit(0.0, 0.5 / orbit_scale); // dy such that pitch moves exactly 0.5
-            assert!((cam_mid.pitch - 0.5).abs() < 1e-5,
-                "pitch should be 0.5 after small dy, got {}", cam_mid.pitch);
+            assert!(
+                (cam_mid.pitch - 0.5).abs() < 1e-5,
+                "pitch should be 0.5 after small dy, got {}",
+                cam_mid.pitch
+            );
         }
 
         // ── generate_grid_quad ───────────────────────────────────────────────
@@ -1009,14 +1196,16 @@ void main() {
 
         #[test]
         fn viewport_instance_defaults_to_visible_and_grid_on() {
-            let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            let inst =
+                ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
             assert!(inst.visible, "new instance should be visible");
             assert!(inst.grid_visible, "new instance should show grid");
         }
 
         #[test]
         fn viewport_instance_camera_default_yaw_zero() {
-            let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            let inst =
+                ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
             assert_eq!(inst.camera.yaw, 0.0, "camera yaw should start at 0 to match JS convention");
         }
 
@@ -1047,11 +1236,11 @@ void main() {
 
         #[test]
         fn viewport_instance_defaults_to_perspective() {
-            let inst = ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
+            let inst =
+                ViewportInstance::new(ViewportBounds { x: 0, y: 0, width: 800, height: 600 });
             assert!(!inst.is_ortho, "new instance should default to perspective");
         }
     }
-
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1062,10 +1251,10 @@ void main() {
 /// viewport panel moves across OS windows (e.g. pop-out / dock-back).
 #[derive(Clone, Debug, Default)]
 pub struct CameraState {
-    pub target:   [f32; 3],
+    pub target: [f32; 3],
     pub distance: f32,
-    pub yaw:      f32,
-    pub pitch:    f32,
+    pub yaw: f32,
+    pub pitch: f32,
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1087,14 +1276,18 @@ impl NativeViewport {
         Err("Not implemented".into())
     }
     pub fn upsert_instance(&self, _id: String, _bounds: ViewportBounds) {}
-    pub fn remove_instance(&self, _id: &str) -> bool { true }
+    pub fn remove_instance(&self, _id: &str) -> bool {
+        true
+    }
     pub fn set_instance_bounds(&self, _id: &str, _bounds: ViewportBounds) {}
     pub fn set_instance_visible(&self, _id: &str, _visible: bool) {}
     pub fn camera_orbit(&self, _id: &str, _dx: f32, _dy: f32) {}
     pub fn camera_pan(&self, _id: &str, _dx: f32, _dy: f32) {}
     pub fn camera_zoom(&self, _id: &str, _delta: f32) {}
     pub fn camera_reset(&self, _id: &str) {}
-    pub fn get_instance_camera(&self, _id: &str) -> Option<CameraState> { None }
+    pub fn get_instance_camera(&self, _id: &str) -> Option<CameraState> {
+        None
+    }
     pub fn set_instance_camera(&self, _id: &str, _state: CameraState) {}
     pub fn set_grid_visible(&self, _id: &str, _visible: bool) {}
     pub fn camera_set_orientation(&self, _id: &str, _yaw: f32, _pitch: f32) {}

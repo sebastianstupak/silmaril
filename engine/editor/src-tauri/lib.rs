@@ -6,6 +6,10 @@ pub mod viewport;
 pub mod world;
 
 use bridge::commands;
+use file_explorer::{
+    get_file_tree, expand_dir, get_git_status, start_file_watch, stop_file_watch,
+    open_in_editor, create_file, create_dir, rename_path, delete_path,
+};
 
 /// Installs a custom WNDPROC that overrides tao's `WM_NCCALCSIZE` handler.
 ///
@@ -199,6 +203,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::NativeViewportState::new())
+        .manage(file_explorer::FileWatcherState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::open_project,
@@ -225,6 +230,16 @@ pub fn run() {
             commands::window_start_drag,
             commands::start_dock_drag,
             commands::broadcast_settings,
+            get_file_tree,
+            expand_dir,
+            get_git_status,
+            start_file_watch,
+            stop_file_watch,
+            open_in_editor,
+            create_file,
+            create_dir,
+            rename_path,
+            delete_path,
         ])
         .setup(|app| {
             use tauri::Manager;

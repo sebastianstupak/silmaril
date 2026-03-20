@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- White background with rounded corners -->
+  <rect width="1024" height="1024" rx="200" ry="200" fill="#ffffff"/>
+
+  <!-- Outer octagon ring — padded well inside the canvas -->
+  <polygon
+    points="430,130 594,130 894,430 894,594 594,894 430,894 130,594 130,430"
+    fill="none"
+    stroke="#007acc"
+    stroke-width="52"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner octagon fill -->
+  <polygon
+    points="460,290 564,290 734,460 734,564 564,734 460,734 290,564 290,460"
+    fill="#007acc"
+    opacity="0.25"
+  />
+
+  <!-- Inner octagon ring -->
+  <polygon
+    points="460,290 564,290 734,460 734,564 564,734 460,734 290,564 290,460"
+    fill="none"
+    stroke="#007acc"
+    stroke-width="18"
+    stroke-linejoin="round"
+    opacity="0.6"
+  />
+</svg>
