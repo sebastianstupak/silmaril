@@ -778,10 +778,25 @@
     outline-offset: -1px;
   }
 
-  .viewport-container :global(svg) {
+  /* Gizmo and HUD icon SVGs must not be stretched by the global rule below.
+     The global rule was originally for a full-viewport SVG (removed); keep it
+     scoped away from overlay elements. */
+  .axis-gizmo :global(svg) {
     display: block;
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
+  }
+
+  .viewport-hud :global(svg) {
+    display: block;
+    width: auto;
+    height: auto;
+  }
+
+  .viewport-toolbar :global(svg) {
+    display: block;
+    width: auto;
+    height: auto;
   }
 
   .viewport-loading {
@@ -934,6 +949,11 @@
 
   .hud-btn:hover {
     color: #ccc;
+  }
+
+  .hud-btn:focus-visible {
+    outline: 1px solid var(--color-accent, #61afef);
+    border-radius: 2px;
   }
 
   /* Drag-mode indicator */
