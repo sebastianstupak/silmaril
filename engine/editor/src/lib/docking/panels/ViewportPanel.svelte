@@ -15,6 +15,7 @@
     viewportCameraReset,
     viewportSetGridVisible,
     viewportCameraSetOrientation,
+    viewportSetProjection,
   } from '$lib/api';
   import type { SceneTool, ProjectionMode } from '$lib/scene/state';
   import {
@@ -66,10 +67,9 @@
   let activeTool: SceneTool = $state('select');
   let gridVisible = $state(true);
   let snapToGrid = $state(false);
-  let projection: ProjectionMode = $state('persp');
+  let projection: ProjectionMode = $state('perspective');
   let cameraYawRad = $state(0.0);         // radians, matches Rust OrbitCamera::yaw
   let cameraPitchRad = $state(Math.PI / 6); // radians, matches Rust OrbitCamera::pitch default
-  let cameraZoom = $state(1);
 
   // True once onMount has loaded saved settings — gates the $effect save below
   // so we don't overwrite localStorage with defaults on first render.
@@ -84,7 +84,6 @@
       gridVisible,
       snapToGrid,
       projection,
-      cameraZoom,
       cameraYawRad,
       cameraPitchRad,
     });
@@ -167,8 +166,9 @@
           createNativeViewport(viewportId, bounds.x, bounds.y, bounds.width, bounds.height).then(() => {
             nativeViewportCreated = true;
             loading = false;
-            // Sync grid visibility to Rust on mount — restores persisted state
+            // Sync grid visibility and projection to Rust on mount — restores persisted state
             viewportSetGridVisible(viewportId, gridVisible);
+            viewportSetProjection(viewportId, projection === 'ortho');
           }).catch((_e) => {
             loading = false;
           });
@@ -185,11 +185,8 @@
         if (saved.activeTool) activeTool = saved.activeTool as SceneTool;
         gridVisible = saved.gridVisible;
         snapToGrid = saved.snapToGrid;
-        if (saved.projection === 'persp' || saved.projection === 'ortho') {
-          projection = saved.projection;
-        }
-        if (saved.cameraZoom != null && saved.cameraZoom > 0) {
-          cameraZoom = saved.cameraZoom;
+        if (saved.projection === 'perspective' || saved.projection === 'ortho') {
+          projection = saved.projection as ProjectionMode;
         }
         if (saved.cameraYawRad != null) {
           cameraYawRad = saved.cameraYawRad;
@@ -250,8 +247,6 @@
   /** Handle mouse wheel for zoom. */
   function handleWheel(event: WheelEvent) {
     event.preventDefault();
-    const delta = event.deltaY > 0 ? -0.1 : 0.1;
-    cameraZoom = Math.max(0.01, cameraZoom + delta);
     viewportCameraZoom(viewportId, -event.deltaY);
   }
 
@@ -358,7 +353,6 @@
       case 'zoom': {
         dragStartX = event.clientX;
         dragStartY = event.clientY;
-        cameraZoom = Math.max(0.01, cameraZoom + (-dy * 0.005));
         viewportCameraZoom(viewportId, dy * -5);
         break;
       }
@@ -411,6 +405,12 @@
     event.preventDefault();
   }
 
+  /** Toggle projection mode and sync to Rust. */
+  function toggleProjection() {
+    projection = projection === 'perspective' ? 'ortho' : 'perspective';
+    viewportSetProjection(viewportId, projection === 'ortho');
+  }
+
   // ---------------------------------------------------------------------------
   // Keyboard shortcuts
   // ---------------------------------------------------------------------------
@@ -432,6 +432,13 @@
       if (selectedEntityId != null) {
         focusEntity(selectedEntityId);
       }
+      return;
+    }
+
+    // P — toggle projection
+    if (event.key.toLowerCase() === 'p' && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      toggleProjection();
       return;
     }
 
@@ -542,7 +549,7 @@
       <button
         class="tool-btn"
         title={projection === 'ortho' ? 'Switch to Perspective' : 'Switch to Orthographic'}
-        onclick={(e: MouseEvent) => { e.stopPropagation(); projection = projection === 'ortho' ? 'persp' : 'ortho'; }}
+        onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
       >
         <span class="tool-icon">{projection === 'ortho' ? '\u229E' : '\u25CE'}</span>
       </button>
@@ -652,15 +659,10 @@
     </span>
     <span class="hud-separator">|</span>
     <span class="hud-projection">{projection === 'ortho' ? 'Ortho' : 'Persp'}</span>
-    <span class="hud-separator">|</span>
-    <span class="hud-zoom" title={t('viewport.zoom')}>
-      {Math.round(cameraZoom * 100)}%
-    </span>
     <button
       class="hud-btn"
       onclick={(e: MouseEvent) => {
         e.stopPropagation();
-        cameraZoom = 1;
         cameraYawRad = 0.0;
         cameraPitchRad = Math.PI / 6;
         viewportCameraReset(viewportId);
