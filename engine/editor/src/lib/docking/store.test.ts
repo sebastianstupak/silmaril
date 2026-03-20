@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { EditorLayout, TabsNode } from './types';
+import type { EditorLayout, TabsNode, SplitNode } from './types';
 import {
   removePanelFromLayout,
   dropPanel,
@@ -52,6 +52,16 @@ describe('removePanelFromLayout', () => {
     const bp = result.bottomPanel as TabsNode;
     expect(bp.panels).toEqual(['console', 'profiler']);
   });
+
+  it('leaves empty TabsNode when all panels removed from split bottomPanel', () => {
+    const layout = makeLayoutWithSplitBottom();
+    // Remove console first
+    const after1 = removePanelFromLayout(layout, 'console');
+    // Remove profiler — bottomPanel should now be an empty TabsNode
+    const after2 = removePanelFromLayout(after1, 'profiler');
+    expect(after2.bottomPanel.type).toBe('tabs');
+    expect((after2.bottomPanel as TabsNode).panels).toEqual([]);
+  });
 });
 
 describe('dropPanel — isBottomPanel=true', () => {
@@ -67,25 +77,19 @@ describe('dropPanel — isBottomPanel=true', () => {
     const layout = makeLayoutWithFlatBottom();
     const result = dropPanel(layout, 'hierarchy', [], 'right', true);
     expect(result.bottomPanel.type).toBe('split');
-    if (result.bottomPanel.type === 'split') {
-      expect(result.bottomPanel.direction).toBe('horizontal');
-      const allPanels = JSON.stringify(result.bottomPanel);
-      expect(allPanels).toContain('hierarchy');
-    }
+    expect((result.bottomPanel as SplitNode).direction).toBe('horizontal');
+    expect(JSON.stringify(result.bottomPanel)).toContain('hierarchy');
   });
 
   it('left drop creates horizontal split with new panel on left', () => {
     const layout = makeLayoutWithFlatBottom();
     const result = dropPanel(layout, 'hierarchy', [], 'left', true);
     expect(result.bottomPanel.type).toBe('split');
-    if (result.bottomPanel.type === 'split') {
-      expect(result.bottomPanel.direction).toBe('horizontal');
-      const firstChild = result.bottomPanel.children[0];
-      expect(firstChild.type).toBe('tabs');
-      if (firstChild.type === 'tabs') {
-        expect(firstChild.panels).toContain('hierarchy');
-      }
-    }
+    const bp = result.bottomPanel as SplitNode;
+    expect(bp.direction).toBe('horizontal');
+    const firstChild = bp.children[0];
+    expect(firstChild.type).toBe('tabs');
+    expect((firstChild as TabsNode).panels).toContain('hierarchy');
   });
 
   it('panel is not lost after drop — removed from source, appears in target', () => {
@@ -93,6 +97,17 @@ describe('dropPanel — isBottomPanel=true', () => {
     const result = dropPanel(layout, 'hierarchy', [], 'right', true);
     expect((result.root as TabsNode).panels).not.toContain('hierarchy');
     expect(JSON.stringify(result.bottomPanel)).toContain('hierarchy');
+  });
+
+  it('center drop on split bottomPanel adds panel to first TabsNode', () => {
+    const layout = makeLayoutWithSplitBottom();
+    // bottomPanel is a split with console (left) and profiler (right)
+    const result = dropPanel(layout, 'hierarchy', [], 'center', true);
+    // hierarchy should be added as a tab, not create another split level
+    expect(result.bottomPanel.type).toBe('split');
+    const firstChild = (result.bottomPanel as SplitNode).children[0];
+    expect(firstChild.type).toBe('tabs');
+    expect((firstChild as TabsNode).panels).toContain('hierarchy');
   });
 });
 
@@ -118,9 +133,9 @@ describe('resizeSplit — isBottomPanel=true', () => {
   it('resizes a split node inside bottomPanel', () => {
     const layout = makeLayoutWithSplitBottom();
     const result = resizeSplit(layout, [], 1, 50, 1000, true);
-    if (result.bottomPanel.type === 'split') {
-      expect(result.bottomPanel.sizes[0]).toBeCloseTo(55, 0);
-      expect(result.bottomPanel.sizes[1]).toBeCloseTo(45, 0);
-    }
+    expect(result.bottomPanel.type).toBe('split');
+    const bp = result.bottomPanel as SplitNode;
+    expect(bp.sizes[0]).toBeCloseTo(55, 0);
+    expect(bp.sizes[1]).toBeCloseTo(45, 0);
   });
 });

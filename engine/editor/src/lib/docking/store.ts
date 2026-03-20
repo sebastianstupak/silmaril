@@ -239,6 +239,16 @@ function cleanNode(node: LayoutNode): LayoutNode {
   return node;
 }
 
+/** Find the first TabsNode in a subtree (depth-first) */
+function findFirstTabsNode(node: LayoutNode): TabsNode | null {
+  if (node.type === 'tabs') return node;
+  for (const child of node.children) {
+    const found = findFirstTabsNode(child);
+    if (found) return found;
+  }
+  return null;
+}
+
 /** Find a TabsNode by searching for it by one of its panel IDs */
 function findTabsNodeWithPanel(root: LayoutNode, panelId: string, path: number[] = []): { node: TabsNode; path: number[] } | null {
   if (root.type === 'tabs') {
@@ -315,10 +325,14 @@ function insertPanelIntoTree(
   if (!found) return tree;
   const { node: targetNode, path: resolvedPath } = found;
 
-  if (zone === 'center' && targetNode.type === 'tabs') {
-    targetNode.panels.push(panelId);
-    targetNode.activeTab = targetNode.panels.length - 1;
-    return tree;
+  if (zone === 'center') {
+    // Find a tabs node to add into — targetNode might be a SplitNode if path is stale
+    const tabsNode = targetNode.type === 'tabs' ? targetNode : findFirstTabsNode(targetNode);
+    if (tabsNode) {
+      tabsNode.panels.push(panelId);
+      tabsNode.activeTab = tabsNode.panels.length - 1;
+      return tree;
+    }
   }
 
   const newPanel: TabsNode = { type: 'tabs', activeTab: 0, panels: [panelId] };
