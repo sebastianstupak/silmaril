@@ -1235,7 +1235,8 @@ pub fn scene_undo(
         stack.pop_undo()
     };
     let Some(action) = action else {
-        return Ok(serde_json::json!({ "canUndo": false, "canRedo": false }));
+        let stack = undo_state.lock().map_err(|e| e.to_string())?;
+        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
     };
     // For undo, apply `before`.
     let (entity_id, target) = match &action {
@@ -1262,7 +1263,8 @@ pub fn scene_redo(
         stack.pop_redo()
     };
     let Some(action) = action else {
-        return Ok(serde_json::json!({ "canUndo": false, "canRedo": false }));
+        let stack = undo_state.lock().map_err(|e| e.to_string())?;
+        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
     };
     // For redo, apply `after`.
     let (entity_id, target) = match &action {
