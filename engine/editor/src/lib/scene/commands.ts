@@ -15,7 +15,7 @@ import {
   type Vec3,
 } from './state';
 import { logInfo, logDebug } from '$lib/stores/console';
-import { buildInitialComponentValues, type FieldValue } from '$lib/inspector/inspector-utils';
+import { applyComponentDefaults, buildInitialComponentValues, type FieldValue } from '$lib/inspector/inspector-utils';
 import { getSchemas } from '$lib/inspector/schema-store';
 import { setComponentField as apiSetComponentField } from '$lib/api';
 
@@ -411,6 +411,57 @@ export function setComponentField(
 }
 
 // ---------------------------------------------------------------------------
+// Component management
+// ---------------------------------------------------------------------------
+
+/** Add a component to an entity. No-op if already present. */
+export function addComponent(entityId: number, componentName: string): void {
+  const schema = getSchemas()[componentName];
+  const defaults = schema ? applyComponentDefaults(schema) : {};
+  _mutate((s) => {
+    const entities = s.entities.map((e) => {
+      if (e.id !== entityId) return e;
+      if (e.components.includes(componentName)) return e;
+      return {
+        ...e,
+        components: [...e.components, componentName],
+        componentValues: { ...e.componentValues, [componentName]: defaults },
+      };
+    });
+    return { ...s, entities };
+  });
+  logInfo(`Component added: ${componentName} → entity #${entityId}`);
+  // Tauri forward — fire-and-forget, ignore errors
+  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+    import('@tauri-apps/api/core').then(({ invoke }) =>
+      invoke('add_component', { entityId, component: componentName }).catch(() => {}),
+    );
+  }
+}
+
+/** Remove a component from an entity. No-op if not present. */
+export function removeComponent(entityId: number, componentName: string): void {
+  _mutate((s) => {
+    const entities = s.entities.map((e) => {
+      if (e.id !== entityId) return e;
+      const { [componentName]: _removed, ...rest } = e.componentValues ?? {};
+      return {
+        ...e,
+        components: e.components.filter((c) => c !== componentName),
+        componentValues: rest,
+      };
+    });
+    return { ...s, entities };
+  });
+  logInfo(`Component removed: ${componentName} from entity #${entityId}`);
+  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+    import('@tauri-apps/api/core').then(({ invoke }) =>
+      invoke('remove_component', { entityId, component: componentName }).catch(() => {}),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Command dispatcher — maps string command names to functions
 // Used by the Tauri bridge for AI agent access.
 // ---------------------------------------------------------------------------
@@ -511,6 +562,14 @@ export function dispatchSceneCommand(
 
     case 'get_state':
       return getSceneState();
+
+    case 'add_component':
+      addComponent(args.id as number, args.component as string);
+      return { ok: true };
+
+    case 'remove_component':
+      removeComponent(args.id as number, args.component as string);
+      return { ok: true };
 
     default:
       return { error: `Unknown scene command: ${command}` };
