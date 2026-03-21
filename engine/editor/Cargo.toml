@@ -26,6 +26,7 @@ codegen = []
 [dependencies]
 engine-ops = { path = "../ops" }
 engine-core = { path = "../core" }
+engine-ai = { path = "../ai" }
 tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
