@@ -6,6 +6,7 @@
   import { formatKeybindDisplay } from '../keybind-utils';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { t } from '$lib/i18n';
+  import Omnibar from '$lib/omnibar/Omnibar.svelte';
 
   // ── Panel catalogue ────────────────────────────────────────────────────────
   const ALL_PANELS: { id: string; label: string }[] = [
@@ -35,6 +36,10 @@
     onOpenProject?: () => void;
     onLayoutReset?: () => void;
     compactMenu?: boolean;
+    omnibarOpen?: boolean;
+    onOmnibarOpen?: () => void;
+    onOmnibarClose?: () => void;
+    projectPath?: string | null;
   }
 
   let {
@@ -54,6 +59,10 @@
     onOpenProject,
     onLayoutReset,
     compactMenu = false,
+    omnibarOpen = false,
+    onOmnibarOpen,
+    onOmnibarClose,
+    projectPath = null,
   }: Props = $props();
 
   const MAX_VISIBLE_SLOTS = 4;
@@ -169,12 +178,12 @@
   // ── Drag / window controls ─────────────────────────────────────────────────
   function onTitlebarMousedown(e: MouseEvent) {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('button, input, .slot-wrapper, .overflow-wrapper, .panels-btn-wrapper')) return;
+    if ((e.target as HTMLElement).closest('button, input, .slot-wrapper, .overflow-wrapper, .panels-btn-wrapper, .omnibar-wrapper')) return;
     invoke('window_start_drag').catch(() => {});
   }
 
   function onTitlebarDblclick(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('button, input, .slot-wrapper, .overflow-wrapper, .panels-btn-wrapper')) return;
+    if ((e.target as HTMLElement).closest('button, input, .slot-wrapper, .overflow-wrapper, .panels-btn-wrapper, .omnibar-wrapper')) return;
     invoke('window_toggle_maximize').catch(() => {});
   }
 
@@ -373,8 +382,15 @@
     </div>
   </div>
 
-  <!-- Center: draggable spacer -->
-  <div class="titlebar-center"></div>
+  <!-- Center: omnibar -->
+  <div class="titlebar-center">
+    <Omnibar
+      bind:open={omnibarOpen}
+      {projectPath}
+      onOpen={onOmnibarOpen}
+      onClose={onOmnibarClose}
+    />
+  </div>
 
   <!-- Right: layout slots · overflow · panels · window controls -->
   <div class="titlebar-right">
