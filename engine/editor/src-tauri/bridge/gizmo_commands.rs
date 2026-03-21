@@ -36,6 +36,8 @@ pub struct DragState {
     pub camera_pos: Vec3,
     /// Gizmo handle scale (distance-based).
     pub gizmo_scale: f32,
+    /// Viewport width at drag-start (used for screen-delta projection).
+    pub viewport_width: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -64,11 +66,14 @@ pub fn ray_capsule_intersects(
     }
 
     let t = (d.dot(ab) * ab.dot(ao) - ab.dot(ab) * d.dot(ao)) / denom;
-    let s = (d.dot(d) * ab.dot(ao) - d.dot(ab) * d.dot(ao)) / denom;
-    let s = s.clamp(0.0, 1.0);
-
-    let closest_ray = ray_origin + d * t.max(0.0);
-    let closest_cap = cap_a + ab * s;
+    let t = t.max(0.0); // ray only goes forward
+    let s_reclamped = if ab.length_squared() > 1e-10 {
+        ((ray_origin + d * t - cap_a).dot(ab) / ab.dot(ab)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let closest_ray = ray_origin + d * t;
+    let closest_cap = cap_a + ab * s_reclamped;
     closest_ray.distance(closest_cap) <= radius
 }
 
@@ -196,6 +201,7 @@ pub fn gizmo_hit_test(
                 camera_proj: proj,
                 camera_pos: cam_pos,
                 gizmo_scale,
+                viewport_width: bounds.width.max(1) as f32,
             });
 
             tracing::debug!(
@@ -205,9 +211,22 @@ pub fn gizmo_hit_test(
                 "Gizmo hit"
             );
 
+            let axis_str = match axis {
+                crate::viewport::GizmoAxis::X  => "x",
+                crate::viewport::GizmoAxis::Y  => "y",
+                crate::viewport::GizmoAxis::Z  => "z",
+                crate::viewport::GizmoAxis::XY => "xy",
+                crate::viewport::GizmoAxis::XZ => "xz",
+                crate::viewport::GizmoAxis::YZ => "yz",
+            };
+            let mode_str = match mode {
+                crate::viewport::GizmoMode::Move   => "move",
+                crate::viewport::GizmoMode::Rotate => "rotate",
+                crate::viewport::GizmoMode::Scale  => "scale",
+            };
             return Some(serde_json::json!({
-                "axis": format!("{:?}", axis),
-                "mode": format!("{:?}", mode),
+                "axis": axis_str,
+                "mode": mode_str,
             }));
         }
     }
@@ -260,7 +279,7 @@ pub fn gizmo_drag(
     match mode {
         crate::viewport::GizmoMode::Move => {
             let delta =
-                project_screen_delta_to_axis((dx, dy), axis_vec, 1024.0, gizmo_scale * 2.0);
+                project_screen_delta_to_axis((dx, dy), axis_vec, ds.viewport_width.max(1.0), gizmo_scale * 2.0);
             let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
             if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
                 t.position += delta;
