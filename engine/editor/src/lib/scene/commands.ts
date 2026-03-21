@@ -15,7 +15,7 @@ import {
   type Vec3,
 } from './state';
 import { logInfo, logDebug } from '$lib/stores/console';
-import { buildInitialComponentValues } from '$lib/inspector/inspector-utils';
+import { buildInitialComponentValues, type FieldValue } from '$lib/inspector/inspector-utils';
 import { getSchemas } from '$lib/inspector/schema-store';
 import { setComponentField as apiSetComponentField } from '$lib/api';
 
@@ -389,7 +389,7 @@ export function setComponentField(
           ...e.componentValues,
           [componentName]: {
             ...e.componentValues[componentName],
-            [fieldName]: value as import('$lib/inspector/inspector-utils').FieldValue,
+            [fieldName]: value as FieldValue,
           },
         },
       };
