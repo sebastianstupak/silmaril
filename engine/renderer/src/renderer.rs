@@ -72,6 +72,7 @@ pub struct Renderer {
     current_frame: usize,
     clear_color: [f32; 4],
     frame_counter: u64,
+    swapchain_needs_rebuild: bool,
 
     // Agentic debugging (Phase 1.6.R)
     debug_enabled: bool,
@@ -227,6 +228,7 @@ impl Renderer {
             current_frame: 0,
             clear_color: [0.0, 0.0, 0.0, 1.0], // Black by default
             frame_counter: 0,
+            swapchain_needs_rebuild: false,
 
             // Debug disabled by default
             debug_enabled: false,
@@ -257,16 +259,17 @@ impl Renderer {
     ///
     /// # Arguments
     ///
-    /// * `hwnd`   — Raw Win32 window handle (as `isize` / `HWND`).
-    /// * `width`  — Swapchain width in pixels.
-    /// * `height` — Swapchain height in pixels.
+    /// * `hwnd`      — Raw Win32 window handle (as `isize` / `HWND`).
+    /// * `width`     — Swapchain width in pixels.
+    /// * `height`    — Swapchain height in pixels.
+    /// * `app_name`  — Application name reported to the Vulkan driver.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use engine_renderer::Renderer;
     /// # let hwnd: isize = 0;
-    /// let renderer = Renderer::from_raw_handle(hwnd, 1280, 720)?;
+    /// let renderer = Renderer::from_raw_handle(hwnd, 1280, 720, "my-app")?;
     /// # Ok::<(), engine_renderer::RendererError>(())
     /// ```
     #[cfg(windows)]
@@ -274,11 +277,12 @@ impl Renderer {
         hwnd: isize,
         width: u32,
         height: u32,
+        app_name: &str,
     ) -> Result<Self, RendererError> {
         info!(hwnd = hwnd, width = width, height = height, "Creating renderer from raw HWND");
 
         // 1. Create Vulkan context (instance creation includes surface extensions)
-        let context = VulkanContext::new("silmaril-editor", None, None)?;
+        let context = VulkanContext::new(app_name, None, None)?;
 
         // 2. Create Vulkan entry for surface creation
         let entry = unsafe {
@@ -402,6 +406,7 @@ impl Renderer {
             current_frame: 0,
             clear_color: [0.0, 0.0, 0.0, 1.0],
             frame_counter: 0,
+            swapchain_needs_rebuild: false,
 
             debug_enabled: false,
             debugger: None,
@@ -439,6 +444,13 @@ impl Renderer {
     /// ```
     #[instrument(skip(self))]
     pub fn begin_frame(&mut self) -> Option<FrameRecorder> {
+        // If the previous frame signalled that the swapchain is suboptimal,
+        // signal the caller to rebuild before proceeding.
+        if self.swapchain_needs_rebuild {
+            self.swapchain_needs_rebuild = false;
+            return None;
+        }
+
         let sync = &self.sync_objects[self.current_frame];
 
         // Wait for the previous use of this frame slot to finish.
@@ -465,7 +477,15 @@ impl Renderer {
         };
 
         let image_index = match acquire_result {
-            Ok((idx, _suboptimal)) => idx,
+            Ok((idx, suboptimal)) => {
+                if suboptimal {
+                    // Mark the swapchain for rebuild; the current frame can
+                    // still be rendered, but the next call to begin_frame will
+                    // return None so the caller can resize.
+                    self.swapchain_needs_rebuild = true;
+                }
+                idx
+            }
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                 // Swapchain must be rebuilt; signal caller by returning None.
                 return None;
@@ -830,6 +850,7 @@ impl Renderer {
     }
 
     /// Render a frame (clears to configured color)
+    #[deprecated(since = "0.1.0", note = "Use begin_frame/end_frame instead")]
     #[instrument(skip(self))]
     pub fn render_frame(&mut self) -> Result<(), RendererError> {
         let frame_start_time = std::time::Instant::now();
