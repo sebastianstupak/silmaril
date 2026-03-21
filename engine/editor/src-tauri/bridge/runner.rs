@@ -1,6 +1,6 @@
 // engine/editor/src-tauri/bridge/runner.rs
 use serde::Serialize;
-use tauri::Manager;
+use tauri::Emitter;
 
 use super::registry::{CommandRegistryState, EditorCommand};
 
