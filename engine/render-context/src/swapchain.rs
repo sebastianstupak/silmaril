@@ -9,19 +9,6 @@
 //! - Automatic resize handling
 //! - Minimal allocations during recreation
 
-// Tracy profiling macros (no-op when profiling feature disabled)
-#[cfg(feature = "profiling")]
-macro_rules! profile_scope {
-    ($name:expr) => {
-        let _tracy_span = tracy_client::span!($name);
-    };
-}
-
-#[cfg(not(feature = "profiling"))]
-macro_rules! profile_scope {
-    ($name:expr) => {};
-}
-
 use crate::context::VulkanContext;
 use crate::error::RendererError;
 use ash::vk;

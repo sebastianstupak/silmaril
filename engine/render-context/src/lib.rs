@@ -5,6 +5,38 @@
 
 #![warn(missing_docs)]
 
+/// Creates a Tracy profiling span for the given name.
+///
+/// Compiles to a no-op when the `profiling` feature is not enabled.
+/// Use this macro in performance-critical paths to instrument them for Tracy.
+///
+/// # Example
+/// ```ignore
+/// profile_scope!("render_frame");
+/// ```
+#[cfg(feature = "profiling")]
+#[macro_export]
+macro_rules! profile_scope {
+    ($name:expr) => {
+        let _tracy_span = tracy_client::span!($name);
+    };
+}
+
+/// Creates a Tracy profiling span for the given name.
+///
+/// Compiles to a no-op when the `profiling` feature is not enabled.
+/// Use this macro in performance-critical paths to instrument them for Tracy.
+///
+/// # Example
+/// ```ignore
+/// profile_scope!("render_frame");
+/// ```
+#[cfg(not(feature = "profiling"))]
+#[macro_export]
+macro_rules! profile_scope {
+    ($name:expr) => {};
+}
+
 pub mod buffer;
 pub mod command;
 pub mod context;

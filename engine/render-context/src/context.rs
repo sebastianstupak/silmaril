@@ -3,19 +3,6 @@
 //! Handles Vulkan instance, device, and swapchain creation following best practices
 //! from the 2026 Vulkan guide. Implements Phase 1.5: Vulkan Context.
 
-// Tracy profiling macros (no-op when profiling feature disabled)
-#[cfg(feature = "profiling")]
-macro_rules! profile_scope {
-    ($name:expr) => {
-        let _tracy_span = tracy_client::span!($name);
-    };
-}
-
-#[cfg(not(feature = "profiling"))]
-macro_rules! profile_scope {
-    ($name:expr) => {};
-}
-
 use crate::error::RendererError;
 use ash::vk;
 use gpu_allocator::vulkan as gpu_alloc;
