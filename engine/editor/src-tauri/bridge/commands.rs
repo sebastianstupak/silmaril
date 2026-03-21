@@ -534,14 +534,14 @@ pub fn window_start_resize(window: tauri::WebviewWindow, direction: String) -> R
             HTTOPLEFT, HTTOPRIGHT, HTBOTTOMLEFT, HTBOTTOMRIGHT,
         };
         let hit: usize = match direction.as_str() {
-            "n"  => HTTOP.0 as usize,
-            "s"  => HTBOTTOM.0 as usize,
-            "e"  => HTRIGHT.0 as usize,
-            "w"  => HTLEFT.0 as usize,
-            "ne" => HTTOPRIGHT.0 as usize,
-            "nw" => HTTOPLEFT.0 as usize,
-            "se" => HTBOTTOMRIGHT.0 as usize,
-            "sw" => HTBOTTOMLEFT.0 as usize,
+            "n"  => HTTOP as usize,
+            "s"  => HTBOTTOM as usize,
+            "e"  => HTRIGHT as usize,
+            "w"  => HTLEFT as usize,
+            "ne" => HTTOPRIGHT as usize,
+            "nw" => HTTOPLEFT as usize,
+            "se" => HTBOTTOMRIGHT as usize,
+            "sw" => HTBOTTOMLEFT as usize,
             other => return Err(format!("unknown resize direction: {other}")),
         };
         let raw = window.hwnd().map_err(|e| format!("get HWND: {e}"))?;
