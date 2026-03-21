@@ -748,6 +748,9 @@ void main() {
     // ──────────────────────────────────────────────────────────────────────
 
     struct ViewportRenderer {
+        // IMPORTANT: field declaration order matters for Drop order.
+        // `renderer` must come before `grid_pipeline` so that `Renderer::drop`
+        // (which calls device.wait_idle) runs before `GridPipeline::drop`.
         renderer: engine_renderer::Renderer,
         grid_pipeline: GridPipeline,
         width: u32,
@@ -789,7 +792,7 @@ void main() {
         fn render_frame(
             &mut self,
             viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
-        ) -> Result<bool, String> {
+        ) -> Result<(), String> {
             if self.needs_recreate {
                 self.renderer
                     .rebuild_swapchain(self.width, self.height)
@@ -800,7 +803,7 @@ void main() {
             let Some(recorder) = self.renderer.begin_frame() else {
                 // Swapchain out-of-date — mark for rebuild and retry next tick
                 self.needs_recreate = true;
-                return Ok(false);
+                return Ok(());
             };
 
             let cmd = recorder.command_buffer;
@@ -811,8 +814,11 @@ void main() {
                 self.grid_pipeline.record(cmd, extent, viewports);
             }
 
+            // TODO(Task 8): wire render_meshes once SceneWorldState is available
+            // self.renderer.render_meshes(&recorder, &world, None, &vp_descs);
+
             self.renderer.end_frame(recorder);
-            Ok(true)
+            Ok(())
         }
     }
 
