@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { dispatchCommand } from '$lib/dispatch';
   import type { SavedLayout } from '../docking/store';
   import type { EditorLayout } from '../docking/types';
   import { buildMinimap, buildIcon } from '../docking/minimap';
@@ -261,11 +262,11 @@
           <span class="menu-label">{t('menu.edit')}</span>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="start" sideOffset={4} class="min-w-[200px]">
-          <DropdownMenu.Item onclick={onUndo} disabled={!canUndo}>
+          <DropdownMenu.Item onclick={() => dispatchCommand('edit.undo').catch(console.error)} disabled={!canUndo}>
             {t('menu.edit.undo')}
             <DropdownMenu.Shortcut>Ctrl+Z</DropdownMenu.Shortcut>
           </DropdownMenu.Item>
-          <DropdownMenu.Item onclick={onRedo} disabled={!canRedo}>
+          <DropdownMenu.Item onclick={() => dispatchCommand('edit.redo').catch(console.error)} disabled={!canRedo}>
             {t('menu.edit.redo')}
             <DropdownMenu.Shortcut>Ctrl+Y</DropdownMenu.Shortcut>
           </DropdownMenu.Item>

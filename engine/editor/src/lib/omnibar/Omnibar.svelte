@@ -1,11 +1,12 @@
 <!-- engine/editor/src/lib/omnibar/Omnibar.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/core';
-  import type { EditorCommand, OmnibarResult, AnyCommand } from './types';
+  import type { OmnibarResult, AnyCommand } from './types';
   import { isFrontendCommand } from './types';
   import { listFrontendCommands } from './registry';
   import { buildResults } from './providers';
+  import { listSpecs, dispatchCommand } from '$lib/dispatch';
+  import type { CommandSpec } from '$lib/bindings';
   import { getEditorContext, setEntities, setSelectedEntityId } from '$lib/stores/editor-context';
   import { selectEntity } from '$lib/scene/commands';
   import { openProject, scanProjectEntities, scanAssets } from '$lib/api';
@@ -28,17 +29,10 @@
   let selectedIndex = $state(0);
   let inputEl: HTMLInputElement | undefined = $state(undefined);
 
-  // Cached Rust commands (fetched once on mount)
-  let rustCommands: EditorCommand[] = $state([]);
   // Cached assets — kept in sync with the assets store
   let assets: { path: string; assetType: string }[] = $state(getAssets());
 
-  onMount(async () => {
-    try {
-      rustCommands = await invoke<EditorCommand[]>('list_commands');
-    } catch {
-      rustCommands = [];
-    }
+  onMount(() => {
     assets = getAssets();
     const unsubAssets = subscribeAssets((list) => { assets = list; });
     return unsubAssets;
@@ -49,11 +43,12 @@
     if (!open) { results = []; selectedIndex = 0; return; }
 
     const tsCommands = listFrontendCommands();
-    // Merge: TS-first (TS shadows Rust on same id)
+    // Merge: TS-first (TS shadows registry on same id)
     const tsIds = new Set(tsCommands.map(c => c.id));
+    const registrySpecs: CommandSpec[] = listSpecs();
     const merged: AnyCommand[] = [
       ...tsCommands,
-      ...rustCommands.filter(c => !tsIds.has(c.id)),
+      ...registrySpecs.filter(c => !tsIds.has(c.id)),
     ];
 
     const ctx = getEditorContext();
@@ -83,9 +78,9 @@
           await cmd.run();
         } else {
           try {
-            await invoke('run_command', { id: cmd.id });
+            await dispatchCommand(cmd.id);
           } catch (e) {
-            console.error('[omnibar] run_command failed:', e);
+            console.error('[omnibar] dispatchCommand failed:', e);
           }
         }
         break;
