@@ -24,7 +24,7 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 | Phase | Duration | Key Deliverables | Status |
 |-------|----------|------------------|--------|
-| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~97% (Profiling ✅, Docs ✅, **CLI ✅**, **Editor ✅ ~85%** — Tauri/Vulkan/panels/omnibar/undo-redo/CQRS done; assets+hierarchy CRUD in progress) |
+| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~99% (Profiling ✅, Docs ✅, **CLI ✅**, **Editor ✅ ~98%** — Tauri/Vulkan/panels/omnibar/undo-redo/CQRS/recent-items/hierarchy CRUD/inspector add-remove/assets panel all done; terminal+output panels next) |
 | **Phase 1** | 6-7 weeks | Core ECS + Basic Rendering + **Agentic Rendering Debug** | ✅ ~85-90% (ECS ✅, Serialization ✅, Templates ✅, Rendering ✅, Agentic Debug ✅, Assets ✅, Frame Capture ✅) |
 | **Phase 2** | 3-4 weeks | Networking + Client/Server | 🟡 ~75-80% (Foundation ✅, TCP/UDP ✅, Prediction ✅, Server Loop ✅, TLS ✅, Missing: Full E2E integration) |
 | **Phase 3** | 3-4 weeks | Physics + Audio + LOD | 🟡 ~35-40% (Audio ✅ 100%, Physics ~40-50%, Interest Mgmt ~30-40%, LOD ⚪ Not Started) |
@@ -35,14 +35,14 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 **New Additions:**
 - **Phase 0.7: Silm CLI Tool** ✅ **COMPLETE** - Code-first game development
-- **Phase 0.8: Editor Foundation** 🟡 **~85% COMPLETE** - Tauri + Svelte + Vulkan viewport + docking + omnibar + undo/redo + CQRS
+- **Phase 0.8: Editor Foundation** 🟡 **~98% COMPLETE** - Tauri + Svelte + Vulkan viewport + docking + omnibar + undo/redo + CQRS + recent items + hierarchy CRUD + inspector add/remove + assets panel
 - **Phase 4.9: Editor Advanced Features** 🟢 **LOW** - Drag-drop, full AI integration (3-4 weeks)
 
 ---
 
 ## 📋 **Phase 0: Documentation, Foundation & Developer Tools** (Weeks 1-5)
 
-**Status:** 🟡 **~97% Complete** (Profiling ✅, Repo Setup ✅, Docs ✅, Dev Tools ✅, CLI ✅, **Editor 🟡 ~85%**)
+**Status:** 🟡 **~99% Complete** (Profiling ✅, Repo Setup ✅, Docs ✅, Dev Tools ✅, CLI ✅, **Editor 🟡 ~98%**)
 
 ### **Goals**
 - Complete technical documentation
@@ -257,7 +257,7 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 
 ---
 
-#### **0.8 Silmaril Editor Foundation** 🟡 **MOSTLY COMPLETE (~85%)** - [docs/tasks/phase0-8-editor-foundation.md](docs/tasks/phase0-8-editor-foundation.md)
+#### **0.8 Silmaril Editor Foundation** 🟡 **MOSTLY COMPLETE (~98%)** - [docs/tasks/phase0-8-editor-foundation.md](docs/tasks/phase0-8-editor-foundation.md)
 
 **Priority:** 🟡 **MEDIUM** - After ops migration, provides visual workflow
 
@@ -285,24 +285,28 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
   - [x] "Open Folder" via Tauri dialog picker ✅
   - [x] Validate `game.toml`, scan entities on open ✅
   - [x] Breadcrumb shows project name / scene ✅
-  - [ ] Recent projects store (in progress — `stores/recent-items.ts`) ⬜
+  - [x] Recent projects store (persist-backed, max 10, dedup, subscribe/notify) ✅
 
-- [x] **EDITOR.4:** Hierarchy panel ✅ (CRUD in progress)
+- [x] **EDITOR.4:** Hierarchy panel ✅
   - [x] Entity list with search filter ✅
   - [x] Click-to-select, inspector sync ✅
-  - [ ] Create/delete/rename/duplicate entities (in progress) ⬜
-  - [ ] Right-click context menu (in progress) ⬜
+  - [x] Create entity (+ header button) ✅
+  - [x] Delete entity (✕ hover button + Del key) ✅
+  - [x] Rename entity (double-click inline, Enter/blur commits, Escape cancels) ✅
+  - [x] Duplicate entity (⧉ hover button) ✅
+  - [x] Right-click context menu (Rename/Duplicate/Add Child/Delete + backdrop) ✅
 
-- [x] **EDITOR.5:** Inspector panel ✅ (add/remove in progress)
+- [x] **EDITOR.5:** Inspector panel ✅
   - [x] Schema-driven component display ✅
   - [x] Field editing (string, number, boolean, vec3, color) ✅
   - [x] Collapsible component sections ✅
-  - [ ] Add Component picker + Remove button (in progress) ⬜
+  - [x] Remove component (✕ per component header, Tauri IPC stub) ✅
+  - [x] Add Component picker (filter input, schema list excluding existing, Tauri IPC stub) ✅
 
 - [x] **EDITOR.6:** Additional panels ✅
   - [x] Console panel (logInfo/logWarn/logError/logDebug, filter, clear) ✅
   - [x] File Explorer panel (project file tree) ✅
-  - [x] Assets panel (scaffolded; scan_assets wiring in progress) 🟡
+  - [x] Assets panel (grouped by type, fuzzy filter, copy-path toast, scan_assets wired) ✅
   - [x] Profiler panel (scaffolded) 🟡
 
 - [x] **EDITOR.7:** Playback controls 🟡
@@ -327,16 +331,18 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 - [x] Hierarchy, Inspector, Console panels ✅
 - [x] shadcn-svelte components throughout ✅
 - [x] Dark theme polished ✅
-- [ ] Assets panel fully wired ⬜
-- [ ] Hierarchy CRUD (create/delete/rename/duplicate) ⬜
-- [ ] Recent projects persist ⬜
+- [x] Assets panel fully wired (grouped, filtered, copy-path) ✅
+- [x] Hierarchy CRUD (create/delete/rename/duplicate + context menu) ✅
+- [x] Inspector add/remove component (picker + Tauri IPC stubs) ✅
+- [x] Recent projects persist (store, omnibar wired, addRecentItem on open) ✅
+- [ ] Terminal + Output panels ⬜ (plan written, next up)
 - [ ] Documentation (editor-guide.md) ⬜
 
 **Note:** Editor is **optional** - CLI (`silm`) is primary workflow. Editor provides visual tools for those who prefer it.
 
 ---
 
-**Phase 0 Time Estimate:** ✅ Complete — CLI shipped, Editor ~85% done.
+**Phase 0 Time Estimate:** ✅ Near-complete — CLI shipped, Editor ~98% done (terminal+output panels remaining).
 
 ---
 
@@ -1013,21 +1019,21 @@ After each phase:
 
 **Last Updated:** 2026-03-21
 
-**Current Phase:** Phase 0 (~97%), Phase 1 (~85-90%), Phase 2 (~75-80%)
+**Current Phase:** Phase 0 (~99%), Phase 1 (~85-90%), Phase 2 (~75-80%)
 
 **Active Work:**
-- **Phase 0.8 Editor (remaining ~15%):** Assets panel wiring, Hierarchy CRUD (create/delete/rename/duplicate), recent projects store
+- **Phase 0.8 Editor (remaining ~2%):** Terminal + Output panels (plan written at `docs/superpowers/plans/`)
 - Phase 2 networking E2E integration
 
 **Next Milestones:**
-- Complete Phase 0.8 remaining items (assets, hierarchy CRUD, recent projects)
+- Terminal + Output panels (Phase 0.8 last item)
 - Entity rendering in viewport (placeholder mesh → shows in viewport when entity created)
 - Complete Phase 2 networking E2E integration
 - Phase 3 (Physics/Audio/LOD)
 - Phase 4.9 (Editor Advanced — drag-drop, full AI integration)
 
 **Recommended Implementation Order:**
-1. Phase 0.8 remaining items (assets, CRUD, recent) — in progress
+1. Phase 0.8 terminal+output panels — plan ready, implement next
 2. Entity rendering in viewport (Phase 1 ECS → renderer bridge)
 3. Phase 2 networking E2E integration
 4. Phase 3 (Physics/Audio/LOD) - Game features
