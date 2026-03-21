@@ -404,7 +404,7 @@ pub fn gizmo_drag_end(
 
     // Read final transform from ECS (set during drag).
     let after_json = {
-        let world = world_state.0.read().map_err(|e| e.to_string())?;
+        let world = world_state.inner().0.read().map_err(|e| e.to_string())?;
         let t = world
             .get::<engine_core::Transform>(entity)
             .ok_or_else(|| format!("Entity {} not found", ds.entity_id))?;
@@ -415,7 +415,7 @@ pub fn gizmo_drag_end(
         })
     };
 
-    maybe_record_gizmo_drag(&template_path, ds.entity_id, after_json.clone(), &editor_state)?;
+    maybe_record_gizmo_drag(&template_path, ds.entity_id, after_json, &editor_state)?;
 
     // Sync TemplateState → ECS (emit entity-transform-changed so inspector stays live).
     if !template_path.is_empty() {
