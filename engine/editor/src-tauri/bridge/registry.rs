@@ -234,13 +234,13 @@ mod tests {
         let needs_handler: Vec<&str> = reg.requires_undo_handler().iter().map(|c| c.id.as_str()).collect();
 
         // Scene mutations must require an undo handler (non_undoable: false)
-        assert!(needs_handler.contains(&"scene.new_entity"));
+        assert!(needs_handler.contains(&"scene.create_entity"));
         assert!(needs_handler.contains(&"scene.delete_entity"));
         assert!(needs_handler.contains(&"scene.duplicate_entity"));
         assert!(needs_handler.contains(&"template.execute"));
 
         // These must NOT require an undo handler (non_undoable: true)
-        assert!(!needs_handler.contains(&"scene.focus_entity"));
+        assert!(!needs_handler.contains(&"scene.select_entity"));
         assert!(!needs_handler.contains(&"edit.undo"));
         assert!(!needs_handler.contains(&"edit.redo"));
         assert!(!needs_handler.contains(&"file.save_scene"));

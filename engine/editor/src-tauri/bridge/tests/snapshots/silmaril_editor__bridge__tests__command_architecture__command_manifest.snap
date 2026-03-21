@@ -131,9 +131,18 @@ expression: commands
   },
   {
     "category": "Scene",
-    "id": "scene.new_entity",
+    "id": "scene.get_state",
     "keybind": null,
-    "label": "New Entity",
+    "label": "Get Scene State",
+    "module_id": "scene",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Scene",
+    "id": "scene.create_entity",
+    "keybind": null,
+    "label": "Create Entity",
     "module_id": "scene",
     "non_undoable": false,
     "returns_data": false
@@ -149,6 +158,15 @@ expression: commands
   },
   {
     "category": "Scene",
+    "id": "scene.rename_entity",
+    "keybind": null,
+    "label": "Rename Entity",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
     "id": "scene.duplicate_entity",
     "keybind": "Ctrl+D",
     "label": "Duplicate Entity",
@@ -158,11 +176,65 @@ expression: commands
   },
   {
     "category": "Scene",
-    "id": "scene.focus_entity",
-    "keybind": "F",
-    "label": "Focus Entity",
+    "id": "scene.add_component",
+    "keybind": null,
+    "label": "Add Component",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.remove_component",
+    "keybind": null,
+    "label": "Remove Component",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.set_component_field",
+    "keybind": null,
+    "label": "Set Component Field",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.select_entity",
+    "keybind": null,
+    "label": "Select Entity",
     "module_id": "scene",
     "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.move_entity",
+    "keybind": null,
+    "label": "Move Entity",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.rotate_entity",
+    "keybind": null,
+    "label": "Rotate Entity",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.scale_entity",
+    "keybind": null,
+    "label": "Scale Entity",
+    "module_id": "scene",
+    "non_undoable": false,
     "returns_data": false
   },
   {
@@ -230,18 +302,63 @@ expression: commands
   },
   {
     "category": "Viewport",
-    "id": "viewport.toggle_grid",
+    "id": "viewport.orbit",
     "keybind": null,
-    "label": "Toggle Grid",
+    "label": "Orbit Camera",
     "module_id": "viewport",
     "non_undoable": true,
     "returns_data": false
   },
   {
     "category": "Viewport",
-    "id": "viewport.toggle_gizmos",
+    "id": "viewport.pan",
     "keybind": null,
-    "label": "Toggle Gizmos",
+    "label": "Pan Camera",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.zoom",
+    "keybind": null,
+    "label": "Zoom Camera",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.set_projection",
+    "keybind": null,
+    "label": "Set Projection",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.reset_camera",
+    "keybind": null,
+    "label": "Reset Camera",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.set_grid_visible",
+    "keybind": null,
+    "label": "Set Grid Visible",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.focus_entity",
+    "keybind": "F",
+    "label": "Focus Entity",
     "module_id": "viewport",
     "non_undoable": true,
     "returns_data": false

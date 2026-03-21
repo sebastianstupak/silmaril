@@ -580,6 +580,15 @@ export function dispatchSceneCommand(
       removeComponent(args.id as number, args.component as string);
       return { ok: true };
 
+    case 'set_component_field':
+      setComponentField(
+        args.id as number,
+        args.component as string,
+        args.field as string,
+        args.value,
+      );
+      return { ok: true };
+
     default:
       return { error: `Unknown scene command: ${command}` };
   }
