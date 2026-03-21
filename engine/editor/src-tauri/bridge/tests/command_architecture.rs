@@ -11,6 +11,8 @@ fn build_full_registry() -> CommandRegistry {
     reg.register_module(&ViewportModule);
     reg.register_module(&TemplateModule);
     reg.register_module(&UserCommandsModule);
+    reg.register_module(&EditorCoreModule);
+    reg.register_module(&ProjectModule);
     reg
 }
 

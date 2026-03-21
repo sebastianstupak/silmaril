@@ -425,5 +425,95 @@ expression: commands
     "module_id": "user",
     "non_undoable": true,
     "returns_data": false
+  },
+  {
+    "category": "Editor",
+    "id": "editor.get_scene_state",
+    "keybind": null,
+    "label": "Get Scene State",
+    "module_id": "editor",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Editor",
+    "id": "editor.get_entity",
+    "keybind": null,
+    "label": "Get Entity",
+    "module_id": "editor",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Editor",
+    "id": "editor.list_assets",
+    "keybind": null,
+    "label": "List Assets",
+    "module_id": "editor",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Editor",
+    "id": "editor.get_project_info",
+    "keybind": null,
+    "label": "Get Project Info",
+    "module_id": "editor",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Build",
+    "id": "project.build",
+    "keybind": null,
+    "label": "Build Project",
+    "module_id": "project",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "project.add_module",
+    "keybind": null,
+    "label": "Add Module",
+    "module_id": "project",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "project.list_modules",
+    "keybind": null,
+    "label": "List Modules",
+    "module_id": "project",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Build",
+    "id": "project.generate_component",
+    "keybind": null,
+    "label": "Generate Component",
+    "module_id": "project",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "project.generate_system",
+    "keybind": null,
+    "label": "Generate System",
+    "module_id": "project",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "project.run",
+    "keybind": null,
+    "label": "Run Command",
+    "module_id": "project",
+    "non_undoable": true,
+    "returns_data": false
   }
 ]
