@@ -298,6 +298,8 @@ pub fn run() {
             bridge::template_commands::template_undo,
             bridge::template_commands::template_redo,
             bridge::template_commands::template_history,
+            commands::add_component,
+            commands::remove_component,
         ])
         .setup(|app| {
             use tauri::Manager;

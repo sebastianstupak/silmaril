@@ -301,3 +301,20 @@ export async function setComponentField(
 ): Promise<void> {
   return tauriInvoke<void>('set_component_field', { entityId, component, field, value });
 }
+
+export async function addComponent(entityId: number, component: string): Promise<void> {
+  if (!isTauri) return; // browser: scene state already updated client-side
+  return tauriInvoke('add_component', { entityId, component });
+}
+
+export async function removeComponent(entityId: number, component: string): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke('remove_component', { entityId, component });
+}
+
+export async function scanAssets(
+  projectPath: string,
+): Promise<{ path: string; asset_type: string }[]> {
+  if (!isTauri) return [];
+  return tauriInvoke('scan_assets', { projectPath });
+}

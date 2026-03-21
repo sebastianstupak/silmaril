@@ -979,3 +979,21 @@ pub fn scan_assets(project_path: String) -> Result<Vec<AssetInfo>, String> {
     walk(root, ASSET_EXTS, &mut assets);
     Ok(assets)
 }
+
+// ── Component mutation stubs (ECS not live yet) ───────────────────────────
+
+#[tauri::command]
+pub fn add_component(_entity_id: u64, component: String) -> Result<(), String> {
+    if component.is_empty() {
+        return Err("component name required".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_component(_entity_id: u64, component: String) -> Result<(), String> {
+    if component.is_empty() {
+        return Err("component name required".into());
+    }
+    Ok(())
+}
