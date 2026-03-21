@@ -10,6 +10,7 @@ members = [
     "engine/build-utils",
     "engine/assets",
     "engine/renderer",
+    "engine/render-context",
     "engine/networking",
     "engine/physics",
     "engine/audio",

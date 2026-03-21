@@ -1,0 +1,25 @@
+[package]
+name = "engine-render-context"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+backtrace = ["engine-core/backtrace"]
+
+[dependencies]
+ash = "0.38"
+gpu-allocator = { version = "0.28", features = ["vulkan"] }
+glam = { workspace = true }
+raw-window-handle = "0.6"
+tracing = "0.1"
+bytemuck = "1.14"
+engine-core = { path = "../core" }
+engine-macros = { path = "../macros" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_System_LibraryLoader",
+] }
