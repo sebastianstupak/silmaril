@@ -1,7 +1,7 @@
 //! IPC surface types: error envelope, command result, action summaries.
 
 use serde::{Deserialize, Serialize};
-use engine_core::error::EngineError;
+use engine_core::EngineError;
 use crate::error::OpsError;
 use crate::template::TemplateState;
 

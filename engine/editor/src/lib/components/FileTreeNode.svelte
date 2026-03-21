@@ -33,6 +33,7 @@
 
   let renaming = $state(false);
   let newName = $state('');
+  let creating: 'file' | 'folder' | null = $state(null);
 
   const GIT_COLORS: Record<string, string> = {
     modified: 'var(--color-warn)',
@@ -65,7 +66,17 @@
     renaming = false;
   }
 
-  function cancelRename() { renaming = false; }
+  async function confirmCreate() {
+    if (!newName.trim()) { creating = null; return; }
+    const parentDir = node.kind === 'dir' ? node.path : node.path.substring(0, node.path.length - node.name.length - 1);
+    const fullPath = parentDir + '/' + newName;
+    if (creating === 'file') {
+      await invoke('create_file', { path: fullPath }).catch((e: unknown) => logError(String(e)));
+    } else {
+      await invoke('create_dir', { path: fullPath }).catch((e: unknown) => logError(String(e)));
+    }
+    creating = null;
+  }
 
   async function handleContextMenu(e: MouseEvent) {
     e.preventDefault();
@@ -74,25 +85,28 @@
     if (action === 'rename') startRename();
     if (action === 'delete') await invoke('delete_path', { path: node.path }).catch((e: unknown) => logError(String(e)));
     if (action === 'copy_path') navigator.clipboard.writeText(node.path);
-    if (action === 'new_file') {
-      const name = prompt(t('explorer.new_file'));
-      if (name) await invoke('create_file', { path: node.path + '/' + name }).catch((e: unknown) => logError(String(e)));
-    }
-    if (action === 'new_folder') {
-      const name = prompt(t('explorer.new_folder'));
-      if (name) await invoke('create_dir', { path: node.path + '/' + name }).catch((e: unknown) => logError(String(e)));
-    }
+    if (action === 'new_file') { newName = ''; creating = 'file'; }
+    if (action === 'new_folder') { newName = ''; creating = 'folder'; }
     if (action === 'reveal') {
       // Deferred: OS reveal requires a Tauri shell command — implement in follow-up
       logError('Reveal in Explorer not yet implemented');
     }
   }
 
-  // Placeholder — replaced with a proper context menu component in a follow-up
+  // Placeholder — replaced with proper context menu in follow-up
   async function showContextMenu(_node: TreeNode): Promise<string | null> {
-    const options = ['rename', 'delete', 'copy_path', 'reveal'];
-    if (_node.kind === 'dir') options.unshift('new_file', 'new_folder');
-    return prompt('Action: ' + options.join(', ')) ?? null;
+    const allOptions: Array<{ id: string; label: string }> = [
+      { id: 'new_file', label: t('explorer.new_file') },
+      { id: 'new_folder', label: t('explorer.new_folder') },
+      { id: 'rename', label: t('explorer.rename') },
+      { id: 'delete', label: t('explorer.delete') },
+      { id: 'copy_path', label: t('explorer.copy_path') },
+      { id: 'reveal', label: t('explorer.reveal') },
+    ];
+    const labelMap: Record<string, string> = {};
+    for (const o of allOptions) labelMap[o.label] = o.id;
+    const chosen = prompt(allOptions.map((o) => o.label).join(' / '));
+    return chosen ? (labelMap[chosen] ?? null) : null;
   }
 
   let visibleChildren = $derived(
@@ -126,13 +140,16 @@
     <!-- Icon -->
     <span class="icon">{node.kind === 'dir' ? '📁' : '📄'}</span>
 
-    <!-- Name or inline rename input -->
-    {#if renaming}
+    <!-- Name or inline rename/create input -->
+    {#if renaming || creating !== null}
       <input
         class="rename-input"
         bind:value={newName}
-        onkeydown={(e) => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') cancelRename(); }}
-        onblur={cancelRename}
+        onkeydown={(e) => {
+          if (e.key === 'Enter') { renaming ? confirmRename() : confirmCreate(); }
+          if (e.key === 'Escape') { renaming = false; creating = null; }
+        }}
+        onblur={() => { renaming = false; creating = null; }}
         autofocus
         onclick={(e) => e.stopPropagation()}
       />
