@@ -2,6 +2,16 @@
 use serde::Serialize;
 use tokio::sync::watch;
 
+/// A specta-compatible wrapper that generates `unknown` in TypeScript.
+/// Used for `args_schema` which is an arbitrary JSON Schema value.
+struct SpecUnknown;
+
+impl specta::Type for SpecUnknown {
+    fn inline(_t: &mut specta::TypeCollection, _generics: specta::Generics) -> specta::DataType {
+        specta::DataType::Unknown
+    }
+}
+
 /// Full descriptor for a single editor command.
 #[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct CommandSpec {
@@ -11,7 +21,7 @@ pub struct CommandSpec {
     pub category: String,
     pub description: Option<String>,
     pub keybind: Option<String>,
-    #[specta(type = Option<String>)]
+    #[specta(type = Option<SpecUnknown>)]
     pub args_schema: Option<serde_json::Value>,
     pub returns_data: bool,
 }
