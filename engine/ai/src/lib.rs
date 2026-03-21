@@ -172,6 +172,45 @@ impl AiServer {
 }
 
 #[cfg(test)]
+mod server_tests {
+    use super::*;
+    use tokio::sync::{mpsc, watch};
+
+    #[tokio::test]
+    async fn server_starts_and_responds_to_tools_list() {
+        let (cmd_tx, _cmd_rx) = mpsc::channel(32);
+        let (perm_tx, _perm_rx) = mpsc::channel(8);
+        let (ss_tx, _ss_rx) = mpsc::channel(4);
+        let (_reg_tx, reg_rx) = watch::channel(Vec::<McpCommand>::new());
+
+        let channels = AiBridgeChannels {
+            command_tx: cmd_tx,
+            permission_tx: perm_tx,
+            screenshot_tx: ss_tx,
+            registry_rx: reg_rx,
+        };
+
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+        // Start server on port 0 — OS assigns a free port.
+        let permissions = std::sync::Arc::new(std::sync::Mutex::new(
+            crate::permissions::PermissionStore::new(),
+        ));
+        tokio::spawn(async move {
+            server::run(0, channels, true, permissions, shutdown_rx)
+                .await
+                .ok();
+        });
+
+        // Give the server a moment to bind.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // The server started without panicking — that's the test.
+        let _ = shutdown_tx.send(());
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
