@@ -3,6 +3,9 @@ use clap::Subcommand;
 use colored::Colorize;
 use std::path::{Path, PathBuf};
 
+use engine_ops::command::TemplateCommand as OpsTemplateCommand;
+use engine_ops::processor::CommandProcessor;
+
 #[derive(Subcommand)]
 pub enum TemplateCommand {
     /// Create a new template
@@ -77,6 +80,79 @@ pub enum TemplateCommand {
         #[arg(short, long)]
         yes: bool,
     },
+
+    /// Edit entity data in a template file (CQRS, supports undo/redo)
+    Entity {
+        /// Path to the template YAML file
+        #[arg(long)]
+        template: PathBuf,
+
+        #[command(subcommand)]
+        command: EntitySubcommand,
+    },
+
+    /// Edit component data in a template file
+    Component {
+        #[arg(long)]
+        template: PathBuf,
+
+        #[command(subcommand)]
+        command: ComponentSubcommand,
+    },
+
+    /// Undo last template edit
+    Undo {
+        #[arg(long)]
+        template: PathBuf,
+    },
+
+    /// Redo last undone template edit
+    Redo {
+        #[arg(long)]
+        template: PathBuf,
+    },
+
+    /// Show template edit history
+    History {
+        #[arg(long)]
+        template: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum EntitySubcommand {
+    Create {
+        #[arg(short, long)]
+        name: Option<String>,
+    },
+    Delete {
+        id: u64,
+    },
+    Rename {
+        id: u64,
+        name: String,
+    },
+    Duplicate {
+        id: u64,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ComponentSubcommand {
+    Set {
+        entity_id: u64,
+        type_name: String,
+        data: String,
+    },
+    Add {
+        entity_id: u64,
+        type_name: String,
+        data: String,
+    },
+    Remove {
+        entity_id: u64,
+        type_name: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -127,6 +203,68 @@ pub fn handle_template_command(cmd: TemplateCommand) -> Result<()> {
         TemplateCommand::Tree { path } => show_template_tree(&path),
         TemplateCommand::Rename { path, new_name } => rename_template(&path, &new_name),
         TemplateCommand::Delete { path, yes } => delete_template(&path, yes),
+        TemplateCommand::Entity { template, command } => {
+            let cmd = match command {
+                EntitySubcommand::Create { name } => OpsTemplateCommand::CreateEntity { name },
+                EntitySubcommand::Delete { id } => OpsTemplateCommand::DeleteEntity { id },
+                EntitySubcommand::Rename { id, name } => {
+                    OpsTemplateCommand::RenameEntity { id, name: Some(name) }
+                }
+                EntitySubcommand::Duplicate { id } => OpsTemplateCommand::DuplicateEntity { id },
+            };
+            let mut proc =
+                CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+            let result = proc.execute(cmd).map_err(|e| anyhow::anyhow!("{e}"))?;
+            println!("{}", serde_json::to_string_pretty(&result.new_state).unwrap());
+            Ok(())
+        }
+        TemplateCommand::Component { template, command } => {
+            let cmd = match command {
+                ComponentSubcommand::Set { entity_id, type_name, data } => {
+                    let data = serde_json::from_str(&data)
+                        .map_err(|e| anyhow::anyhow!("Invalid JSON: {e}"))?;
+                    OpsTemplateCommand::SetComponent { id: entity_id, type_name, data }
+                }
+                ComponentSubcommand::Add { entity_id, type_name, data } => {
+                    let data = serde_json::from_str(&data)
+                        .map_err(|e| anyhow::anyhow!("Invalid JSON: {e}"))?;
+                    OpsTemplateCommand::AddComponent { id: entity_id, type_name, data }
+                }
+                ComponentSubcommand::Remove { entity_id, type_name } => {
+                    OpsTemplateCommand::RemoveComponent { id: entity_id, type_name }
+                }
+            };
+            let mut proc =
+                CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+            let result = proc.execute(cmd).map_err(|e| anyhow::anyhow!("{e}"))?;
+            println!("{}", serde_json::to_string_pretty(&result.new_state).unwrap());
+            Ok(())
+        }
+        TemplateCommand::Undo { template } => {
+            let mut proc =
+                CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+            match proc.undo().map_err(|e| anyhow::anyhow!("{e}"))? {
+                Some(id) => println!("{{\"ok\":true,\"undone_action_id\":{id}}}"),
+                None => println!("{{\"ok\":true,\"nothing_to_undo\":true}}"),
+            }
+            Ok(())
+        }
+        TemplateCommand::Redo { template } => {
+            let mut proc =
+                CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+            match proc.redo().map_err(|e| anyhow::anyhow!("{e}"))? {
+                Some(id) => println!("{{\"ok\":true,\"redone_action_id\":{id}}}"),
+                None => println!("{{\"ok\":true,\"nothing_to_redo\":true}}"),
+            }
+            Ok(())
+        }
+        TemplateCommand::History { template } => {
+            let proc =
+                CommandProcessor::load(template).map_err(|e| anyhow::anyhow!("{e}"))?;
+            let summaries = proc.history_summaries();
+            println!("{}", serde_json::to_string_pretty(&summaries).unwrap());
+            Ok(())
+        }
     }
 }
 
