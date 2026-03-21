@@ -479,8 +479,12 @@ mod imp {
                 );
 
                 // ── Mode handles (selected entity only) ──────────────────
-                let is_selected = selected_entity_id
-                    .map_or(false, |id| entity.id() == id as u32);
+                let is_selected = selected_entity_id.map_or(false, |id| {
+                    if id > u32::MAX as u64 {
+                        return false; // can't match a u32 entity id
+                    }
+                    entity.id() == id as u32
+                });
                 if is_selected {
                     match mode {
                         GizmoMode::Move => {
@@ -912,6 +916,35 @@ mod portable {
         fn move_arrow_generates_nonzero_vertices() {
             let verts = generate_move_arrow_vertices(GizmoAxis::X);
             assert!(!verts.is_empty());
+        }
+
+        #[test]
+        fn crosshair_vertices_are_even_count() {
+            assert_eq!(generate_crosshair_vertices().len() % 2, 0);
+        }
+
+        #[test]
+        fn move_arrow_vertices_are_even_count() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                assert_eq!(generate_move_arrow_vertices(axis).len() % 2, 0,
+                    "move arrow vertices must be even for LINE_LIST on axis {:?}", axis);
+            }
+        }
+
+        #[test]
+        fn rotate_ring_vertices_are_even_count() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                assert_eq!(generate_rotate_ring_vertices(axis).len() % 2, 0,
+                    "rotate ring vertices must be even for LINE_LIST on axis {:?}", axis);
+            }
+        }
+
+        #[test]
+        fn scale_handle_vertices_are_even_count() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                assert_eq!(generate_scale_handle_vertices(axis).len() % 2, 0,
+                    "scale handle vertices must be even for LINE_LIST on axis {:?}", axis);
+            }
         }
     }
 }
