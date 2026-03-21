@@ -416,6 +416,36 @@ describe('undo-history — sceneRedo()', () => {
     await store.sceneRedo();
     expect(mockRunCommand).toHaveBeenCalledWith('template.redo', { template_path: '/tmp/hero.yaml' });
   });
+
+  it('sceneRedo calls _refreshState after (notifies subscribers)', async () => {
+    const store = await loadStore();
+    mockRunCommand.mockResolvedValueOnce(ok([]));
+    await store.setActiveTemplate('/tmp/hero.yaml');
+    const listener = vi.fn();
+    store.subscribeUndoHistory(listener);
+    listener.mockClear();
+    mockRunCommand.mockResolvedValueOnce(ok(null));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
+    await store.sceneRedo();
+    expect(listener).toHaveBeenCalled();
+  });
+
+  it('sceneUndo second call while in-flight is dropped', async () => {
+    const store = await loadStore();
+    mockRunCommand.mockResolvedValueOnce(ok([]));
+    await store.setActiveTemplate('/tmp/hero.yaml');
+    // Make the first undo hang so the second fires while inflight
+    let resolveFirst!: () => void;
+    const firstUndoPromise = new Promise<void>((resolve) => { resolveFirst = resolve; });
+    mockRunCommand.mockReturnValueOnce(firstUndoPromise);
+    const p1 = store.sceneUndo();
+    const p2 = store.sceneUndo(); // should be dropped
+    resolveFirst();
+    await p1;
+    await p2;
+    const undoCalls = mockRunCommand.mock.calls.filter((call) => call[0] === 'template.undo');
+    expect(undoCalls).toHaveLength(1);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
