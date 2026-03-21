@@ -24,6 +24,7 @@
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
   import { registerCommand } from './lib/omnibar/registry';
   import { dispatchSceneCommand } from './lib/scene/commands';
+  import { initTauriListeners } from './lib/scene/state';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -381,6 +382,7 @@
   }
 
   onMount(async () => {
+    await initTauriListeners();
     setLocale(settings.language);
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
