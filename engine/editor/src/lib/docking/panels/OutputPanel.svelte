@@ -18,7 +18,7 @@
   ] as const;
 
   let outputEl: HTMLDivElement;
-  let userScrolledUp = false;
+  let userScrolledUp = $state(false);
 
   function onScroll() {
     if (!outputEl) return;

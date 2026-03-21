@@ -120,7 +120,10 @@
     updateVisibility();
   });
 
-  // Reactive: drain pending data and write to appropriate terminal
+  // Reactive: drain pending data and write to appropriate terminal.
+  // IMPORTANT: drainTerminalData() must NOT call notify() — this effect
+  // mutates the store's pendingData Map directly without triggering reactivity,
+  // which avoids an infinite effect loop. See terminal.ts drainTerminalData().
   $effect(() => {
     for (const tab of state.tabs) {
       const data = drainTerminalData(tab.id);
@@ -139,7 +142,7 @@
 
 <div class="terminal-panel">
   {#if state.tabs.length === 0}
-    <div class="placeholder">{t('placeholder.no_project')}</div>
+    <div class="placeholder">{t('terminal.opening')}</div>
   {:else}
     <TerminalTabs
       tabs={state.tabs}

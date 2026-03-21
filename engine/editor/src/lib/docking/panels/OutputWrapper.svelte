@@ -53,6 +53,9 @@
     // Check project is loaded
     try {
       const editorState = await invoke<{ project_path?: string }>('get_editor_state');
+      // hasProject is set once on mount. If a project is opened after mount,
+      // the panel must be remounted to pick up the change. This is acceptable
+      // because the docking system remounts panels when layout changes.
       hasProject = !!editorState.project_path;
     } catch { /* leave hasProject false */ }
 

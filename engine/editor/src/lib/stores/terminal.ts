@@ -76,6 +76,9 @@ export function appendTerminalData(tabId: string, data: string): void {
   notify();
 }
 
+// NOTE: drainTerminalData does NOT call notify(). This is intentional —
+// TerminalPanel.$effect reads pendingData via this function inside a $effect.
+// If notify() were called here, it would trigger an infinite effect loop.
 export function drainTerminalData(tabId: string): string {
   const data = state.pendingData.get(tabId) ?? '';
   state.pendingData.delete(tabId);

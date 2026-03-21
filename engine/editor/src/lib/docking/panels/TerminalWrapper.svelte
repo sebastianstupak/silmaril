@@ -67,6 +67,9 @@
 
   onDestroy(async () => {
     unsubscribe?.();
+    // Note: Svelte does not await async onDestroy callbacks.
+    // These close calls are best-effort; the backend closes PTYs
+    // when the Tauri process exits regardless.
     // Clean up all listeners and close all open tabs
     const tabIds = [...unlisteners.keys()];
     for (const tabId of tabIds) {

@@ -20,7 +20,7 @@
   /** Last non-exited tab cannot be closed */
   function canClose(tab: TerminalTab): boolean {
     if (tab.exited) return true;
-    const liveCount = tabs.filter(t => !t.exited).length;
+    const liveCount = tabs.filter(tab => !tab.exited).length;
     return liveCount > 1;
   }
 </script>
@@ -37,14 +37,11 @@
     >
       <span class="tab-label">{tab.title}</span>
       {#if canClose(tab)}
-        <span
+        <button
           class="tab-close"
-          role="button"
           aria-label={t('terminal.close_tab')}
-          tabindex="0"
           onclick={e => { e.stopPropagation(); onCloseTab(tab.id); }}
-          onkeydown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onCloseTab(tab.id); } }}
-        >×</span>
+        >×</button>
       {/if}
     </button>
   {/each}
