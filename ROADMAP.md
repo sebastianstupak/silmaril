@@ -24,7 +24,7 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 | Phase | Duration | Key Deliverables | Status |
 |-------|----------|------------------|--------|
-| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~95% (Profiling ✅, Docs ✅, **CLI ✅ 100%** (new/add/module/dev/build/package/completions), **Editor ⚪ Not Started**) |
+| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~97% (Profiling ✅, Docs ✅, **CLI ✅**, **Editor ✅ ~85%** — Tauri/Vulkan/panels/omnibar/undo-redo/CQRS done; assets+hierarchy CRUD in progress) |
 | **Phase 1** | 6-7 weeks | Core ECS + Basic Rendering + **Agentic Rendering Debug** | ✅ ~85-90% (ECS ✅, Serialization ✅, Templates ✅, Rendering ✅, Agentic Debug ✅, Assets ✅, Frame Capture ✅) |
 | **Phase 2** | 3-4 weeks | Networking + Client/Server | 🟡 ~75-80% (Foundation ✅, TCP/UDP ✅, Prediction ✅, Server Loop ✅, TLS ✅, Missing: Full E2E integration) |
 | **Phase 3** | 3-4 weeks | Physics + Audio + LOD | 🟡 ~35-40% (Audio ✅ 100%, Physics ~40-50%, Interest Mgmt ~30-40%, LOD ⚪ Not Started) |
@@ -35,14 +35,14 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 **New Additions:**
 - **Phase 0.7: Silm CLI Tool** ✅ **COMPLETE** - Code-first game development
-- **Phase 0.8: Editor Foundation** 🟡 **MEDIUM** - Tauri + Svelte + shadcn-svelte (3-4 weeks)
+- **Phase 0.8: Editor Foundation** 🟡 **~85% COMPLETE** - Tauri + Svelte + Vulkan viewport + docking + omnibar + undo/redo + CQRS
 - **Phase 4.9: Editor Advanced Features** 🟢 **LOW** - Drag-drop, full AI integration (3-4 weeks)
 
 ---
 
 ## 📋 **Phase 0: Documentation, Foundation & Developer Tools** (Weeks 1-5)
 
-**Status:** 🟡 **~60% Complete** (Profiling ✅, Repo Setup ✅, Docs ✅, Dev Tools ✅, **CLI 🔴 PENDING**, **Editor 🟡 FUTURE**)
+**Status:** 🟡 **~97% Complete** (Profiling ✅, Repo Setup ✅, Docs ✅, Dev Tools ✅, CLI ✅, **Editor 🟡 ~85%**)
 
 ### **Goals**
 - Complete technical documentation
@@ -229,11 +229,9 @@ silm package --platform windows
 
 ---
 
-#### **0.7.1 Shared Operation Layer (`engine/ops`)** 🟡 **IN PROGRESS**
+#### **0.7.1 Shared Operation Layer (`engine/ops`)** ✅ **COMPLETE**
 
 **Priority:** 🔴 **CRITICAL** - Required for editor to share CLI operations
-
-**Status:** ✅ **Complete**
 
 Extract CLI command logic into `engine/ops` so both CLI and editor use the same operations.
 
@@ -242,146 +240,103 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 - [x] `ops::project` — project creation, discovery, templates, Target, atomic_write ✅
 - [x] `ops::codegen` — component/system code generation, module wiring ✅
 - [x] `ops::module` — add/remove/list module management ✅
-- [x] `ops::undo` — command pattern undo/redo stack (8 tests) ✅
-- [x] `ops::scene` — YAML + Bincode scene save/load (5 tests) ✅
+- [x] `ops::undo` — UndoStack (VecDeque, Serialize/Deserialize, done_descriptions) ✅
+- [x] `ops::template` — YAML + Bincode template save/load, TemplateState/Entity/Component ✅
+- [x] `ops::command` — TemplateCommand enum (7 variants, Serialize/Deserialize) ✅
+- [x] `ops::processor` — CommandProcessor (CQRS: execute/undo/redo, done_ids/undone_ids, write_state, load) ✅
+- [x] `ops::ipc` — IpcError, CommandResult, ActionSummary, ActionId ✅
+- [x] `ops::error` — OpsError via define_error! macro (EntityNotFound, ComponentNotFound, etc.) ✅
 - [x] CLI `silm new` rewired to use ops ✅
 - [x] CLI `silm add module` / `silm module` rewired to use ops ✅
 - [x] CLI `silm build` / `silm package` rewired to use ops (5 duplicate files deleted, -1113 lines) ✅
 - [x] CLI `silm add component/system` rewired to use ops ✅
-- [x] 81 build tests + 13 integration tests pass via re-exports ✅
+- [x] CLI `silm template` — entity/component/undo/redo/history subcommands ✅
+- [x] Tauri IPC: template_open/close/execute/undo/redo/history (6 commands) ✅
+- [x] 81 build tests + 13 integration tests + 19 processor tests + proptest undo/redo invariant ✅
+- [x] E2E: comprehensive shell suite (106 tests — all subcommands, error cases, undo/redo sequences) ✅
 
 ---
 
-#### **0.8 Silmaril Editor Foundation** 🟡 **SCAFFOLDED** - [docs/tasks/phase0-8-editor-foundation.md](docs/tasks/phase0-8-editor-foundation.md)
+#### **0.8 Silmaril Editor Foundation** 🟡 **MOSTLY COMPLETE (~85%)** - [docs/tasks/phase0-8-editor-foundation.md](docs/tasks/phase0-8-editor-foundation.md)
 
 **Priority:** 🟡 **MEDIUM** - After ops migration, provides visual workflow
 
-**Status:** 🟡 Scaffolded (~15%) — project structure, bridge, plugin system stubs in place
+**Stack:** Tauri 2 + Svelte 5 + shadcn-svelte + Tailwind v3, Vulkan child-window sandwich
 
-**Time Estimate:** 3-4 weeks (20-25 working days)
+- [x] **EDITOR.1:** Tauri project setup ✅
+  - [x] Tauri 2 + Svelte 5 + shadcn-svelte ✅
+  - [x] Frameless transparent window, WS_CLIPCHILDREN removed ✅
+  - [x] tracing-subscriber initialized ✅
+  - [x] Pop-out panel windows (Rust-side WebviewWindowBuilder) ✅
+  - [x] Dock-back from pop-out via dock_panel_back IPC ✅
 
-**Core Features:**
-- [ ] **EDITOR.1:** Tauri project setup
-  - [ ] Tauri 2 + Svelte 5 + shadcn-svelte
-  - [ ] Editor crate structure
-  - [ ] Tauri app opens
+- [x] **EDITOR.2:** Native Vulkan viewport ✅
+  - [x] Vulkan VkSurfaceKHR on parent HWND (full-window swapchain) ✅
+  - [x] ~60fps render loop on dedicated thread ✅
+  - [x] Grid rendering (SPIR-V shaders via naga), axis lines ✅
+  - [x] Auto-resize: swapchain tracks parent window, scissor tracks panel bounds ✅
+  - [x] Orbit/pan/zoom camera (right-click/alt+drag/scroll, arrow keys) ✅
+  - [x] Axis gizmo (SVG, 6-face snap-to-axis) ✅
+  - [x] Projection toggle (perspective ↔ ortho) ✅
+  - [x] Camera reset, viewport settings persisted to localStorage ✅
+  - [x] Tool switcher (Select/Move/Rotate/Scale, Q/W/E/R) ✅
 
-- [ ] **EDITOR.2:** Native Vulkan viewport
-  - [ ] Embed Vulkan in Tauri window
-  - [ ] Render at 60 FPS
-  - [ ] Handle window resize
-  - [ ] Mouse/keyboard input
+- [x] **EDITOR.3:** Project discovery & loading ✅
+  - [x] "Open Folder" via Tauri dialog picker ✅
+  - [x] Validate `game.toml`, scan entities on open ✅
+  - [x] Breadcrumb shows project name / scene ✅
+  - [ ] Recent projects store (in progress — `stores/recent-items.ts`) ⬜
 
-- [ ] **EDITOR.3:** Project discovery & loading (VSCode-style hybrid)
-  - [ ] Welcome screen with recent projects
-  - [ ] "Open Folder" button (Tauri dialog picker)
-  - [ ] Validate `game.toml` exists in selected folder
-  - [ ] Recent projects list (~/.silmaril/editor-config.toml)
-  - [ ] Load World state from project
-  - [ ] Display entities
-  - [ ] Optional: `.silmaril-workspace.json` for multi-project scenarios
+- [x] **EDITOR.4:** Hierarchy panel ✅ (CRUD in progress)
+  - [x] Entity list with search filter ✅
+  - [x] Click-to-select, inspector sync ✅
+  - [ ] Create/delete/rename/duplicate entities (in progress) ⬜
+  - [ ] Right-click context menu (in progress) ⬜
 
-- [ ] **EDITOR.4:** Hierarchy panel
-  - [ ] Entity tree (shadcn-svelte Tree)
-  - [ ] Spawn/delete entities
-  - [ ] Entity selection
-  - [ ] Real-time updates
+- [x] **EDITOR.5:** Inspector panel ✅ (add/remove in progress)
+  - [x] Schema-driven component display ✅
+  - [x] Field editing (string, number, boolean, vec3, color) ✅
+  - [x] Collapsible component sections ✅
+  - [ ] Add Component picker + Remove button (in progress) ⬜
 
-- [ ] **EDITOR.5:** Inspector panel
-  - [ ] Display components (shadcn-svelte Card)
-  - [ ] Edit component fields (Input, Slider)
-  - [ ] Add/remove components
-  - [ ] Real-time updates
+- [x] **EDITOR.6:** Additional panels ✅
+  - [x] Console panel (logInfo/logWarn/logError/logDebug, filter, clear) ✅
+  - [x] File Explorer panel (project file tree) ✅
+  - [x] Assets panel (scaffolded; scan_assets wiring in progress) 🟡
+  - [x] Profiler panel (scaffolded) 🟡
 
-- [ ] **EDITOR.6:** Additional panels
-  - [ ] Assets panel (asset browser, thumbnails, drag-to-scene)
-  - [ ] File Explorer panel (raw project file tree, VSCode-style — distinct from asset browser)
-  - [ ] Console panel (log streaming, filter by level, timestamps, clear)
-  - [ ] AI Chat panel (basic UI, full features in Phase 4.9)
+- [x] **EDITOR.7:** Playback controls 🟡
+  - [x] Play/pause/stop buttons in toolbar ✅
+  - [ ] Game loop integration ⬜
 
-- [ ] **EDITOR.7:** Playback controls
-  - [ ] Play/pause/stop buttons
-  - [ ] Game loop integration
-  - [ ] Visual feedback
-
-- [ ] **EDITOR.8:** Integration & Polish
-  - [ ] Resizable panels (shadcn-svelte ResizablePanelGroup)
-  - [ ] Dark theme (consistent)
-  - [ ] Keyboard shortcuts
-  - [ ] Menu bar (Menubar component)
-  - [ ] Settings dialog
-  - [ ] Status bar (FPS, entity count)
-
-**Project Discovery Approach (VSCode-Style Hybrid):**
-
-Following modern editor UX patterns (VSCode, Sublime), Silmaril uses a **directory-based** approach with optional workspace files:
-
-**Primary Method: Folder-Based**
-- Editor shows welcome screen with "Open Folder" button
-- Uses Tauri dialog picker to select project folder
-- Validates by checking for `game.toml` in selected folder
-- No extra project files needed for single projects
-
-**Recent Projects List**
-- Stored in `~/.silmaril/editor-config.toml`
-- Shows last 10 opened projects with timestamps
-- Quick access from welcome screen
-
-**Optional: Multi-Project Workspaces**
-- `.silmaril-workspace.json` for working on multiple games
-- Similar to VSCode's `.code-workspace` files
-- Contains project paths, shared settings
-- File association for double-click open (Phase 4.9)
-
-**Why This Approach:**
-- ✅ Zero friction - just open any Silmaril project folder
-- ✅ AI-friendly - agents detect projects via `game.toml`
-- ✅ Git-committable - no binary or generated files
-- ✅ Code-first - aligns with Rust project structure
-- ✅ Scales to multi-project scenarios via optional workspace files
-
-**Architecture:**
-```
-┌────────────────────────────────────────────────────────┐
-│  Tauri Native Window (600 KB bundle)                  │
-│  ┌──────────────────┬────────────────────────────────┐ │
-│  │  Native Vulkan   │   Svelte UI (shadcn-svelte)   │ │
-│  │  Viewport        │   - Hierarchy (Tree)          │ │
-│  │  (Game Preview)  │   - Inspector (Card, Input)   │ │
-│  │                  │   - Assets (FileTree)         │ │
-│  │  [3D Scene]      │   - Console (ScrollArea)      │ │
-│  │                  │   - AI Chat (Textarea)        │ │
-│  └──────────────────┴────────────────────────────────┘ │
-└────────────────────────────────────────────────────────┘
-```
-
-**Why shadcn-svelte:**
-- Battle-tested components (Button, Input, Card, Dialog, etc.)
-- Tauri 2 + Svelte 5 + shadcn-svelte boilerplate exists
-- Dark theme built-in
-- Customizable, accessible
-- Performance: Svelte bundle 6.8 KB vs React 40.1 KB (6x smaller!)
+- [x] **EDITOR.8:** Integration & Polish ✅
+  - [x] Docking layout (split/tabs, drag-to-reorder, pop-out, dock-back) ✅
+  - [x] Saved layouts with keybinds (up to 4 visible slots) ✅
+  - [x] Dark theme, consistent color tokens ✅
+  - [x] Menu bar (File/Edit/View/Entity/Build/Modules/Help) ✅
+  - [x] Settings dialog (General/Appearance/Editor/Keybindings tabs) ✅
+  - [x] Status bar (FPS/memory placeholders, entity info) ✅
+  - [x] Omnibar (Ctrl+K, fuzzy search, commands/entities/assets/schemas) ✅
+  - [x] i18n system (all strings through `t()`) ✅
+  - [x] Undo/redo in Edit menu + Ctrl+Z/Ctrl+Y keybinds + omnibar commands ✅
+  - [x] Toolbar padding polish ✅
 
 **Deliverables:**
-- [ ] `engine/editor/` crate implementation
-- [ ] Editor binary (`silmaril-editor` or `silm editor`)
-- [ ] Native Vulkan viewport (60 FPS)
-- [ ] Hierarchy, Inspector, Assets, Console panels
-- [ ] shadcn-svelte components throughout
-- [ ] Dark theme polished
-- [ ] Documentation (editor-guide.md)
+- [x] `engine/editor/` crate implementation ✅
+- [x] Native Vulkan viewport (60 FPS) ✅
+- [x] Hierarchy, Inspector, Console panels ✅
+- [x] shadcn-svelte components throughout ✅
+- [x] Dark theme polished ✅
+- [ ] Assets panel fully wired ⬜
+- [ ] Hierarchy CRUD (create/delete/rename/duplicate) ⬜
+- [ ] Recent projects persist ⬜
+- [ ] Documentation (editor-guide.md) ⬜
 
 **Note:** Editor is **optional** - CLI (`silm`) is primary workflow. Editor provides visual tools for those who prefer it.
 
 ---
 
-**Phase 0 Time Estimate:**
-- Original: 2-3 weeks
-- With CLI: +2-3 weeks (🔴 CRITICAL)
-- With Editor: +3-4 weeks (🟡 MEDIUM, can defer)
-- **Total: 4-5 weeks (with CLI), 7-10 weeks (with Editor)**
-
-**Recommended approach:** Implement Phase 0.7 (CLI) NOW before continuing Phase 1. Defer Phase 0.8 (Editor) until after Phase 1 is complete.
+**Phase 0 Time Estimate:** ✅ Complete — CLI shipped, Editor ~85% done.
 
 ---
 
@@ -1056,29 +1011,26 @@ After each phase:
 
 ---
 
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-03-21
 
-**Current Phase:** Phase 0 (~60%), Phase 1 (~50%), Phase 2 (~15-20%)
+**Current Phase:** Phase 0 (~97%), Phase 1 (~85-90%), Phase 2 (~75-80%)
 
 **Active Work:**
-- 🔴 **Phase 0.7: Silm CLI Tool (CRITICAL - SHOULD IMPLEMENT NOW)**
-- **Phase 1.6.R: Agentic Rendering Debug Infrastructure (NEW - PRIORITY)** 🆕
-- Phase 1.6: Basic Rendering Pipeline (37.5% - 3/8 modules complete)
+- **Phase 0.8 Editor (remaining ~15%):** Assets panel wiring, Hierarchy CRUD (create/delete/rename/duplicate), recent projects store
+- Phase 2 networking E2E integration
 
 **Next Milestones:**
-- **🔴 CRITICAL: Implement Phase 0.7 (Silm CLI) - Unblocks code-first workflow**
-- **Implement Phase 1.6.R (Agentic rendering debug)** 🎯
-- Complete Phase 1.6 remaining modules (framebuffers, commands, sync, shaders, orchestration)
-- 🟡 FUTURE: Implement Phase 0.8 (Editor Foundation) - Visual workflow (optional)
-- Complete Phase 2.2-2.8 (Networking)
-- 🟢 FUTURE: Implement Phase 4.9 (Editor Advanced) - Productivity enhancements (optional)
+- Complete Phase 0.8 remaining items (assets, hierarchy CRUD, recent projects)
+- Entity rendering in viewport (placeholder mesh → shows in viewport when entity created)
+- Complete Phase 2 networking E2E integration
+- Phase 3 (Physics/Audio/LOD)
+- Phase 4.9 (Editor Advanced — drag-drop, full AI integration)
 
 **Recommended Implementation Order:**
-1. **Phase 0.7 (CLI)** 🔴 - Do this NOW
-2. Phase 1.6.R + 1.6 (Rendering) - Continue current work
-3. Phase 2 (Networking) - Core multiplayer
+1. Phase 0.8 remaining items (assets, CRUD, recent) — in progress
+2. Entity rendering in viewport (Phase 1 ECS → renderer bridge)
+3. Phase 2 networking E2E integration
 4. Phase 3 (Physics/Audio/LOD) - Game features
-5. Phase 0.8 (Editor Foundation) 🟡 - After core engine works
-6. Phase 4 (Polish) - Production features
-7. Phase 4.9 (Editor Advanced) 🟢 - Optional enhancements
+5. Phase 4 (Polish) - Production features
+6. Phase 4.9 (Editor Advanced) 🟢 - Optional enhancements
 8. Phase 5 (Examples/Docs) - Public release
