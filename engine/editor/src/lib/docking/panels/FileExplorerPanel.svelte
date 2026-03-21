@@ -23,6 +23,7 @@
         class:active={state.showIgnored}
         onclick={toggleShowIgnored}
         aria-label={t('explorer.show_ignored')}
+        aria-pressed={state.showIgnored}
       >
         👁
       </button>
@@ -46,9 +47,10 @@
   {/if}
 
   <!-- Tree -->
-  <div class="tree-scroll" role="tree" aria-label={t('panel.file_explorer')}>
+  <!-- Store always creates new state objects (spread assign), so $derived recomputes correctly on reference change -->
+  <div class="tree-scroll" role="tree" aria-label={t('panel.file_explorer')} aria-busy={state.loading}>
     {#if state.loading}
-      <div class="status-msg">Loading...</div>
+      <div class="status-msg">{t('explorer.loading')}</div>
     {:else if !state.root}
       <div class="status-msg">{t('placeholder.no_project')}</div>
     {:else if visibleRoots.length === 0}

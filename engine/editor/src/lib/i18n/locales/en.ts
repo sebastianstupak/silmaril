@@ -145,6 +145,7 @@ const en = {
   'explorer.refresh': 'Refresh',
   'explorer.show_ignored': 'Show Ignored Files',
   'explorer.empty': 'No files',
+  'explorer.loading': 'Loading...',
   'explorer.error': 'Could not read folder',
 
   // Hierarchy panel
