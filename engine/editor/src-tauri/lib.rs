@@ -253,6 +253,7 @@ pub fn run() {
         .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
         .manage(commands::ProjectState::new())
         .manage(crate::state::SceneWorldState::new())
+        .manage(std::sync::Mutex::new(crate::state::SceneUndoStack::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::get_component_schemas,
@@ -304,6 +305,8 @@ pub fn run() {
             commands::remove_component,
             commands::create_entity,
             commands::delete_entity,
+            commands::scene_undo,
+            commands::scene_redo,
         ])
         .setup(|app| {
             use tauri::Manager;

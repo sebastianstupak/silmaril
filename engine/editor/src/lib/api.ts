@@ -318,3 +318,24 @@ export async function scanAssets(
   if (!isTauri) return [];
   return tauriInvoke('scan_assets', { projectPath });
 }
+
+// ---------------------------------------------------------------------------
+// Scene undo / redo
+// ---------------------------------------------------------------------------
+
+export interface UndoRedoState {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+/** Undo the last scene action. Returns the new undo/redo availability. */
+export async function sceneUndo(): Promise<UndoRedoState> {
+  if (!isTauri) return { canUndo: false, canRedo: false };
+  return tauriInvoke<UndoRedoState>('scene_undo');
+}
+
+/** Redo the last undone scene action. Returns the new undo/redo availability. */
+export async function sceneRedo(): Promise<UndoRedoState> {
+  if (!isTauri) return { canUndo: false, canRedo: false };
+  return tauriInvoke<UndoRedoState>('scene_redo');
+}

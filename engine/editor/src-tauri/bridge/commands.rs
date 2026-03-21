@@ -1216,6 +1216,130 @@ pub fn remove_component(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Scene undo / redo IPC
+// ---------------------------------------------------------------------------
+
+/// Undo the last scene action, applying its `before` state to the live ECS world.
+///
+/// Returns `{ canUndo, canRedo }` so the frontend can update toolbar button state.
+/// Returns the same payload with both fields `false` when the undo stack is empty.
+#[tauri::command]
+pub fn scene_undo(
+    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<serde_json::Value, String> {
+    let action = {
+        let mut stack = undo_state.lock().map_err(|e| e.to_string())?;
+        stack.pop_undo()
+    };
+    let Some(action) = action else {
+        let stack = undo_state.lock().map_err(|e| e.to_string())?;
+        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
+    };
+    // For undo, apply `before`.
+    apply_scene_action_before(&action, &world_state, &app)?;
+    let stack = undo_state.lock().map_err(|e| e.to_string())?;
+    tracing::debug!(can_undo = stack.can_undo(), can_redo = stack.can_redo(), "scene_undo applied");
+    Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }))
+}
+
+/// Redo the last undone scene action, applying its `after` state to the live ECS world.
+///
+/// Returns `{ canUndo, canRedo }` so the frontend can update toolbar button state.
+/// Returns the same payload with both fields `false` when the redo stack is empty.
+#[tauri::command]
+pub fn scene_redo(
+    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<serde_json::Value, String> {
+    let action = {
+        let mut stack = undo_state.lock().map_err(|e| e.to_string())?;
+        stack.pop_redo()
+    };
+    let Some(action) = action else {
+        let stack = undo_state.lock().map_err(|e| e.to_string())?;
+        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
+    };
+    // For redo, apply `after`.
+    apply_scene_action_after(&action, &world_state, &app)?;
+    let stack = undo_state.lock().map_err(|e| e.to_string())?;
+    tracing::debug!(can_undo = stack.can_undo(), can_redo = stack.can_redo(), "scene_redo applied");
+    Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }))
+}
+
+/// Apply the `before` state of a `SceneAction` to the live ECS world and emit events.
+fn apply_scene_action_before(
+    action: &crate::state::SceneAction,
+    world_state: &crate::state::SceneWorldState,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    use crate::state::SceneAction;
+    use tauri::Emitter;
+    match action {
+        SceneAction::SetTransform { entity_id, before, .. } => {
+            debug_assert!(*entity_id <= u32::MAX as u64, "entity_id truncation");
+            // FIXME: hardcodes generation 0 — will break after any entity slot reuse
+            let entity = engine_core::Entity::new(*entity_id as u32, 0);
+            let mut world = world_state.0.write().map_err(|e| e.to_string())?;
+            if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
+                t.position = glam::Vec3::from(before.position);
+                t.rotation = glam::Quat::from_array(before.rotation);
+                t.scale = glam::Vec3::from(before.scale);
+            }
+            drop(world);
+            app.emit(
+                "entity-transform-changed",
+                serde_json::json!({
+                    "id": entity_id,
+                    "position": before.position,
+                    "rotation": before.rotation,
+                    "scale": before.scale,
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// Apply the `after` state of a `SceneAction` to the live ECS world and emit events.
+fn apply_scene_action_after(
+    action: &crate::state::SceneAction,
+    world_state: &crate::state::SceneWorldState,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    use crate::state::SceneAction;
+    use tauri::Emitter;
+    match action {
+        SceneAction::SetTransform { entity_id, after, .. } => {
+            debug_assert!(*entity_id <= u32::MAX as u64, "entity_id truncation");
+            // FIXME: hardcodes generation 0 — will break after any entity slot reuse
+            let entity = engine_core::Entity::new(*entity_id as u32, 0);
+            let mut world = world_state.0.write().map_err(|e| e.to_string())?;
+            if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
+                t.position = glam::Vec3::from(after.position);
+                t.rotation = glam::Quat::from_array(after.rotation);
+                t.scale = glam::Vec3::from(after.scale);
+            }
+            drop(world);
+            app.emit(
+                "entity-transform-changed",
+                serde_json::json!({
+                    "id": entity_id,
+                    "position": after.position,
+                    "rotation": after.rotation,
+                    "scale": after.scale,
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use engine_core::{Transform, World};
