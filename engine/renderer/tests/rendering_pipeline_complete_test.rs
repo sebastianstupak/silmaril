@@ -366,9 +366,11 @@ fn test_render_clear_color_visual() {
     let mut frame_count = 0;
 
     while start.elapsed().as_secs() < 3 {
-        renderer.window_mut().poll_events();
+        if let Some(w) = renderer.window_mut() {
+            w.poll_events();
+        }
 
-        if renderer.window().should_close() {
+        if renderer.window().map_or(false, |w| w.should_close()) {
             break;
         }
 

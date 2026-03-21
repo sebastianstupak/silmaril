@@ -88,3 +88,19 @@ pub use sync::{create_sync_objects, FrameResources, FrameSync, FrameSyncObjects,
 
 // Window types
 pub use window::{Window, WindowConfig, WindowError, WindowEventType};
+
+/// An integer-aligned sub-rectangle within a surface or render target.
+///
+/// Used by [`ViewportDescriptor`](engine_renderer::ViewportDescriptor) to define
+/// the screen-space region assigned to a viewport.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Rect {
+    /// Left edge (pixels, origin at top-left)
+    pub x: i32,
+    /// Top edge (pixels, origin at top-left)
+    pub y: i32,
+    /// Width in pixels
+    pub width: u32,
+    /// Height in pixels
+    pub height: u32,
+}

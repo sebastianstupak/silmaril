@@ -15,12 +15,50 @@
 
 use crate::*;
 use ash::vk;
+use std::marker::PhantomData;
 use std::path::Path;
 use tracing::{error, info, instrument, warn};
 
+/// Describes one viewport sub-rect within the swapchain surface.
+///
+/// Pass this to multi-viewport render APIs to specify which portion of the
+/// swapchain surface a camera should render into.
+pub struct ViewportDescriptor {
+    /// Screen-space bounds (pixels, origin at top-left of the swapchain surface)
+    pub bounds: engine_render_context::Rect,
+    /// View matrix (world → camera space)
+    pub view: glam::Mat4,
+    /// Projection matrix (camera → clip space)
+    pub proj: glam::Mat4,
+}
+
+/// Live handle to an in-progress frame.
+///
+/// The render pass is open for the entire lifetime of this value.  Inject
+/// overlay draw calls (e.g. gizmos) directly into `command_buffer` between
+/// [`Renderer::begin_frame`] and [`Renderer::end_frame`].
+///
+/// # Thread safety
+///
+/// `FrameRecorder` is intentionally `!Send` — the Vulkan command buffer must
+/// not cross thread boundaries while recording.  Consume via
+/// [`Renderer::end_frame`] on the same thread.
+pub struct FrameRecorder {
+    /// The Vulkan command buffer currently recording the frame.
+    ///
+    /// The render pass is already open; record additional draw calls here
+    /// before passing the recorder to [`Renderer::end_frame`].
+    pub command_buffer: vk::CommandBuffer,
+    pub(crate) image_index: u32,
+    _not_send: PhantomData<*mut ()>,
+}
+
 /// Main renderer struct that orchestrates the rendering pipeline
 pub struct Renderer {
-    window: Window,
+    /// Winit window, absent when created via `from_raw_handle`.
+    window: Option<Window>,
+    /// Fallback dimensions used when `window` is `None`.
+    dimensions: (u32, u32),
     context: VulkanContext,
     _entry: ash::Entry,
     #[allow(dead_code)]
@@ -175,7 +213,8 @@ impl Renderer {
         );
 
         Ok(Self {
-            window,
+            window: Some(window),
+            dimensions: (width, height),
             context,
             _entry: entry,
             surface,
@@ -204,6 +243,371 @@ impl Renderer {
             gpu_cache,
             render_queue: Vec::new(),
         })
+    }
+
+    /// Create a renderer attached to an externally-managed Win32 window.
+    ///
+    /// Use this when the window (and its HWND) are managed by a host process
+    /// such as Tauri — the renderer does not own a winit event loop in this
+    /// case.
+    ///
+    /// The init sequence is identical to [`Renderer::new`] except that the
+    /// Vulkan surface is created from the raw HWND rather than from a winit
+    /// window.
+    ///
+    /// # Arguments
+    ///
+    /// * `hwnd`   — Raw Win32 window handle (as `isize` / `HWND`).
+    /// * `width`  — Swapchain width in pixels.
+    /// * `height` — Swapchain height in pixels.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use engine_renderer::Renderer;
+    /// # let hwnd: isize = 0;
+    /// let renderer = Renderer::from_raw_handle(hwnd, 1280, 720)?;
+    /// # Ok::<(), engine_renderer::RendererError>(())
+    /// ```
+    #[cfg(windows)]
+    pub fn from_raw_handle(
+        hwnd: isize,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, RendererError> {
+        info!(hwnd = hwnd, width = width, height = height, "Creating renderer from raw HWND");
+
+        // 1. Create Vulkan context (instance creation includes surface extensions)
+        let context = VulkanContext::new("silmaril-editor", None, None)?;
+
+        // 2. Create Vulkan entry for surface creation
+        let entry = unsafe {
+            ash::Entry::load().map_err(|e| {
+                RendererError::instancecreationfailed(format!("Failed to load Vulkan: {:?}", e))
+            })?
+        };
+
+        // 3. Create surface from the raw HWND (Windows-only path)
+        let surface =
+            Surface::from_raw_hwnd(&entry, &context.instance, hwnd).map_err(|e| {
+                RendererError::surfacecreationfailed(format!(
+                    "Surface creation from HWND failed: {:?}",
+                    e
+                ))
+            })?;
+
+        // 4. Create swapchain
+        let swapchain =
+            Swapchain::new(&context, surface.handle(), surface.loader(), width, height, None)?;
+
+        // 5. Create depth buffer
+        let depth_buffer =
+            DepthBuffer::new(&context.device, &context.allocator, swapchain.extent)?;
+
+        // 6. Create render pass (with depth attachment)
+        let render_pass = RenderPass::new(
+            &context.device,
+            RenderPassConfig {
+                color_format: swapchain.format,
+                depth_format: Some(depth_buffer.format()),
+                samples: vk::SampleCountFlags::TYPE_1,
+                load_op: vk::AttachmentLoadOp::CLEAR,
+                store_op: vk::AttachmentStoreOp::STORE,
+            },
+        )
+        .map_err(|e| RendererError::renderpasscreationfailed(format!("{:?}", e)))?;
+
+        // 7. Create framebuffers with depth attachment
+        let mut framebuffers = Vec::with_capacity(swapchain.image_views.len());
+        for &image_view in &swapchain.image_views {
+            let attachments = [image_view, depth_buffer.image_view()];
+            let framebuffer_info = vk::FramebufferCreateInfo::default()
+                .render_pass(render_pass.handle())
+                .attachments(&attachments)
+                .width(swapchain.extent.width)
+                .height(swapchain.extent.height)
+                .layers(1);
+
+            let framebuffer =
+                unsafe { context.device.create_framebuffer(&framebuffer_info, None) }.map_err(
+                    |e| {
+                        RendererError::framebuffercreationfailed(format!(
+                            "Failed to create framebuffer: {:?}",
+                            e
+                        ))
+                    },
+                )?;
+
+            framebuffers.push(Framebuffer::from_raw(&context.device, framebuffer));
+        }
+
+        // 8. Create mesh pipeline
+        let mesh_pipeline = GraphicsPipeline::new_mesh_pipeline(
+            &context.device,
+            &render_pass,
+            swapchain.extent,
+            Some(depth_buffer.format()),
+        )?;
+
+        // 9. Create GPU cache
+        let gpu_cache = GpuCache::new(&context)?;
+
+        // 10. Create command pool
+        let command_pool = CommandPool::new(
+            &context.device,
+            context.queue_families.graphics,
+            vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+        )
+        .map_err(|e| RendererError::commandpoolcreationfailed(format!("{:?}", e)))?;
+
+        // 11. Allocate command buffers (one per frame in flight)
+        const FRAMES_IN_FLIGHT: u32 = 2;
+        let command_buffers = command_pool
+            .allocate(&context.device, vk::CommandBufferLevel::PRIMARY, FRAMES_IN_FLIGHT)
+            .map_err(|e| {
+                RendererError::commandbufferallocationfailed(FRAMES_IN_FLIGHT, format!("{:?}", e))
+            })?
+            .into_iter()
+            .map(CommandBuffer::from_handle)
+            .collect();
+
+        // 12. Create synchronization objects
+        let sync_objects =
+            create_sync_objects(&context.device, FRAMES_IN_FLIGHT).map_err(|e| {
+                RendererError::syncobjectcreationfailed(
+                    "frame sync".to_string(),
+                    format!("{:?}", e),
+                )
+            })?;
+
+        info!(
+            width = width,
+            height = height,
+            images = swapchain.image_count,
+            "Renderer (raw HWND) created successfully"
+        );
+
+        Ok(Self {
+            window: None,
+            dimensions: (width, height),
+            context,
+            _entry: entry,
+            surface,
+            swapchain,
+            render_pass,
+            framebuffers,
+            command_pool,
+            command_buffers,
+            sync_objects,
+            current_frame: 0,
+            clear_color: [0.0, 0.0, 0.0, 1.0],
+            frame_counter: 0,
+
+            debug_enabled: false,
+            debugger: None,
+            event_recorder: None,
+            debug_exporter: None,
+
+            capture_manager: None,
+
+            _depth_buffer: Some(depth_buffer),
+            mesh_pipeline: Some(mesh_pipeline),
+            gpu_cache,
+            render_queue: Vec::new(),
+        })
+    }
+
+    /// Begin a new frame and open the render pass.
+    ///
+    /// Returns a [`FrameRecorder`] that gives the caller access to the active
+    /// Vulkan command buffer so additional draw calls (e.g. gizmos, overlays)
+    /// can be injected before the frame is submitted.
+    ///
+    /// Returns `None` if the swapchain is out of date and needs to be rebuilt
+    /// (the caller should handle resizing and retry on the next tick).
+    ///
+    /// # Usage
+    ///
+    /// ```no_run
+    /// # use engine_renderer::{Renderer, WindowConfig};
+    /// # let mut renderer = Renderer::new(WindowConfig::default(), "test")?;
+    /// if let Some(recorder) = renderer.begin_frame() {
+    ///     // inject extra draw calls into recorder.command_buffer …
+    ///     renderer.end_frame(recorder);
+    /// }
+    /// # Ok::<(), engine_renderer::RendererError>(())
+    /// ```
+    #[instrument(skip(self))]
+    pub fn begin_frame(&mut self) -> Option<FrameRecorder> {
+        let sync = &self.sync_objects[self.current_frame];
+
+        // Wait for the previous use of this frame slot to finish.
+        let wait_result = unsafe {
+            self.context.device.wait_for_fences(
+                &[sync.in_flight_fence],
+                true,
+                u64::MAX,
+            )
+        };
+        if let Err(e) = wait_result {
+            error!(error = ?e, "begin_frame: failed to wait for in-flight fence");
+            return None;
+        }
+
+        // Acquire the next swapchain image.
+        let acquire_result = unsafe {
+            self.swapchain.loader.acquire_next_image(
+                self.swapchain.swapchain,
+                u64::MAX,
+                sync.image_available_semaphore,
+                vk::Fence::null(),
+            )
+        };
+
+        let image_index = match acquire_result {
+            Ok((idx, _suboptimal)) => idx,
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                // Swapchain must be rebuilt; signal caller by returning None.
+                return None;
+            }
+            Err(e) => {
+                error!(error = ?e, "begin_frame: swapchain acquire failed");
+                return None;
+            }
+        };
+
+        // Reset the fence now that we know which image we have.
+        if let Err(e) =
+            unsafe { self.context.device.reset_fences(&[sync.in_flight_fence]) }
+        {
+            error!(error = ?e, "begin_frame: failed to reset fence");
+            return None;
+        }
+
+        // Begin the command buffer.
+        let cmd = self.command_buffers[self.current_frame].handle();
+
+        let begin_info = vk::CommandBufferBeginInfo::default();
+        if let Err(e) =
+            unsafe { self.context.device.begin_command_buffer(cmd, &begin_info) }
+        {
+            error!(error = ?e, "begin_frame: failed to begin command buffer");
+            return None;
+        }
+
+        // Open the render pass.
+        let clear_values = [
+            vk::ClearValue {
+                color: vk::ClearColorValue { float32: self.clear_color },
+            },
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue { depth: 1.0, stencil: 0 },
+            },
+        ];
+
+        let render_pass_begin = vk::RenderPassBeginInfo::default()
+            .render_pass(self.render_pass.handle())
+            .framebuffer(self.framebuffers[image_index as usize].handle())
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.swapchain.extent,
+            })
+            .clear_values(&clear_values);
+
+        unsafe {
+            self.context.device.cmd_begin_render_pass(
+                cmd,
+                &render_pass_begin,
+                vk::SubpassContents::INLINE,
+            );
+        }
+
+        Some(FrameRecorder {
+            command_buffer: cmd,
+            image_index,
+            _not_send: PhantomData,
+        })
+    }
+
+    /// Close the render pass, submit the command buffer, and present.
+    ///
+    /// Consumes the [`FrameRecorder`] returned by [`Renderer::begin_frame`],
+    /// which ensures the render pass cannot be ended more than once.
+    ///
+    /// Advances the internal frame counter.
+    #[instrument(skip(self, recorder))]
+    pub fn end_frame(&mut self, recorder: FrameRecorder) {
+        let cmd = recorder.command_buffer;
+        let image_index = recorder.image_index;
+        // `recorder` is consumed here; `_not_send` phantom field is dropped.
+        drop(recorder);
+
+        let sync = &self.sync_objects[self.current_frame];
+
+        // Close the render pass and command buffer.
+        unsafe {
+            self.context.device.cmd_end_render_pass(cmd);
+        }
+
+        if let Err(e) = unsafe { self.context.device.end_command_buffer(cmd) } {
+            error!(error = ?e, "end_frame: failed to end command buffer");
+            // Advance frame counter even on error to avoid stalling.
+            self.current_frame = (self.current_frame + 1) % self.sync_objects.len();
+            self.frame_counter += 1;
+            return;
+        }
+
+        // Submit.
+        let wait_semaphores = [sync.image_available_semaphore];
+        let signal_semaphores = [sync.render_finished_semaphore];
+        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let command_buffers = [cmd];
+
+        let submit_info = vk::SubmitInfo::default()
+            .wait_semaphores(&wait_semaphores)
+            .wait_dst_stage_mask(&wait_stages)
+            .command_buffers(&command_buffers)
+            .signal_semaphores(&signal_semaphores);
+
+        if let Err(e) = unsafe {
+            self.context.device.queue_submit(
+                self.context.graphics_queue,
+                &[submit_info],
+                sync.in_flight_fence,
+            )
+        } {
+            error!(error = ?e, "end_frame: queue submit failed");
+            self.current_frame = (self.current_frame + 1) % self.sync_objects.len();
+            self.frame_counter += 1;
+            return;
+        }
+
+        // Present.
+        let swapchains = [self.swapchain.swapchain];
+        let image_indices = [image_index];
+
+        let present_info = vk::PresentInfoKHR::default()
+            .wait_semaphores(&signal_semaphores)
+            .swapchains(&swapchains)
+            .image_indices(&image_indices);
+
+        if let Err(e) = unsafe {
+            self.swapchain
+                .loader
+                .queue_present(self.context.present_queue, &present_info)
+        } {
+            match e {
+                vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR => {
+                    // Caller will need to rebuild swapchain on the next begin_frame.
+                }
+                _ => {
+                    error!(error = ?e, "end_frame: present failed");
+                }
+            }
+        }
+
+        self.current_frame = (self.current_frame + 1) % self.sync_objects.len();
+        self.frame_counter += 1;
     }
 
     /// Enable agentic debugging with optional database export
@@ -276,22 +680,42 @@ impl Renderer {
         self.clear_color = [r, g, b, a];
     }
 
-    /// Get window reference
-    pub fn window(&self) -> &Window {
-        &self.window
+    /// Returns the current render dimensions (width, height) in pixels.
+    ///
+    /// When the renderer was created with a winit window the live window size
+    /// is returned; otherwise the dimensions supplied to `from_raw_handle` are
+    /// used.
+    pub fn dimensions(&self) -> (u32, u32) {
+        if let Some(w) = &self.window {
+            w.size()
+        } else {
+            self.dimensions
+        }
     }
 
-    /// Get window mut reference
-    pub fn window_mut(&mut self) -> &mut Window {
-        &mut self.window
+    /// Get window reference.
+    ///
+    /// Returns `None` when the renderer was created via [`Renderer::from_raw_handle`].
+    pub fn window(&self) -> Option<&Window> {
+        self.window.as_ref()
+    }
+
+    /// Get window mut reference.
+    ///
+    /// Returns `None` when the renderer was created via [`Renderer::from_raw_handle`].
+    pub fn window_mut(&mut self) -> Option<&mut Window> {
+        self.window.as_mut()
     }
 
     /// Take ownership of the event loop for manual event pumping
     ///
     /// This allows using winit 0.30's pump_app_events() for proper event handling.
     /// After calling this, the window's event loop will be None.
+    ///
+    /// Returns `None` when the renderer was created via [`Renderer::from_raw_handle`]
+    /// (no winit event loop exists in that case).
     pub fn take_event_loop(&mut self) -> Option<winit::event_loop::EventLoop<()>> {
-        self.window.take_event_loop()
+        self.window.as_mut().and_then(|w| w.take_event_loop())
     }
 
     /// Render meshes from ECS world
@@ -441,7 +865,7 @@ impl Renderer {
                             // Debug: Record swapchain recreation event
                             if self.debug_enabled {
                                 if let Some(recorder) = &self.event_recorder {
-                                    let (width, height) = self.window.size();
+                                    let (width, height) = self.dimensions();
                                     recorder.record(debug::RenderEvent::SwapchainRecreated {
                                         frame: self.frame_counter,
                                         timestamp: frame_start_time.elapsed().as_secs_f64(),
@@ -723,7 +1147,7 @@ impl Renderer {
             return None;
         }
 
-        let (width, height) = self.window.size();
+        let (width, height) = self.dimensions();
 
         // Build snapshot using constructor
         let mut snapshot = debug::RenderDebugSnapshot::new(
@@ -825,7 +1249,7 @@ impl Renderer {
     pub fn enable_capture(&mut self, config: capture::CaptureConfig) -> Result<(), RendererError> {
         info!("Enabling frame capture");
 
-        let (width, height) = self.window.size();
+        let (width, height) = self.dimensions();
         let mut manager = capture::CaptureManager::new(config);
         manager.initialize(&self.context.device, &self.context.allocator, width, height)?;
 

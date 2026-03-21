@@ -77,7 +77,7 @@ pub use gpu_cache::{GpuCache, GpuCachedMesh, MeshInfo};
 pub use offscreen::OffscreenTarget;
 pub use pipeline::GraphicsPipeline;
 pub use render_pass::{RenderPass, RenderPassConfig, RenderPassError};
-pub use renderer::Renderer;
+pub use renderer::{FrameRecorder, Renderer, ViewportDescriptor};
 pub use shader::{stage_from_extension, ShaderModule};
 pub use surface::{Surface, SurfaceError};
 pub use swapchain::Swapchain;
@@ -86,6 +86,9 @@ pub use window::{Window, WindowConfig, WindowError, WindowEventType};
 
 // Re-export winit types for external use
 pub use winit::window::Window as WinitWindow;
+
+// Re-export Rect from engine-render-context for use with ViewportDescriptor
+pub use engine_render_context::Rect;
 
 // Re-export from engine-assets for convenience
 pub use engine_assets::{MeshData, Vertex};
