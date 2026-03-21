@@ -10,6 +10,7 @@
   import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
   import { logInfo, logWarn } from './lib/stores/console';
+  import { loadSchemas } from './lib/inspector/schema-store';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
   import DragOverlay from './lib/docking/DragOverlay.svelte';
@@ -334,6 +335,7 @@
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
     logInfo('Silmaril Editor started');
+    loadSchemas(); // fire-and-forget; store notifies subscribers when ready
     editorState = await getEditorState();
 
     // Hydrate from tauri-plugin-store (durable, OS app-data directory).

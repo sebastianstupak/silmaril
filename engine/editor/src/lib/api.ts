@@ -1,5 +1,6 @@
 // Tauri API wrapper with browser fallback for Playwright testing
 import { getPanelInfo } from '$lib/docking/types';
+import type { ComponentSchema } from '$lib/inspector/schema';
 
 export interface EditorState {
   mode: string;
@@ -40,6 +41,28 @@ const mockEntities: EntityInfo[] = [
   { id: 5, name: 'Ground', components: ['Transform', 'MeshRenderer', 'Collider'] },
 ];
 
+const mockSchemas: ComponentSchema[] = [
+  {
+    name: 'Transform',
+    label: 'Transform',
+    category: 'Core',
+    fields: [
+      { name: 'position', label: 'Position', field_type: { kind: 'vec3' } },
+      { name: 'rotation', label: 'Rotation', field_type: { kind: 'vec3' } },
+      { name: 'scale',    label: 'Scale',    field_type: { kind: 'vec3' } },
+    ],
+  },
+  {
+    name: 'Health',
+    label: 'Health',
+    category: 'Core',
+    fields: [
+      { name: 'current', label: 'Current HP', field_type: { kind: 'f32', min: 0, max: 10000 } },
+      { name: 'max',     label: 'Max HP',     field_type: { kind: 'f32', min: 1, max: 10000 } },
+    ],
+  },
+];
+
 function browserMock<T>(cmd: string, args?: Record<string, unknown>): T {
   const mocks: Record<string, unknown> = {
     get_editor_state: {
@@ -54,6 +77,8 @@ function browserMock<T>(cmd: string, args?: Record<string, unknown>): T {
     } satisfies EditorState,
     open_project_dialog: '/mock/project/path',
     scan_project_entities: mockEntities,
+    get_component_schemas: mockSchemas,
+    set_component_field: null,
   };
   return (mocks[cmd] ?? null) as T;
 }
@@ -195,25 +220,84 @@ export async function viewportSetProjection(viewportId: string, isOrtho: boolean
 }
 
 // ---------------------------------------------------------------------------
-// Scene commands (AI agent API)
+// Template CQRS types
 // ---------------------------------------------------------------------------
 
-/**
- * Execute a scene command by name with the given arguments.
- * This is the primary entry point for AI agents to manipulate the scene via
- * Tauri. In the browser (Playwright testing), it dispatches locally.
- */
-export async function executeSceneCommand(
-  command: string,
-  args: Record<string, unknown> = {},
-): Promise<unknown> {
-  if (isTauri) {
-    return tauriInvoke<unknown>('scene_command', {
-      command,
-      args: JSON.stringify(args),
-    });
-  }
-  // Browser fallback — dispatch through local scene commands
-  const mod = await import('$lib/scene/commands');
-  return mod.dispatchSceneCommand(command, args);
+export interface TemplateComponent {
+  type_name: string;
+  data: unknown;
+}
+
+export interface TemplateEntity {
+  id: number;
+  name: string | null;
+  components: TemplateComponent[];
+}
+
+export interface TemplateState {
+  name: string;
+  entities: TemplateEntity[];
+}
+
+export interface CommandResult {
+  action_id: number;
+  new_state: TemplateState;
+}
+
+export interface ActionSummary {
+  action_id: number;
+  description: string;
+}
+
+export type TemplateCommand =
+  | { CreateEntity: { name: string | null } }
+  | { DeleteEntity: { id: number } }
+  | { RenameEntity: { id: number; name: string | null } }
+  | { DuplicateEntity: { id: number } }
+  | { SetComponent: { id: number; type_name: string; data: unknown } }
+  | { AddComponent: { id: number; type_name: string; data: unknown } }
+  | { RemoveComponent: { id: number; type_name: string } };
+
+// ---------------------------------------------------------------------------
+// Template IPC calls
+// ---------------------------------------------------------------------------
+
+export async function templateOpen(templatePath: string): Promise<TemplateState> {
+  return tauriInvoke<TemplateState>('template_open', { templatePath });
+}
+
+export async function templateClose(templatePath: string): Promise<void> {
+  return tauriInvoke<void>('template_close', { templatePath });
+}
+
+export async function templateExecute(
+  templatePath: string,
+  command: TemplateCommand,
+): Promise<CommandResult> {
+  return tauriInvoke<CommandResult>('template_execute', { templatePath, command });
+}
+
+export async function templateUndo(templatePath: string): Promise<number | null> {
+  return tauriInvoke<number | null>('template_undo', { templatePath });
+}
+
+export async function templateRedo(templatePath: string): Promise<number | null> {
+  return tauriInvoke<number | null>('template_redo', { templatePath });
+}
+
+export async function templateHistory(templatePath: string): Promise<ActionSummary[]> {
+  return tauriInvoke<ActionSummary[]>('template_history', { templatePath });
+}
+
+export async function getComponentSchemas(): Promise<ComponentSchema[]> {
+  return tauriInvoke<ComponentSchema[]>('get_component_schemas');
+}
+
+export async function setComponentField(
+  entityId: number,
+  component: string,
+  field: string,
+  value: unknown,
+): Promise<void> {
+  return tauriInvoke<void>('set_component_field', { entityId, component, field, value });
 }

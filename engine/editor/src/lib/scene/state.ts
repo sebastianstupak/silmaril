@@ -4,6 +4,7 @@
 // commands via Tauri.
 
 import type { EntityInfo } from '$lib/api';
+import type { EntityComponentValues } from '$lib/inspector/inspector-utils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +22,8 @@ export interface SceneEntity extends EntityInfo {
   scale: Vec3;
   visible: boolean;
   locked: boolean;
+  /** Live field values for all components, keyed by component type name. */
+  componentValues: EntityComponentValues;
 }
 
 export type ProjectionMode = 'ortho' | 'perspective';
