@@ -176,10 +176,17 @@ mod tests {
     #[test]
     fn output_state_can_store_and_take_child() {
         let state = OutputState::new();
-        let child = std::process::Command::new("cmd")
-            .args(["/C", "echo hello"])
-            .spawn()
-            .expect("cmd must be available on Windows");
+        let child = if cfg!(windows) {
+            std::process::Command::new("cmd")
+                .args(["/C", "echo hello"])
+                .spawn()
+                .expect("cmd must be available on Windows")
+        } else {
+            std::process::Command::new("sh")
+                .args(["-c", "echo hello"])
+                .spawn()
+                .expect("sh must be available on Unix")
+        };
 
         {
             let mut guard = state.child.lock().unwrap();
