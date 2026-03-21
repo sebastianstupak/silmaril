@@ -1,0 +1,19 @@
+pub mod asset;
+pub mod build;
+pub mod edit;
+pub mod file;
+pub mod scene;
+pub mod template;
+pub mod user_modules;
+pub mod view;
+pub mod viewport;
+
+pub use asset::AssetModule;
+pub use build::BuildModule;
+pub use edit::EditModule;
+pub use file::FileModule;
+pub use scene::SceneModule;
+pub use template::TemplateModule;
+pub use user_modules::UserCommandsModule;
+pub use view::ViewModule;
+pub use viewport::ViewportModule;
