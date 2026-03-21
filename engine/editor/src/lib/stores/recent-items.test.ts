@@ -3,6 +3,7 @@ import {
   addRecentItem,
   getRecentItems,
   subscribeRecent,
+  hydrateRecentItems,
   _resetRecentItems,
 } from './recent-items';
 
@@ -44,5 +45,20 @@ describe('subscribeRecent', () => {
     unsub();
     addRecentItem({ label: 'Y', path: '/y', itemType: 'project' });
     expect(called).toBe(1); // unsubscribed
+  });
+});
+
+describe('hydrateRecentItems', () => {
+  it('leaves items empty when no persisted data exists', async () => {
+    await hydrateRecentItems();
+    expect(getRecentItems()).toHaveLength(0);
+  });
+
+  it('notifies subscribers after hydration', async () => {
+    let called = 0;
+    const unsub = subscribeRecent(() => { called++; });
+    await hydrateRecentItems();
+    expect(called).toBe(1);
+    unsub();
   });
 });
