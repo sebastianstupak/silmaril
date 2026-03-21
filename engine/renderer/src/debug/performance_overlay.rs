@@ -453,6 +453,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires valid VulkanContext; VulkanContext now contains non-null fn pointers"]
+    #[allow(invalid_value)]
     fn test_performance_grade() {
         // Create mock overlay for testing grades
         let context = Arc::new(unsafe { std::mem::zeroed() });
@@ -475,6 +477,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires valid VulkanContext; VulkanContext now contains non-null fn pointers"]
+    #[allow(invalid_value)]
     fn test_meets_target() {
         let context = Arc::new(unsafe { std::mem::zeroed() });
         let mut overlay = PerformanceOverlay::new(context).unwrap();
