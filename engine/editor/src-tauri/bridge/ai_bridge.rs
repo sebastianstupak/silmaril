@@ -307,11 +307,16 @@ pub fn ai_grant_permission(
 pub fn ai_scene_response(
     request_id: String,
     data: Option<serde_json::Value>,
+    error: Option<String>,
     bridge: State<'_, AiBridgeState>,
 ) -> Result<(), String> {
     let mut pending = bridge.command_response_pending.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(tx) = pending.remove(&request_id) {
-        let _ = tx.send(Ok(data));
+        let result = match error {
+            Some(e) => Err(e),
+            None => Ok(data),
+        };
+        let _ = tx.send(result);
         tracing::debug!(request_id = %request_id, "Command response resolved");
     } else {
         tracing::warn!(request_id = %request_id, "No pending command for request_id");

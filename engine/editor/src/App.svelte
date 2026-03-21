@@ -589,9 +589,10 @@
               const { id, args, request_id } = event.payload;
               try {
                 const result = await invoke<{ status: string; data?: unknown }>('run_command', { id, args: args ?? null });
-                await invoke('ai_scene_response', { request_id, data: result?.data ?? null });
+                await invoke('ai_scene_response', { request_id, data: result?.data ?? null, error: null });
               } catch (e) {
-                await invoke('ai_scene_response', { request_id, data: null });
+                const errorMsg = e instanceof Error ? e.message : String(e);
+                await invoke('ai_scene_response', { request_id, data: null, error: errorMsg });
               }
             }
           );
