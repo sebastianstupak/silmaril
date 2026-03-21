@@ -6,6 +6,11 @@ pub mod viewport;
 pub mod world;
 
 use bridge::commands;
+use bridge::{
+    builtin_schemas::register_builtin_schemas,
+    commands::ComponentSchemaState,
+    schema_registry::ComponentSchemaRegistry,
+};
 use file_explorer::{
     get_file_tree, expand_dir, get_git_status, start_file_watch, stop_file_watch,
     open_in_editor, create_file, create_dir, rename_path, delete_path,
@@ -199,13 +204,19 @@ pub fn run() {
 
     tracing::info!("Silmaril Editor starting");
 
+    let mut schema_registry = ComponentSchemaRegistry::new();
+    register_builtin_schemas(&mut schema_registry);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::NativeViewportState::new())
         .manage(file_explorer::FileWatcherState::new())
+        .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
+            commands::get_component_schemas,
+            commands::set_component_field,
             commands::open_project,
             commands::open_project_dialog,
             commands::scan_project_entities,

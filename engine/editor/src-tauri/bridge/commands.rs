@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
+use crate::bridge::schema_registry::{ComponentSchema, ComponentSchemaRegistry};
 use crate::viewport::native_viewport::{CameraState, NativeViewport, ViewportBounds};
 
 #[derive(Serialize)]
@@ -22,6 +23,39 @@ pub struct EntityInfo {
 #[tauri::command]
 pub fn get_editor_state() -> EditorStateResponse {
     EditorStateResponse { mode: "edit".to_string(), project_name: None, project_path: None }
+}
+
+/// Returns all registered component schemas.
+///
+/// `ComponentSchema` derives `Serialize`, so Tauri serializes it directly —
+/// no intermediate `serde_json::Value` step needed.
+#[tauri::command]
+pub fn get_component_schemas(
+    state: tauri::State<ComponentSchemaState>,
+) -> Result<Vec<ComponentSchema>, String> {
+    let registry = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(registry.all().into_iter().cloned().collect())
+}
+
+/// Sets a single component field value for an entity.
+///
+/// Design-time: updates are tracked in the frontend scene state.
+/// Play-time (future): this will forward to the live ECS.
+#[tauri::command]
+pub fn set_component_field(
+    entity_id: u64,
+    component: String,
+    field: String,
+    value: serde_json::Value,
+) -> Result<(), String> {
+    tracing::debug!(
+        entity_id,
+        component = %component,
+        field = %field,
+        value = %value,
+        "set_component_field"
+    );
+    Ok(())
 }
 
 #[tauri::command]
@@ -239,6 +273,9 @@ impl ViewportRegistry {
         self.by_hwnd.get(hwnd)
     }
 }
+
+/// Tauri managed state holding the component schema registry.
+pub struct ComponentSchemaState(pub std::sync::Mutex<ComponentSchemaRegistry>);
 
 pub struct NativeViewportState(pub Mutex<ViewportRegistry>);
 
