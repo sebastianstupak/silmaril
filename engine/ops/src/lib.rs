@@ -21,6 +21,7 @@ pub mod error;
 pub mod undo;
 pub mod command;
 pub mod ipc;
+pub mod processor;
 
 /// Trait for reporting operation progress to frontends.
 ///
