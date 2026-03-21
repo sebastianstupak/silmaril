@@ -1,0 +1,40 @@
+name: Editor CI
+
+on:
+  push:
+    paths:
+      - 'engine/editor/**'
+  pull_request:
+    paths:
+      - 'engine/editor/**'
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install npm dependencies
+        working-directory: engine/editor
+        run: npm ci
+
+      - name: Rust tests
+        run: cargo test -p silmaril-editor
+
+      - name: TypeScript tests
+        working-directory: engine/editor
+        run: npm test -- --run
+
+      - name: Undo coverage lint
+        run: cargo xtask lint
+
+      - name: Check TypeScript bindings are up to date
+        run: cargo xtask check-bindings
