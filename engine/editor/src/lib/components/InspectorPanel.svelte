@@ -58,9 +58,13 @@
     {#each entity.components as componentName (componentName)}
       {@const schema = schemas[componentName]}
       <div class="component-section">
-        <button
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div
           class="component-header"
+          role="button"
+          tabindex="0"
           onclick={() => toggleSection(componentName)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleSection(componentName); }}
           aria-expanded={!collapsedSections[componentName]}
         >
           <span class="component-chevron" class:collapsed={collapsedSections[componentName]}>
@@ -77,7 +81,7 @@
             title="Remove {componentName}"
             onclick={(e) => { e.stopPropagation(); removeComponent(entity.id, componentName); }}
           >✕</button>
-        </button>
+        </div>
 
         {#if !collapsedSections[componentName]}
           <div class="component-body">

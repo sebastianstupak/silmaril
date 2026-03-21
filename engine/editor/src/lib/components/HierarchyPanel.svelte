@@ -7,7 +7,6 @@
     deleteEntity,
     duplicateEntity,
     renameEntity,
-    selectEntity,
   } from '$lib/scene/commands';
 
   let { entities = [], selectedId = null, onSelect }: {
@@ -108,13 +107,12 @@
           onmouseleave={() => { if (!contextMenu) hoveredId = null; }}
           onclick={() => {
             if (renamingId !== entity.id) {
-              selectEntity(entity.id);
               onSelect(entity.id);
             }
           }}
           ondblclick={() => startRename(entity.id, entity.name)}
           oncontextmenu={(e) => openContextMenu(e, entity.id)}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { selectEntity(entity.id); onSelect(entity.id); } }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onSelect(entity.id); } }}
         >
           <span class="entity-chevron">
             <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
@@ -174,13 +172,13 @@
   {/if}
 
   {#if contextMenu}
+    {@const cid = contextMenu.entityId}
+    {@const cname = entities.find((e) => e.id === cid)?.name ?? ''}
     <div
       class="context-menu"
       style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
       role="menu"
     >
-      {@const cid = contextMenu.entityId}
-      {@const cname = entities.find((e) => e.id === cid)?.name ?? ''}
       <button role="menuitem" onclick={() => { startRename(cid, cname); }}>Rename</button>
       <button role="menuitem" onclick={() => { duplicateEntity(cid); closeContextMenu(); }}>Duplicate</button>
       <button role="menuitem" onclick={() => { const c = createEntity(); onSelect(c.id); closeContextMenu(); }}>Add Child</button>
