@@ -303,11 +303,23 @@ mod platform {
         /// completes, so the returned bytes reflect the last fully rendered frame.
         pub fn capture_png_bytes(&self) -> Result<Vec<u8>, String> {
             let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
-            *self.screenshot_slot.lock().unwrap() = Some(reply_tx);
-            reply_rx
+            *self.screenshot_slot.lock().unwrap_or_else(|p| p.into_inner()) = Some(reply_tx);
+            let result = reply_rx
                 .recv_timeout(std::time::Duration::from_secs(1))
-                .map_err(|_| "Screenshot timed out".to_string())
-                .and_then(|r| r)
+                .map_err(|e| match e {
+                    std::sync::mpsc::RecvTimeoutError::Timeout => {
+                        "Screenshot timed out".to_string()
+                    }
+                    std::sync::mpsc::RecvTimeoutError::Disconnected => {
+                        "Screenshot request displaced by concurrent call".to_string()
+                    }
+                })
+                .and_then(|r| r);
+            match &result {
+                Ok(bytes) => tracing::debug!(bytes = bytes.len(), "Screenshot captured"),
+                Err(e) => tracing::warn!(error = %e, "Screenshot capture failed"),
+            }
+            result
         }
 
         pub fn destroy(&mut self) {
@@ -988,7 +1000,7 @@ void main() {
             }
 
             // Screenshot capture — if a request arrived, capture and reply.
-            if let Some(reply_tx) = screenshot_slot.lock().unwrap().take() {
+            if let Some(reply_tx) = screenshot_slot.lock().unwrap_or_else(|p| p.into_inner()).take() {
                 let result = renderer.renderer.get_frame_png().map_err(|e| e.to_string());
                 let _ = reply_tx.send(result);
             }
