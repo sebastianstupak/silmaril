@@ -10,6 +10,7 @@
   import { selectEntity } from '$lib/scene/commands';
   import { openProject, scanProjectEntities } from '$lib/api';
   import type { RecentItem } from '$lib/stores/recent-items';
+  import { getAssets, subscribeAssets } from '$lib/stores/assets';
 
   interface Props {
     projectPath?: string | null;
@@ -28,9 +29,8 @@
 
   // Cached Rust commands (fetched once on mount)
   let rustCommands: EditorCommand[] = $state([]);
-  // Cached assets (fetched lazily on first '#' use)
-  let assets: { path: string; assetType: string }[] = $state([]);
-  let assetsFetched = false;
+  // Cached assets — kept in sync with the assets store
+  let assets: { path: string; assetType: string }[] = $state(getAssets());
 
   onMount(async () => {
     try {
@@ -38,6 +38,9 @@
     } catch {
       rustCommands = [];
     }
+    assets = getAssets();
+    const unsubAssets = subscribeAssets((list) => { assets = list; });
+    return unsubAssets;
   });
 
   // Recompute results whenever query or open state changes
@@ -58,14 +61,6 @@
       name: e.name,
       components: e.components,
     }));
-
-    // Fetch assets lazily on first '#' use
-    if (query.startsWith('#') && !assetsFetched && projectPath) {
-      assetsFetched = true;
-      invoke<{ path: string; asset_type: string }[]>('scan_assets', { projectPath })
-        .then(list => { assets = list.map(a => ({ path: a.path, assetType: a.asset_type })); })
-        .catch(() => {});
-    }
 
     results = buildResults(query, merged, entities, assets, recentItems);
     selectedIndex = 0;

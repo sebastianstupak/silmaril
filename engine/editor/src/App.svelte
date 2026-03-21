@@ -10,6 +10,8 @@
   import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
   import { hydrateRecentItems, addRecentItem, subscribeRecent, getRecentItems, type RecentItem } from './lib/stores/recent-items';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
+  import { setAssets, clearAssets, type AssetEntry } from './lib/stores/assets';
+  import { scanAssets } from './lib/api';
   import { logInfo, logWarn } from './lib/stores/console';
   import { undo, redo, getCanUndo, getCanRedo, subscribeUndoHistory } from './lib/stores/undo-history';
   import { loadSchemas } from './lib/inspector/schema-store';
@@ -102,6 +104,17 @@
       setSelectedEntityId(null);
       logInfo(`Project loaded: ${editorState.project_name}`);
       logInfo(`Found ${entities.length} entities in scene`);
+      clearAssets();
+      try {
+        const raw = await scanAssets(path);
+        setAssets(raw.map((a) => ({
+          path: a.path,
+          assetType: a.asset_type as AssetEntry['assetType'],
+          filename: a.path.split(/[\\/]/).pop() ?? a.path,
+        })));
+      } catch {
+        // non-fatal — assets panel will show empty
+      }
     } catch {
       logWarn('Failed to open project');
     }
