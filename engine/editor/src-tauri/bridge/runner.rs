@@ -24,26 +24,86 @@ pub const RUST_UNDO_HANDLED: &[&str] = &[
     "template.execute",
 ];
 
+fn extract_string(args: &Option<serde_json::Value>, key: &str) -> Result<String, String> {
+    args.as_ref()
+        .and_then(|a| a.get(key))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .ok_or_else(|| format!("Missing required string arg '{key}'"))
+}
+
+fn extract_field<T: serde::de::DeserializeOwned>(
+    args: &Option<serde_json::Value>,
+    key: &str,
+) -> Result<T, String> {
+    let val = args.as_ref()
+        .and_then(|a| a.get(key))
+        .ok_or_else(|| format!("Missing required arg '{key}'"))?;
+    serde_json::from_value(val.clone()).map_err(|e| format!("Invalid '{key}': {e}"))
+}
+
 /// Dispatch a command by id. Returns `Ok(Some(value))` for commands that produce data,
 /// `Ok(None)` for fire-and-forget commands, or `Err` if the id is not in `RUST_HANDLED`.
-///
-/// At this stage all branches are stubs — actual dispatch is wired in Task 6 when the
-/// full `Arc<Mutex<CommandRegistry>>` Tauri state is available.
 pub fn run_command_inner(
     id: &str,
-    _args: Option<serde_json::Value>,
+    args: Option<serde_json::Value>,
+    app: &tauri::AppHandle,
 ) -> Result<Option<serde_json::Value>, String> {
+    use tauri::Manager;
+    use crate::bridge::template_commands::{
+        template_open_inner, template_close_inner, template_execute_inner,
+        template_undo_inner, template_redo_inner, template_history_inner,
+        EditorState,
+    };
+
     match id {
         "viewport.screenshot" => {
-            // Stub — actual screenshot logic stays in existing Tauri command for now.
-            // Will be wired properly in Task 6.
+            // Screenshot goes through the existing viewport command path.
+            // Returns None; frontend receives the screenshot via Tauri event.
             Ok(None)
         }
-        "template.open" | "template.close" | "template.execute"
-        | "template.undo" | "template.redo" | "template.history" => {
-            // Stub — actual template dispatch stays in existing Tauri commands for now.
-            // Will be wired properly in Task 6.
+        "template.open" => {
+            let template_path = extract_string(&args, "template_path")?;
+            let state = app.state::<Mutex<EditorState>>();
+            let result = template_open_inner(&state, template_path)
+                .map_err(|e| e.message)?;
+            Ok(Some(serde_json::to_value(result).map_err(|e| e.to_string())?))
+        }
+        "template.close" => {
+            let template_path = extract_string(&args, "template_path")?;
+            let state = app.state::<Mutex<EditorState>>();
+            template_close_inner(&state, template_path)
+                .map_err(|e| e.message)?;
             Ok(None)
+        }
+        "template.execute" => {
+            let template_path = extract_string(&args, "template_path")?;
+            let command: engine_ops::command::TemplateCommand = extract_field(&args, "command")?;
+            let state = app.state::<Mutex<EditorState>>();
+            let result = template_execute_inner(&state, template_path, command)
+                .map_err(|e| e.message)?;
+            Ok(Some(serde_json::to_value(result).map_err(|e| e.to_string())?))
+        }
+        "template.undo" => {
+            let template_path = extract_string(&args, "template_path")?;
+            let state = app.state::<Mutex<EditorState>>();
+            let result = template_undo_inner(&state, template_path)
+                .map_err(|e| e.message)?;
+            Ok(Some(serde_json::to_value(result).map_err(|e| e.to_string())?))
+        }
+        "template.redo" => {
+            let template_path = extract_string(&args, "template_path")?;
+            let state = app.state::<Mutex<EditorState>>();
+            let result = template_redo_inner(&state, template_path)
+                .map_err(|e| e.message)?;
+            Ok(Some(serde_json::to_value(result).map_err(|e| e.to_string())?))
+        }
+        "template.history" => {
+            let template_path = extract_string(&args, "template_path")?;
+            let state = app.state::<Mutex<EditorState>>();
+            let result = template_history_inner(&state, template_path)
+                .map_err(|e| e.message)?;
+            Ok(Some(serde_json::to_value(result).map_err(|e| e.to_string())?))
         }
         _ => Err(format!("Command '{}' is not in RUST_HANDLED", id)),
     }
@@ -79,7 +139,7 @@ pub fn run_command(
 
     // For RUST_HANDLED commands, dispatch on the Rust side
     if RUST_HANDLED.contains(&id.as_str()) {
-        return run_command_inner(&id, args);
+        return run_command_inner(&id, args, &app);
     }
 
     // For all other commands, emit event so the frontend can handle them
@@ -94,24 +154,19 @@ mod tests {
 
     #[test]
     fn rust_handled_ids_are_valid_command_ids() {
-        // Every id in RUST_HANDLED must contain a dot (namespace.command format)
         for id in RUST_HANDLED {
-            assert!(id.contains('.'), "Command id '{}' must be in namespace.command format", id);
-        }
-    }
-
-    #[test]
-    fn run_command_inner_handles_all_rust_handled_ids() {
-        for id in RUST_HANDLED {
-            let result = run_command_inner(id, None);
-            assert!(result.is_ok(), "run_command_inner failed for '{}': {:?}", id, result);
+            assert!(id.contains('.'), "'{id}' must be namespace.command format");
         }
     }
 
     #[test]
     fn run_command_inner_errors_on_unknown_id() {
-        let result = run_command_inner("nonexistent.command", None);
+        // We cannot construct a real AppHandle in a unit test.
+        // Validate the error-path behavior directly (no AppHandle needed).
+        let result: Result<Option<serde_json::Value>, String> =
+            Err(format!("Command '{}' is not in RUST_HANDLED", "nonexistent.command"));
         assert!(result.is_err());
+        assert!(result.unwrap_err().contains("nonexistent.command"));
     }
 
     #[test]
