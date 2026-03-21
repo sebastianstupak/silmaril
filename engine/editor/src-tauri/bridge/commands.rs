@@ -377,7 +377,9 @@ pub fn create_native_viewport(
         // Create a NativeViewport for this HWND if one doesn't exist yet.
         if let std::collections::hash_map::Entry::Vacant(e) = registry.by_hwnd.entry(hwnd_isize) {
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
-            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone()).map_err(|e| {
+            let selected_entity_id = std::sync::Arc::clone(&viewport_state.selected_entity_id);
+            let gizmo_mode = std::sync::Arc::clone(&viewport_state.gizmo_mode);
+            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone(), selected_entity_id, gizmo_mode).map_err(|e| {
                 tracing::error!(error = %e, "NativeViewport::new failed");
                 e
             })?;

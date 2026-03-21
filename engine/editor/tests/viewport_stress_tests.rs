@@ -10,6 +10,7 @@
 
 #![cfg(windows)]
 
+use engine_core::World;
 use silmaril_editor::viewport::native_viewport::{NativeViewport, ViewportBounds};
 use windows::Win32::{
     Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
@@ -77,6 +78,17 @@ fn default_bounds() -> ViewportBounds {
     ViewportBounds { x: 0, y: 0, width: 800, height: 600 }
 }
 
+/// Create a `NativeViewport` with dummy Arc values for tests that do not
+/// exercise the gizmo / entity selection paths.
+fn create_test_viewport(hwnd: HWND) -> Result<NativeViewport, String> {
+    use std::sync::{Arc, Mutex};
+    use std::sync::atomic::AtomicU8;
+    let world = Arc::new(std::sync::RwLock::new(World::new()));
+    let selected_entity_id = Arc::new(Mutex::new(None::<u64>));
+    let gizmo_mode = Arc::new(AtomicU8::new(0));
+    NativeViewport::new(hwnd, world, selected_entity_id, gizmo_mode)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -86,7 +98,7 @@ fn default_bounds() -> ViewportBounds {
 #[ignore]
 fn test_viewport_create_render_destroy() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent).expect("create viewport");
+    let mut vp = create_test_viewport(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), default_bounds());
 
@@ -104,7 +116,7 @@ fn test_viewport_create_destroy_cycles() {
     let parent = create_hidden_parent();
 
     for i in 0..10 {
-        let mut vp = NativeViewport::new(parent)
+        let mut vp = create_test_viewport(parent)
             .unwrap_or_else(|e| panic!("create viewport (cycle {i}): {e}"));
         vp.start_rendering()
             .unwrap_or_else(|e| panic!("start rendering (cycle {i}): {e}"));
@@ -124,7 +136,7 @@ fn test_viewport_create_destroy_cycles() {
 #[ignore]
 fn test_viewport_rapid_resize() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent).expect("create viewport");
+    let mut vp = create_test_viewport(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), default_bounds());
 
@@ -153,7 +165,7 @@ fn test_viewport_rapid_resize() {
 fn test_viewport_zero_size() {
     let parent = create_hidden_parent();
     let bounds = ViewportBounds { x: 0, y: 0, width: 0, height: 0 };
-    let mut vp = NativeViewport::new(parent).expect("create viewport with zero size");
+    let mut vp = create_test_viewport(parent).expect("create viewport with zero size");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), bounds);
 
@@ -169,7 +181,7 @@ fn test_viewport_zero_size() {
 fn test_viewport_one_pixel() {
     let parent = create_hidden_parent();
     let bounds = ViewportBounds { x: 0, y: 0, width: 1, height: 1 };
-    let mut vp = NativeViewport::new(parent).expect("create 1x1 viewport");
+    let mut vp = create_test_viewport(parent).expect("create 1x1 viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), bounds);
 
@@ -185,7 +197,7 @@ fn test_viewport_one_pixel() {
 fn test_viewport_4k() {
     let parent = create_hidden_parent();
     let bounds = ViewportBounds { x: 0, y: 0, width: 3840, height: 2160 };
-    let mut vp = NativeViewport::new(parent).expect("create 4K viewport");
+    let mut vp = create_test_viewport(parent).expect("create 4K viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), bounds);
 
@@ -204,7 +216,7 @@ fn test_viewport_lifecycle_stress() {
 
     for cycle in 0..50 {
         let mut vp =
-            NativeViewport::new(parent).unwrap_or_else(|e| panic!("cycle {cycle}: create: {e}"));
+            create_test_viewport(parent).unwrap_or_else(|e| panic!("cycle {cycle}: create: {e}"));
         vp.start_rendering().unwrap_or_else(|e| panic!("cycle {cycle}: start: {e}"));
         vp.upsert_instance("main".to_string(), default_bounds());
 
@@ -222,7 +234,7 @@ fn test_viewport_lifecycle_stress() {
 #[ignore]
 fn test_viewport_resize_zero_then_restore() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent).expect("create viewport");
+    let mut vp = create_test_viewport(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), default_bounds());
 
@@ -247,7 +259,7 @@ fn test_viewport_drop_cleanup() {
     let parent = create_hidden_parent();
 
     {
-        let mut vp = NativeViewport::new(parent).expect("create viewport");
+        let mut vp = create_test_viewport(parent).expect("create viewport");
         vp.start_rendering().expect("start rendering");
         vp.upsert_instance("main".to_string(), default_bounds());
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -263,7 +275,7 @@ fn test_viewport_drop_cleanup() {
 #[ignore]
 fn test_viewport_multiple_simultaneous() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent).expect("create viewport");
+    let mut vp = create_test_viewport(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
 
     // Register 3 viewport instances side by side
@@ -284,7 +296,7 @@ fn test_viewport_multiple_simultaneous() {
 #[ignore]
 fn test_viewport_extreme_aspect_ratios() {
     let parent = create_hidden_parent();
-    let mut vp = NativeViewport::new(parent).expect("create viewport");
+    let mut vp = create_test_viewport(parent).expect("create viewport");
     vp.start_rendering().expect("start rendering");
     vp.upsert_instance("main".to_string(), default_bounds());
     std::thread::sleep(std::time::Duration::from_millis(100));
