@@ -6,17 +6,20 @@
   import { isFrontendCommand } from './types';
   import { listFrontendCommands } from './registry';
   import { buildResults } from './providers';
-  import { getEditorContext } from '$lib/stores/editor-context';
+  import { getEditorContext, setEntities, setSelectedEntityId } from '$lib/stores/editor-context';
   import { selectEntity } from '$lib/scene/commands';
+  import { openProject, scanProjectEntities } from '$lib/api';
+  import type { RecentItem } from '$lib/stores/recent-items';
 
   interface Props {
     projectPath?: string | null;
     open?: boolean;
     onOpen?: () => void;
     onClose?: () => void;
+    recentItems?: RecentItem[];
   }
 
-  let { projectPath = null, open = $bindable(false), onOpen, onClose }: Props = $props();
+  let { projectPath = null, open = $bindable(false), onOpen, onClose, recentItems = [] }: Props = $props();
 
   let query = $state('');
   let results: OmnibarResult[] = $state([]);
@@ -64,8 +67,7 @@
         .catch(() => {});
     }
 
-    // Recent items: v1 passes empty array
-    results = buildResults(query, merged, entities, assets, []);
+    results = buildResults(query, merged, entities, assets, recentItems);
     selectedIndex = 0;
   });
 
@@ -98,9 +100,13 @@
       case 'asset':
         // Future: focus asset in assets panel
         break;
-      case 'recent':
-        // Future: open project/scene
+      case 'recent': {
+        const state = await openProject(result.path);
+        const scannedEntities = await scanProjectEntities(result.path);
+        setEntities(scannedEntities);
+        setSelectedEntityId(null);
         break;
+      }
     }
   }
 

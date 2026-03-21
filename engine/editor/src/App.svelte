@@ -8,6 +8,7 @@
   import ViewportOverlay from './lib/components/ViewportOverlay.svelte';
   import { themes, applyTheme } from './lib/theme/tokens';
   import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
+  import { hydrateRecentItems, addRecentItem, subscribeRecent, getRecentItems, type RecentItem } from './lib/stores/recent-items';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
   import { logInfo, logWarn } from './lib/stores/console';
   import { undo, redo, getCanUndo, getCanRedo, subscribeUndoHistory } from './lib/stores/undo-history';
@@ -45,6 +46,7 @@
   let omnibarOpen = $state(false);
   let canUndoState = $state(false);
   let canRedoState = $state(false);
+  let recentItems = $state<RecentItem[]>([]);
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -94,6 +96,7 @@
 
     try {
       editorState = await openProject(path);
+      addRecentItem({ label: editorState.project_name ?? path, path, itemType: 'project' });
       const entities = await scanProjectEntities(path);
       setEntities(entities);
       setSelectedEntityId(null);
@@ -386,6 +389,10 @@
       if (hydratedLayouts) savedLayouts = hydratedLayouts;
     }
 
+    await hydrateRecentItems();
+    recentItems = getRecentItems();
+    subscribeRecent((items) => { recentItems = items; });
+
     // Register UI-only commands in the frontend registry
     registerCommand({
       id: 'edit.undo',
@@ -506,6 +513,7 @@
         compactMenu={settings.compactMenu}
         bind:omnibarOpen
         projectPath={editorState?.project_path ?? null}
+        {recentItems}
         onOmnibarOpen={() => { omnibarOpen = true; }}
         onOmnibarClose={() => { omnibarOpen = false; }}
       />

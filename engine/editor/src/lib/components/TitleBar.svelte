@@ -7,6 +7,7 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { t } from '$lib/i18n';
   import Omnibar from '$lib/omnibar/Omnibar.svelte';
+  import type { RecentItem } from '$lib/stores/recent-items';
 
   // ── Panel catalogue ────────────────────────────────────────────────────────
   const ALL_PANELS: { id: string; label: string }[] = [
@@ -44,6 +45,7 @@
     onOmnibarOpen?: () => void;
     onOmnibarClose?: () => void;
     projectPath?: string | null;
+    recentItems?: RecentItem[];
   }
 
   let {
@@ -71,6 +73,7 @@
     onOmnibarOpen,
     onOmnibarClose,
     projectPath = null,
+    recentItems = [],
   }: Props = $props();
 
   const MAX_VISIBLE_SLOTS = 4;
@@ -395,6 +398,7 @@
     <Omnibar
       bind:open={omnibarOpen}
       {projectPath}
+      {recentItems}
       onOpen={onOmnibarOpen}
       onClose={onOmnibarClose}
     />
