@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{mpsc, watch, oneshot};
+use tracing::{debug, warn};
 
 use crate::{
     CommandRequest, McpCommand, PermissionRequest,
@@ -106,6 +107,8 @@ async fn handle_tools_call(
     };
     let args = params.get("arguments").cloned();
 
+    debug!(method = "tools/call", tool = %tool_name, "Dispatching tool call");
+
     // Validate command exists
     let commands = state.registry_rx.borrow().clone();
     if !commands.iter().any(|c| c.id == tool_name) {
@@ -128,6 +131,7 @@ async fn handle_tools_call(
                 response_tx: resp_tx,
             };
             if state.permission_tx.send(perm_req).await.is_err() {
+                warn!(category, command_id = %tool_name, "Permission channel closed");
                 return JsonRpcResponse::error(id, ERR_SERVER_ERROR, "Permission channel closed");
             }
             match tokio::time::timeout(
@@ -138,10 +142,12 @@ async fn handle_tools_call(
                     state.permissions.lock().unwrap().grant(category, level);
                 }
                 Ok(Ok(None)) => {
+                    warn!(category, command_id = %tool_name, "Permission denied by user");
                     return JsonRpcResponse::error(id, ERR_PERMISSION_DENIED,
                         format!("Permission denied for category '{}'", category));
                 }
                 _ => {
+                    warn!(category, command_id = %tool_name, "Permission request timed out");
                     return JsonRpcResponse::error(id, ERR_PERMISSION_DENIED,
                         format!("Permission denied (timed out) for category '{}'", category));
                 }
@@ -149,14 +155,9 @@ async fn handle_tools_call(
         }
     }
 
-    // Consume Once grants now that permission is confirmed (before dispatch)
-    if !state.allow_all {
-        state.permissions.lock().unwrap().consume_once(category);
-    }
-
     // Special case: screenshot
     if tool_name == "viewport.screenshot" {
-        return handle_screenshot(id, state).await;
+        return handle_screenshot(id, state, category).await;
     }
 
     // Standard command dispatch
@@ -169,27 +170,40 @@ async fn handle_tools_call(
         response_tx: resp_tx,
     };
     if state.command_tx.send(cmd_req).await.is_err() {
+        warn!(command_id = %tool_name, "Command channel closed");
         return JsonRpcResponse::error(id, ERR_SERVER_ERROR, "Command channel closed");
     }
-    match tokio::time::timeout(std::time::Duration::from_secs(5), resp_rx).await {
-        Ok(Ok(Ok(Some(data)))) => JsonRpcResponse::ok(id, serde_json::json!({
-            "content": [{ "type": "text", "text": data.to_string() }]
-        })),
-        Ok(Ok(Ok(None))) => JsonRpcResponse::ok(id, serde_json::json!({
-            "content": [{ "type": "text", "text": "ok" }]
-        })),
+    let result = match tokio::time::timeout(std::time::Duration::from_secs(5), resp_rx).await {
+        Ok(Ok(Ok(Some(data)))) => {
+            JsonRpcResponse::ok(id, serde_json::json!({
+                "content": [{ "type": "text", "text": data.to_string() }]
+            }))
+        }
+        Ok(Ok(Ok(None))) => {
+            JsonRpcResponse::ok(id, serde_json::json!({
+                "content": [{ "type": "text", "text": "ok" }]
+            }))
+        }
         Ok(Ok(Err(e))) => JsonRpcResponse::error(id, ERR_SERVER_ERROR, e),
-        _ => JsonRpcResponse::error(id, ERR_SERVER_ERROR,
-            format!("Command '{}' timed out", tool_name)),
+        _ => {
+            warn!(command_id = %tool_name, "Command timed out");
+            JsonRpcResponse::error(id, ERR_SERVER_ERROR, format!("Command '{}' timed out", tool_name))
+        }
+    };
+    // Consume Once grants only on success
+    if !state.allow_all && result.error.is_none() {
+        state.permissions.lock().unwrap().consume_once(category);
     }
+    result
 }
 
-async fn handle_screenshot(id: Option<Value>, state: &McpState) -> JsonRpcResponse {
+async fn handle_screenshot(id: Option<Value>, state: &McpState, category: &str) -> JsonRpcResponse {
     let (resp_tx, resp_rx) = oneshot::channel();
     if state.screenshot_tx.send(crate::ScreenshotRequest { response_tx: resp_tx }).await.is_err() {
+        warn!("Screenshot channel closed");
         return JsonRpcResponse::error(id, ERR_SERVER_ERROR, "Screenshot channel closed");
     }
-    match tokio::time::timeout(std::time::Duration::from_secs(10), resp_rx).await {
+    let result = match tokio::time::timeout(std::time::Duration::from_secs(10), resp_rx).await {
         Ok(Ok(Ok(png_bytes))) => {
             use base64::Engine as _;
             let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
@@ -202,15 +216,23 @@ async fn handle_screenshot(id: Option<Value>, state: &McpState) -> JsonRpcRespon
             }))
         }
         Ok(Ok(Err(e))) => JsonRpcResponse::error(id, ERR_SERVER_ERROR, e),
-        _ => JsonRpcResponse::error(id, ERR_SERVER_ERROR, "Screenshot timed out"),
+        _ => {
+            warn!("Screenshot request timed out");
+            JsonRpcResponse::error(id, ERR_SERVER_ERROR, "Screenshot timed out")
+        }
+    };
+    // Consume Once grants only on success
+    if !state.allow_all && result.error.is_none() {
+        state.permissions.lock().unwrap().consume_once(category);
     }
+    result
 }
 
 fn uuid_v4() -> String {
-    // Simple UUID-like id using random bytes
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
-    format!("req-{:08x}", t)
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("req-{:016x}", n)
 }
 
 #[cfg(test)]
