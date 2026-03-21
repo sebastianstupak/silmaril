@@ -346,6 +346,7 @@ export async function gizmoDragEnd(viewportId: string): Promise<void> {
 
 /** Mirror the selected entity to the Rust viewport renderer. */
 export async function setSelectedEntity(entityId: number | null): Promise<void> {
+  if (!isTauri) return;
   return tauriInvoke<void>('set_selected_entity', { entityId });
 }
 
