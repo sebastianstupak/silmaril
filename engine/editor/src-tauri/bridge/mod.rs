@@ -12,3 +12,6 @@ pub mod subscriptions;
 pub mod registry;
 pub mod runner;
 pub mod template_commands;
+
+#[cfg(test)]
+pub mod tests;

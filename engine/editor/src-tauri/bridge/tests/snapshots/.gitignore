@@ -1,0 +1,3 @@
+# Insta snapshot files are intentionally committed.
+# The root .gitignore blocks snapshots/ globally, but we need these.
+!*.snap
