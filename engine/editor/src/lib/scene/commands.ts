@@ -14,10 +14,11 @@ import {
   type ProjectionMode,
   type Vec3,
 } from './state';
-import { logInfo, logDebug } from '$lib/stores/console';
+import { logInfo, logDebug, logError } from '$lib/stores/console';
 import { applyComponentDefaults, buildInitialComponentValues, type FieldValue } from '$lib/inspector/inspector-utils';
 import { getSchemas } from '$lib/inspector/schema-store';
-import { setComponentField as apiSetComponentField } from '$lib/api';
+import { templateExecute } from '$lib/api';
+import { getActiveTemplatePath, onTemplateMutated } from '$lib/stores/undo-history';
 
 // ---------------------------------------------------------------------------
 // Entity colour palette (matches viewport rendering)
@@ -406,8 +407,15 @@ export function setComponentField(
     else if (fieldName === 'scale') scaleEntity(entityId, v.x, v.y, v.z);
   }
 
-  // Forward to Tauri (no-op in browser; will wire to live ECS in Play mode)
-  apiSetComponentField(entityId, componentName, fieldName, value).catch(() => {});
+  // Forward through CQRS (undo/redo support) — fire-and-forget, optimistic update already applied
+  const path = getActiveTemplatePath();
+  if (path) {
+    const entity = getEntityById(entityId);
+    const componentData = entity?.componentValues[componentName] ?? {};
+    templateExecute(path, { SetComponent: { id: entityId, type_name: componentName, data: componentData } })
+      .then(() => onTemplateMutated())
+      .catch(() => {}); // silent — local state already reflects the change
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -431,11 +439,11 @@ export function addComponent(entityId: number, componentName: string): void {
     return { ...s, entities };
   });
   logInfo(`Component added: ${componentName} → entity #${entityId}`);
-  // Tauri forward — fire-and-forget, ignore errors
-  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-    import('@tauri-apps/api/core').then(({ invoke }) =>
-      invoke('add_component', { entityId, component: componentName }).catch(() => {}),
-    );
+  const _addPath = getActiveTemplatePath();
+  if (_addPath) {
+    templateExecute(_addPath, { AddComponent: { id: entityId, type_name: componentName, data: defaults } })
+      .then(() => onTemplateMutated())
+      .catch((e) => logError(`AddComponent failed: ${e}`));
   }
 }
 
@@ -454,10 +462,11 @@ export function removeComponent(entityId: number, componentName: string): void {
     return { ...s, entities };
   });
   logInfo(`Component removed: ${componentName} from entity #${entityId}`);
-  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-    import('@tauri-apps/api/core').then(({ invoke }) =>
-      invoke('remove_component', { entityId, component: componentName }).catch(() => {}),
-    );
+  const _removePath = getActiveTemplatePath();
+  if (_removePath) {
+    templateExecute(_removePath, { RemoveComponent: { id: entityId, type_name: componentName } })
+      .then(() => onTemplateMutated())
+      .catch((e) => logError(`RemoveComponent failed: ${e}`));
   }
 }
 
