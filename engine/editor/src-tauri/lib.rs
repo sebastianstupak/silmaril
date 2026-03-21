@@ -5,6 +5,8 @@ pub mod state;
 pub mod viewport;
 pub mod world;
 
+use std::sync::Mutex;
+
 use bridge::commands;
 use bridge::registry::{CommandRegistryState, EditorCommand};
 use bridge::runner;
@@ -205,6 +207,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::NativeViewportState::new())
+        .manage(Mutex::new(bridge::template_commands::EditorState::new()))
         .manage(CommandRegistryState::new())
         .manage(file_explorer::FileWatcherState::new())
         .invoke_handler(tauri::generate_handler![
@@ -212,7 +215,6 @@ pub fn run() {
             commands::open_project,
             commands::open_project_dialog,
             commands::scan_project_entities,
-            commands::scene_command,
             commands::create_native_viewport,
             commands::resize_native_viewport,
             commands::destroy_native_viewport,
@@ -246,6 +248,12 @@ pub fn run() {
             runner::list_commands,
             runner::run_command,
             commands::scan_assets,
+            bridge::template_commands::template_open,
+            bridge::template_commands::template_close,
+            bridge::template_commands::template_execute,
+            bridge::template_commands::template_undo,
+            bridge::template_commands::template_redo,
+            bridge::template_commands::template_history,
         ])
         .setup(|app| {
             use tauri::Manager;
