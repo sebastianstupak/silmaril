@@ -24,6 +24,7 @@ pub struct CommandSpec {
     #[specta(type = Option<SpecUnknown>)]
     pub args_schema: Option<serde_json::Value>,
     pub returns_data: bool,
+    pub undoable: bool,
 }
 
 /// Implemented by every subsystem that exposes commands to the editor.
@@ -103,6 +104,10 @@ impl CommandRegistry {
             .iter()
             .find(|c| c.keybind.as_deref() == Some(keybind))
     }
+
+    pub fn undoable_commands(&self) -> Vec<&CommandSpec> {
+        self.commands.iter().filter(|c| c.undoable).collect()
+    }
 }
 
 // Temporary stub — CommandRegistryState is removed from the new design.
@@ -139,6 +144,7 @@ mod tests {
                 keybind: Some("Ctrl+T".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             }]
         }
     }
@@ -184,6 +190,7 @@ mod tests {
                     keybind: None,
                     args_schema: None,
                     returns_data: false,
+                    undoable: false,
                 }]
             }
         }
@@ -201,7 +208,7 @@ mod tests {
         impl EditorModule for Mod {
             fn id(&self) -> &str { "foo" }
             fn commands(&self) -> Vec<CommandSpec> {
-                vec![CommandSpec { id: "foo.bar".into(), module_id: String::new(), label: "Bar".into(), category: "General".into(), description: None, keybind: None, args_schema: None, returns_data: false }]
+                vec![CommandSpec { id: "foo.bar".into(), module_id: String::new(), label: "Bar".into(), category: "General".into(), description: None, keybind: None, args_schema: None, returns_data: false, undoable: false }]
             }
         }
         let (mut reg, _rx) = CommandRegistry::new();
@@ -217,5 +224,29 @@ mod tests {
         registry.register_module(&TestModule);
         // After registration, receiver sees the new snapshot
         assert_eq!(rx.borrow().len(), 1);
+    }
+
+    #[test]
+    fn undoable_commands_are_scene_and_template_execute() {
+        use crate::bridge::modules::*;
+        let (mut reg, _rx) = CommandRegistry::new();
+        reg.register_module(&SceneModule);
+        reg.register_module(&TemplateModule);
+        reg.register_module(&EditModule);
+        reg.register_module(&FileModule);
+
+        let undoable: Vec<&str> = reg.undoable_commands().iter().map(|c| c.id.as_str()).collect();
+
+        // Scene mutations must be undoable
+        assert!(undoable.contains(&"scene.new_entity"));
+        assert!(undoable.contains(&"scene.delete_entity"));
+        assert!(undoable.contains(&"scene.duplicate_entity"));
+        assert!(undoable.contains(&"template.execute"));
+
+        // These must NOT be undoable
+        assert!(!undoable.contains(&"scene.focus_entity"));
+        assert!(!undoable.contains(&"edit.undo"));
+        assert!(!undoable.contains(&"edit.redo"));
+        assert!(!undoable.contains(&"file.save_scene"));
     }
 }

@@ -18,6 +18,7 @@ impl EditorModule for FileModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "file.open_project".into(),
@@ -28,6 +29,7 @@ impl EditorModule for FileModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "file.save_scene".into(),
@@ -38,6 +40,7 @@ impl EditorModule for FileModule {
                 keybind: Some("Ctrl+S".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "file.save_scene_as".into(),
@@ -48,6 +51,7 @@ impl EditorModule for FileModule {
                 keybind: Some("Ctrl+Shift+S".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "file.open_scene".into(),
@@ -58,6 +62,7 @@ impl EditorModule for FileModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
         ]
     }

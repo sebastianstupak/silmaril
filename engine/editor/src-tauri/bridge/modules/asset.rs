@@ -18,6 +18,7 @@ impl EditorModule for AssetModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "asset.refresh".into(),
@@ -28,6 +29,7 @@ impl EditorModule for AssetModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "asset.scan".into(),
@@ -38,6 +40,7 @@ impl EditorModule for AssetModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
         ]
     }

@@ -18,6 +18,7 @@ impl EditorModule for ViewModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "view.toggle_inspector".into(),
@@ -28,6 +29,7 @@ impl EditorModule for ViewModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "view.toggle_console".into(),
@@ -38,6 +40,7 @@ impl EditorModule for ViewModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "view.toggle_asset_browser".into(),
@@ -48,6 +51,7 @@ impl EditorModule for ViewModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "view.zoom_in".into(),
@@ -58,6 +62,7 @@ impl EditorModule for ViewModule {
                 keybind: Some("Ctrl+=".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "view.zoom_out".into(),
@@ -68,6 +73,7 @@ impl EditorModule for ViewModule {
                 keybind: Some("Ctrl+-".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "view.zoom_reset".into(),
@@ -78,6 +84,7 @@ impl EditorModule for ViewModule {
                 keybind: Some("Ctrl+0".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
         ]
     }

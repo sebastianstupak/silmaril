@@ -18,6 +18,7 @@ impl EditorModule for SceneModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: true,
             },
             CommandSpec {
                 id: "scene.delete_entity".into(),
@@ -28,6 +29,7 @@ impl EditorModule for SceneModule {
                 keybind: Some("Delete".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: true,
             },
             CommandSpec {
                 id: "scene.duplicate_entity".into(),
@@ -38,6 +40,7 @@ impl EditorModule for SceneModule {
                 keybind: Some("Ctrl+D".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: true,
             },
             CommandSpec {
                 id: "scene.focus_entity".into(),
@@ -48,6 +51,7 @@ impl EditorModule for SceneModule {
                 keybind: Some("F".into()),
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
         ]
     }

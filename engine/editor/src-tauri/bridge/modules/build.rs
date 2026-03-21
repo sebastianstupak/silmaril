@@ -18,6 +18,7 @@ impl EditorModule for BuildModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "build.build".into(),
@@ -28,6 +29,7 @@ impl EditorModule for BuildModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
             CommandSpec {
                 id: "build.package".into(),
@@ -38,6 +40,7 @@ impl EditorModule for BuildModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
+                undoable: false,
             },
         ]
     }

@@ -18,6 +18,7 @@ impl EditorModule for UserCommandsModule {
             keybind: None,
             args_schema: None,
             returns_data: false,
+            undoable: false,
         }]
     }
 }

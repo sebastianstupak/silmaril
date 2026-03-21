@@ -48,10 +48,13 @@ pub struct CommandSpec {
     pub keybind: Option<String>,             // "Ctrl+Shift+N"
     pub args_schema: Option<serde_json::Value>, // JSON Schema for parameters
     pub returns_data: bool,                  // false = fire-and-forget, true = awaits result
+    pub undoable: bool,                      // true = command mutates scene state and can be undone
 }
 ```
 
 `id` is always namespaced: `<module-id>.<action>`. `module_id` is populated by `register_module` from `module.id()` — callers never set it directly. The module id prefix is enforced at registration time. `returns_data` defaults to `false` for all commands unless explicitly set; user module manifests may set `returns_data = true` per command.
+
+`undoable` is `true` for commands that mutate scene state and can be placed on the undo stack: `scene.new_entity`, `scene.delete_entity`, `scene.duplicate_entity`, and `template.execute`. All other built-in commands are `undoable: false` — notably `scene.focus_entity` (camera-only, no state mutation), `edit.undo`, `edit.redo` (they ARE the undo operations), and all file/view/build/viewport/asset commands. `CommandRegistry::undoable_commands()` returns a filtered slice for use by the undo subsystem.
 
 ### `CommandRegistry` — the single catalog
 
@@ -73,6 +76,7 @@ impl CommandRegistry {
     pub fn get(&self, id: &str) -> Option<&CommandSpec>;
     pub fn by_module(&self, module_id: &str) -> Vec<&CommandSpec>;
     pub fn get_by_keybind(&self, keybind: &str) -> Option<&CommandSpec>;
+    pub fn undoable_commands(&self) -> Vec<&CommandSpec>; // filter by undoable == true
 }
 ```
 
@@ -731,6 +735,8 @@ let app_svelte = fs::read_to_string("engine/editor/src/App.svelte")?;
 ```
 
 The exact implementation is left to the developer. The invariant to enforce: **the keyboard handler calls exactly `registry.getByKeybind` and `dispatchCommand`, nothing else**.
+
+The lint must also verify the `undoable` manifest: every command with `undoable: true` in `CommandRegistry` must have a corresponding entry in a `RUST_UNDOABLE` constant (exported from the Rust-generated bindings) or a registered TypeScript undo handler map. Any `undoable: true` command without a corresponding undo handler registration must cause `cargo xtask lint` to fail.
 
 ---
 
