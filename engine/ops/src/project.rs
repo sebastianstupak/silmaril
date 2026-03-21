@@ -410,6 +410,7 @@ dist/
 # Editor runtime state
 .silmaril/
 *.editor.yaml
+*.undo.json          # Undo history (ephemeral, not committed)
 
 # Node.js (editor panels)
 node_modules/

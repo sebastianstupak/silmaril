@@ -2,6 +2,7 @@ use engine_ops::command::TemplateCommand;
 use engine_ops::processor::CommandProcessor;
 use serde_json::json;
 use tempfile::tempdir;
+use proptest::prelude::*;
 
 fn make_processor() -> (CommandProcessor, tempfile::TempDir) {
     let dir = tempdir().unwrap();
@@ -229,4 +230,39 @@ fn add_component_duplicate_returns_error() {
     proc.execute(TemplateCommand::AddComponent { id, type_name: "Health".into(), data: json!({}) }).unwrap();
     let err = proc.execute(TemplateCommand::AddComponent { id, type_name: "Health".into(), data: json!({}) });
     assert!(err.is_err());
+}
+
+proptest! {
+    #[test]
+    fn undo_redo_restores_state(names in proptest::collection::vec("[a-zA-Z]{1,10}", 0..5)) {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("prop.yaml");
+        std::fs::write(&path, "name: prop\nentities: []\n").unwrap();
+        let mut proc = CommandProcessor::load(path.clone()).unwrap();
+
+        // Execute N creates
+        let n = names.len();
+        for name in &names {
+            proc.execute(TemplateCommand::CreateEntity { name: Some(name.clone()) }).unwrap();
+        }
+        let state_after = proc.state_ref().clone();
+
+        // Undo all
+        for _ in 0..n {
+            proc.undo().unwrap();
+        }
+        prop_assert!(proc.state_ref().entities.is_empty(), "after undoing all creates, state should be empty");
+
+        // Redo all
+        for _ in 0..n {
+            proc.redo().unwrap();
+        }
+        prop_assert_eq!(proc.state_ref().entities.len(), state_after.entities.len(),
+            "after redoing all, entity count should match");
+
+        // YAML must be valid
+        let content = std::fs::read_to_string(&path).unwrap();
+        let parsed: Result<serde_yaml::Value, _> = serde_yaml::from_str(&content);
+        prop_assert!(parsed.is_ok(), "YAML must be valid after undo/redo cycle");
+    }
 }
