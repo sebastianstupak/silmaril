@@ -24,8 +24,11 @@ use crate::bridge::registry::CommandSpec;
 pub struct AiBridgeState {
     pub server: Mutex<Option<AiServer>>,
     /// Pending permission requests awaiting user response (request_id → response channel).
+    /// FIXME: Entries are never TTL-expired; if the frontend crashes, leaked senders
+    /// will hold the corresponding MCP oneshot receivers open indefinitely.
     pub pending_permissions: Mutex<HashMap<String, oneshot::Sender<Option<GrantLevel>>>>,
     /// Pending command round-trips awaiting TypeScript response.
+    /// FIXME: Entries are never TTL-expired; see pending_permissions note above.
     pub command_response_pending: Mutex<HashMap<String, oneshot::Sender<Result<Option<serde_json::Value>, String>>>>,
     /// Clone of the registry watch receiver — stored here so ai_server_start can clone it.
     pub registry_rx: Mutex<Option<watch::Receiver<Vec<CommandSpec>>>>,
@@ -120,7 +123,7 @@ pub fn spawn_bridge_tasks(
             // Store the response channel so ai_scene_response can resolve it
             if let Some(state) = app2.try_state::<AiBridgeState>() {
                 state.command_response_pending.lock()
-                    .unwrap_or_else(|p: std::sync::PoisonError<_>| p.into_inner())
+                    .unwrap_or_else(|p| p.into_inner())
                     .insert(request_id.clone(), response_tx);
                 tracing::debug!(request_id = %request_id, "Command round-trip pending");
             } else {
@@ -149,7 +152,7 @@ pub fn spawn_bridge_tasks(
 
             if let Some(state) = app_perm.try_state::<AiBridgeState>() {
                 state.pending_permissions.lock()
-                    .unwrap_or_else(|p: std::sync::PoisonError<_>| p.into_inner())
+                    .unwrap_or_else(|p| p.into_inner())
                     .insert(request_id.clone(), response_tx);
                 tracing::debug!(request_id = %request_id, "Permission request pending");
             } else {
@@ -167,7 +170,7 @@ pub fn spawn_bridge_tasks(
                 use crate::bridge::commands::NativeViewportState;
                 let result = if let Some(nvs) = app_ss.try_state::<NativeViewportState>() {
                     let registry = nvs.registry.lock()
-                        .unwrap_or_else(|p: std::sync::PoisonError<_>| p.into_inner());
+                        .unwrap_or_else(|p| p.into_inner());
                     registry.first_viewport()
                         .map(|vp: &crate::viewport::native_viewport::NativeViewport| vp.capture_png_bytes())
                         .unwrap_or_else(|| Err("No active viewport".into()))
@@ -182,7 +185,10 @@ pub fn spawn_bridge_tasks(
 
     // Non-Windows: screenshot_rx is dropped; requests will time out on the MCP side
     #[cfg(not(windows))]
-    let _ = screenshot_rx;
+    {
+        tracing::info!("Screenshot capture is not supported on this platform; screenshot requests will time out");
+        let _ = screenshot_rx;
+    }
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
@@ -200,9 +206,13 @@ pub async fn ai_server_start(
     bridge: State<'_, AiBridgeState>,
     app: AppHandle,
 ) -> Result<u16, String> {
-    let mut server_guard = bridge.server.lock().unwrap_or_else(|p| p.into_inner());
-    if server_guard.is_some() {
-        return Err("AI server is already running".into());
+    // Check and early-return while guard is held — drop before await
+    {
+        let guard = bridge.server.lock().unwrap_or_else(|p| p.into_inner());
+        if guard.is_some() {
+            return Err("AI server is already running".into());
+        }
+        // guard dropped here
     }
 
     let (cmd_tx, cmd_rx) = mpsc::channel::<CommandRequest>(32);
@@ -229,14 +239,23 @@ pub async fn ai_server_start(
         PermissionStore::with_path(std::path::Path::new(&project_path))
     ));
 
+    // await is now outside any mutex guard
     let server = AiServer::start(port, channels, allow_all, permissions).await
         .map_err(|e| format!("Failed to start AI server: {e}"))?;
     let bound_port = server.port();
+
+    // Re-acquire after await; handle the TOCTOU race
+    let mut server_guard = bridge.server.lock().unwrap_or_else(|p| p.into_inner());
+    if server_guard.is_some() {
+        // Concurrent call won the race; stop the server we just started
+        let mut s = server;
+        s.stop();
+        return Err("AI server is already running".into());
+    }
     *server_guard = Some(server);
     drop(server_guard);
 
     spawn_bridge_tasks(app, cmd_rx, perm_rx, ss_rx);
-
     tracing::info!(port = bound_port, "AI MCP server started");
     Ok(bound_port)
 }
