@@ -79,6 +79,7 @@ function browserMock<T>(cmd: string, args?: Record<string, unknown>): T {
     scan_project_entities: mockEntities,
     get_component_schemas: mockSchemas,
     set_component_field: null,
+    set_selected_entity: undefined,
   };
   return (mocks[cmd] ?? null) as T;
 }
@@ -341,6 +342,11 @@ export async function gizmoDrag(
 export async function gizmoDragEnd(viewportId: string): Promise<void> {
   if (!isTauri) return;
   return tauriInvoke<void>('gizmo_drag_end', { viewportId });
+}
+
+/** Mirror the selected entity to the Rust viewport renderer. */
+export async function setSelectedEntity(entityId: number | null): Promise<void> {
+  return tauriInvoke<void>('set_selected_entity', { entityId });
 }
 
 /** Set the active gizmo mode. Accepted values: "move", "rotate", "scale". */
