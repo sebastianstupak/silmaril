@@ -14,3 +14,7 @@ impl OutputState {
         Self { child: Arc::new(Mutex::new(None)) }
     }
 }
+
+impl Default for OutputState {
+    fn default() -> Self { Self::new() }
+}

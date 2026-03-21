@@ -1,7 +1,7 @@
 // engine/editor/src-tauri/terminal/pty.rs
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use portable_pty::MasterPty;
 
@@ -16,11 +16,15 @@ pub struct PtySession {
 }
 
 pub struct TerminalState {
-    pub sessions: Mutex<HashMap<String, PtySession>>,
+    pub sessions: Mutex<HashMap<String, Arc<Mutex<PtySession>>>>,
 }
 
 impl TerminalState {
     pub fn new() -> Self {
         Self { sessions: Mutex::new(HashMap::new()) }
     }
+}
+
+impl Default for TerminalState {
+    fn default() -> Self { Self::new() }
 }
