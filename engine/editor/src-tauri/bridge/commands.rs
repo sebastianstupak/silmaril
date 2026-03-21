@@ -61,7 +61,8 @@ pub fn set_component_field(
 
     // For Transform component fields, also update the live ECS world.
     if component == "Transform" {
-        let entity = engine_core::Entity::new(entity_id as u32, 0);
+        debug_assert!(entity_id <= u32::MAX as u64, "entity_id truncation");
+        let entity = engine_core::Entity::new(entity_id as u32, 0); // FIXME: hardcodes generation 0 — will break after any entity slot reuse
         let val = value.as_f64().ok_or("value must be a number")? as f32;
         let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
         if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
@@ -78,6 +79,8 @@ pub fn set_component_field(
                 "scale.z" => t.scale.z = val,
                 _ => {}
             }
+        } else {
+            return Err(format!("Entity {entity_id} has no Transform component"));
         }
         // Read back the full transform to emit the event.
         if let Some(t) = world.get::<engine_core::Transform>(entity) {
@@ -137,7 +140,8 @@ pub fn delete_entity(
     use tauri::Emitter;
 
     let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
-    world.despawn(engine_core::Entity::new(entity_id as u32, 0));
+    debug_assert!(entity_id <= u32::MAX as u64, "entity_id truncation");
+    world.despawn(engine_core::Entity::new(entity_id as u32, 0)); // FIXME: hardcodes generation 0 — will break after any entity slot reuse
     drop(world);
 
     app.emit(
