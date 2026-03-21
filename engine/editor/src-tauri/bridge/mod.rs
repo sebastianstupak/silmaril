@@ -5,4 +5,5 @@
 
 pub mod commands;
 pub mod events;
+pub mod schema_registry;
 pub mod subscriptions;
