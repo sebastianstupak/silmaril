@@ -16,6 +16,10 @@
     viewportSetGridVisible,
     viewportCameraSetOrientation,
     viewportSetProjection,
+    gizmoHitTest,
+    gizmoDrag,
+    gizmoDragEnd,
+    setGizmoMode,
   } from '$lib/api';
   import type { SceneTool, ProjectionMode } from '$lib/scene/state';
   import {
@@ -111,6 +115,13 @@
   let dragMode: DragMode = $state('none');
   let dragStartX = 0;
   let dragStartY = 0;
+
+  /** True while the user is dragging a gizmo axis handle.
+   *  Gizmo drag takes priority — camera orbit/pan are suppressed. */
+  let isDraggingGizmo = $state(false);
+
+  /** Active gizmo mode — kept in sync with the Rust backend via set_gizmo_mode. */
+  let gizmoMode: 'move' | 'rotate' | 'scale' = $state('move');
 
   /** Cursor CSS value — reactive, recalculated on every relevant state change. */
   let cursor = $state('default');
@@ -268,11 +279,13 @@
    *
    *  Tool interactions (Left mouse, no modifier):
    *    Q (Select)  : Left click         = select entity
-   *    W (Move)    : Left click + drag  = move entity
-   *    E (Rotate)  : Left click + drag  = rotate entity
-   *    R (Scale)   : Left click + drag  = scale entity
+   *    W (Move)    : Left click + drag  = gizmo move (if handle hit) or move entity
+   *    E (Rotate)  : Left click + drag  = gizmo rotate (if handle hit) or rotate entity
+   *    R (Scale)   : Left click + drag  = gizmo scale (if handle hit) or scale entity
+   *
+   *  Gizmo handles take priority over the legacy entity drag path.
    */
-  function handleMouseDown(event: MouseEvent) {
+  async function handleMouseDown(event: MouseEvent) {
     const tool = activeTool;
 
     // Middle mouse → pan
@@ -310,9 +323,17 @@
       return;
     }
 
-    // Left click with manipulation tool on selected entity → entity drag
+    // Left click with manipulation tool on selected entity:
+    // First try gizmo hit test — if a handle is hit, gizmo drag takes priority.
     if (event.button === 0 && tool !== 'select' && selectedEntityId != null) {
       event.preventDefault();
+      const hit = await gizmoHitTest(viewportId, event.clientX, event.clientY, selectedEntityId);
+      if (hit) {
+        isDraggingGizmo = true;
+        cursor = cursorForTool(tool);
+        return;
+      }
+      // No gizmo handle hit — fall through to legacy entity drag
       const mode: DragMode =
         tool === 'move' ? 'move_entity' :
         tool === 'rotate' ? 'rotate_entity' : 'scale_entity';
@@ -331,7 +352,13 @@
     cursor = cursorForDrag(mode);
   }
 
-  function handleMouseMove(event: MouseEvent) {
+  async function handleMouseMove(event: MouseEvent) {
+    // Gizmo drag takes priority over camera/entity drag.
+    if (isDraggingGizmo) {
+      await gizmoDrag(viewportId, event.clientX, event.clientY);
+      return;
+    }
+
     if (!isDragging) return;
 
     const dy = event.clientY - dragStartY;
@@ -400,7 +427,15 @@
     }
   }
 
-  function handleMouseUp() {
+  async function handleMouseUp() {
+    // Finalise gizmo drag first — clears DragState on Rust side and pushes undo.
+    if (isDraggingGizmo) {
+      isDraggingGizmo = false;
+      await gizmoDragEnd(viewportId);
+      cursor = cursorForTool(activeTool);
+      return;
+    }
+
     if (isDragging) {
       isDragging = false;
       dragMode = 'none';
@@ -424,13 +459,26 @@
   // ---------------------------------------------------------------------------
 
   /** Handle keyboard shortcuts when viewport is focused. */
-  function handleKeyDown(event: KeyboardEvent) {
+  async function handleKeyDown(event: KeyboardEvent) {
     // Tool switching: Q/W/E/R
+    // W/E/R also sync gizmo mode to the Rust backend so the gizmo renders the
+    // correct handle style and hit-test uses the correct mode.
     const toolKey = TOOL_KEYS[event.key.toLowerCase()];
     if (toolKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       activeTool = toolKey;
       cursor = cursorForTool(toolKey);
+      // Sync gizmo mode for manipulation tools
+      if (toolKey === 'move') {
+        gizmoMode = 'move';
+        setGizmoMode('move');
+      } else if (toolKey === 'rotate') {
+        gizmoMode = 'rotate';
+        setGizmoMode('rotate');
+      } else if (toolKey === 'scale') {
+        gizmoMode = 'scale';
+        setGizmoMode('scale');
+      }
       return;
     }
 
