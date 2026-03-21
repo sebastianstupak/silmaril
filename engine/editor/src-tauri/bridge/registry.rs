@@ -54,8 +54,13 @@ impl CommandRegistry {
     /// Panics in debug builds if any command id doesn't start with `module.id() + "."`.
     pub fn register_module(&mut self, module: &dyn EditorModule) {
         let prefix = format!("{}.", module.id());
+        assert!(
+            !self.module_index.contains_key(module.id()),
+            "Module '{}' has already been registered",
+            module.id()
+        );
         let mut specs = module.commands();
-        debug_assert!(
+        assert!(
             !specs.is_empty(),
             "Module '{}' registered with no commands",
             module.id()
@@ -187,6 +192,21 @@ mod tests {
             registry.register_module(&BadModule);
         });
         assert!(result.is_err(), "should panic on bad prefix");
+    }
+
+    #[test]
+    #[should_panic(expected = "has already been registered")]
+    fn register_module_panics_on_double_registration() {
+        struct Mod;
+        impl EditorModule for Mod {
+            fn id(&self) -> &str { "foo" }
+            fn commands(&self) -> Vec<CommandSpec> {
+                vec![CommandSpec { id: "foo.bar".into(), module_id: String::new(), label: "Bar".into(), category: "General".into(), description: None, keybind: None, args_schema: None, returns_data: false }]
+            }
+        }
+        let (mut reg, _rx) = CommandRegistry::new();
+        reg.register_module(&Mod);
+        reg.register_module(&Mod); // should panic
     }
 
     #[test]
