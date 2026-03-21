@@ -885,6 +885,7 @@ pub fn set_selected_entity(
     entity_id: Option<u64>,
     viewport_state: tauri::State<'_, NativeViewportState>,
 ) -> Result<(), String> {
+    tracing::debug!(entity_id = ?entity_id, "set_selected_entity");
     *viewport_state
         .selected_entity_id
         .lock()
