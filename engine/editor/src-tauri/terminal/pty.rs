@@ -120,6 +120,54 @@ pub fn terminal_new_tab(
     Ok(tab_id)
 }
 
+/// Writes keystroke data to the PTY session.
+/// Silent no-op if session already closed (tab close race — expected).
+#[tauri::command]
+pub fn terminal_write(
+    tab_id: String,
+    data: String,
+    state: State<TerminalState>,
+) -> Result<(), String> {
+    let sessions = state.sessions.lock().map_err(|e| e.to_string())?;
+    if let Some(session_arc) = sessions.get(&tab_id) {
+        let mut session = session_arc.lock().map_err(|e| e.to_string())?;
+        session.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Resizes the PTY for the given tab.
+#[tauri::command]
+pub fn terminal_resize(
+    tab_id: String,
+    cols: u16,
+    rows: u16,
+    state: State<TerminalState>,
+) -> Result<(), String> {
+    let sessions = state.sessions.lock().map_err(|e| e.to_string())?;
+    if let Some(session_arc) = sessions.get(&tab_id) {
+        let session = session_arc.lock().map_err(|e| e.to_string())?;
+        session
+            .master
+            .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Kills the shell process and removes the session from the map.
+/// No-op if tab already closed.
+#[tauri::command]
+pub fn terminal_close_tab(tab_id: String, state: State<TerminalState>) {
+    let mut sessions = state.sessions.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(session_arc) = sessions.remove(&tab_id) {
+        if let Ok(mut session) = session_arc.lock() {
+            let _ = session.child.kill();
+        }
+        debug!(tab_id = %tab_id, "terminal tab closed");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
