@@ -1,10 +1,9 @@
 // engine/editor/src-tauri/bridge/runner.rs
-// NOTE: This file is being incrementally replaced as part of the command-arch refactor.
-// Task 6 will wire the full Tauri state and remove the legacy IPC commands below.
 use serde::Serialize;
 use tauri::Emitter;
+use std::sync::{Arc, Mutex};
 
-use super::registry::{CommandRegistryState, CommandSpec};
+use super::registry::{CommandRegistry, CommandSpec};
 
 /// Command ids that are dispatched on the Rust side (not passed back to TypeScript).
 /// Task 6 will wire these into run_command so the frontend no longer needs to handle them.
@@ -45,11 +44,9 @@ pub fn run_command_inner(
 
 #[tauri::command]
 pub fn list_commands(
-    _registry: tauri::State<CommandRegistryState>,
+    registry: tauri::State<Arc<Mutex<CommandRegistry>>>,
 ) -> Vec<CommandSpec> {
-    // CommandRegistryState is a temporary stub (Task 6 wires real state).
-    // Return empty list until Task 5/6 complete the wiring.
-    Vec::new()
+    registry.lock().unwrap().list().to_vec()
 }
 
 #[derive(Serialize, Clone)]
@@ -60,15 +57,26 @@ struct RunCommandEvent {
 #[tauri::command]
 pub fn run_command(
     id: String,
-    _registry: tauri::State<CommandRegistryState>,
+    args: Option<serde_json::Value>,
+    registry: tauri::State<Arc<Mutex<CommandRegistry>>>,
     app: tauri::AppHandle,
-) -> Result<(), String> {
-    // CommandRegistryState is a temporary stub — always emit the event for now.
-    // Task 6 will replace this with run_command_inner using Arc<Mutex<CommandRegistry>>.
+) -> Result<Option<serde_json::Value>, String> {
+    let _reg = registry.lock().unwrap();
+    // Validate the command exists in registry
+    if _reg.get(&id).is_none() {
+        return Err(format!("Unknown command: {}", id));
+    }
+    drop(_reg); // release lock before dispatch
+
+    // For RUST_HANDLED commands, dispatch on the Rust side
+    if RUST_HANDLED.contains(&id.as_str()) {
+        return run_command_inner(&id, args);
+    }
+
+    // For all other commands, emit event so the frontend can handle them
     app.emit("editor-run-command", RunCommandEvent { id })
         .map_err(|e| e.to_string())?;
-
-    Ok(())
+    Ok(None)
 }
 
 #[cfg(test)]

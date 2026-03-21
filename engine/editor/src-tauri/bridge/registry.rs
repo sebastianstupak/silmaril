@@ -120,20 +120,6 @@ impl CommandRegistry {
     }
 }
 
-// Temporary stub — CommandRegistryState is removed from the new design.
-// Task 6 will replace .manage(CommandRegistryState::new()) with
-// Arc<Mutex<CommandRegistry>> stored directly in Tauri managed state.
-// This stub exists only so lib.rs and runner.rs compile during the
-// incremental refactor (Tasks 3–5 will clean up the remaining usages).
-#[allow(dead_code)]
-pub struct CommandRegistryState;
-
-#[allow(dead_code)]
-impl CommandRegistryState {
-    pub fn new() -> Self {
-        CommandRegistryState
-    }
-}
 
 #[cfg(test)]
 mod tests {

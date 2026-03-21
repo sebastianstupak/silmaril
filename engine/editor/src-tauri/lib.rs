@@ -6,10 +6,11 @@ pub mod terminal;
 pub mod viewport;
 pub mod world;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use bridge::commands;
-use bridge::registry::CommandRegistryState;
+use bridge::modules::*;
+use bridge::registry::CommandRegistry;
 use bridge::runner;
 use bridge::{
     builtin_schemas::register_builtin_schemas,
@@ -249,12 +250,24 @@ pub fn run() {
     let mut schema_registry = ComponentSchemaRegistry::new();
     register_builtin_schemas(&mut schema_registry);
 
+    let (mut registry, _registry_rx) = CommandRegistry::new();
+    registry.register_module(&FileModule);
+    registry.register_module(&EditModule);
+    registry.register_module(&ViewModule);
+    registry.register_module(&SceneModule);
+    registry.register_module(&AssetModule);
+    registry.register_module(&BuildModule);
+    registry.register_module(&ViewportModule);
+    registry.register_module(&TemplateModule);
+    registry.register_module(&UserCommandsModule);
+    let registry = Arc::new(Mutex::new(registry));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::NativeViewportState::new())
         .manage(Mutex::new(bridge::template_commands::EditorState::new()))
-        .manage(CommandRegistryState::new())
+        .manage(registry)
         .manage(file_explorer::FileWatcherState::new())
         .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
         .manage(commands::ProjectState::new())
@@ -353,9 +366,6 @@ pub fn run() {
                     apply_dwm_window_style(hwnd);
                 }
             }
-            // TODO(Task 6): Register built-in editor commands via Arc<Mutex<CommandRegistry>>.
-            // CommandRegistryState is temporarily a stub; the real wiring happens in Task 6.
-            let _cmd_state = app.state::<CommandRegistryState>();
             Ok(())
         })
         .run(tauri::generate_context!())
