@@ -74,6 +74,11 @@ impl PermissionStore {
     ///
     /// If the grant level is `Always`, immediately persists to disk.
     /// For `Once` and `Session` grants, only stored in memory.
+    ///
+    /// # Disk write failures
+    ///
+    /// If the `.silmaril/` directory is not writable, the write silently fails.
+    /// The grant remains active for the current session but will not survive a restart.
     pub fn grant(&mut self, category: &str, level: GrantLevel) {
         self.session_grants.insert(category.to_string(), level);
         if level == GrantLevel::Always {
