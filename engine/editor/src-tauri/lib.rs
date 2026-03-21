@@ -251,6 +251,7 @@ pub fn run() {
         .manage(CommandRegistryState::new())
         .manage(file_explorer::FileWatcherState::new())
         .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
+        .manage(commands::ProjectState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::get_component_schemas,

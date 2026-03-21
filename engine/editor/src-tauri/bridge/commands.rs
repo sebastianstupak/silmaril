@@ -59,7 +59,10 @@ pub fn set_component_field(
 }
 
 #[tauri::command]
-pub fn open_project(path: String) -> Result<EditorStateResponse, String> {
+pub fn open_project(
+    project_state: tauri::State<ProjectState>,
+    path: String,
+) -> Result<EditorStateResponse, String> {
     let project_root = std::path::Path::new(&path);
     if !project_root.join("game.toml").exists() {
         return Err("No game.toml found in selected directory".to_string());
@@ -69,6 +72,10 @@ pub fn open_project(path: String) -> Result<EditorStateResponse, String> {
         std::fs::read_to_string(project_root.join("game.toml")).map_err(|e| e.to_string())?;
     let name = engine_ops::build::parse_project_name(&game_toml)
         .unwrap_or_else(|| "Unknown Project".to_string());
+
+    // Store the project path so component commands can find the scene file.
+    *project_state.0.lock().map_err(|e| e.to_string())? =
+        Some(std::path::PathBuf::from(&path));
 
     Ok(EditorStateResponse {
         mode: "edit".to_string(),
@@ -207,6 +214,15 @@ impl ViewportRegistry {
 
 /// Tauri managed state holding the component schema registry.
 pub struct ComponentSchemaState(pub std::sync::Mutex<ComponentSchemaRegistry>);
+
+/// Tauri managed state holding the currently open project path.
+pub struct ProjectState(pub std::sync::Mutex<Option<std::path::PathBuf>>);
+
+impl ProjectState {
+    pub fn new() -> Self {
+        Self(std::sync::Mutex::new(None))
+    }
+}
 
 pub struct NativeViewportState(pub Mutex<ViewportRegistry>);
 
@@ -980,20 +996,126 @@ pub fn scan_assets(project_path: String) -> Result<Vec<AssetInfo>, String> {
     Ok(assets)
 }
 
-// ── Component mutation stubs (ECS not live yet) ───────────────────────────
+// ── Minimal scene representation for editor persistence ───────────────────
+//
+// Mirrors engine_ops::scene but lives here to avoid pulling serde_yaml /
+// bincode transitive deps into the editor binary.  Persisted as JSON in
+// `<project>/scenes/main.scene.json`.
 
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct SceneFile {
+    name: String,
+    entities: Vec<SceneFileEntity>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SceneFileEntity {
+    id: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    components: Vec<SceneFileComponent>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SceneFileComponent {
+    type_name: String,
+    #[serde(default)]
+    data: serde_json::Value,
+}
+
+/// Load `<project>/scenes/main.scene.json`, or return an empty scene.
+fn load_or_create_scene(project_path: &std::path::Path) -> Result<SceneFile, String> {
+    let scene_path = project_path.join("scenes").join("main.scene.json");
+    if scene_path.exists() {
+        let raw = std::fs::read_to_string(&scene_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&raw).map_err(|e| e.to_string())
+    } else {
+        Ok(SceneFile { name: "main".into(), entities: Vec::new() })
+    }
+}
+
+/// Save to `<project>/scenes/main.scene.json`, creating the directory if needed.
+fn save_scene(project_path: &std::path::Path, scene: &SceneFile) -> Result<(), String> {
+    let scene_path = project_path.join("scenes").join("main.scene.json");
+    if let Some(dir) = scene_path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(scene).map_err(|e| e.to_string())?;
+    std::fs::write(&scene_path, json).map_err(|e| e.to_string())
+}
+
+/// Add a component to an entity in the persisted scene.
+///
+/// Loads `<project>/scenes/main.scene.json`, inserts the component (with empty
+/// data object) into the matching entity (or creates the entity if missing),
+/// then saves the file back.  No-op when no project is open (browser mode).
 #[tauri::command]
-pub fn add_component(_entity_id: u64, component: String) -> Result<(), String> {
+pub fn add_component(
+    project_state: tauri::State<ProjectState>,
+    entity_id: u64,
+    component: String,
+) -> Result<(), String> {
     if component.is_empty() {
         return Err("component name required".into());
     }
+    let guard = project_state.0.lock().map_err(|e| e.to_string())?;
+    let Some(ref project_path) = *guard else {
+        tracing::debug!(entity_id, component = %component, "add_component (no project open)");
+        return Ok(());
+    };
+
+    let mut scene = load_or_create_scene(project_path)?;
+
+    if let Some(entity) = scene.entities.iter_mut().find(|e| e.id == entity_id) {
+        if !entity.components.iter().any(|c| c.type_name == component) {
+            entity.components.push(SceneFileComponent {
+                type_name: component.clone(),
+                data: serde_json::Value::Object(Default::default()),
+            });
+        }
+    } else {
+        scene.entities.push(SceneFileEntity {
+            id: entity_id,
+            name: None,
+            components: vec![SceneFileComponent {
+                type_name: component.clone(),
+                data: serde_json::Value::Object(Default::default()),
+            }],
+        });
+    }
+
+    save_scene(project_path, &scene)?;
+    tracing::info!(entity_id, component = %component, "add_component");
     Ok(())
 }
 
+/// Remove a component from an entity in the persisted scene.
+///
+/// Loads `<project>/scenes/main.scene.json`, removes the named component from
+/// the matching entity, then saves the file back.  No-op when no project is
+/// open (browser mode).
 #[tauri::command]
-pub fn remove_component(_entity_id: u64, component: String) -> Result<(), String> {
+pub fn remove_component(
+    project_state: tauri::State<ProjectState>,
+    entity_id: u64,
+    component: String,
+) -> Result<(), String> {
     if component.is_empty() {
         return Err("component name required".into());
     }
+    let guard = project_state.0.lock().map_err(|e| e.to_string())?;
+    let Some(ref project_path) = *guard else {
+        tracing::debug!(entity_id, component = %component, "remove_component (no project open)");
+        return Ok(());
+    };
+
+    let mut scene = load_or_create_scene(project_path)?;
+
+    if let Some(entity) = scene.entities.iter_mut().find(|e| e.id == entity_id) {
+        entity.components.retain(|c| c.type_name != component);
+    }
+
+    save_scene(project_path, &scene)?;
+    tracing::info!(entity_id, component = %component, "remove_component");
     Ok(())
 }
