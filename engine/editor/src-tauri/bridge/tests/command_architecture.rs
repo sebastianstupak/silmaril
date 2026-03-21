@@ -95,3 +95,18 @@ fn lint_undo_coverage() {
         missing.join("\n  ")
     );
 }
+
+#[test]
+fn registry_watch_fires_on_module_registration() {
+    let (mut reg, mut rx) = CommandRegistry::new();
+
+    // Initial state: no change yet
+    assert!(!rx.has_changed().unwrap());
+
+    // After registering a module, the watch should have a new value
+    reg.register_module(&FileModule);
+
+    assert!(rx.has_changed().unwrap());
+    let specs = rx.borrow_and_update();
+    assert!(!specs.is_empty());
+}
