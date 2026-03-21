@@ -15,6 +15,9 @@ import {
   type Vec3,
 } from './state';
 import { logInfo, logDebug } from '$lib/stores/console';
+import { buildInitialComponentValues } from '$lib/inspector/inspector-utils';
+import { getSchemas } from '$lib/inspector/schema-store';
+import { setComponentField as apiSetComponentField } from '$lib/api';
 
 // ---------------------------------------------------------------------------
 // Entity colour palette (matches viewport rendering)
@@ -43,19 +46,31 @@ export function createEntity(name?: string): SceneEntity {
   let created!: SceneEntity;
   _mutate((s) => {
     const id = s.nextEntityId;
+    const position = {
+      x: (Math.random() - 0.5) * 10,
+      y: 0,
+      z: (Math.random() - 0.5) * 10,
+    };
     const entity: SceneEntity = {
       id,
       name: name ?? `Entity ${id}`,
       components: ['Transform'],
-      position: {
-        x: (Math.random() - 0.5) * 10,
-        y: 0,
-        z: (Math.random() - 0.5) * 10,
-      },
+      position,
       rotation: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
       visible: true,
       locked: false,
+      componentValues: buildInitialComponentValues(
+        ['Transform'],
+        getSchemas(),
+        {
+          Transform: {
+            position,
+            rotation: { x: 0, y: 0, z: 0 },
+            scale: { x: 1, y: 1, z: 1 },
+          },
+        },
+      ),
     };
     created = entity;
     return {
@@ -330,7 +345,7 @@ export function newScene(): void {
  *  Assigns random positions so they appear spread out in the viewport. */
 export function populateFromScan(infos: EntityInfo[]): void {
   _mutate((s) => {
-    const entities: SceneEntity[] = infos.map((info, i) => ({
+    const entities: SceneEntity[] = infos.map((info) => ({
       ...info,
       position: {
         x: (Math.random() - 0.5) * 10,
@@ -341,6 +356,7 @@ export function populateFromScan(infos: EntityInfo[]): void {
       scale: { x: 1, y: 1, z: 1 },
       visible: true,
       locked: false,
+      componentValues: buildInitialComponentValues(info.components, getSchemas()),
     }));
     const maxId = entities.reduce((m, e) => Math.max(m, e.id), 0);
     return {
@@ -350,6 +366,48 @@ export function populateFromScan(infos: EntityInfo[]): void {
       selectedEntityId: null,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Component field editing
+// ---------------------------------------------------------------------------
+
+/** Update a single component field value and sync related inline transform fields. */
+export function setComponentField(
+  entityId: number,
+  componentName: string,
+  fieldName: string,
+  value: unknown,
+): void {
+  _mutate((s) => ({
+    ...s,
+    entities: s.entities.map((e) => {
+      if (e.id !== entityId) return e;
+      return {
+        ...e,
+        componentValues: {
+          ...e.componentValues,
+          [componentName]: {
+            ...e.componentValues[componentName],
+            [fieldName]: value as import('$lib/inspector/inspector-utils').FieldValue,
+          },
+        },
+      };
+    }),
+  }));
+
+  // Sync inline transform fields when a Transform field changes.
+  // Branch on fieldName — do NOT spread objects into function args (objects are
+  // not iterable; spreading { x, y, z } produces nothing).
+  if (componentName === 'Transform') {
+    const v = value as { x: number; y: number; z: number };
+    if (fieldName === 'position') moveEntity(entityId, v.x, v.y, v.z);
+    else if (fieldName === 'rotation') rotateEntity(entityId, v.x, v.y, v.z);
+    else if (fieldName === 'scale') scaleEntity(entityId, v.x, v.y, v.z);
+  }
+
+  // Forward to Tauri (no-op in browser; will wire to live ECS in Play mode)
+  apiSetComponentField(entityId, componentName, fieldName, value).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
