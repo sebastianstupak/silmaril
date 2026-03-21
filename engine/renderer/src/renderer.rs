@@ -86,7 +86,7 @@ pub struct Renderer {
     // Mesh rendering (Phase 1.8)
     _depth_buffer: Option<DepthBuffer>,
     mesh_pipeline: Option<GraphicsPipeline>,
-    gpu_cache: GpuCache,
+    gpu_cache: std::cell::RefCell<GpuCache>,
     // Render queue for current frame
     render_queue: Vec<MeshRenderCommand>,
 }
@@ -242,7 +242,7 @@ impl Renderer {
             // Mesh rendering enabled
             _depth_buffer: Some(depth_buffer),
             mesh_pipeline: Some(mesh_pipeline),
-            gpu_cache,
+            gpu_cache: std::cell::RefCell::new(gpu_cache),
             render_queue: Vec::new(),
         })
     }
@@ -417,7 +417,7 @@ impl Renderer {
 
             _depth_buffer: Some(depth_buffer),
             mesh_pipeline: Some(mesh_pipeline),
-            gpu_cache,
+            gpu_cache: std::cell::RefCell::new(gpu_cache),
             render_queue: Vec::new(),
         })
     }
@@ -738,115 +738,205 @@ impl Renderer {
         self.window.as_mut().and_then(|w| w.take_event_loop())
     }
 
-    /// Render meshes from ECS world
+    /// Render meshes from ECS world into the active frame.
     ///
-    /// Queries all entities with Transform + MeshRenderer components,
-    /// finds active camera, calculates MVP matrices, and issues draw calls.
+    /// Queries all entities with [`Transform`](engine_core::Transform) +
+    /// [`MeshRenderer`](engine_core::MeshRenderer) components and issues draw
+    /// calls directly into `recorder.command_buffer`.  Draw calls are emitted
+    /// once per viewport so each viewport gets its own view-projection matrix.
+    ///
+    /// Pass `assets: None` when mesh rendering should be skipped for this
+    /// phase (e.g. gizmo-only passes).  The method is a no-op in that case.
     ///
     /// # Arguments
-    /// * `world` - ECS world containing entities to render
+    /// * `recorder`  - Active frame recorder (render pass is open).
+    /// * `world`     - ECS world containing entities to render.
+    /// * `assets`    - Asset manager; `None` = deferred/gizmo-only, early return.
+    /// * `viewports` - One or more viewport descriptors; empty = no-op.
     ///
     /// # Example
     /// ```no_run
-    /// # use engine_renderer::{Renderer, WindowConfig};
-    /// # use engine_core::{World, Transform, MeshRenderer, Camera};
-    /// # use engine_assets::{AssetManager, MeshData, AssetId};
+    /// # use engine_renderer::{Renderer, WindowConfig, ViewportDescriptor};
+    /// # use engine_core::{World, Transform, MeshRenderer};
+    /// # use engine_assets::AssetManager;
+    /// # use engine_render_context::Rect;
     /// let mut renderer = Renderer::new(WindowConfig::default(), "MyApp")?;
-    /// let mut world = World::new();
-    ///
-    /// // Spawn a cube
-    /// let entity = world.spawn();
-    /// world.add(entity, Transform::default());
-    /// world.add(entity, MeshRenderer::new(1));
-    ///
-    /// // Spawn camera
-    /// let camera_entity = world.spawn();
-    /// world.add(camera_entity, Transform::default());
-    /// world.add(camera_entity, Camera::default());
-    ///
-    /// // Load mesh asset
+    /// let world = World::new();
     /// let assets = AssetManager::new();
-    /// assets.meshes().insert(AssetId::from(1u64), MeshData::cube());
     ///
-    /// // Render
-    /// renderer.render_meshes(&world, &assets)?;
+    /// if let Some(recorder) = renderer.begin_frame() {
+    ///     let vp = ViewportDescriptor {
+    ///         bounds: Rect { x: 0, y: 0, width: 1920, height: 1080 },
+    ///         view: glam::Mat4::IDENTITY,
+    ///         proj: glam::Mat4::IDENTITY,
+    ///     };
+    ///     renderer.render_meshes(&recorder, &world, Some(&assets), &[vp]);
+    ///     renderer.end_frame(recorder);
+    /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[instrument(skip(self, world, assets))]
+    #[instrument(skip(self, recorder, world, assets, viewports))]
     pub fn render_meshes(
-        &mut self,
+        &self,
+        recorder: &FrameRecorder,
         world: &engine_core::World,
-        assets: &engine_assets::AssetManager,
-    ) -> Result<(), RendererError> {
-        use engine_core::{Camera, MeshRenderer, Transform};
+        assets: Option<&engine_assets::AssetManager>,
+        viewports: &[ViewportDescriptor],
+    ) {
+        use engine_core::{MeshRenderer, Transform};
 
-        // Clear previous frame's render queue
-        self.render_queue.clear();
+        // Deferred / gizmo-only phase: skip mesh rendering entirely.
+        let Some(assets) = assets else { return; };
 
-        // Find active camera (first camera with Transform)
-        let mut camera_transform: Option<&Transform> = None;
-        let mut camera_comp: Option<&Camera> = None;
-
-        for entity in world.entities() {
-            if let (Some(transform), Some(camera)) =
-                (world.get::<Transform>(entity), world.get::<Camera>(entity))
-            {
-                camera_transform = Some(transform);
-                camera_comp = Some(camera);
-                break;
-            }
+        // Nothing to do with no viewports.
+        if viewports.is_empty() {
+            return;
         }
 
-        // Use default camera if none found
-        let default_transform = Transform::default();
-        let default_camera = Camera::default();
-        let cam_transform = camera_transform.unwrap_or(&default_transform);
-        let cam = if let Some(c) = camera_comp {
-            c
-        } else {
-            warn!("No camera found in world, using default");
-            &default_camera
+        let cmd = recorder.command_buffer;
+
+        // Bind the mesh pipeline once for all viewports.
+        let Some(pipeline) = &self.mesh_pipeline else {
+            warn!("render_meshes: no mesh pipeline available, skipping");
+            return;
         };
 
-        // Calculate view-projection matrix
-        let view_matrix = cam.view_matrix(cam_transform);
-        let proj_matrix = cam.projection_matrix_const();
-        let vp_matrix = proj_matrix * view_matrix;
+        unsafe {
+            self.context.device.cmd_bind_pipeline(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline.handle(),
+            );
+        }
 
-        // Query all renderable entities (Transform + MeshRenderer)
+        // Collect renderable entities (model matrices + mesh ids).
+        let mut renderables: Vec<(engine_assets::AssetId, glam::Mat4)> = Vec::new();
         for entity in world.entities() {
             if let (Some(transform), Some(mesh_renderer)) =
                 (world.get::<Transform>(entity), world.get::<MeshRenderer>(entity))
             {
-                // Skip invisible meshes
                 if !mesh_renderer.is_visible() {
                     continue;
                 }
 
-                // Get mesh data from asset manager (mesh_id is u64)
-                // Convert to AssetId using seed method (procedural generation path)
-                let mesh_id =
-                    engine_assets::AssetId::from_seed_and_params(mesh_renderer.mesh_id, b"mesh");
+                let mesh_id = engine_assets::AssetId::from_seed_and_params(
+                    mesh_renderer.mesh_id,
+                    b"mesh",
+                );
 
-                // Upload mesh to GPU cache if not already cached
-                if !self.gpu_cache.contains(mesh_id) {
-                    let mesh_data = assets.get_mesh(mesh_id).ok_or_else(|| {
-                        RendererError::invalidmeshdata(format!("Mesh not found: {:?}", mesh_id))
-                    })?;
-                    self.gpu_cache.upload_mesh(&self.context, mesh_id, &mesh_data)?;
+                // Upload mesh to GPU cache if not already present.
+                {
+                    let mut cache = self.gpu_cache.borrow_mut();
+                    if !cache.contains(mesh_id) {
+                        match assets.get_mesh(mesh_id) {
+                            Some(mesh_data) => {
+                                if let Err(e) =
+                                    cache.upload_mesh(&self.context, mesh_id, &mesh_data)
+                                {
+                                    warn!(
+                                        error = ?e,
+                                        mesh_id = ?mesh_id,
+                                        "render_meshes: failed to upload mesh, skipping"
+                                    );
+                                    continue;
+                                }
+                            }
+                            None => {
+                                warn!(
+                                    mesh_id = ?mesh_id,
+                                    "render_meshes: mesh not found in AssetManager, skipping"
+                                );
+                                continue;
+                            }
+                        }
+                    }
                 }
 
-                // Calculate MVP matrix (Model * View * Projection)
-                let model_matrix = transform.matrix();
-                let mvp_matrix = vp_matrix * model_matrix;
-
-                // Add to render queue
-                self.render_queue.push(MeshRenderCommand { mesh_id, mvp_matrix });
+                renderables.push((mesh_id, transform.matrix()));
             }
         }
 
-        info!(draw_count = self.render_queue.len(), "Queued meshes for rendering");
-        Ok(())
+        // Emit draw calls per viewport.
+        for vp in viewports {
+            let vp_matrix = vp.proj * vp.view;
+
+            // Dynamic viewport.
+            let viewport = vk::Viewport::default()
+                .x(vp.bounds.x as f32)
+                .y(vp.bounds.y as f32)
+                .width(vp.bounds.width as f32)
+                .height(vp.bounds.height as f32)
+                .min_depth(0.0)
+                .max_depth(1.0);
+
+            // Dynamic scissor (clamp to swapchain extent).
+            let scissor = vk::Rect2D {
+                offset: vk::Offset2D { x: vp.bounds.x, y: vp.bounds.y },
+                extent: vk::Extent2D {
+                    width: vp.bounds.width,
+                    height: vp.bounds.height,
+                },
+            };
+
+            unsafe {
+                self.context.device.cmd_set_viewport(cmd, 0, &[viewport]);
+                self.context.device.cmd_set_scissor(cmd, 0, &[scissor]);
+            }
+
+            let cache = self.gpu_cache.borrow();
+            for &(mesh_id, model_matrix) in &renderables {
+                let mvp_matrix = vp_matrix * model_matrix;
+
+                if let (Some((vertex_buf, index_buf)), Some(mesh_info)) =
+                    (cache.get_buffers(mesh_id), cache.get_mesh_info(mesh_id))
+                {
+                    unsafe {
+                        // Push MVP via push constants.
+                        let mvp_bytes = mvp_matrix.as_ref();
+                        let mvp_slice = std::slice::from_raw_parts(
+                            mvp_bytes.as_ptr() as *const u8,
+                            std::mem::size_of::<glam::Mat4>(),
+                        );
+                        self.context.device.cmd_push_constants(
+                            cmd,
+                            pipeline.layout(),
+                            vk::ShaderStageFlags::VERTEX,
+                            0,
+                            mvp_slice,
+                        );
+
+                        self.context.device.cmd_bind_vertex_buffers(
+                            cmd,
+                            0,
+                            &[vertex_buf],
+                            &[0],
+                        );
+
+                        self.context.device.cmd_bind_index_buffer(
+                            cmd,
+                            index_buf,
+                            0,
+                            vk::IndexType::UINT32,
+                        );
+
+                        self.context.device.cmd_draw_indexed(
+                            cmd,
+                            mesh_info.index_count,
+                            1,
+                            0,
+                            0,
+                            0,
+                        );
+                    }
+                }
+            }
+        }
+
+        info!(
+            draw_count = renderables.len(),
+            viewport_count = viewports.len(),
+            "render_meshes: issued draw calls"
+        );
     }
 
     /// Render a frame (clears to configured color)
@@ -1096,12 +1186,13 @@ impl Renderer {
                     self.context.device.cmd_set_scissor(command_buffer, 0, &[scissor]);
 
                     // Draw each mesh in queue
+                    let gpu_cache = self.gpu_cache.borrow();
                     for cmd in &self.render_queue {
                         // Get mesh buffers from cache
                         if let Some((vertex_buffer, index_buffer)) =
-                            self.gpu_cache.get_buffers(cmd.mesh_id)
+                            gpu_cache.get_buffers(cmd.mesh_id)
                         {
-                            if let Some(mesh_info) = self.gpu_cache.get_mesh_info(cmd.mesh_id) {
+                            if let Some(mesh_info) = gpu_cache.get_mesh_info(cmd.mesh_id) {
                                 // Push MVP matrix (convert to bytes)
                                 let mvp_bytes = cmd.mvp_matrix.as_ref();
                                 let mvp_slice = std::slice::from_raw_parts(
