@@ -112,7 +112,7 @@ impl EditorModule for SceneModule {
                 description: Some("Select an entity by id, or deselect with null".into()),
                 keybind: None,
                 args_schema: Some(serde_json::json!({
-                    "type": "object", "required": ["id"],
+                    "type": "object",
                     "properties": { "id": { "type": ["integer", "null"] } }
                 })),
                 returns_data: false, non_undoable: true,
