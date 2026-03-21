@@ -144,3 +144,89 @@ fn history_summaries_returns_descriptions() {
     assert_eq!(summaries.len(), 1);
     assert!(summaries[0].description.contains("Create Entity"));
 }
+
+#[test]
+fn rename_entity_undo_restores_old_name() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: Some("OldName".into()) }).unwrap();
+    let id = result.new_state.entities[0].id;
+    proc.execute(TemplateCommand::RenameEntity { id, name: Some("NewName".into()) }).unwrap();
+    assert_eq!(proc.state_ref().find_entity(id).unwrap().name.as_deref(), Some("NewName"));
+    proc.undo().unwrap();
+    assert_eq!(proc.state_ref().find_entity(id).unwrap().name.as_deref(), Some("OldName"));
+}
+
+#[test]
+fn rename_entity_to_none_and_undo_restores() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: Some("Named".into()) }).unwrap();
+    let id = result.new_state.entities[0].id;
+    proc.execute(TemplateCommand::RenameEntity { id, name: None }).unwrap();
+    assert!(proc.state_ref().find_entity(id).unwrap().name.is_none());
+    proc.undo().unwrap();
+    assert_eq!(proc.state_ref().find_entity(id).unwrap().name.as_deref(), Some("Named"));
+}
+
+#[test]
+fn add_component_undo_removes_redo_restores_exact_data() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: None }).unwrap();
+    let id = result.new_state.entities[0].id;
+    let data = json!({"current": 75, "max": 100});
+    proc.execute(TemplateCommand::AddComponent { id, type_name: "Health".into(), data: data.clone() }).unwrap();
+    assert_eq!(proc.state_ref().find_entity(id).unwrap().components.len(), 1);
+    proc.undo().unwrap();
+    assert!(proc.state_ref().find_entity(id).unwrap().components.is_empty());
+    proc.redo().unwrap();
+    let comp = &proc.state_ref().find_entity(id).unwrap().components[0];
+    assert_eq!(comp.type_name, "Health");
+    assert_eq!(comp.data, data);
+}
+
+#[test]
+fn set_component_undo_restores_old_value() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: None }).unwrap();
+    let id = result.new_state.entities[0].id;
+    let old_data = json!({"x": 0.0});
+    let new_data = json!({"x": 10.0});
+    proc.execute(TemplateCommand::AddComponent { id, type_name: "Transform".into(), data: old_data.clone() }).unwrap();
+    proc.execute(TemplateCommand::SetComponent { id, type_name: "Transform".into(), data: new_data.clone() }).unwrap();
+    assert_eq!(proc.state_ref().find_entity(id).unwrap().components[0].data, new_data);
+    proc.undo().unwrap();
+    assert_eq!(proc.state_ref().find_entity(id).unwrap().components[0].data, old_data);
+}
+
+#[test]
+fn remove_component_undo_restores_component() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: None }).unwrap();
+    let id = result.new_state.entities[0].id;
+    let data = json!({"speed": 5.0});
+    proc.execute(TemplateCommand::AddComponent { id, type_name: "Movement".into(), data: data.clone() }).unwrap();
+    proc.execute(TemplateCommand::RemoveComponent { id, type_name: "Movement".into() }).unwrap();
+    assert!(proc.state_ref().find_entity(id).unwrap().components.is_empty());
+    proc.undo().unwrap();
+    let comp = &proc.state_ref().find_entity(id).unwrap().components[0];
+    assert_eq!(comp.type_name, "Movement");
+    assert_eq!(comp.data, data);
+}
+
+#[test]
+fn remove_component_not_found_returns_error() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: None }).unwrap();
+    let id = result.new_state.entities[0].id;
+    let err = proc.execute(TemplateCommand::RemoveComponent { id, type_name: "NonExistent".into() });
+    assert!(err.is_err());
+}
+
+#[test]
+fn add_component_duplicate_returns_error() {
+    let (mut proc, _dir) = make_processor();
+    let result = proc.execute(TemplateCommand::CreateEntity { name: None }).unwrap();
+    let id = result.new_state.entities[0].id;
+    proc.execute(TemplateCommand::AddComponent { id, type_name: "Health".into(), data: json!({}) }).unwrap();
+    let err = proc.execute(TemplateCommand::AddComponent { id, type_name: "Health".into(), data: json!({}) });
+    assert!(err.is_err());
+}

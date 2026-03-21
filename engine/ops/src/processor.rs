@@ -14,10 +14,12 @@ use crate::template::{TemplateComponent, TemplateEntity, TemplateState};
 use crate::undo::{EditorAction, EntityId, EntitySnapshot, UndoStack};
 
 pub struct CommandProcessor {
-    pub(crate) state: TemplateState,
+    state: TemplateState,
     undo_stack: UndoStack,
     // Parallel deque tracking ActionId for each entry in undo_stack.done
     done_ids: VecDeque<ActionId>,
+    // Tracks ActionIds of undone actions (mirrors undo_stack.undone)
+    undone_ids: VecDeque<ActionId>,
     template_path: PathBuf,
     next_action_id: ActionId,
 }
@@ -27,13 +29,12 @@ impl CommandProcessor {
     pub fn load(path: PathBuf) -> Result<Self, OpsError> {
         let state = TemplateState::load_yaml(&path)?;
         let undo_path = undo_path_for(&path);
-        let (undo_stack, done_ids) = if undo_path.exists() {
+        let (undo_stack, done_ids, undone_ids, next_action_id) = if undo_path.exists() {
             load_undo_history(&undo_path)?
         } else {
-            (UndoStack::new(100), VecDeque::new())
+            (UndoStack::new(100), VecDeque::new(), VecDeque::new(), 0)
         };
-        let next_action_id = done_ids.back().copied().map(|id| id + 1).unwrap_or(0);
-        Ok(Self { state, undo_stack, done_ids, template_path: path, next_action_id })
+        Ok(Self { state, undo_stack, done_ids, undone_ids, template_path: path, next_action_id })
     }
 
     /// Execute a command. Mutates state, writes YAML, pushes undo action.
@@ -42,6 +43,8 @@ impl CommandProcessor {
         self.next_action_id += 1;
 
         let action = self.apply_command(cmd)?;
+        // New command clears redo stack — clear undone_ids to match
+        self.undone_ids.clear();
         self.done_ids.push_back(action_id);
         // Trim done_ids to match UndoStack depth
         while self.done_ids.len() > 100 {
@@ -58,6 +61,9 @@ impl CommandProcessor {
         match self.undo_stack.undo() {
             Ok(action) => {
                 let action_id = self.done_ids.pop_back();
+                if let Some(id) = action_id {
+                    self.undone_ids.push_back(id);
+                }
                 self.apply_inverse(&action)?;
                 self.write_state()?;
                 Ok(action_id)
@@ -70,12 +76,13 @@ impl CommandProcessor {
     pub fn redo(&mut self) -> Result<Option<ActionId>, OpsError> {
         match self.undo_stack.redo() {
             Ok(action) => {
-                let action_id = self.next_action_id;
-                self.next_action_id += 1;
-                self.done_ids.push_back(action_id);
+                let action_id = self.undone_ids.pop_back();
+                if let Some(id) = action_id {
+                    self.done_ids.push_back(id);
+                }
                 self.apply_action(&action)?;
                 self.write_state()?;
-                Ok(Some(action_id))
+                Ok(action_id)
             }
             Err(()) => Ok(None),
         }
@@ -270,6 +277,8 @@ impl CommandProcessor {
         let data = serde_json::to_string(&UndoHistoryFile {
             undo_stack: &self.undo_stack,
             done_ids: &self.done_ids,
+            undone_ids: &self.undone_ids,
+            next_action_id: self.next_action_id,
         })
         .map_err(|e| OpsError::SerializeFailed { reason: e.to_string() })?;
         std::fs::write(&undo_path, data)
@@ -282,6 +291,8 @@ impl CommandProcessor {
 struct UndoHistoryFile<'a> {
     undo_stack: &'a UndoStack,
     done_ids: &'a VecDeque<ActionId>,
+    undone_ids: &'a VecDeque<ActionId>,
+    next_action_id: ActionId,
 }
 
 /// Helper struct for deserializing undo history from disk.
@@ -289,16 +300,18 @@ struct UndoHistoryFile<'a> {
 struct UndoHistoryFileOwned {
     undo_stack: UndoStack,
     done_ids: VecDeque<ActionId>,
+    undone_ids: VecDeque<ActionId>,
+    next_action_id: ActionId,
 }
 
 fn undo_path_for(template_path: &Path) -> PathBuf {
     template_path.with_extension("undo.json")
 }
 
-fn load_undo_history(path: &Path) -> Result<(UndoStack, VecDeque<ActionId>), OpsError> {
+fn load_undo_history(path: &Path) -> Result<(UndoStack, VecDeque<ActionId>, VecDeque<ActionId>, ActionId), OpsError> {
     let data = std::fs::read_to_string(path)
         .map_err(|e| OpsError::IoFailed { path: path.display().to_string(), reason: e.to_string() })?;
     let file: UndoHistoryFileOwned = serde_json::from_str(&data)
         .map_err(|e| OpsError::SerializeFailed { reason: e.to_string() })?;
-    Ok((file.undo_stack, file.done_ids))
+    Ok((file.undo_stack, file.done_ids, file.undone_ids, file.next_action_id))
 }
