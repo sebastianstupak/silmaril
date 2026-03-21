@@ -695,14 +695,14 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 0 7px;
+    padding: 0 10px;
     font-size: 12px;
     font-weight: 500;
     color: var(--color-textMuted, #999);
     cursor: default;
     user-select: none;
     border-radius: 3px;
-    height: 22px;
+    height: 26px;
     white-space: nowrap;
     min-width: 28px;
     box-sizing: border-box;

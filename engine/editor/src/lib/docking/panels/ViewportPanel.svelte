@@ -802,41 +802,42 @@
   /* Toolbar */
   .viewport-toolbar {
     position: absolute;
-    top: 6px;
+    top: 8px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 2px 6px;
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 5px;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
     z-index: 10;
     pointer-events: auto;
   }
 
   .toolbar-group {
     display: flex;
-    gap: 1px;
+    gap: 2px;
   }
 
   .toolbar-separator {
     width: 1px;
-    height: 14px;
-    background: #333;
-    margin: 0 3px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 5px;
   }
 
   .tool-btn {
     background: none;
     border: 1px solid transparent;
-    border-radius: 3px;
+    border-radius: 4px;
     color: #666;
     padding: 0;
     cursor: pointer;
     line-height: 1;
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;

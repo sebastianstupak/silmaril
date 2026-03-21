@@ -629,10 +629,10 @@
 
   /* Toolbar */
   .toolbar {
-    height: 38px;
+    height: 42px;
     display: flex;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 16px;
     background: var(--color-bgHeader, #2d2d2d);
     border-bottom: 1px solid var(--color-border, #404040);
     gap: 8px;
@@ -692,13 +692,13 @@
     border-radius: 0;
     border: none;
     border-right: 1px solid var(--color-border, #404040);
-    padding: 4px 8px;
+    padding: 6px 10px;
   }
   .transport-btn:last-child {
     border-right: none;
   }
   .transport-play {
-    padding: 4px 10px;
+    padding: 6px 12px;
   }
   .transport-play:hover {
     color: var(--color-accent, #007acc);
