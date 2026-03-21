@@ -28,6 +28,7 @@
     focusEntity,
   } from '$lib/scene/commands';
   import { saveViewportSettings, loadViewportSettings } from '$lib/viewport-settings';
+  import { setViewportFocused } from '$lib/stores/undo-history';
   import type { Component } from 'svelte';
   import {
     MousePointer2, Move, RotateCw, Maximize2,
@@ -506,7 +507,8 @@
   onmousedown={handleMouseDown}
   onmousemove={handleMouseMove}
   onmouseup={handleMouseUp}
-  onmouseleave={handleMouseUp}
+  onmouseenter={() => setViewportFocused(true)}
+  onmouseleave={() => { handleMouseUp(); setViewportFocused(false); }}
   oncontextmenu={handleContextMenu}
   onkeydown={handleKeyDown}
 >

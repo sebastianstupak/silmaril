@@ -5,13 +5,17 @@
 // update the undo stack — this store just tracks can-undo / can-redo locally
 // so the UI can reflect the state without polling.
 
-import { templateUndo, templateRedo, templateHistory } from '$lib/api';
+import { templateUndo, templateRedo, templateHistory, sceneUndo as _sceneUndo, sceneRedo as _sceneRedo } from '$lib/api';
 import { logInfo, logWarn, logError } from '$lib/stores/console';
 
 let _path: string | null = null;
 let _canUndo = false;
 let _canRedo = false;
 let _listeners: (() => void)[] = [];
+
+// Scene undo/redo state (independent of the template undo stack).
+let _sceneCanUndo = false;
+let _sceneCanRedo = false;
 
 function notify(): void {
   _listeners.forEach((fn) => fn());
@@ -26,6 +30,40 @@ export function subscribeUndoHistory(fn: () => void): () => void {
 export function getCanUndo(): boolean { return _canUndo; }
 export function getCanRedo(): boolean { return _canRedo; }
 export function getActiveTemplatePath(): string | null { return _path; }
+
+export function getSceneCanUndo(): boolean { return _sceneCanUndo; }
+export function getSceneCanRedo(): boolean { return _sceneCanRedo; }
+
+// Track whether the viewport panel is currently under the mouse cursor.
+// ViewportPanel sets this via setViewportFocused(); App.svelte reads it to
+// route Ctrl+Z / Ctrl+Y to scene_undo / scene_redo instead of template undo.
+let _viewportFocused = false;
+export function setViewportFocused(focused: boolean): void { _viewportFocused = focused; }
+export function getViewportFocused(): boolean { return _viewportFocused; }
+
+/** Undo the last scene action and update local canUndo/canRedo state. */
+export async function sceneUndo(): Promise<void> {
+  try {
+    const result = await _sceneUndo();
+    _sceneCanUndo = result.canUndo;
+    _sceneCanRedo = result.canRedo;
+    notify();
+  } catch (e) {
+    logError(`Scene undo failed: ${e}`);
+  }
+}
+
+/** Redo the last undone scene action and update local canUndo/canRedo state. */
+export async function sceneRedo(): Promise<void> {
+  try {
+    const result = await _sceneRedo();
+    _sceneCanUndo = result.canUndo;
+    _sceneCanRedo = result.canRedo;
+    notify();
+  } catch (e) {
+    logError(`Scene redo failed: ${e}`);
+  }
+}
 
 /**
  * Set the template that undo/redo operates on.

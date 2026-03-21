@@ -13,7 +13,7 @@
   import { setAssets, clearAssets, type AssetEntry } from './lib/stores/assets';
   import { scanAssets } from './lib/api';
   import { logInfo, logWarn } from './lib/stores/console';
-  import { undo, redo, getCanUndo, getCanRedo, subscribeUndoHistory } from './lib/stores/undo-history';
+  import { undo, redo, sceneUndo, sceneRedo, getCanUndo, getCanRedo, getViewportFocused, subscribeUndoHistory } from './lib/stores/undo-history';
   import { loadSchemas } from './lib/inspector/schema-store';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
@@ -309,14 +309,22 @@
       // Undo: Ctrl+Z
       if (e.key === 'z' && e.ctrlKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
-        undo();
+        if (getViewportFocused()) {
+          sceneUndo();
+        } else {
+          undo();
+        }
         return;
       }
       // Redo: Ctrl+Y or Ctrl+Shift+Z
       if ((e.key === 'y' && e.ctrlKey && !e.shiftKey && !e.altKey) ||
           (e.key === 'z' && e.ctrlKey && e.shiftKey && !e.altKey)) {
         e.preventDefault();
-        redo();
+        if (getViewportFocused()) {
+          sceneRedo();
+        } else {
+          redo();
+        }
         return;
       }
       // Omnibar: Ctrl+K
