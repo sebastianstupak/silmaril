@@ -1,4 +1,4 @@
-use crate::bridge::{modules::*, registry::CommandRegistry};
+use crate::bridge::{modules::*, registry::CommandRegistry, runner::RUST_HANDLED};
 
 fn build_full_registry() -> CommandRegistry {
     let (mut reg, _rx) = CommandRegistry::new();
@@ -58,4 +58,16 @@ fn command_manifest_snapshot() {
         })
     }).collect();
     insta::assert_json_snapshot!("command_manifest", commands);
+}
+
+#[test]
+fn rust_handled_commands_exist_in_registry() {
+    let reg = build_full_registry();
+    for id in RUST_HANDLED {
+        assert!(
+            reg.get(id).is_some(),
+            "RUST_HANDLED contains '{}' but it is not in the registry",
+            id
+        );
+    }
 }
