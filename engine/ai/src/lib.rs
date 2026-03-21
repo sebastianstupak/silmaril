@@ -177,7 +177,7 @@ mod server_tests {
     use tokio::sync::{mpsc, watch};
 
     #[tokio::test]
-    async fn server_starts_and_responds_to_tools_list() {
+    async fn server_starts_without_panicking() {
         let (cmd_tx, _cmd_rx) = mpsc::channel(32);
         let (perm_tx, _perm_rx) = mpsc::channel(8);
         let (ss_tx, _ss_rx) = mpsc::channel(4);
