@@ -218,9 +218,20 @@
       // Allow $effect to start saving now that defaults have been overwritten.
       settingsLoaded = true;
 
+      // Clear isDraggingGizmo if the mouse is released outside the viewport
+      // element — the viewport's own mouseup handler won't fire in that case.
+      function handleWindowPointerUp() {
+        if (isDraggingGizmo) {
+          isDraggingGizmo = false;
+          gizmoDragEnd(viewportId).catch(err => console.error('gizmo_drag_end failed:', err));
+        }
+      }
+      window.addEventListener('pointerup', handleWindowPointerUp);
+
       return () => {
         unsub();
         observer.disconnect();
+        window.removeEventListener('pointerup', handleWindowPointerUp);
         // Remove this instance from the Rust registry on unmount.
         if (isTauri && viewportRegistered) {
           destroyNativeViewport(viewportId);
@@ -327,9 +338,15 @@
     // First try gizmo hit test — if a handle is hit, gizmo drag takes priority.
     if (event.button === 0 && tool !== 'select' && selectedEntityId != null) {
       event.preventDefault();
-      const hit = await gizmoHitTest(viewportId, event.clientX, event.clientY, selectedEntityId);
+      let hit = null;
+      try {
+        hit = await gizmoHitTest(viewportId, event.clientX, event.clientY, selectedEntityId);
+      } catch (err) {
+        console.error('gizmo_hit_test failed:', err);
+      }
       if (hit) {
         isDraggingGizmo = true;
+        event.stopPropagation();
         cursor = cursorForTool(tool);
         return;
       }
@@ -355,7 +372,12 @@
   async function handleMouseMove(event: MouseEvent) {
     // Gizmo drag takes priority over camera/entity drag.
     if (isDraggingGizmo) {
-      await gizmoDrag(viewportId, event.clientX, event.clientY);
+      try {
+        await gizmoDrag(viewportId, event.clientX, event.clientY);
+      } catch (err) {
+        console.error('gizmo_drag failed:', err);
+        isDraggingGizmo = false;  // clear on error to prevent stuck state
+      }
       return;
     }
 
@@ -430,8 +452,12 @@
   async function handleMouseUp() {
     // Finalise gizmo drag first — clears DragState on Rust side and pushes undo.
     if (isDraggingGizmo) {
-      isDraggingGizmo = false;
-      await gizmoDragEnd(viewportId);
+      isDraggingGizmo = false;  // clear first so state is always cleaned up even if IPC fails
+      try {
+        await gizmoDragEnd(viewportId);
+      } catch (err) {
+        console.error('gizmo_drag_end failed:', err);
+      }
       cursor = cursorForTool(activeTool);
       return;
     }
