@@ -7,7 +7,7 @@
   import { drainTerminalData, setActiveTab } from '$lib/stores/terminal';
   import TerminalTabs from './TerminalTabs.svelte';
 
-  let { state, onNewTab, onCloseTab }: {
+  let { state: termState, onNewTab, onCloseTab }: {
     state: TerminalState;
     onNewTab: () => void;
     onCloseTab: (id: string) => void;
@@ -15,9 +15,9 @@
 
   // Map of tabId → { terminal, fitAddon, containerEl }
   let xtermInstances = new Map<string, { term: any; fit: any; el: HTMLDivElement }>();
-  let containerRef: HTMLDivElement;
+  let containerRef = $state<HTMLDivElement | null>(null);
   let resizeObserver: ResizeObserver | null = null;
-  let loadError: string | null = $state(null);
+  let loadError = $state<string | null>(null);
 
   // xterm.js is imported dynamically to avoid SSR issues
   let XTermModule: { Terminal: any; FitAddon: any } | null = null;
@@ -46,7 +46,7 @@
     }
 
     // Create terminals for any tabs that already exist
-    for (const tab of state.tabs) {
+    for (const tab of termState.tabs) {
       if (!xtermInstances.has(tab.id)) {
         createTerminal(tab.id);
       }
@@ -92,7 +92,7 @@
 
   function updateVisibility(): void {
     for (const [id, inst] of xtermInstances) {
-      inst.el.style.display = id === state.activeTabId ? 'block' : 'none';
+      inst.el.style.display = id === termState.activeTabId ? 'block' : 'none';
     }
   }
 
@@ -109,10 +109,10 @@
     }
   }
 
-  // Reactive: when state.tabs changes, create terminals for new tabs
+  // Reactive: when termState.tabs changes, create terminals for new tabs
   $effect(() => {
     if (!XTermModule) return;
-    for (const tab of state.tabs) {
+    for (const tab of termState.tabs) {
       if (!xtermInstances.has(tab.id)) {
         createTerminal(tab.id);
       }
@@ -125,7 +125,7 @@
   // mutates the store's pendingData Map directly without triggering reactivity,
   // which avoids an infinite effect loop. See terminal.ts drainTerminalData().
   $effect(() => {
-    for (const tab of state.tabs) {
+    for (const tab of termState.tabs) {
       const data = drainTerminalData(tab.id);
       if (data) {
         xtermInstances.get(tab.id)?.term.write(data);
@@ -135,18 +135,18 @@
 
   // Reactive: update visibility when active tab changes
   $effect(() => {
-    void state.activeTabId; // track dependency
+    void termState.activeTabId; // track dependency
     updateVisibility();
   });
 </script>
 
 <div class="terminal-panel">
-  {#if state.tabs.length === 0}
+  {#if termState.tabs.length === 0}
     <div class="placeholder">{t('terminal.opening')}</div>
   {:else}
     <TerminalTabs
-      tabs={state.tabs}
-      activeTabId={state.activeTabId}
+      tabs={termState.tabs}
+      activeTabId={termState.activeTabId}
       {onNewTab}
       onCloseTab={onCloseTab}
       onSelectTab={id => setActiveTab(id)}

@@ -143,6 +143,10 @@ const en = {
   'terminal.close_tab': 'Close Tab',
 
   // Output panel
+  'output.build': 'Build',
+  'output.test': 'Test',
+  'output.run': 'Run',
+  'output.clippy': 'Clippy',
   'output.cancel': 'Cancel',
   'output.clear': 'Clear',
   'output.empty': 'Run a cargo command to see output',

@@ -27,13 +27,15 @@
 
 <div class="tab-bar" role="tablist">
   {#each tabs as tab (tab.id)}
-    <button
+    <div
       class="tab"
       class:active={tab.id === activeTabId}
       class:exited={tab.exited}
       role="tab"
+      tabindex="0"
       aria-selected={tab.id === activeTabId}
       onclick={() => onSelectTab(tab.id)}
+      onkeydown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectTab(tab.id); } }}
     >
       <span class="tab-label">{tab.title}</span>
       {#if canClose(tab)}
@@ -43,7 +45,7 @@
           onclick={e => { e.stopPropagation(); onCloseTab(tab.id); }}
         >×</button>
       {/if}
-    </button>
+    </div>
   {/each}
   <button class="tab-new" aria-label={t('terminal.new_tab')} onclick={onNewTab}>+</button>
 </div>

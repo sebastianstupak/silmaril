@@ -3,7 +3,7 @@
   import { t } from '$lib/i18n';
   import type { OutputState } from '$lib/stores/output';
 
-  let { state, onRun, onCancel, onClear }: {
+  let { state: outputState, onRun, onCancel, onClear }: {
     state: OutputState;
     onRun: (command: string, args: string[]) => void;
     onCancel: () => void;
@@ -17,7 +17,7 @@
     { key: 'clippy', cmd: 'cargo', args: ['clippy'], labelKey: 'output.clippy' },
   ] as const;
 
-  let outputEl: HTMLDivElement;
+  let outputEl = $state<HTMLDivElement | null>(null);
   let userScrolledUp = $state(false);
 
   function onScroll() {
@@ -28,7 +28,7 @@
 
   $effect(() => {
     // Scroll to bottom on new lines unless user scrolled up
-    void state.lines.length;
+    void outputState.lines.length;
     if (!userScrolledUp && outputEl) {
       outputEl.scrollTop = outputEl.scrollHeight;
     }
@@ -41,11 +41,11 @@
     {#each COMMANDS as c}
       <button
         class="btn"
-        disabled={state.running}
+        disabled={outputState.running}
         onclick={() => onRun(c.cmd, [...c.args])}
       >{t(c.labelKey)}</button>
     {/each}
-    {#if state.running}
+    {#if outputState.running}
       <button class="btn btn-cancel" onclick={onCancel}>{t('output.cancel')}</button>
     {/if}
     <button class="btn btn-clear" onclick={onClear}>{t('output.clear')}</button>
@@ -59,10 +59,10 @@
     bind:this={outputEl}
     onscroll={onScroll}
   >
-    {#if state.lines.length === 0 && !state.running}
+    {#if outputState.lines.length === 0 && !outputState.running}
       <div class="placeholder">{t('output.empty')}</div>
     {:else}
-      {#each state.lines as line, i (i)}
+      {#each outputState.lines as line, i (i)}
         <div class="output-line">
           {#each line.spans as span}
             <span
@@ -79,16 +79,16 @@
 
   <!-- Status bar -->
   <div class="status-bar">
-    {#if state.running}
-      <span class="status-running">⟳ {state.command} {t('output.running')}</span>
-    {:else if state.cancelled}
+    {#if outputState.running}
+      <span class="status-running">⟳ {outputState.command} {t('output.running')}</span>
+    {:else if outputState.cancelled}
       <span class="status-cancelled">⊘ {t('output.cancelled')}</span>
-    {:else if state.exitCode === 0 && state.command}
+    {:else if outputState.exitCode === 0 && outputState.command}
       <span class="status-ok">✓ {t('output.exit_ok')}</span>
-    {:else if state.exitCode !== null && state.exitCode !== 0}
-      <span class="status-err">✗ {t('output.exit_err')} (exit {state.exitCode})</span>
+    {:else if outputState.exitCode !== null && outputState.exitCode !== 0}
+      <span class="status-err">✗ {t('output.exit_err')} (exit {outputState.exitCode})</span>
     {:else}
-      <span class="status-idle">{state.command ?? ''}</span>
+      <span class="status-idle">{outputState.command ?? ''}</span>
     {/if}
   </div>
 </div>
