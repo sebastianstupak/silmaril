@@ -339,9 +339,9 @@ export async function gizmoDrag(
 }
 
 /** Finalise an active gizmo drag: clears drag state and pushes undo entry. */
-export async function gizmoDragEnd(viewportId: string): Promise<void> {
+export async function gizmoDragEnd(viewportId: string, templatePath: string): Promise<void> {
   if (!isTauri) return;
-  return tauriInvoke<void>('gizmo_drag_end', { viewportId });
+  return tauriInvoke<void>('gizmo_drag_end', { viewportId, templatePath });
 }
 
 /** Mirror the selected entity to the Rust viewport renderer. */
@@ -356,23 +356,3 @@ export async function setGizmoMode(mode: 'move' | 'rotate' | 'scale'): Promise<v
   return tauriInvoke<void>('set_gizmo_mode', { mode });
 }
 
-// ---------------------------------------------------------------------------
-// Scene undo / redo
-// ---------------------------------------------------------------------------
-
-export interface UndoRedoState {
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
-/** Undo the last scene action. Returns the new undo/redo availability. */
-export async function sceneUndo(): Promise<UndoRedoState> {
-  if (!isTauri) return { canUndo: false, canRedo: false };
-  return tauriInvoke<UndoRedoState>('scene_undo');
-}
-
-/** Redo the last undone scene action. Returns the new undo/redo availability. */
-export async function sceneRedo(): Promise<UndoRedoState> {
-  if (!isTauri) return { canUndo: false, canRedo: false };
-  return tauriInvoke<UndoRedoState>('scene_redo');
-}

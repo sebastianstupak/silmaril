@@ -32,7 +32,7 @@
     focusEntity,
   } from '$lib/scene/commands';
   import { saveViewportSettings, loadViewportSettings } from '$lib/viewport-settings';
-  import { setViewportFocused } from '$lib/stores/undo-history';
+  import { setViewportFocused, getActiveTemplatePath } from '$lib/stores/undo-history';
   import type { Component } from 'svelte';
   import {
     MousePointer2, Move, RotateCw, Maximize2,
@@ -223,7 +223,8 @@
       function handleWindowPointerUp() {
         if (isDraggingGizmo) {
           isDraggingGizmo = false;
-          gizmoDragEnd(viewportId).catch(err => console.error('gizmo_drag_end failed:', err));
+          const path = getActiveTemplatePath() ?? '';
+          gizmoDragEnd(viewportId, path).catch(err => console.error('gizmo_drag_end failed:', err));
         }
       }
       window.addEventListener('pointerup', handleWindowPointerUp);
@@ -454,7 +455,8 @@
     if (isDraggingGizmo) {
       isDraggingGizmo = false;  // clear first so state is always cleaned up even if IPC fails
       try {
-        await gizmoDragEnd(viewportId);
+        const path = getActiveTemplatePath() ?? '';
+        await gizmoDragEnd(viewportId, path);
       } catch (err) {
         console.error('gizmo_drag_end failed:', err);
       }
