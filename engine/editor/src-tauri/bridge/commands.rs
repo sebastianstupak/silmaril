@@ -301,7 +301,7 @@ impl ViewportRegistry {
         Self::default()
     }
 
-    fn get_for_id(&self, id: &str) -> Option<&NativeViewport> {
+    pub fn get_for_id(&self, id: &str) -> Option<&NativeViewport> {
         let hwnd = self.hwnd_by_id.get(id)?;
         self.by_hwnd.get(hwnd)
     }
@@ -319,11 +319,21 @@ impl ProjectState {
     }
 }
 
-pub struct NativeViewportState(pub Mutex<ViewportRegistry>);
+pub struct NativeViewportState {
+    pub registry: Mutex<ViewportRegistry>,
+    /// Active gizmo drag operation, if any. Cleared on `gizmo_drag_end`.
+    pub drag_state: Mutex<Option<crate::bridge::gizmo_commands::DragState>>,
+    /// Current gizmo mode: 0 = Move, 1 = Rotate, 2 = Scale.
+    pub gizmo_mode: std::sync::atomic::AtomicU8,
+}
 
 impl Default for NativeViewportState {
     fn default() -> Self {
-        Self(Mutex::new(ViewportRegistry::new()))
+        Self {
+            registry: Mutex::new(ViewportRegistry::new()),
+            drag_state: Mutex::new(None),
+            gizmo_mode: std::sync::atomic::AtomicU8::new(0),
+        }
     }
 }
 
@@ -357,7 +367,7 @@ pub fn create_native_viewport(
         let parent_hwnd = window.hwnd().map_err(|e| format!("Failed to get HWND: {e}"))?;
         let hwnd_isize = parent_hwnd.0 as isize;
 
-        let mut registry = viewport_state.0.lock().unwrap();
+        let mut registry = viewport_state.registry.lock().unwrap();
 
         // Create a NativeViewport for this HWND if one doesn't exist yet.
         if let std::collections::hash_map::Entry::Vacant(e) = registry.by_hwnd.entry(hwnd_isize) {
@@ -409,7 +419,7 @@ pub fn resize_native_viewport(
     width: u32,
     height: u32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_instance_bounds(&viewport_id, ViewportBounds { x, y, width, height });
     }
@@ -429,7 +439,7 @@ pub fn destroy_native_viewport(
     viewport_state: tauri::State<NativeViewportState>,
     viewport_id: String,
 ) -> Result<(), String> {
-    let mut registry = viewport_state.0.lock().unwrap();
+    let mut registry = viewport_state.registry.lock().unwrap();
     // .copied() gives an owned isize — releases the borrow on hwnd_by_id before the block.
     if let Some(hwnd) = registry.hwnd_by_id.get(&viewport_id).copied() {
         // Save camera (owned return value, borrow of by_hwnd ends after .and_then).
@@ -530,7 +540,7 @@ pub async fn dock_panel_back(
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {
         let hwnd_isize = hwnd.0 as isize;
-        let mut registry = viewport_state.0.lock().unwrap();
+        let mut registry = viewport_state.registry.lock().unwrap();
         let saved_cam = registry
             .by_hwnd
             .get(&hwnd_isize)
@@ -752,7 +762,7 @@ pub fn set_viewport_visible(
     viewport_id: String,
     visible: bool,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_instance_visible(&viewport_id, visible);
     }
@@ -767,7 +777,7 @@ pub fn viewport_camera_orbit(
     dx: f32,
     dy: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_orbit(&viewport_id, dx, dy);
     }
@@ -782,7 +792,7 @@ pub fn viewport_camera_pan(
     dx: f32,
     dy: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_pan(&viewport_id, dx, dy);
     }
@@ -796,7 +806,7 @@ pub fn viewport_camera_zoom(
     viewport_id: String,
     delta: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_zoom(&viewport_id, delta);
     }
@@ -809,7 +819,7 @@ pub fn viewport_camera_reset(
     viewport_state: tauri::State<NativeViewportState>,
     viewport_id: String,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_reset(&viewport_id);
     }
@@ -823,7 +833,7 @@ pub fn viewport_set_grid_visible(
     viewport_id: String,
     visible: bool,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_grid_visible(&viewport_id, visible);
     }
@@ -840,7 +850,7 @@ pub fn viewport_camera_set_orientation(
     yaw: f32,
     pitch: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_set_orientation(&viewport_id, yaw, pitch);
     }
@@ -854,7 +864,7 @@ pub fn viewport_set_projection(
     viewport_id: String,
     is_ortho: bool,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_projection(&viewport_id, is_ortho);
     }
@@ -1013,7 +1023,7 @@ fn dock_drag_thread(
                 // createNativeViewport is called after the dock-panel-back event.
                 let vp_state = app.state::<NativeViewportState>();
                 {
-                    let mut registry = vp_state.0.lock().unwrap();
+                    let mut registry = vp_state.registry.lock().unwrap();
                     let saved_cam = registry
                         .by_hwnd
                         .get(&popout_hwnd_raw)

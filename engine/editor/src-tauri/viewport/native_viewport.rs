@@ -263,6 +263,34 @@ mod platform {
             }
         }
 
+        /// Return the camera data needed for ray-casting (gizmo hit-testing).
+        ///
+        /// Returns `(view_matrix, proj_matrix, eye_position, bounds)` or `None`
+        /// if the instance does not exist.
+        pub fn get_instance_ray_data(
+            &self,
+            id: &str,
+        ) -> Option<(Mat4, Mat4, Vec3, ViewportBounds)> {
+            let instances = self.instances.lock().ok()?;
+            let inst = instances.get(id)?;
+            let cam = &inst.camera;
+            let eye = cam.eye();
+            let view = Mat4::look_at_rh(eye, cam.target, Vec3::Y);
+            let aspect = if inst.bounds.height > 0 {
+                inst.bounds.width as f32 / inst.bounds.height as f32
+            } else {
+                1.0
+            };
+            let proj = if inst.is_ortho {
+                let half_h = cam.distance * (cam.fov_y * 0.5).tan();
+                let half_w = half_h * aspect;
+                Mat4::orthographic_rh(-half_w, half_w, -half_h, half_h, cam.near, cam.far * 2.0)
+            } else {
+                Mat4::perspective_rh(cam.fov_y, aspect, cam.near, cam.far)
+            };
+            Some((view, proj, eye, inst.bounds))
+        }
+
         pub fn destroy(&mut self) {
             self.render_active.store(false, Ordering::SeqCst);
             self.should_stop.store(true, Ordering::SeqCst);

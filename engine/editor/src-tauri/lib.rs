@@ -307,6 +307,10 @@ pub fn run() {
             commands::delete_entity,
             commands::scene_undo,
             commands::scene_redo,
+            bridge::gizmo_commands::gizmo_hit_test,
+            bridge::gizmo_commands::gizmo_drag,
+            bridge::gizmo_commands::gizmo_drag_end,
+            bridge::gizmo_commands::set_gizmo_mode,
         ])
         .setup(|app| {
             use tauri::Manager;
