@@ -7,9 +7,8 @@ import {
   markExited,
   appendTerminalData,
   drainTerminalData,
+  _resetForTest,
 } from './terminal';
-
-import { _resetForTest } from './terminal';
 
 beforeEach(() => _resetForTest());
 
