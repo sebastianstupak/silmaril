@@ -939,6 +939,91 @@ impl Renderer {
         self.context.wait_idle()
     }
 
+    /// Borrow the raw Vulkan logical device handle.
+    ///
+    /// Useful for overlay pipelines (grid, gizmos) that need to create their
+    /// own Vulkan resources against the same device.
+    pub fn device(&self) -> &ash::Device {
+        &self.context.device
+    }
+
+    /// The active render pass handle.
+    ///
+    /// Overlay pipelines need this to create compatible graphics pipelines.
+    pub fn render_pass(&self) -> vk::RenderPass {
+        self.render_pass.handle()
+    }
+
+    /// Current swapchain extent (width x height in pixels).
+    pub fn extent(&self) -> vk::Extent2D {
+        self.swapchain.extent
+    }
+
+    /// Borrow the underlying [`VulkanContext`](engine_render_context::VulkanContext).
+    ///
+    /// Provides access to the allocator, queues, and other low-level handles
+    /// needed by overlay pipelines.
+    pub fn context(&self) -> &VulkanContext {
+        &self.context
+    }
+
+    /// Rebuild the swapchain, depth buffer, and framebuffers for a new size.
+    ///
+    /// Call this when the host window is resized.  The renderer waits for the
+    /// device to become idle before tearing down old resources.
+    pub fn rebuild_swapchain(&mut self, width: u32, height: u32) -> Result<(), RendererError> {
+        let (width, height) = (width.max(1), height.max(1));
+        self.context.wait_idle()?;
+
+        self.framebuffers.clear();
+
+        self.swapchain
+            .recreate(
+                &self.context,
+                self.surface.handle(),
+                self.surface.loader(),
+                width,
+                height,
+            )
+            .map_err(|e| {
+                RendererError::surfacecreationfailed(format!("Swapchain recreate failed: {:?}", e))
+            })?;
+
+        let depth_buffer =
+            DepthBuffer::new(&self.context.device, &self.context.allocator, self.swapchain.extent)?;
+
+        let mut framebuffers = Vec::with_capacity(self.swapchain.image_views.len());
+        for &image_view in &self.swapchain.image_views {
+            let attachments = [image_view, depth_buffer.image_view()];
+            let framebuffer_info = vk::FramebufferCreateInfo::default()
+                .render_pass(self.render_pass.handle())
+                .attachments(&attachments)
+                .width(self.swapchain.extent.width)
+                .height(self.swapchain.extent.height)
+                .layers(1);
+
+            let framebuffer =
+                unsafe { self.context.device.create_framebuffer(&framebuffer_info, None) }.map_err(
+                    |e| {
+                        RendererError::framebuffercreationfailed(format!(
+                            "Failed to create framebuffer: {:?}",
+                            e
+                        ))
+                    },
+                )?;
+
+            framebuffers.push(Framebuffer::from_raw(&self.context.device, framebuffer));
+        }
+
+        self._depth_buffer = Some(depth_buffer);
+        self.framebuffers = framebuffers;
+        self.dimensions = (width, height);
+        self.swapchain_needs_rebuild = false;
+
+        info!(width, height, "Swapchain rebuilt");
+        Ok(())
+    }
+
     /// Enable frame capture with configuration
     ///
     /// # Example
