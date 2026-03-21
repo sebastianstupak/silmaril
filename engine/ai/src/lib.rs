@@ -191,21 +191,17 @@ mod server_tests {
         };
 
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-
-        // Start server on port 0 — OS assigns a free port.
         let permissions = std::sync::Arc::new(std::sync::Mutex::new(
             crate::permissions::PermissionStore::new(),
         ));
-        tokio::spawn(async move {
-            server::run(0, channels, true, permissions, shutdown_rx)
-                .await
-                .ok();
-        });
 
-        // Give the server a moment to bind.
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        // run() now returns the bound port immediately (serve loop is spawned internally)
+        let bound_port = server::run(0, channels, true, permissions, shutdown_rx)
+            .await
+            .expect("server should start");
 
-        // The server started without panicking — that's the test.
+        assert!(bound_port > 0, "bound port should be non-zero");
+
         let _ = shutdown_tx.send(());
     }
 }

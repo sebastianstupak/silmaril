@@ -23,11 +23,11 @@ use crate::{
 ///
 /// Tries to bind to `0.0.0.0:{port}`, auto-incrementing up to `port + 10` on conflict.
 /// Port `0` is handled as a special case: binds once and lets the OS assign a port.
-/// Returns the actual bound port.
+/// Returns the actual bound port immediately — the serve loop runs in a spawned task.
 ///
 /// # Errors
 ///
-/// Returns an error string if no port in the range could be bound.
+/// Returns an error if no port in the range could be bound.
 pub async fn run(
     port: u16,
     channels: AiBridgeChannels,
@@ -50,41 +50,45 @@ pub async fn run(
         .route("/mcp/sse", get(mcp_sse))
         .with_state(state);
 
-    // Port 0: let the OS assign any available port — used in tests.
-    if port == 0 {
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:0")
-            .await
-            .map_err(|e| crate::AiError::ServerBind(format!("Failed to bind: {}", e)))?;
-        let bound_port = listener
-            .local_addr()
-            .map(|a| a.port())
-            .unwrap_or(0);
-        tracing::info!(port = bound_port, "MCP server listening");
-        axum::serve(listener, app)
+    // Bind the listener first, then return the port immediately.
+    // axum::serve runs in a spawned task so run() does not block.
+    let listener = bind_listener(port).await?;
+    let bound_port = listener
+        .local_addr()
+        .map_err(|e| crate::AiError::ServerBind(e.to_string()))?
+        .port();
+
+    tracing::info!(port = bound_port, "MCP server listening");
+
+    tokio::spawn(async move {
+        if let Err(e) = axum::serve(listener, app)
             .with_graceful_shutdown(async { let _ = shutdown_rx.await; })
             .await
-            .map_err(|e| crate::AiError::ServerBind(format!("Server error: {}", e)))?;
-        return Ok(bound_port);
+        {
+            tracing::error!(error = %e, "MCP server error");
+        }
+    });
+
+    Ok(bound_port)
+}
+
+/// Bind a TcpListener to the given port, auto-incrementing up to `port + 10` on conflict.
+///
+/// Special case: port 0 skips the loop and lets the OS assign any free port.
+async fn bind_listener(port: u16) -> Result<tokio::net::TcpListener, crate::AiError> {
+    // Port 0: OS assigns a free port immediately.
+    if port == 0 {
+        return tokio::net::TcpListener::bind("0.0.0.0:0")
+            .await
+            .map_err(|e| crate::AiError::ServerBind(e.to_string()));
     }
 
-    // Try port, port+1, ..., port+10 to avoid conflicts.
     let max_port = port.saturating_add(10);
     let mut last_err = String::new();
     for try_port in port..=max_port {
         let addr = format!("0.0.0.0:{}", try_port);
         match tokio::net::TcpListener::bind(&addr).await {
-            Ok(listener) => {
-                let bound_port = listener
-                    .local_addr()
-                    .map(|a| a.port())
-                    .unwrap_or(try_port);
-                tracing::info!(port = bound_port, "MCP server listening");
-                axum::serve(listener, app)
-                    .with_graceful_shutdown(async { let _ = shutdown_rx.await; })
-                    .await
-                    .map_err(|e| crate::AiError::ServerBind(format!("Server error: {}", e)))?;
-                return Ok(bound_port);
-            }
+            Ok(listener) => return Ok(listener),
             Err(e) => {
                 last_err = format!("Port {}: {}", try_port, e);
                 tracing::debug!(port = try_port, "Port in use, trying next");
