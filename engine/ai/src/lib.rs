@@ -12,6 +12,12 @@ use tokio::sync::{mpsc, oneshot, watch};
 use serde::{Deserialize, Serialize};
 
 /// Error type for AI MCP server operations.
+///
+/// # Design Note
+/// This crate intentionally does not use `silmaril_core::define_error!` because
+/// `engine-ai` has no dependency on `silmaril_core` (to avoid coupling the MCP server
+/// to the game engine internals). The hand-rolled `Display + Error` impl is the correct
+/// approach for this standalone crate.
 #[derive(Debug)]
 pub enum AiError {
     /// Failed to bind the HTTP server to any port in the configured range.
@@ -65,6 +71,10 @@ pub struct CommandRequest {
     /// Optional arguments for the command.
     pub args: Option<serde_json::Value>,
     /// Channel for the editor to send the execution result back.
+    ///
+    /// The error `String` is intentional: the editor crate sends results back over this
+    /// channel but does not depend on `engine-ai`, so it cannot use [`AiError`].
+    /// At the MCP server boundary, errors are converted to JSON-RPC error responses.
     pub response_tx: oneshot::Sender<Result<Option<serde_json::Value>, String>>,
 }
 
@@ -84,6 +94,10 @@ pub struct PermissionRequest {
 /// A request to capture a screenshot as PNG bytes.
 pub struct ScreenshotRequest {
     /// Channel for the editor to send the captured PNG bytes back.
+    ///
+    /// The error `String` is intentional: the editor crate sends results back over this
+    /// channel but does not depend on `engine-ai`, so it cannot use [`AiError`].
+    /// At the MCP server boundary, errors are converted to JSON-RPC error responses.
     pub response_tx: oneshot::Sender<Result<Vec<u8>, String>>,
 }
 
