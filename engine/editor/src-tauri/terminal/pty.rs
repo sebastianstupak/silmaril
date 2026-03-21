@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use tauri::{AppHandle, Emitter, State};
+use tracing::{debug, warn};
 
 /// One active PTY session per terminal tab.
 pub struct PtySession {
@@ -36,6 +37,7 @@ impl Default for TerminalState {
 fn resolve_shell() -> PathBuf {
     for candidate in &["pwsh", "powershell.exe"] {
         if let Ok(path) = which::which(candidate) {
+            debug!(shell = ?path, "resolved shell");
             return path;
         }
     }
@@ -87,10 +89,21 @@ pub fn terminal_new_tab(
         let mut buf = [0u8; 4096];
         loop {
             match reader.read(&mut buf) {
-                Ok(0) | Err(_) => {
+                Ok(0) => {
                     app_handle
                         .emit(&format!("terminal-exit:{tab_id_clone}"), ())
                         .ok();
+                    // Session map cleanup is the responsibility of terminal_close_tab,
+                    // which the frontend must call after receiving terminal-exit.
+                    break;
+                }
+                Err(e) => {
+                    warn!(tab_id = %tab_id_clone, error = %e, "PTY read error, closing tab");
+                    app_handle
+                        .emit(&format!("terminal-exit:{tab_id_clone}"), ())
+                        .ok();
+                    // Session map cleanup is the responsibility of terminal_close_tab,
+                    // which the frontend must call after receiving terminal-exit.
                     break;
                 }
                 Ok(n) => {
@@ -103,6 +116,7 @@ pub fn terminal_new_tab(
         }
     });
 
+    debug!(tab_id = %tab_id, "terminal tab opened");
     Ok(tab_id)
 }
 
