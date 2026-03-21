@@ -57,7 +57,7 @@ pub use error::{RenderContextError, RendererError};
 pub use buffer::{GpuBuffer, GpuMesh, IndexBuffer, VertexBuffer};
 
 // Command types
-pub use command::{CommandBuffer, CommandPool};
+pub use command::{CommandBuffer, CommandError, CommandPool};
 
 // Context types
 pub use context::{QueueFamilies, VulkanContext};
@@ -66,7 +66,7 @@ pub use context::{QueueFamilies, VulkanContext};
 pub use depth::DepthBuffer;
 
 // Framebuffer types
-pub use framebuffer::{create_framebuffers, Framebuffer};
+pub use framebuffer::{create_framebuffers, Framebuffer, FramebufferError};
 
 // Pipeline types
 pub use pipeline::GraphicsPipeline;
