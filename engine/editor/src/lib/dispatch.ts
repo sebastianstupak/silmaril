@@ -20,6 +20,10 @@ const _registry: CommandRegistry = {
   specs: new Map(),
 };
 
+// Undo verifier — called after dispatching a non_undoable=false command.
+// Returns true if an undo operation was recorded.
+let _undoVerifier: (() => boolean) | null = null;
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Public API
 // ──────────────────────────────────────────────────────────────────────────────
@@ -62,6 +66,13 @@ export async function dispatchCommand(id: string, args?: unknown): Promise<void>
   if (handler) {
     // TypeScript-side handler (view toggles, UI commands, etc.)
     await handler(args);
+    // Post-execute undo verification for undoable commands
+    if (!spec.non_undoable && _undoVerifier && !_undoVerifier()) {
+      console.warn(
+        `[dispatch] Command '${id}' has non_undoable=false but no undo operation was recorded. ` +
+        `Ensure the handler calls onTemplateMutated() or pushes to the undo stack.`
+      );
+    }
     return;
   }
 
@@ -86,6 +97,14 @@ export function listSpecs(): CommandSpec[] {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Undo verifier registration
+// ──────────────────────────────────────────────────────────────────────────────
+
+export function setUndoVerifier(fn: () => boolean): void {
+  _undoVerifier = fn;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Test helpers (not part of the public production API)
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -96,4 +115,5 @@ export function listSpecs(): CommandSpec[] {
 export function _resetRegistryForTesting(): void {
   _registry.specs.clear();
   _registry.handlers.clear();
+  _undoVerifier = null;
 }

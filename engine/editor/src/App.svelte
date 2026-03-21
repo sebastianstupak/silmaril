@@ -25,7 +25,7 @@
   import { setLayout as setLayoutStore, subscribeLayout, getLayout as getLayoutStore } from './lib/stores/layout';
   import { registerCommand } from './lib/omnibar/registry';
   import { dispatchSceneCommand } from './lib/scene/commands';
-  import { populateRegistry, listSpecs, dispatchCommand } from './lib/dispatch';
+  import { populateRegistry, listSpecs, dispatchCommand, setUndoVerifier } from './lib/dispatch';
   import { registerAllHandlers } from './lib/commands/index';
   import { initTauriListeners } from './lib/scene/state';
 
@@ -453,6 +453,7 @@
     // Wire the dispatch layer: register all TypeScript-side handlers first,
     // then populate the spec registry from Rust so keybind lookup works.
     registerAllHandlers();
+    setUndoVerifier(() => getCanUndo());
     try {
       const { commands: bindingCommands } = await import('./lib/bindings');
       const specs = await bindingCommands.listCommands();

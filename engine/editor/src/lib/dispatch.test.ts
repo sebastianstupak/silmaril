@@ -15,6 +15,7 @@ import {
   getSpec,
   listSpecs,
   _resetRegistryForTesting,
+  setUndoVerifier,
 } from './dispatch';
 import { commands } from './bindings';
 
@@ -172,5 +173,52 @@ describe('dispatch', () => {
       await dispatchCommand('viewport.screenshot');
       expect(commands.runCommand).toHaveBeenCalledWith('viewport.screenshot', null);
     });
+  });
+});
+
+describe('undo verifier', () => {
+  beforeEach(() => {
+    _resetRegistryForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('warns when non_undoable=false command handler skips undo', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    populateRegistry([{
+      ...sampleSpecs[0], // reuse any spec as base
+      id: 'test.undoable',
+      non_undoable: false
+    }]);
+
+    setUndoVerifier(() => false);
+
+    const handler = vi.fn().mockResolvedValue(undefined);
+    registerCommandHandler('test.undoable', handler);
+
+    await dispatchCommand('test.undoable');
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("no undo operation was recorded")
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn when verifier returns true', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    populateRegistry([{
+      ...sampleSpecs[0],
+      id: 'test.undoable2',
+      non_undoable: false
+    }]);
+
+    setUndoVerifier(() => true);
+
+    const handler = vi.fn().mockResolvedValue(undefined);
+    registerCommandHandler('test.undoable2', handler);
+
+    await dispatchCommand('test.undoable2');
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
