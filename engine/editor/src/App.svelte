@@ -22,6 +22,7 @@
   import ResizeHandles from './lib/components/ResizeHandles.svelte';
   import { loadLayout, saveLayout, defaultLayout, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
+  import { setLayout as setLayoutStore, subscribeLayout, getLayout as getLayoutStore } from './lib/stores/layout';
   import { registerCommand } from './lib/omnibar/registry';
   import { dispatchSceneCommand } from './lib/scene/commands';
 
@@ -60,6 +61,10 @@
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
   let bottomHeight = $state(_initial.bottomPanelHeight);
+
+  // Keep the shared layout store in sync with App.svelte's authoritative state.
+  // setLayout() is called here once on init and again inside handleLayoutChange().
+  setLayoutStore(layout);
 
   function _collectPanels(node: LayoutNode, out: Set<string>) {
     if (node.type === 'tabs') { for (const p of node.panels) out.add(p); }
@@ -126,6 +131,7 @@
 
   function handleLayoutChange(newLayout: EditorLayout) {
     layout = newLayout;
+    setLayoutStore(layout);
     saveLayout(layout);
   }
 
@@ -298,6 +304,18 @@
     return subscribeUndoHistory(() => {
       canUndoState = getCanUndo();
       canRedoState = getCanRedo();
+    });
+  });
+
+  // React to layout changes made by view command handlers (e.g. toggle_hierarchy).
+  // The store notifies when togglePanel() mutates the layout outside App.svelte.
+  $effect(() => {
+    return subscribeLayout(() => {
+      const updated = getLayoutStore();
+      if (updated !== null) {
+        layout = updated;
+        saveLayout(layout);
+      }
     });
   });
 

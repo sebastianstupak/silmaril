@@ -1,22 +1,17 @@
 import { registerCommandHandler } from '../dispatch';
-
-// View commands toggle UI panels. Panel layout state currently lives in
-// App.svelte and has not yet been extracted to a standalone store (Task 10).
-// All handlers are stubs until Task 10 creates the layout store.
+import {
+  toggleHierarchy,
+  toggleInspector,
+  toggleConsole,
+  toggleAssetBrowser,
+} from '../stores/layout';
 
 export function registerViewHandlers(): void {
-  registerCommandHandler('view.toggle_hierarchy', async () => {
-    console.warn('view.toggle_hierarchy: layout store not yet extracted (Task 10)');
-  });
-  registerCommandHandler('view.toggle_inspector', async () => {
-    console.warn('view.toggle_inspector: layout store not yet extracted (Task 10)');
-  });
-  registerCommandHandler('view.toggle_console', async () => {
-    console.warn('view.toggle_console: layout store not yet extracted (Task 10)');
-  });
-  registerCommandHandler('view.toggle_asset_browser', async () => {
-    console.warn('view.toggle_asset_browser: layout store not yet extracted (Task 10)');
-  });
+  registerCommandHandler('view.toggle_hierarchy', async () => { toggleHierarchy(); });
+  registerCommandHandler('view.toggle_inspector', async () => { toggleInspector(); });
+  registerCommandHandler('view.toggle_console', async () => { toggleConsole(); });
+  registerCommandHandler('view.toggle_asset_browser', async () => { toggleAssetBrowser(); });
+  // Zoom commands operate on the viewport canvas; not yet wired to a store.
   registerCommandHandler('view.zoom_in', async () => {
     console.warn('view.zoom_in: not yet implemented');
   });
