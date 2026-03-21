@@ -11,6 +11,32 @@ pub mod server;
 use tokio::sync::{mpsc, oneshot, watch};
 use serde::{Deserialize, Serialize};
 
+/// Error type for AI MCP server operations.
+#[derive(Debug)]
+pub enum AiError {
+    /// Failed to bind the HTTP server to any port in the configured range.
+    ServerBind(String),
+    /// A required channel was closed unexpectedly.
+    ChannelClosed,
+    /// An operation timed out.
+    Timeout,
+    /// A catch-all for other errors.
+    Other(String),
+}
+
+impl std::fmt::Display for AiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AiError::ServerBind(msg) => write!(f, "Server bind failed: {msg}"),
+            AiError::ChannelClosed => write!(f, "Channel closed unexpectedly"),
+            AiError::Timeout => write!(f, "Operation timed out"),
+            AiError::Other(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
+impl std::error::Error for AiError {}
+
 /// Minimal command descriptor used by the MCP layer.
 /// The editor converts `CommandSpec` → `McpCommand` before passing to this crate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,13 +131,13 @@ impl AiServer {
     ///
     /// # Errors
     ///
-    /// Returns an error string if no port in the range could be bound.
+    /// Returns [`AiError::ServerBind`] if no port in the range could be bound.
     pub async fn start(
         port: u16,
         channels: AiBridgeChannels,
         allow_all: bool,
         permissions: std::sync::Arc<std::sync::Mutex<crate::permissions::PermissionStore>>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, AiError> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let bound_port = server::run(port, channels, allow_all, permissions, shutdown_rx).await?;
         Ok(Self { shutdown_tx: Some(shutdown_tx), port: bound_port })
