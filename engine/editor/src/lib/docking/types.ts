@@ -49,6 +49,7 @@ export const panelRegistry: PanelInfo[] = [
   { id: 'console', titleKey: 'panel.console' },
   { id: 'profiler', titleKey: 'panel.profiler' },
   { id: 'assets', titleKey: 'panel.assets' },
+  { id: 'file-explorer', titleKey: 'panel.file_explorer' },
 ];
 
 /** Get the base panel ID (strip instance suffix like 'viewport:2' → 'viewport') */

@@ -24,6 +24,7 @@
   import ViewportPanel from './lib/docking/panels/ViewportPanel.svelte';
   import ProfilerPanel from './lib/docking/panels/ProfilerPanel.svelte';
   import AssetsPanel from './lib/docking/panels/AssetsPanel.svelte';
+  import FileExplorerWrapper from './lib/docking/panels/FileExplorerWrapper.svelte';
 
   /** Detect if running inside Tauri or standalone browser */
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
@@ -76,6 +77,7 @@
     console: ConsoleWrapper,
     profiler: ProfilerPanel,
     assets: AssetsPanel,
+    'file-explorer': FileExplorerWrapper,
   };
 
   async function handleOpenProject() {
