@@ -404,7 +404,7 @@
 
     await hydrateRecentItems();
     recentItems = getRecentItems();
-    subscribeRecent((items) => { recentItems = items; });
+    const _unsubRecent = subscribeRecent((items) => { recentItems = items; });
 
     // Register UI-only commands in the frontend registry
     registerCommand({

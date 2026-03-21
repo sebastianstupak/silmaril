@@ -8,9 +8,10 @@
   import { buildResults } from './providers';
   import { getEditorContext, setEntities, setSelectedEntityId } from '$lib/stores/editor-context';
   import { selectEntity } from '$lib/scene/commands';
-  import { openProject, scanProjectEntities } from '$lib/api';
+  import { openProject, scanProjectEntities, scanAssets } from '$lib/api';
   import type { RecentItem } from '$lib/stores/recent-items';
-  import { getAssets, subscribeAssets } from '$lib/stores/assets';
+  import { addRecentItem } from '$lib/stores/recent-items';
+  import { getAssets, subscribeAssets, clearAssets, setAssets, type AssetEntry } from '$lib/stores/assets';
 
   interface Props {
     projectPath?: string | null;
@@ -100,6 +101,18 @@
         const scannedEntities = await scanProjectEntities(result.path);
         setEntities(scannedEntities);
         setSelectedEntityId(null);
+        addRecentItem({ label: state.project_name ?? result.path, path: result.path, itemType: 'project' });
+        clearAssets();
+        try {
+          const raw = await scanAssets(result.path);
+          setAssets(raw.map((a) => ({
+            path: a.path,
+            assetType: a.asset_type as AssetEntry['assetType'],
+            filename: a.path.split(/[\\/]/).pop() ?? a.path,
+          })));
+        } catch {
+          // non-fatal
+        }
         break;
       }
     }
