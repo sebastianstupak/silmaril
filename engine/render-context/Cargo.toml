@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [features]
+profiling = ["dep:tracy-client"]
 backtrace = ["engine-core/backtrace"]
 
 [dependencies]
@@ -17,10 +18,18 @@ glam = { workspace = true }
 raw-window-handle = "0.6"
 tracing = "0.1"
 bytemuck = "1.14"
+smallvec = "1.13"
+lazy_static = "1.5"
+winit = "0.30"
 engine-core = { path = "../core" }
 engine-macros = { path = "../macros" }
+engine-assets = { path = "../assets" }
+tracy-client = { version = "0.17", optional = true, default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
     "Win32_System_LibraryLoader",
 ] }
+
+[build-dependencies]
+engine-build-utils = { path = "../build-utils" }
