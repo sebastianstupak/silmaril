@@ -27,10 +27,12 @@ silmaril-editor Tauri process
   │     ├── tool registry
   │     └── permission store
   ├── engine/ops  ←  project ops (build, codegen, module)
-  └── Tauri IPC  ←  scene state, viewport screenshot
+  └── ai_bridge.rs  ←  Tauri bridge (event round-trips to TypeScript)
 ```
 
-The server runs on a background Tokio task. Tauri commands `ai_server_start` and `ai_server_stop` manage its lifecycle. A `tokio::sync::broadcast` channel carries permission-request events from the tool registry to the Tauri frontend (which shows the permission dialog).
+The server runs on a background Tokio task. Tauri commands `ai_server_start` and `ai_server_stop` manage its lifecycle.
+
+**`engine/ai` has no Tauri dependency.** It communicates with the Tauri layer via channels injected at startup (see Bridge section below). This keeps the crate fully testable without a Tauri runtime.
 
 ---
 
@@ -52,13 +54,47 @@ All requests and responses are JSON-RPC 2.0. The server identifies itself as `si
 
 ### Read-only tools
 
-| Tool | Description | Args |
-|------|-------------|------|
-| `get_scene_state` | Full scene JSON (entities, components, camera) | — |
-| `get_entity` | Single entity by id | `id: u64` |
-| `viewport_screenshot` | PNG screenshot of the Vulkan viewport (base64) | — |
-| `list_assets` | All assets in the open project | — |
-| `get_project_info` | Project name, path, game.toml contents | — |
+| Tool | Description | Args | Returns |
+|------|-------------|------|---------|
+| `get_scene_state` | Full scene (entities, components, camera) | — | `SceneSnapshot` JSON |
+| `get_entity` | Single entity by id | `id: u64` | `EntitySnapshot` JSON |
+| `viewport_screenshot` | PNG of the Vulkan viewport | — | base64 PNG string |
+| `list_assets` | All assets in the open project | — | `AssetInfo[]` JSON |
+| `get_project_info` | Project name, path, game.toml contents | — | `ProjectInfo` JSON |
+
+**`SceneSnapshot` schema** mirrors the TypeScript `SceneState` type in `src/lib/scene/state.ts`:
+```typescript
+{
+  entities: Array<{
+    id: number;
+    name: string;
+    components: string[];
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    scale:    { x: number; y: number; z: number };
+    visible: boolean;
+    locked: boolean;
+    componentValues: Record<string, Record<string, unknown>>;
+  }>;
+  selectedEntityId: number | null;
+  camera: {
+    position: { x: number; y: number; z: number };
+    target:   { x: number; y: number; z: number };
+    zoom: number;
+    fov: number;
+    viewAngle: number;
+    projection: 'perspective' | 'ortho';
+  };
+  gridVisible: boolean;
+  snapToGrid: boolean;
+  gridSize: number;
+  // activeTool and nextEntityId are intentionally excluded: activeTool is
+  // editor UI state (not game data), and nextEntityId is an internal counter
+  // that agents should not depend on.
+}
+```
+
+`EntitySnapshot` is one element of `entities` above.
 
 ### Scene mutation tools
 
@@ -81,22 +117,26 @@ All requests and responses are JSON-RPC 2.0. The server identifies itself as `si
 | `silm_build` | Build the project for a platform | `platform: string` |
 | `silm_add_module` | Add a module to the project | `name: string` |
 | `silm_list_modules` | List installed modules | — |
-| `silm_run_command` | Run any registered silm command by id | `id: string` |
+| `silm_run_command` | Run a registered silm command by id | `id: string` |
 | `generate_component` | Code-generate a new ECS component | `name: string, fields: FieldSpec[]` |
 | `generate_system` | Code-generate a new ECS system | `name: string` |
+
+**Note on `set_component_field`:** `dispatchSceneCommand` in `src/lib/scene/commands.ts` currently has no `set_component_field` case. The implementation must add one that calls the existing `setComponentField(entityId, componentName, fieldName, value)` function.
+
+**Note on `silm_run_command`:** this tool requires the `build` permission category. Before executing, the bridge must look up the command's own category in the `CommandRegistry` and verify the caller also holds that category's grant. This prevents using `silm_run_command` to bypass narrower permission grants.
 
 ---
 
 ## Permission System
 
-Mirrors Claude Code's permission model. No tool executes without a grant.
+Mirrors Claude Code's permission model. No mutation or build tool executes without a grant. Read-only tools (`read` category) require a grant too — they are just granted more readily.
 
 ### Permission categories
 
 | Category | Tools |
 |----------|-------|
 | `read` | `get_scene_state`, `get_entity`, `list_assets`, `get_project_info`, `viewport_screenshot` |
-| `scene` | All entity/component mutation tools |
+| `scene` | All entity/component mutation tools (`create_entity`, `delete_entity`, `rename_entity`, `duplicate_entity`, `add_component`, `remove_component`, `set_component_field`, `select_entity`, `move_entity`) |
 | `build` | `silm_build`, `silm_run_command` |
 | `codegen` | `generate_component`, `generate_system` |
 | `modules` | `silm_add_module`, `silm_list_modules` |
@@ -107,14 +147,21 @@ Mirrors Claude Code's permission model. No tool executes without a grant.
 - **Session** — allow for the lifetime of this editor session
 - **Always** — persist to `<project>/.silmaril/ai-permissions.json`
 
-### Flow
+### Permission request flow
 
-1. Tool call arrives at the registry
-2. Registry checks the permission store for the tool's category
-3. If no grant: emit a `ai:permission_request` Tauri event to the frontend
-4. Frontend shows a non-blocking toast/dialog: `"Claude Code wants to use scene mutations — Allow once / This session / Always / Deny"`
-5. User responds; grant is stored; tool executes (or returns a permission-denied error)
-6. If the server has no connected frontend (headless), deny by default unless `--ai-allow-all` flag is passed at startup (for CI use)
+1. Tool call arrives at the registry.
+2. Registry checks the permission store for the tool's category.
+3. If no grant exists: tool handler sends a `PermissionRequest { category, tool_name, response_tx: oneshot::Sender<GrantLevel> }` to the Tauri bridge via `permission_tx: mpsc::Sender<PermissionRequest>`.
+4. The Tauri bridge fires a `ai:permission_request` Tauri event to the frontend.
+5. Frontend shows a non-blocking dialog: `"Claude Code wants to use <category> — Allow once / This session / Always / Deny"`.
+6. User clicks a response. Frontend calls the Tauri command `ai_grant_permission(category: String, level: String)`.
+7. The Tauri bridge sends the grant level back on `response_tx`.
+8. The permission store records the grant (for Session/Always). The tool handler resumes.
+9. **Timeout:** if no response arrives within **30 seconds**, the permission request resolves as `Deny` and the tool returns JSON-RPC error `-32003 Permission denied (timed out)`.
+
+### Headless / CI mode
+
+When the editor is started with the environment variable `SILMARIL_AI_ALLOW_ALL=1` (or CLI flag `--ai-allow-all`), all permission requests are auto-granted as `Session`. This is intended only for CI pipelines where no human is present to approve dialogs. **Security note:** do not set this flag in development or production environments; it allows any MCP client on the machine to mutate the project without prompts.
 
 ### Persistence format
 
@@ -124,23 +171,51 @@ Mirrors Claude Code's permission model. No tool executes without a grant.
   "grants": {
     "read": "always",
     "scene": "session",
-    "build": null
+    "build": null,
+    "codegen": null,
+    "modules": null
   }
 }
 ```
 
 ---
 
-## Server Lifecycle
+## Tauri Bridge (`src-tauri/bridge/ai_bridge.rs`)
 
-- **Auto-start:** when a project is opened and the `ai` feature is compiled in
-- **Manual toggle:** View menu → "AI Server" or `Ctrl+Shift+A`
-- **Tauri commands:**
-  - `ai_server_start(project_path: String, port: u16) → Result<u16, String>` — returns bound port
-  - `ai_server_stop() → Result<(), String>`
-  - `ai_server_status() → ServerStatus` — `{ running: bool, port: Option<u16> }`
-- **Status bar:** shows `MCP :7878` badge when running (clickable to copy URL)
-- **Port conflict:** if `7878` is taken, auto-increment to `7879`, `7880`, etc. (up to 10 attempts)
+The bridge is the glue layer between `engine/ai` (no Tauri) and the Tauri runtime. It owns:
+
+1. **Scene command round-trip:** All AI-driven scene mutations and reads go through the TypeScript scene state (which is the source of truth). The bridge converts an `AiSceneCommand` enum into a Tauri event (`ai:scene_command { command, args }`) fired at the WebView. TypeScript receives it, calls `dispatchSceneCommand(command, args)`, then for commands that return data (read tools), posts a `ai:scene_response { request_id, data }` Tauri event back. The bridge correlates request and response via a `request_id` uuid, with a `oneshot::Receiver` waiting on the Rust side. **Timeout: 5 seconds.**
+
+2. **Permission request handling:** Receives `PermissionRequest` from `engine/ai` via `mpsc::Receiver`, fires `ai:permission_request` Tauri event, registers the `response_tx` in a `HashMap<request_id, oneshot::Sender<GrantLevel>>`. When `ai_grant_permission(request_id, level)` Tauri command is called by the frontend, the bridge looks up and sends on the oneshot.
+
+3. **Screenshot:** Receives a `ScreenshotRequest` from `engine/ai` via `mpsc::Receiver`. The bridge calls `NativeViewport::capture_png_bytes()` directly (no TypeScript round-trip needed — the capture logic is pure Rust/Vulkan). It base64-encodes the result and sends it back on the `oneshot::Sender` embedded in the request. **Timeout: 10 seconds.**
+
+**New Tauri commands exposed by the bridge:**
+
+| Command | Args | Purpose |
+|---------|------|---------|
+| `ai_server_start` | `project_path: String, port: u16` | Start MCP server, returns bound port |
+| `ai_server_stop` | — | Stop MCP server |
+| `ai_server_status` | — | `{ running: bool, port: Option<u16> }` |
+| `ai_grant_permission` | `request_id: String, level: String` | Resolve pending permission request |
+
+---
+
+## NativeViewport Screenshot API (New)
+
+The `NativeViewport` struct in `src-tauri/viewport/native_viewport.rs` currently has no screenshot method. A new method must be added:
+
+```rust
+pub fn capture_png_bytes(&self) -> Result<Vec<u8>, String>
+```
+
+This method:
+1. Signals the render thread to copy the current swapchain image into a CPU-readable buffer
+2. Waits for the copy to complete (blocking, max 1 second)
+3. Encodes the raw RGBA bytes as PNG using the `png` crate
+4. Returns the PNG bytes
+
+The render thread already has access to the `vk::Device`, `vk::Queue`, and swapchain images required for a readback blit. The `engine-renderer` crate's `capture` module (`src/capture/mod.rs`) contains the Vulkan blit + readback logic and can be reused.
 
 ---
 
@@ -149,65 +224,77 @@ Mirrors Claude Code's permission model. No tool executes without a grant.
 ```
 engine/ai/
 ├── src/
-│   ├── lib.rs           — public API: AiServer, start(), stop()
-│   ├── server.rs        — axum HTTP server setup, routes
-│   ├── mcp.rs           — MCP JSON-RPC protocol types + dispatcher
+│   ├── lib.rs              — public API: AiServer, AiBridge channels, start(), stop()
+│   ├── server.rs           — axum HTTP server setup, routes
+│   ├── mcp.rs              — MCP JSON-RPC 2.0 protocol types + dispatcher
 │   ├── tools/
-│   │   ├── mod.rs       — ToolRegistry, ToolHandler trait
-│   │   ├── read.rs      — get_scene_state, get_entity, list_assets, get_project_info
-│   │   ├── scene.rs     — entity/component mutation tools
-│   │   ├── project.rs   — build, modules, codegen tools
-│   │   └── screenshot.rs — viewport_screenshot (Tauri event round-trip)
-│   └── permissions.rs   — PermissionStore, grant check, persist to JSON
+│   │   ├── mod.rs          — ToolRegistry, ToolHandler trait, request/response types
+│   │   ├── read.rs         — get_scene_state, get_entity, list_assets, get_project_info
+│   │   ├── scene.rs        — entity/component mutation tools
+│   │   ├── project.rs      — build, modules, codegen tools
+│   │   └── screenshot.rs   — viewport_screenshot round-trip
+│   └── permissions.rs      — PermissionStore, grant check, persist to JSON
 └── Cargo.toml
 ```
 
-The crate has no dependency on Tauri. It communicates with the Tauri layer via two channels passed in at startup:
-- `scene_tx: mpsc::Sender<SceneCommand>` — to execute scene mutations
-- `permission_tx: broadcast::Sender<PermissionRequest>` — to request UI permission grants
-- `permission_rx` side held by the Tauri layer, which fires events to the frontend
+**Channels injected at `AiServer::new(...)`:**
 
-This keeps `engine/ai` testable without a Tauri runtime.
+```rust
+pub struct AiBridgeChannels {
+    /// Send a scene command to TypeScript and await the response.
+    pub scene_tx: mpsc::Sender<SceneRequest>,
+    /// Send a permission request and await the user's grant.
+    pub permission_tx: mpsc::Sender<PermissionRequest>,
+    /// Request a viewport screenshot and await PNG bytes.
+    pub screenshot_tx: mpsc::Sender<ScreenshotRequest>,
+}
+```
 
----
-
-## Screenshot Tool
-
-`viewport_screenshot` works via a request/response pattern:
-
-1. Tool handler sends a `ScreenshotRequest` on a one-shot channel
-2. Tauri layer receives it, calls the existing `NativeViewport` screenshot API
-3. Raw bytes returned on the one-shot channel
-4. Tool encodes to base64 PNG and returns as MCP content type `image`
-
-The viewport screenshot API already exists in `engine/renderer`. This tool is the only one that requires the Tauri process to be running with a visible window.
+All three are `mpsc::Sender`s; the Rust side of each embeds a `oneshot::Sender` for the response, making the round-trip async without coupling to Tauri.
 
 ---
 
-## Integration Points in `silmaril-editor`
+## Server Lifecycle
 
-- `engine/editor/Cargo.toml` — add `engine-ai` as optional dep under `[features] ai = ["engine-ai"]`
-- `src-tauri/lib.rs` — conditionally start `AiServer` after project open, register `ai_server_start/stop/status` commands
-- `src-tauri/bridge/ai_bridge.rs` (new) — thin bridge: receives `SceneCommand` from AI crate, calls `dispatchSceneCommand` equivalent in Rust; handles `PermissionRequest` by firing Tauri events
-- Status bar component — add `MCP :PORT` badge
+- **Auto-start:** when a project is opened and the `ai` feature is compiled in
+- **Manual toggle:** View menu → "AI Server" or `Ctrl+Shift+A`
+- **Port conflict:** if `7878` is taken, auto-increment to `7879`…`7888` (10 attempts), then error
+- **Status bar:** `MCP :7878` badge shown when running (clickable copies `http://localhost:7878` to clipboard)
 
 ---
 
 ## Error Handling
 
-- Invalid tool name → JSON-RPC error `-32601 Method not found`
-- Permission denied → JSON-RPC error `-32003 Permission denied` with message explaining which category to grant
-- Tool execution failure → JSON-RPC error `-32000 Server error` with the underlying error string
-- No project open → `-32002 No project open` for all mutation and project tools; read tools return empty state
+| Situation | JSON-RPC error |
+|-----------|----------------|
+| Unknown tool name | `-32601 Method not found` |
+| Permission denied | `-32003 Permission denied` (includes category name) |
+| Permission request timed out | `-32003 Permission denied (timed out waiting for user response)` |
+| No project open | `-32002 No project open` (mutation + project tools only; reads return empty state) |
+| Tool execution failure | `-32000 Server error` with underlying error string |
+| Scene response timed out | `-32000 Server error (scene command timed out)` |
+| Screenshot timed out | `-32000 Server error (screenshot timed out)` |
+
+---
+
+## Known Limitations
+
+- **Undo/redo:** AI-driven scene mutations go through `dispatchSceneCommand` in TypeScript, which does NOT currently push to the undo stack. The user cannot Ctrl+Z AI changes. This is a known limitation for v1; a future version should route AI mutations through the undo-aware command processor.
+- **Headless scene reads:** `get_scene_state` requires the TypeScript WebView to be running and responsive. Fully headless read of scene state is not supported in v1.
 
 ---
 
 ## Testing
 
-- Unit tests in `engine/ai/tests/` — tool registry dispatch, permission store grant/deny/persist logic
-- Integration test: start server, call `get_scene_state` via `reqwest`, assert response shape
-- Integration test: call a mutation tool without permission, assert `-32003`; grant permission, assert success
-- No Tauri runtime required for any test (channels are injected)
+- **Unit — permission store:** grant/deny/persist/load, timeout simulation
+- **Unit — tool registry:** dispatch to correct handler, unknown tool returns `-32601`
+- **Unit — permission bypass check for `silm_run_command`:** command with `scene` category denied when only `build` is granted
+- **Integration — read tools:** start server, call `get_scene_state` via `reqwest`, assert response matches `SceneSnapshot` schema
+- **Integration — permission round-trip:** call a mutation tool; inject simulated grant on `permission_rx` side; assert tool succeeds. Inject no response; assert `-32003` after timeout.
+- **Integration — permission denied:** call mutation tool with no grant and no injected response; assert `-32003`
+- **Integration — `SILMARIL_AI_ALLOW_ALL`:** set env var, call mutation tool, assert no permission prompt and success
+
+No Tauri runtime required for any test; all channels are injected via `AiBridgeChannels`.
 
 ---
 
