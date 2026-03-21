@@ -6,6 +6,8 @@ pub mod viewport;
 pub mod world;
 
 use bridge::commands;
+use bridge::registry::{CommandRegistryState, EditorCommand};
+use bridge::runner;
 use file_explorer::{
     get_file_tree, expand_dir, get_git_status, start_file_watch, stop_file_watch,
     open_in_editor, create_file, create_dir, rename_path, delete_path,
@@ -203,6 +205,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::NativeViewportState::new())
+        .manage(CommandRegistryState::new())
         .manage(file_explorer::FileWatcherState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
@@ -240,6 +243,9 @@ pub fn run() {
             create_dir,
             rename_path,
             delete_path,
+            runner::list_commands,
+            runner::run_command,
+            commands::scan_assets,
         ])
         .setup(|app| {
             use tauri::Manager;
@@ -277,6 +283,20 @@ pub fn run() {
                     install_nc_subclass(hwnd);
                     apply_dwm_window_style(hwnd);
                 }
+            }
+            // Register built-in editor commands
+            let cmd_state = app.state::<CommandRegistryState>();
+            {
+                let mut reg = cmd_state.0.lock().unwrap();
+                reg.register(EditorCommand::new("editor.toggle_grid", "Toggle Grid", "View").with_keybind("Ctrl+G"));
+                reg.register(EditorCommand::new("editor.toggle_snap", "Toggle Snap to Grid", "View"));
+                reg.register(EditorCommand::new("editor.toggle_projection", "Toggle Projection", "View"));
+                reg.register(EditorCommand::new("editor.new_scene", "New Scene", "Scene"));
+                reg.register(EditorCommand::new("editor.reset_camera", "Reset Camera", "View"));
+                reg.register(EditorCommand::new("editor.set_tool.select", "Set Tool: Select", "Tool").with_keybind("Q"));
+                reg.register(EditorCommand::new("editor.set_tool.move", "Set Tool: Move", "Tool").with_keybind("W"));
+                reg.register(EditorCommand::new("editor.set_tool.rotate", "Set Tool: Rotate", "Tool").with_keybind("E"));
+                reg.register(EditorCommand::new("editor.set_tool.scale", "Set Tool: Scale", "Tool").with_keybind("R"));
             }
             Ok(())
         })
