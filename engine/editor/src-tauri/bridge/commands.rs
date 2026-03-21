@@ -324,7 +324,11 @@ pub struct NativeViewportState {
     /// Active gizmo drag operation, if any. Cleared on `gizmo_drag_end`.
     pub drag_state: Mutex<Option<crate::bridge::gizmo_commands::DragState>>,
     /// Current gizmo mode: 0 = Move, 1 = Rotate, 2 = Scale.
-    pub gizmo_mode: std::sync::atomic::AtomicU8,
+    /// Stored as `Arc<AtomicU8>` so it can be cloned into the render thread.
+    pub gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+    /// The entity currently selected in the hierarchy, or `None`.
+    /// Stored as `Arc<Mutex<Option<u64>>>` so the render thread can read it.
+    pub selected_entity_id: std::sync::Arc<Mutex<Option<u64>>>,
 }
 
 impl Default for NativeViewportState {
@@ -332,7 +336,8 @@ impl Default for NativeViewportState {
         Self {
             registry: Mutex::new(ViewportRegistry::new()),
             drag_state: Mutex::new(None),
-            gizmo_mode: std::sync::atomic::AtomicU8::new(0),
+            gizmo_mode: std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            selected_entity_id: std::sync::Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -871,6 +876,22 @@ pub fn viewport_set_projection(
     Ok(())
 }
 
+/// Update which entity is selected in the viewport gizmo renderer.
+///
+/// Called by the frontend whenever `selectedEntityId` changes in the hierarchy.
+/// Pass `None` to deselect.
+#[tauri::command]
+pub fn set_selected_entity(
+    entity_id: Option<u64>,
+    viewport_state: tauri::State<'_, NativeViewportState>,
+) -> Result<(), String> {
+    *viewport_state
+        .selected_entity_id
+        .lock()
+        .map_err(|e| e.to_string())? = entity_id;
+    Ok(())
+}
+
 /// Begin monitoring a pop-out window drag for dock-back gesture.
 ///
 /// Spawns a background thread that polls `GetAsyncKeyState(VK_LBUTTON)` to
@@ -1328,6 +1349,7 @@ fn apply_scene_action(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use engine_core::{Transform, World};
     use std::sync::{Arc, RwLock};
 
@@ -1382,5 +1404,20 @@ mod tests {
         }
         let w = world.read().unwrap();
         assert!(w.get::<Transform>(entity).is_none());
+    }
+
+    #[test]
+    fn selected_entity_id_default_is_none() {
+        let state = NativeViewportState::new();
+        assert_eq!(*state.selected_entity_id.lock().unwrap(), None);
+    }
+
+    #[test]
+    fn selected_entity_id_can_be_set_and_cleared() {
+        let state = NativeViewportState::new();
+        *state.selected_entity_id.lock().unwrap() = Some(42);
+        assert_eq!(*state.selected_entity_id.lock().unwrap(), Some(42));
+        *state.selected_entity_id.lock().unwrap() = None;
+        assert_eq!(*state.selected_entity_id.lock().unwrap(), None);
     }
 }

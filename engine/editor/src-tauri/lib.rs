@@ -361,6 +361,7 @@ pub fn run() {
             bridge::gizmo_commands::gizmo_drag,
             bridge::gizmo_commands::gizmo_drag_end,
             bridge::gizmo_commands::set_gizmo_mode,
+            commands::set_selected_entity,
         ])
         .setup(move |app| {
             bridge::registry_bridge::setup_registry_watch(registry_rx, app.handle().clone());
