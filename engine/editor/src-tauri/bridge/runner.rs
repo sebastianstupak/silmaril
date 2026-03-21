@@ -1,14 +1,19 @@
 // engine/editor/src-tauri/bridge/runner.rs
+// NOTE: This file is being incrementally replaced as part of the command-arch refactor.
+// Task 5 will rewrite this file completely. The stubs below keep compilation working
+// while registry.rs is updated (EditorCommand removed; CommandRegistryState is now a stub).
 use serde::Serialize;
 use tauri::Emitter;
 
-use super::registry::{CommandRegistryState, EditorCommand};
+use super::registry::{CommandRegistryState, CommandSpec};
 
 #[tauri::command]
 pub fn list_commands(
-    registry: tauri::State<CommandRegistryState>,
-) -> Vec<EditorCommand> {
-    registry.0.lock().unwrap().list()
+    _registry: tauri::State<CommandRegistryState>,
+) -> Vec<CommandSpec> {
+    // CommandRegistryState is a temporary stub (Task 6 wires real state).
+    // Return empty list until Task 5/6 complete the wiring.
+    Vec::new()
 }
 
 #[derive(Serialize, Clone)]
@@ -19,15 +24,11 @@ struct RunCommandEvent {
 #[tauri::command]
 pub fn run_command(
     id: String,
-    registry: tauri::State<CommandRegistryState>,
+    _registry: tauri::State<CommandRegistryState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let known = registry.0.lock().unwrap().list();
-    let exists = known.iter().any(|c| c.id == id);
-    if !exists {
-        return Err(format!("Unknown command: {}", id));
-    }
-
+    // CommandRegistryState is a temporary stub — always emit the event for now.
+    // Task 5 will replace this with run_command_inner using Arc<Mutex<CommandRegistry>>.
     app.emit("editor-run-command", RunCommandEvent { id })
         .map_err(|e| e.to_string())?;
 
@@ -36,21 +37,6 @@ pub fn run_command(
 
 #[cfg(test)]
 mod tests {
-    use super::super::registry::{CommandRegistry, EditorCommand};
-
-    #[test]
-    fn list_after_register() {
-        let mut reg = CommandRegistry::new();
-        reg.register(EditorCommand::new("editor.toggle_grid", "Toggle Grid", "View"));
-        let list = reg.list();
-        assert_eq!(list.len(), 1);
-        assert_eq!(list[0].id, "editor.toggle_grid");
-    }
-
-    #[test]
-    fn unknown_command_returns_err() {
-        let reg = CommandRegistry::new();
-        let ids: Vec<_> = reg.list().iter().map(|c| c.id.clone()).collect();
-        assert!(!ids.contains(&"editor.nonexistent".to_string()));
-    }
+    // Old tests removed — they referenced EditorCommand which no longer exists.
+    // New runner tests will be added in Task 5.
 }

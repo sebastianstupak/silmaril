@@ -9,7 +9,7 @@ pub mod world;
 use std::sync::Mutex;
 
 use bridge::commands;
-use bridge::registry::{CommandRegistryState, EditorCommand};
+use bridge::registry::CommandRegistryState;
 use bridge::runner;
 use bridge::{
     builtin_schemas::register_builtin_schemas,
@@ -353,20 +353,9 @@ pub fn run() {
                     apply_dwm_window_style(hwnd);
                 }
             }
-            // Register built-in editor commands
-            let cmd_state = app.state::<CommandRegistryState>();
-            {
-                let mut reg = cmd_state.0.lock().unwrap();
-                reg.register(EditorCommand::new("editor.toggle_grid", "Toggle Grid", "View").with_keybind("Ctrl+G"));
-                reg.register(EditorCommand::new("editor.toggle_snap", "Toggle Snap to Grid", "View"));
-                reg.register(EditorCommand::new("editor.toggle_projection", "Toggle Projection", "View"));
-                reg.register(EditorCommand::new("editor.new_scene", "New Scene", "Scene"));
-                reg.register(EditorCommand::new("editor.reset_camera", "Reset Camera", "View"));
-                reg.register(EditorCommand::new("editor.set_tool.select", "Set Tool: Select", "Tool").with_keybind("Q"));
-                reg.register(EditorCommand::new("editor.set_tool.move", "Set Tool: Move", "Tool").with_keybind("W"));
-                reg.register(EditorCommand::new("editor.set_tool.rotate", "Set Tool: Rotate", "Tool").with_keybind("E"));
-                reg.register(EditorCommand::new("editor.set_tool.scale", "Set Tool: Scale", "Tool").with_keybind("R"));
-            }
+            // TODO(Task 6): Register built-in editor commands via Arc<Mutex<CommandRegistry>>.
+            // CommandRegistryState is temporarily a stub; the real wiring happens in Task 6.
+            let _cmd_state = app.state::<CommandRegistryState>();
             Ok(())
         })
         .run(tauri::generate_context!())
