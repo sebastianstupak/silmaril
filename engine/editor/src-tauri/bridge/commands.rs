@@ -905,3 +905,52 @@ fn dock_drag_thread(
         }
     }
 }
+
+// ── Asset scanning ────────────────────────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+pub struct AssetInfo {
+    pub path: String,
+    pub asset_type: String,
+}
+
+fn ext_to_asset_type(ext: &str) -> &'static str {
+    match ext {
+        "png" | "jpg" | "jpeg" | "webp" => "texture",
+        "gltf" | "glb" => "mesh",
+        "wav" | "ogg" | "mp3" => "audio",
+        "toml" => "config",
+        _ => "unknown",
+    }
+}
+
+#[tauri::command]
+pub fn scan_assets(project_path: String) -> Result<Vec<AssetInfo>, String> {
+    let root = std::path::Path::new(&project_path);
+    if !root.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    const ASSET_EXTS: &[&str] = &["png", "jpg", "jpeg", "webp", "gltf", "glb", "wav", "ogg", "mp3", "toml"];
+    let mut assets = Vec::new();
+
+    fn walk(dir: &std::path::Path, exts: &[&str], out: &mut Vec<AssetInfo>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, exts, out);
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if exts.contains(&ext.to_lowercase().as_str()) {
+                    out.push(AssetInfo {
+                        path: path.to_string_lossy().to_string(),
+                        asset_type: ext_to_asset_type(&ext.to_lowercase()).to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    walk(root, ASSET_EXTS, &mut assets);
+    Ok(assets)
+}
