@@ -88,8 +88,28 @@ pub fn template_execute(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
     command: TemplateCommand,
+    world_state: State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
 ) -> Result<CommandResult, IpcError> {
-    template_execute_inner(&state, template_path, command)
+    // Extract entity_id before moving command into inner (TemplateCommand is Clone).
+    let transform_entity_id = match &command {
+        TemplateCommand::SetComponent { id, type_name, .. } if type_name == "Transform" => {
+            Some(*id)
+        }
+        _ => None,
+    };
+
+    let result = template_execute_inner(&state, template_path, command)?;
+
+    if let Some(entity_id) = transform_entity_id {
+        sync_transform_to_ecs(entity_id, &result.new_state, &world_state, &app)
+            .map_err(|e| IpcError {
+                code: engine_core::error::ErrorCode::TemplateNoTemplateOpen as u32,
+                message: e,
+            })?;
+    }
+
+    Ok(result)
 }
 
 /// Undoes the last command on the given template, returning the undone [`ActionId`].
@@ -106,8 +126,22 @@ pub fn template_undo_inner(
 pub fn template_undo(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
+    world_state: State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
 ) -> Result<Option<ActionId>, IpcError> {
-    template_undo_inner(&state, template_path)
+    let result = template_undo_inner(&state, template_path.clone())?;
+    if result.is_some() {
+        let guard = state.lock().unwrap();
+        let path = std::path::PathBuf::from(&template_path);
+        if let Some(proc) = guard.processors.get(&path) {
+            sync_all_transforms(proc.state_ref(), &world_state, &app)
+                .map_err(|e| IpcError {
+                    code: engine_core::error::ErrorCode::TemplateNoTemplateOpen as u32,
+                    message: e,
+                })?;
+        }
+    }
+    Ok(result)
 }
 
 /// Redoes the last undone command on the given template, returning the redone [`ActionId`].
@@ -124,8 +158,22 @@ pub fn template_redo_inner(
 pub fn template_redo(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
+    world_state: State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
 ) -> Result<Option<ActionId>, IpcError> {
-    template_redo_inner(&state, template_path)
+    let result = template_redo_inner(&state, template_path.clone())?;
+    if result.is_some() {
+        let guard = state.lock().unwrap();
+        let path = std::path::PathBuf::from(&template_path);
+        if let Some(proc) = guard.processors.get(&path) {
+            sync_all_transforms(proc.state_ref(), &world_state, &app)
+                .map_err(|e| IpcError {
+                    code: engine_core::error::ErrorCode::TemplateNoTemplateOpen as u32,
+                    message: e,
+                })?;
+        }
+    }
+    Ok(result)
 }
 
 /// Returns a summary of all recorded actions for the given template.
@@ -156,7 +204,6 @@ pub fn template_history(
 /// `None` if the entity is absent or has no Transform component.
 ///
 /// `TemplateState.entities` is a `Vec`, not a `HashMap` — use `iter().find()`.
-#[allow(dead_code)] // called from sync_transform_to_ecs; callers added in Task 4
 fn extract_transform_from_template(
     entity_id: u64,
     template_state: &TemplateState,
@@ -195,7 +242,6 @@ fn extract_transform_from_template(
 /// Non-fatal if the entity has no Transform in `TemplateState` — logs a warning
 /// and returns `Ok(())`.  Returns `Err` only if `entity_id > u32::MAX` or a
 /// world-lock error occurs.
-#[allow(dead_code)] // wired in by Task 4 (template_execute/undo/redo) and Task 5 (gizmo_drag_end)
 pub(crate) fn sync_transform_to_ecs(
     entity_id: u64,
     template_state: &TemplateState,
@@ -246,7 +292,6 @@ pub(crate) fn sync_transform_to_ecs(
 /// Called after template undo/redo since the affected entity_id is not
 /// returned by `CommandProcessor::undo()`. Syncing all is safe (idempotent)
 /// and correct for the typical small templates used in the editor.
-#[allow(dead_code)] // wired in by Task 4 (template_undo/redo wrappers)
 pub(crate) fn sync_all_transforms(
     template_state: &TemplateState,
     world_state: &crate::state::SceneWorldState,
@@ -301,5 +346,24 @@ mod tests {
         let ts = make_template_with_transform(1, 0.0, 0.0, 0.0);
         let result = extract_transform_from_template(99, &ts);
         assert!(result.is_none(), "entity 99 doesn't exist");
+    }
+
+    #[test]
+    fn extract_transform_scale_parsed_correctly() {
+        let data = json!({
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+            "scale":    {"x": 2.0, "y": 3.0, "z": 4.0}
+        });
+        let mut ts = TemplateState::new("test");
+        ts.entities.push(TemplateEntity {
+            id: 1,
+            name: None,
+            components: vec![TemplateComponent { type_name: "Transform".to_string(), data }],
+        });
+        let (_, _, scl) = extract_transform_from_template(1, &ts).unwrap();
+        assert!((scl.x - 2.0).abs() < 1e-4);
+        assert!((scl.y - 3.0).abs() < 1e-4);
+        assert!((scl.z - 4.0).abs() < 1e-4);
     }
 }
