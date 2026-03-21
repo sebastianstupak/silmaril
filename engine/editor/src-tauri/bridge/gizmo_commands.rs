@@ -10,7 +10,7 @@
 //!    The backend mutates the entity transform and emits
 //!    `entity-transform-changed` so the inspector stays in sync.
 //! 3. On mouse-up the frontend calls `gizmo_drag_end`.
-//!    The backend commits a `SceneAction::SetTransform` to the undo stack.
+//!    The backend records a `SetComponent{Transform}` in the template CommandProcessor.
 //! 4. The frontend (or keyboard shortcuts) call `set_gizmo_mode` to switch
 //!    between Move / Rotate / Scale.
 
@@ -26,8 +26,6 @@ pub struct DragState {
     pub viewport_id: String,
     pub axis: crate::viewport::GizmoAxis,
     pub mode: crate::viewport::GizmoMode,
-    /// Transform of the entity at the moment the drag started (for undo).
-    pub transform_before: crate::state::SerializedTransform,
     /// Screen position of the last drag event.
     pub last_screen: (f32, f32),
     /// Camera matrices captured at drag-start (used for consistent feel).
@@ -181,21 +179,11 @@ pub fn gizmo_hit_test(
         let handle_end = entity_pos + *axis_dir * gizmo_scale;
         let radius = gizmo_scale * 0.1;
         if ray_capsule_intersects(ray_origin, ray_dir, entity_pos, handle_end, radius) {
-            let transform_before = {
-                let world = world_state.inner().0.read().ok()?;
-                let t = world.get::<engine_core::Transform>(entity)?;
-                crate::state::SerializedTransform {
-                    position: [t.position.x, t.position.y, t.position.z],
-                    rotation: [t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w],
-                    scale: [t.scale.x, t.scale.y, t.scale.z],
-                }
-            };
             *viewport_state.drag_state.lock().ok()? = Some(DragState {
                 entity_id,
                 viewport_id,
                 axis: *axis,
                 mode,
-                transform_before,
                 last_screen: (screen_x, screen_y),
                 camera_view: view,
                 camera_proj: proj,
@@ -358,14 +346,45 @@ pub fn gizmo_drag(
     Ok(())
 }
 
-/// Finalise an active drag: clear [`DragState`] and push a `SetTransform`
-/// action onto the undo stack.
+/// Inner logic of `gizmo_drag_end` that can be tested without Tauri State.
+///
+/// Records the final transform in the template's CommandProcessor.
+/// If `template_path` is empty, logs a warning and returns `Ok(())` — the ECS
+/// already has the final state from the drag; only undo history is skipped.
+pub fn maybe_record_gizmo_drag(
+    template_path: &str,
+    entity_id: u64,
+    after_json: serde_json::Value,
+    editor_state: &std::sync::Mutex<crate::bridge::template_commands::EditorState>,
+) -> Result<(), String> {
+    if template_path.is_empty() {
+        tracing::warn!("gizmo_drag_end: no active template, undo history not recorded");
+        return Ok(());
+    }
+    crate::bridge::template_commands::template_execute_inner(
+        editor_state,
+        template_path.to_string(),
+        engine_ops::command::TemplateCommand::SetComponent {
+            id: entity_id,
+            type_name: "Transform".to_string(),
+            data: after_json,
+        },
+    )
+    .map_err(|e| e.message)?;
+    Ok(())
+}
+
+/// Finalise an active drag: clear [`DragState`], record the final transform as
+/// a `SetComponent{Transform}` in the template CommandProcessor, and sync the
+/// ECS world so the inspector stays in sync.
 #[tauri::command]
 pub fn gizmo_drag_end(
     viewport_id: String,
+    template_path: String,
     viewport_state: tauri::State<'_, super::commands::NativeViewportState>,
+    editor_state: tauri::State<'_, std::sync::Mutex<crate::bridge::template_commands::EditorState>>,
     world_state: tauri::State<'_, crate::state::SceneWorldState>,
-    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     let drag = {
         let mut lock = viewport_state.drag_state.lock().map_err(|e| e.to_string())?;
@@ -375,39 +394,44 @@ pub fn gizmo_drag_end(
         return Ok(());
     };
     if ds.viewport_id != viewport_id {
-        // Drag was for a different viewport — put it back and ignore.
         *viewport_state.drag_state.lock().map_err(|e| e.to_string())? = Some(ds);
         return Ok(());
     }
 
     debug_assert!(ds.entity_id <= u32::MAX as u64, "entity_id truncation");
-    // FIXME: hardcodes generation 0 — will break after any entity slot reuse.
+    // FIXME: hardcodes generation 0 — will break after entity slot reuse.
     let entity = engine_core::Entity::new(ds.entity_id as u32, 0);
-    let world = world_state.inner().0.read().map_err(|e| e.to_string())?;
-    let t = world
-        .get::<engine_core::Transform>(entity)
-        .ok_or_else(|| format!("Entity {} not found", ds.entity_id))?;
-    let after = crate::state::SerializedTransform {
-        position: [t.position.x, t.position.y, t.position.z],
-        rotation: [t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w],
-        scale: [t.scale.x, t.scale.y, t.scale.z],
+
+    // Read final transform from ECS (set during drag).
+    let after_json = {
+        let world = world_state.0.read().map_err(|e| e.to_string())?;
+        let t = world
+            .get::<engine_core::Transform>(entity)
+            .ok_or_else(|| format!("Entity {} not found", ds.entity_id))?;
+        serde_json::json!({
+            "position": {"x": t.position.x, "y": t.position.y, "z": t.position.z},
+            "rotation": {"x": t.rotation.x, "y": t.rotation.y, "z": t.rotation.z, "w": t.rotation.w},
+            "scale":    {"x": t.scale.x,    "y": t.scale.y,    "z": t.scale.z},
+        })
     };
-    drop(world);
 
-    tracing::debug!(
-        entity_id = ds.entity_id,
-        before = ?ds.transform_before,
-        after = ?after,
-        "gizmo_drag_end: pushing SetTransform undo"
-    );
+    maybe_record_gizmo_drag(&template_path, ds.entity_id, after_json.clone(), &editor_state)?;
 
-    undo_state.lock().map_err(|e| e.to_string())?.push(
-        crate::state::SceneAction::SetTransform {
-            entity_id: ds.entity_id,
-            before: ds.transform_before,
-            after,
-        },
-    );
+    // Sync TemplateState → ECS (emit entity-transform-changed so inspector stays live).
+    if !template_path.is_empty() {
+        let guard = editor_state.lock().map_err(|e| e.to_string())?;
+        let path = std::path::PathBuf::from(&template_path);
+        if let Some(proc) = guard.processors.get(&path) {
+            crate::bridge::template_commands::sync_transform_to_ecs(
+                ds.entity_id,
+                proc.state_ref(),
+                &world_state,
+                &app,
+            )?;
+        }
+    }
+
+    tracing::debug!(entity_id = ds.entity_id, template_path = %template_path, "gizmo_drag_end: SetComponent recorded");
     Ok(())
 }
 
@@ -488,5 +512,45 @@ mod tests {
             "quaternion w component mismatch: got {}",
             q.w
         );
+    }
+
+    #[test]
+    fn gizmo_drag_end_empty_path_returns_ok_without_template() {
+        let after_json = serde_json::json!({
+            "position": {"x": 1.0, "y": 0.0, "z": 0.0},
+            "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+            "scale":    {"x": 1.0, "y": 1.0, "z": 1.0}
+        });
+        let result = maybe_record_gizmo_drag("", 1, after_json, &std::sync::Mutex::new(
+            crate::bridge::template_commands::EditorState::new()
+        ));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn gizmo_drag_end_valid_path_records_to_command_processor() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create a minimal template YAML
+        let mut f = NamedTempFile::with_suffix(".yaml").unwrap();
+        writeln!(f, "name: test\nentities:\n  - id: 1\n    name: Cube\n    components:\n      - type_name: Transform\n        data: '{{\"position\":{{\"x\":0,\"y\":0,\"z\":0}},\"rotation\":{{\"x\":0,\"y\":0,\"z\":0,\"w\":1}},\"scale\":{{\"x\":1,\"y\":1,\"z\":1}}}}'").unwrap();
+        let path = f.path().to_str().unwrap().to_string();
+
+        let editor_state = std::sync::Mutex::new(crate::bridge::template_commands::EditorState::new());
+        // Open the template so the processor is registered
+        crate::bridge::template_commands::template_open_inner(&editor_state, path.clone()).unwrap();
+
+        let after_json = serde_json::json!({
+            "position": {"x": 5.0, "y": 0.0, "z": 0.0},
+            "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+            "scale":    {"x": 1.0, "y": 1.0, "z": 1.0}
+        });
+        let result = maybe_record_gizmo_drag(&path, 1, after_json, &editor_state);
+        assert!(result.is_ok(), "result: {:?}", result);
+
+        // Verify the action was recorded (history should have one entry)
+        let history = crate::bridge::template_commands::template_history_inner(&editor_state, path).unwrap();
+        assert_eq!(history.len(), 1, "should have 1 undo entry");
     }
 }
