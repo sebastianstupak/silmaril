@@ -41,8 +41,22 @@ let _viewportFocused = false;
 export function setViewportFocused(focused: boolean): void { _viewportFocused = focused; }
 export function getViewportFocused(): boolean { return _viewportFocused; }
 
+// When the OS takes focus away from the window (Alt+Tab etc.) while the mouse
+// is inside the viewport, no mouseleave fires. Reset _viewportFocused so that
+// subsequent Ctrl+Z is not incorrectly routed to sceneUndo.
+if (typeof window !== 'undefined') {
+  window.addEventListener('blur', () => {
+    _viewportFocused = false;
+  });
+}
+
+// Guard against concurrent in-flight IPC calls from rapid Ctrl+Z/Ctrl+Y holds.
+let _sceneUndoRedoInFlight = false;
+
 /** Undo the last scene action and update local canUndo/canRedo state. */
 export async function sceneUndo(): Promise<void> {
+  if (_sceneUndoRedoInFlight) return;
+  _sceneUndoRedoInFlight = true;
   try {
     const result = await _sceneUndo();
     _sceneCanUndo = result.canUndo;
@@ -50,11 +64,15 @@ export async function sceneUndo(): Promise<void> {
     notify();
   } catch (e) {
     logError(`Scene undo failed: ${e}`);
+  } finally {
+    _sceneUndoRedoInFlight = false;
   }
 }
 
 /** Redo the last undone scene action and update local canUndo/canRedo state. */
 export async function sceneRedo(): Promise<void> {
+  if (_sceneUndoRedoInFlight) return;
+  _sceneUndoRedoInFlight = true;
   try {
     const result = await _sceneRedo();
     _sceneCanUndo = result.canUndo;
@@ -62,6 +80,8 @@ export async function sceneRedo(): Promise<void> {
     notify();
   } catch (e) {
     logError(`Scene redo failed: ${e}`);
+  } finally {
+    _sceneUndoRedoInFlight = false;
   }
 }
 
