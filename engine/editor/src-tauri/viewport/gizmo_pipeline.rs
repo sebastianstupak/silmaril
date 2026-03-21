@@ -22,7 +22,7 @@ mod imp {
 
     /// One vertex in gizmo-local space.
     #[repr(C)]
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
     pub struct GizmoVertex {
         pub pos: [f32; 3],
     }
@@ -326,10 +326,10 @@ mod imp {
 
     impl GizmoPipeline {
         pub fn new(
-            device: &ash::Device,
-            render_pass: vk::RenderPass,
             context: &VulkanContext,
+            render_pass: vk::RenderPass,
         ) -> Result<Self, String> {
+            let device = &context.device;
             let (vert_spirv, frag_spirv) = get_or_compile_shaders()?;
             let vert_shader =
                 ShaderModule::from_spirv(device, vert_spirv, vk::ShaderStageFlags::VERTEX, "main")
@@ -787,7 +787,7 @@ mod portable {
 
     /// One vertex in gizmo-local space.
     #[repr(C)]
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
     pub struct GizmoVertex {
         pub pos: [f32; 3],
     }
