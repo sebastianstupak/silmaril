@@ -273,12 +273,33 @@
     bottomHeight = clampBottom(bottomHeight - delta);
   }
 
+  // Subscribe to undo/redo state changes.
+  $effect(() => {
+    return subscribeUndoHistory(() => {
+      canUndoState = getCanUndo();
+      canRedoState = getCanRedo();
+    });
+  });
+
   // Keyboard shortcuts: Ctrl+Tab (tab cycle) + layout keybinds (per-slot).
   $effect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Tab' && e.ctrlKey) {
         e.preventDefault();
         cycleActiveTab(e.shiftKey ? -1 : 1);
+        return;
+      }
+      // Undo: Ctrl+Z
+      if (e.key === 'z' && e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if ((e.key === 'y' && e.ctrlKey && !e.shiftKey && !e.altKey) ||
+          (e.key === 'z' && e.ctrlKey && e.shiftKey && !e.altKey)) {
+        e.preventDefault();
+        redo();
         return;
       }
       // Omnibar: Ctrl+K
@@ -366,6 +387,20 @@
     }
 
     // Register UI-only commands in the frontend registry
+    registerCommand({
+      id: 'edit.undo',
+      label: 'Undo',
+      category: 'Edit',
+      keybind: 'Ctrl+Z',
+      run: undo,
+    });
+    registerCommand({
+      id: 'edit.redo',
+      label: 'Redo',
+      category: 'Edit',
+      keybind: 'Ctrl+Y',
+      run: redo,
+    });
     registerCommand({
       id: 'ui.open_settings',
       label: 'Open Settings',
@@ -464,6 +499,10 @@
         onSettingsOpen={() => showSettings = true}
         onOpenProject={handleOpenProject}
         onLayoutReset={handleLayoutReset}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndoState}
+        canRedo={canRedoState}
         compactMenu={settings.compactMenu}
         bind:omnibarOpen
         projectPath={editorState?.project_path ?? null}
