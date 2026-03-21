@@ -43,6 +43,7 @@ pub fn run_command_inner(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_commands(
     registry: tauri::State<Arc<Mutex<CommandRegistry>>>,
 ) -> Vec<CommandSpec> {
@@ -55,6 +56,7 @@ struct RunCommandEvent {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn run_command(
     id: String,
     args: Option<serde_json::Value>,

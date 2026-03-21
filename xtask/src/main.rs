@@ -1,5 +1,6 @@
 mod benchmark;
 mod build;
+mod codegen;
 mod dev;
 mod docker;
 mod phase2;
@@ -61,6 +62,10 @@ enum Commands {
         #[command(subcommand)]
         command: phase2::Phase2Command,
     },
+    /// Generate TypeScript bindings from Tauri command types
+    Codegen,
+    /// Verify generated TypeScript bindings are up to date (for CI)
+    CheckBindings,
     /// Run all checks (format + clippy + test) - shorthand
     Check,
     /// Format all code - shorthand
@@ -109,6 +114,8 @@ fn main() -> Result<()> {
         Commands::Quality { command } => quality::execute(command),
         Commands::Pgo { command } => pgo::execute(command),
         Commands::Phase2 { command } => phase2::execute(command),
+        Commands::Codegen => codegen::run_codegen(),
+        Commands::CheckBindings => codegen::run_check_bindings(),
         Commands::Check => quality::execute(quality::QualityCommand::Check),
         Commands::Fmt => quality::execute(quality::QualityCommand::Fmt),
         Commands::Clippy => quality::execute(quality::QualityCommand::Clippy),

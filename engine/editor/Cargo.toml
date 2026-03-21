@@ -15,6 +15,14 @@ path = "src-tauri/lib.rs"
 name = "silmaril-editor"
 path = "src-tauri/main.rs"
 
+[[bin]]
+name = "silmaril-editor-codegen"
+path = "src-tauri/bin/codegen.rs"
+required-features = ["codegen"]
+
+[features]
+codegen = []
+
 [dependencies]
 engine-ops = { path = "../ops" }
 engine-core = { path = "../core" }
@@ -35,7 +43,8 @@ ignore = "0.4"
 portable-pty = "0.8"
 which = "4"
 uuid = { version = "1", features = ["v4"] }
-specta = { version = "2.0.0-rc.21", features = ["derive"] }
+specta = { version = "2.0.0-rc.21", features = ["derive", "serde_json"] }
+specta-typescript = "0.0.9"
 tauri-specta = { version = "2.0.0-rc.21", features = ["derive", "typescript"] }
 tokio = { version = "1", features = ["sync"] }
 
