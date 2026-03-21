@@ -154,7 +154,7 @@ Mirrors Claude Code's permission model. No mutation or build tool executes witho
 3. If no grant exists: tool handler sends a `PermissionRequest { category, tool_name, response_tx: oneshot::Sender<GrantLevel> }` to the Tauri bridge via `permission_tx: mpsc::Sender<PermissionRequest>`.
 4. The Tauri bridge fires a `ai:permission_request` Tauri event to the frontend.
 5. Frontend shows a non-blocking dialog: `"Claude Code wants to use <category> — Allow once / This session / Always / Deny"`.
-6. User clicks a response. Frontend calls the Tauri command `ai_grant_permission(category: String, level: String)`.
+6. User clicks a response. Frontend calls the Tauri command `ai_grant_permission(request_id: String, level: String)`.
 7. The Tauri bridge sends the grant level back on `response_tx`.
 8. The permission store records the grant (for Session/Always). The tool handler resumes.
 9. **Timeout:** if no response arrives within **30 seconds**, the permission request resolves as `Deny` and the tool returns JSON-RPC error `-32003 Permission denied (timed out)`.
