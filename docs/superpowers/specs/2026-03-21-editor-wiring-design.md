@@ -76,9 +76,9 @@ export function removeComponent(entityId: number, componentName: string): void
 // 4. invoke('remove_component', { entityId, component: componentName }) — fire-and-forget
 ```
 
-Also add both to `dispatchSceneCommand` router:
-- `'add_component'` → `addComponent(args.entity_id, args.component)`
-- `'remove_component'` → `removeComponent(args.entity_id, args.component)`
+Also add both to `dispatchSceneCommand` router (use `args.id` to match the existing convention used by all other cases):
+- `'add_component'` → `addComponent(args.id as number, args.component as string)`
+- `'remove_component'` → `removeComponent(args.id as number, args.component as string)`
 
 ### 2.4 Tauri commands (new, `bridge/commands.rs`)
 
@@ -115,20 +115,22 @@ Register both in `invoke_handler!` and `api.ts`.
 
 - Add prop `recentItems: RecentItem[] = []`
 - Replace `buildResults(query, merged, entities, assets, [])` → `buildResults(query, merged, entities, assets, recentItems)`
+- Add imports: `import { openProject, scanProjectEntities } from '$lib/api'` (use api.ts wrappers — not raw `invoke` — so browser/Playwright mode works)
 - Implement `case 'recent'` in `execute()`:
   ```typescript
   case 'recent':
-    // Re-open the project
-    const state = await invoke<EditorState>('open_project', { path: result.path });
-    const entities = await invoke<EntityInfo[]>('scan_project_entities', { projectPath: result.path });
-    setEntities(entities);
+    const state = await openProject(result.path);
+    const scannedEntities = await scanProjectEntities(result.path);
+    setEntities(scannedEntities);
     setSelectedEntityId(null);
     break;
   ```
 
 ### 3.3 TitleBar.svelte
 
-- Add `recentItems` prop (passed through to Omnibar)
+- Add `recentItems: RecentItem[] = []` to the `interface Props` block
+- Add `recentItems = []` to the `$props()` destructure
+- Pass `{recentItems}` to `<Omnibar>` in the template
 
 ---
 
@@ -162,7 +164,7 @@ All commands already exist in `scene/commands.ts` — no new scene commands need
 
 ### 4.3 HierarchyWrapper.svelte
 
-- Pass `onCreateEntity`, `onDeleteEntity`, `onDuplicateEntity`, `onRenameEntity` callbacks if needed (or HierarchyPanel imports commands directly — prefer direct import, consistent with InspectorPanel pattern)
+- **No changes needed.** HierarchyPanel imports all CRUD commands directly from `scene/commands.ts`. The wrapper's existing props (`entities`, `selectedId`, `onSelect`) are unchanged.
 
 ---
 
@@ -195,9 +197,10 @@ All commands already exist in `scene/commands.ts` — no new scene commands need
 
 ### 6.1 App.svelte — populate on project open
 
-After `openProject()` + `scanProjectEntities()` succeed:
+After `openProject()` + `scanProjectEntities()` succeed (use `scanAssets` from `api.ts`, not raw `invoke`):
 ```typescript
-const rawAssets = await invoke<{ path: string; asset_type: string }[]>('scan_assets', { projectPath: path });
+// api.ts already wraps scan_assets — add scanAssets() there (see section 7)
+const rawAssets = await scanAssets(path);
 setAssets(rawAssets.map(a => ({
   path: a.path,
   assetType: a.asset_type as AssetEntry['assetType'],
@@ -227,9 +230,10 @@ Already implemented in `Omnibar.svelte` — calls `scan_assets` IPC lazily. Chan
 ```typescript
 export async function addComponent(entityId: number, component: string): Promise<void>
 export async function removeComponent(entityId: number, component: string): Promise<void>
+export async function scanAssets(projectPath: string): Promise<{ path: string; asset_type: string }[]>
 ```
 
-Both with `isTauri` guard and browser no-op fallback.
+All three with `isTauri` guard and browser no-op/mock fallback (consistent with existing api.ts pattern).
 
 ---
 
@@ -246,7 +250,7 @@ Both with `isTauri` guard and browser no-op fallback.
 - `engine/editor/src/lib/components/HierarchyPanel.svelte` — full CRUD UI
 - `engine/editor/src/lib/docking/panels/HierarchyWrapper.svelte` — (minor, if needed)
 - `engine/editor/src/lib/components/InspectorPanel.svelte` — remove/add component UI
-- `engine/editor/src/lib/components/AssetsPanel.svelte` — wired from assets store
+- `engine/editor/src/lib/docking/panels/AssetsPanel.svelte` — wired from assets store
 - `engine/editor/src/lib/scene/commands.ts` — addComponent, removeComponent
 - `engine/editor/src/lib/api.ts` — addComponent, removeComponent wrappers
 - `engine/editor/src-tauri/bridge/commands.rs` — add_component, remove_component
