@@ -91,10 +91,15 @@ mod platform {
         renderer_thread: Option<std::thread::JoinHandle<()>>,
         should_stop: Arc<AtomicBool>,
         render_active: Arc<AtomicBool>,
+        /// Shared ECS world for reading entity transforms during rendering.
+        world: Arc<std::sync::RwLock<engine_core::World>>,
     }
 
     impl NativeViewport {
-        pub fn new(parent_hwnd: HWND) -> Result<Self, String> {
+        pub fn new(
+            parent_hwnd: HWND,
+            world: Arc<std::sync::RwLock<engine_core::World>>,
+        ) -> Result<Self, String> {
             tracing::info!(hwnd = ?parent_hwnd, "NativeViewport created for window");
             Ok(Self {
                 parent_hwnd: SendHwnd(parent_hwnd),
@@ -102,6 +107,7 @@ mod platform {
                 renderer_thread: None,
                 should_stop: Arc::new(AtomicBool::new(false)),
                 render_active: Arc::new(AtomicBool::new(true)),
+                world,
             })
         }
 
@@ -110,6 +116,7 @@ mod platform {
             let render_active = self.render_active.clone();
             let instances = self.instances.clone();
             let hwnd_raw = self.parent_hwnd.0 .0 as isize;
+            let world = self.world.clone();
 
             let handle = std::thread::Builder::new()
                 .name("viewport-render".into())
@@ -117,7 +124,7 @@ mod platform {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        render_loop(hwnd, should_stop, render_active, instances);
+                        render_loop(hwnd, should_stop, render_active, instances, world);
                     })) {
                         Ok(()) => tracing::info!("Viewport render thread stopped"),
                         Err(e) => {
@@ -792,6 +799,7 @@ void main() {
         fn render_frame(
             &mut self,
             viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
+            _world: &std::sync::RwLock<engine_core::World>,
         ) -> Result<(), String> {
             if self.needs_recreate {
                 self.renderer
@@ -831,6 +839,7 @@ void main() {
         should_stop: Arc<AtomicBool>,
         render_active: Arc<AtomicBool>,
         instances: Arc<Mutex<HashMap<String, ViewportInstance>>>,
+        world: Arc<std::sync::RwLock<engine_core::World>>,
     ) {
         let (init_w, init_h) = client_size(hwnd);
         let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h) {
@@ -867,7 +876,7 @@ void main() {
                 continue;
             }
 
-            if let Err(e) = renderer.render_frame(&viewports) {
+            if let Err(e) = renderer.render_frame(&viewports, &world) {
                 tracing::error!(error = %e, "render_frame failed");
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }

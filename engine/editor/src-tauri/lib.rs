@@ -252,6 +252,7 @@ pub fn run() {
         .manage(file_explorer::FileWatcherState::new())
         .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
         .manage(commands::ProjectState::new())
+        .manage(crate::state::SceneWorldState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::get_component_schemas,
@@ -301,6 +302,8 @@ pub fn run() {
             bridge::template_commands::template_history,
             commands::add_component,
             commands::remove_component,
+            commands::create_entity,
+            commands::delete_entity,
         ])
         .setup(|app| {
             use tauri::Manager;

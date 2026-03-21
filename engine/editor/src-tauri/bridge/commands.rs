@@ -39,14 +39,17 @@ pub fn get_component_schemas(
 
 /// Sets a single component field value for an entity.
 ///
-/// Design-time: updates are tracked in the frontend scene state.
-/// Play-time (future): this will forward to the live ECS.
+/// Updates both the frontend scene state (via Tauri event) and the live ECS
+/// world.  For Transform fields the ECS component is mutated in-place and an
+/// `entity-transform-changed` event is emitted so the frontend stays in sync.
 #[tauri::command]
 pub fn set_component_field(
     entity_id: u64,
     component: String,
     field: String,
     value: serde_json::Value,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     tracing::debug!(
         entity_id,
@@ -55,6 +58,94 @@ pub fn set_component_field(
         value = %value,
         "set_component_field"
     );
+
+    // For Transform component fields, also update the live ECS world.
+    if component == "Transform" {
+        let entity = engine_core::Entity::new(entity_id as u32, 0);
+        let val = value.as_f64().ok_or("value must be a number")? as f32;
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
+            match field.as_str() {
+                "position.x" => t.position.x = val,
+                "position.y" => t.position.y = val,
+                "position.z" => t.position.z = val,
+                "rotation.x" => t.rotation.x = val,
+                "rotation.y" => t.rotation.y = val,
+                "rotation.z" => t.rotation.z = val,
+                "rotation.w" => t.rotation.w = val,
+                "scale.x" => t.scale.x = val,
+                "scale.y" => t.scale.y = val,
+                "scale.z" => t.scale.z = val,
+                _ => {}
+            }
+        }
+        // Read back the full transform to emit the event.
+        if let Some(t) = world.get::<engine_core::Transform>(entity) {
+            let pos = [t.position.x, t.position.y, t.position.z];
+            let rot = [t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w];
+            let scl = [t.scale.x, t.scale.y, t.scale.z];
+            use tauri::Emitter;
+            app.emit(
+                "entity-transform-changed",
+                serde_json::json!({
+                    "id": entity_id, "position": pos, "rotation": rot, "scale": scl
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Create a new entity in the live ECS world with a default Transform.
+///
+/// Emits `entity-created` so the frontend can add it to the scene graph.
+#[tauri::command]
+pub fn create_entity(
+    name: Option<String>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<u64, String> {
+    use tauri::Emitter;
+
+    let entity_id = {
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        let entity = world.spawn();
+        world.add(entity, engine_core::Transform::default());
+        entity.id() as u64
+    };
+    let entity_name = name.unwrap_or_else(|| format!("Entity {entity_id}"));
+    app.emit(
+        "entity-created",
+        serde_json::json!({ "id": entity_id, "name": entity_name }),
+    )
+    .map_err(|e| e.to_string())?;
+    tracing::info!(entity_id, name = %entity_name, "Entity created");
+    Ok(entity_id)
+}
+
+/// Remove an entity from the live ECS world.
+///
+/// Emits `entity-deleted` so the frontend can remove it from the scene graph.
+#[tauri::command]
+pub fn delete_entity(
+    entity_id: u64,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Emitter;
+
+    let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+    world.despawn(engine_core::Entity::new(entity_id as u32, 0));
+    drop(world);
+
+    app.emit(
+        "entity-deleted",
+        serde_json::json!({ "id": entity_id }),
+    )
+    .map_err(|e| e.to_string())?;
+    tracing::info!(entity_id, "Entity deleted");
     Ok(())
 }
 
@@ -248,6 +339,7 @@ impl NativeViewportState {
 pub fn create_native_viewport(
     window: tauri::WebviewWindow,
     viewport_state: tauri::State<NativeViewportState>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
     viewport_id: String,
     x: i32,
     y: i32,
@@ -266,7 +358,7 @@ pub fn create_native_viewport(
         // Create a NativeViewport for this HWND if one doesn't exist yet.
         if let std::collections::hash_map::Entry::Vacant(e) = registry.by_hwnd.entry(hwnd_isize) {
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
-            let mut vp = NativeViewport::new(parent_hwnd).map_err(|e| {
+            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone()).map_err(|e| {
                 tracing::error!(error = %e, "NativeViewport::new failed");
                 e
             })?;
@@ -1118,4 +1210,63 @@ pub fn remove_component(
     save_scene(project_path, &scene)?;
     tracing::info!(entity_id, component = %component, "remove_component");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use engine_core::{Transform, World};
+    use std::sync::{Arc, RwLock};
+
+    #[test]
+    fn create_entity_adds_transform_to_world() {
+        let world = Arc::new(RwLock::new(World::new()));
+        let entity = {
+            let mut w = world.write().unwrap();
+            w.register::<Transform>();
+            let e = w.spawn();
+            w.add(e, Transform::default());
+            e
+        };
+        let w = world.read().unwrap();
+        assert!(w.get::<Transform>(entity).is_some());
+    }
+
+    #[test]
+    fn set_component_field_updates_transform_position() {
+        let world = Arc::new(RwLock::new(World::new()));
+        let entity = {
+            let mut w = world.write().unwrap();
+            w.register::<Transform>();
+            let e = w.spawn();
+            w.add(e, Transform::default());
+            e
+        };
+        {
+            let mut w = world.write().unwrap();
+            if let Some(t) = w.get_mut::<Transform>(entity) {
+                t.position.x = 5.0;
+            }
+        }
+        let w = world.read().unwrap();
+        let t = w.get::<Transform>(entity).unwrap();
+        assert_eq!(t.position.x, 5.0);
+    }
+
+    #[test]
+    fn despawn_removes_entity_from_world() {
+        let world = Arc::new(RwLock::new(World::new()));
+        let entity = {
+            let mut w = world.write().unwrap();
+            w.register::<Transform>();
+            let e = w.spawn();
+            w.add(e, Transform::default());
+            e
+        };
+        {
+            let mut w = world.write().unwrap();
+            w.despawn(entity);
+        }
+        let w = world.read().unwrap();
+        assert!(w.get::<Transform>(entity).is_none());
+    }
 }
