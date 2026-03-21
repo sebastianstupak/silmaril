@@ -1,5 +1,6 @@
 import { registerCommandHandler } from '../dispatch';
 import { commands } from '../bindings';
+import { onTemplateMutated } from '../stores/undo-history';
 
 // Template commands are in RUST_HANDLED — run_command on the Rust side dispatches
 // them directly to the template_open / template_close / … Tauri handlers.
@@ -15,6 +16,7 @@ export function registerTemplateHandlers(): void {
   });
   registerCommandHandler('template.execute', async (args) => {
     await commands.runCommand('template.execute', (args as object | null | undefined) ?? null);
+    await onTemplateMutated(); // notify undo history: redo stack cleared
   });
   registerCommandHandler('template.undo', async (args) => {
     await commands.runCommand('template.undo', (args as object | null | undefined) ?? null);

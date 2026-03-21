@@ -273,7 +273,7 @@ pub fn run() {
     let mut schema_registry = ComponentSchemaRegistry::new();
     register_builtin_schemas(&mut schema_registry);
 
-    let (mut registry, _registry_rx) = CommandRegistry::new();
+    let (mut registry, registry_rx) = CommandRegistry::new();
     registry.register_module(&FileModule);
     registry.register_module(&EditModule);
     registry.register_module(&ViewModule);
@@ -362,7 +362,9 @@ pub fn run() {
             bridge::gizmo_commands::gizmo_drag_end,
             bridge::gizmo_commands::set_gizmo_mode,
         ])
-        .setup(|app| {
+        .setup(move |app| {
+            bridge::registry_bridge::setup_registry_watch(registry_rx, app.handle().clone());
+
             use tauri::Manager;
             if let Some(main_window) = app.get_webview_window("main") {
                 // Set window + webview background to fully transparent

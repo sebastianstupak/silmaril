@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { getEditorState, openProjectDialog, openProject, scanProjectEntities, type EditorState } from './lib/api';
   import { t } from './lib/i18n';
   import { setLocale } from './lib/i18n';
@@ -25,7 +25,7 @@
   import { setLayout as setLayoutStore, subscribeLayout, getLayout as getLayoutStore } from './lib/stores/layout';
   import { registerCommand } from './lib/omnibar/registry';
   import { dispatchSceneCommand } from './lib/scene/commands';
-  import { populateRegistry, listSpecs, dispatchCommand } from './lib/dispatch';
+  import { populateRegistry, listSpecs, dispatchCommand, setUndoVerifier } from './lib/dispatch';
   import { registerAllHandlers } from './lib/commands/index';
   import { initTauriListeners } from './lib/scene/state';
 
@@ -55,6 +55,7 @@
   let canUndoState = $state(false);
   let canRedoState = $state(false);
   let recentItems = $state<RecentItem[]>([]);
+  let unlistenCatalog: (() => void) | undefined;
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -452,6 +453,7 @@
     // Wire the dispatch layer: register all TypeScript-side handlers first,
     // then populate the spec registry from Rust so keybind lookup works.
     registerAllHandlers();
+    setUndoVerifier(() => getCanUndo());
     try {
       const { commands: bindingCommands } = await import('./lib/bindings');
       const specs = await bindingCommands.listCommands();
@@ -516,6 +518,19 @@
       run: handleLayoutReset,
     });
 
+    // Listen for registry catalog updates from Rust (editor-catalog-updated).
+    // This keeps the frontend spec registry in sync when modules are loaded at runtime.
+    if (isTauri) {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlistenCatalog = await listen<import('./lib/bindings').CommandSpec[]>('editor-catalog-updated', (event) => {
+          populateRegistry(event.payload);
+        });
+      } catch {
+        // Non-fatal in browser/test environments.
+      }
+    }
+
     // Listen for events from pop-out windows
     if (isTauri && !popoutPanel) {
       try {
@@ -567,6 +582,10 @@
         console.error('[silmaril] Failed to listen for pop-out events:', e);
       }
     }
+  });
+
+  onDestroy(() => {
+    unlistenCatalog?.();
   });
 </script>
 

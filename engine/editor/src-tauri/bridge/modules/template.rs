@@ -16,8 +16,14 @@ impl EditorModule for TemplateModule {
                 category: "Template".into(),
                 description: Some("Open a template file for editing".into()),
                 keybind: None,
-                args_schema: None,
-                returns_data: false,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "template_path": { "type": "string", "description": "Absolute path to the .yaml template file" }
+                    },
+                    "required": ["template_path"]
+                })),
+                returns_data: true,
                 non_undoable: true,
             },
             CommandSpec {
@@ -27,7 +33,13 @@ impl EditorModule for TemplateModule {
                 category: "Template".into(),
                 description: Some("Close the currently open template".into()),
                 keybind: None,
-                args_schema: None,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "template_path": { "type": "string" }
+                    },
+                    "required": ["template_path"]
+                })),
                 returns_data: false,
                 non_undoable: true,
             },
@@ -38,8 +50,18 @@ impl EditorModule for TemplateModule {
                 category: "Template".into(),
                 description: Some("Execute the current template".into()),
                 keybind: None,
-                args_schema: None,
-                returns_data: false,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "template_path": { "type": "string" },
+                        "command": {
+                            "type": "object",
+                            "description": "A TemplateCommand variant: CreateEntity | DeleteEntity | RenameEntity | DuplicateEntity | SetComponent | AddComponent | RemoveComponent"
+                        }
+                    },
+                    "required": ["template_path", "command"]
+                })),
+                returns_data: true,
                 non_undoable: false,
             },
             CommandSpec {
@@ -49,8 +71,12 @@ impl EditorModule for TemplateModule {
                 category: "Template".into(),
                 description: Some("Undo the last template action".into()),
                 keybind: None,
-                args_schema: None,
-                returns_data: false,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": { "template_path": { "type": "string" } },
+                    "required": ["template_path"]
+                })),
+                returns_data: true,
                 non_undoable: true,
             },
             CommandSpec {
@@ -60,8 +86,12 @@ impl EditorModule for TemplateModule {
                 category: "Template".into(),
                 description: Some("Redo the last undone template action".into()),
                 keybind: None,
-                args_schema: None,
-                returns_data: false,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": { "template_path": { "type": "string" } },
+                    "required": ["template_path"]
+                })),
+                returns_data: true,
                 non_undoable: true,
             },
             CommandSpec {
@@ -71,8 +101,12 @@ impl EditorModule for TemplateModule {
                 category: "Template".into(),
                 description: Some("View the template action history".into()),
                 keybind: None,
-                args_schema: None,
-                returns_data: false,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": { "template_path": { "type": "string" } },
+                    "required": ["template_path"]
+                })),
+                returns_data: true,
                 non_undoable: true,
             },
         ]

@@ -12,6 +12,7 @@ pub fn run_lint() -> Result<()> {
             "test",
             "-p",
             "silmaril-editor",
+            "--lib",
             "--",
             "lint_undo_coverage",
             "--nocapture",

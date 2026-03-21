@@ -5,9 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Mock factories — reset per describe block. */
-let mockTemplateHistory: ReturnType<typeof vi.fn>;
-let mockTemplateUndo: ReturnType<typeof vi.fn>;
-let mockTemplateRedo: ReturnType<typeof vi.fn>;
+let mockRunCommand: ReturnType<typeof vi.fn>;
 let mockLogInfo: ReturnType<typeof vi.fn>;
 let mockLogWarn: ReturnType<typeof vi.fn>;
 let mockLogError: ReturnType<typeof vi.fn>;
@@ -18,18 +16,27 @@ async function loadStore() {
   return mod;
 }
 
+/** Wrap a value in the Result<ok> shape that commands.runCommand returns. */
+function ok(data: unknown) {
+  return { status: 'ok' as const, data };
+}
+
 function setupMocks() {
-  mockTemplateHistory = vi.fn().mockResolvedValue([]);
-  mockTemplateUndo = vi.fn().mockResolvedValue(null);
-  mockTemplateRedo = vi.fn().mockResolvedValue(null);
+  mockRunCommand = vi.fn().mockResolvedValue(ok(null));
   mockLogInfo = vi.fn();
   mockLogWarn = vi.fn();
   mockLogError = vi.fn();
 
+  vi.doMock('$lib/bindings', () => ({
+    commands: {
+      runCommand: mockRunCommand,
+      listCommands: vi.fn().mockResolvedValue([]),
+    },
+  }));
+
   vi.doMock('$lib/api', () => ({
-    templateHistory: mockTemplateHistory,
-    templateUndo: mockTemplateUndo,
-    templateRedo: mockTemplateRedo,
+    sceneUndo: vi.fn().mockResolvedValue({ canUndo: false, canRedo: false }),
+    sceneRedo: vi.fn().mockResolvedValue({ canUndo: false, canRedo: false }),
   }));
 
   vi.doMock('$lib/stores/console', () => ({
@@ -68,30 +75,30 @@ describe('undo-history — setActiveTemplate', () => {
 
   it('setActiveTemplate(path) stores the path', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValue(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
     expect(store.getActiveTemplatePath()).toBe('/tmp/hero.yaml');
   });
 
-  it('setActiveTemplate(path) calls templateHistory to refresh state', async () => {
+  it('setActiveTemplate(path) calls template.history to refresh state', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValue(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    expect(mockTemplateHistory).toHaveBeenCalledWith('/tmp/hero.yaml');
+    expect(mockRunCommand).toHaveBeenCalledWith('template.history', { template_path: '/tmp/hero.yaml' });
   });
 
   it('setActiveTemplate with non-empty history → canUndo=true', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([
+    mockRunCommand.mockResolvedValue(ok([
       { action_id: 1, description: 'Create entity' },
-    ]);
+    ]));
     await store.setActiveTemplate('/tmp/hero.yaml');
     expect(store.getCanUndo()).toBe(true);
   });
 
   it('setActiveTemplate with empty history → canUndo=false', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValue(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
     expect(store.getCanUndo()).toBe(false);
   });
@@ -106,16 +113,16 @@ describe('undo-history — setActiveTemplate', () => {
 
   it('setActiveTemplate(path) notifies subscribers after history fetch', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValue(ok([]));
     const listener = vi.fn();
     store.subscribeUndoHistory(listener);
     await store.setActiveTemplate('/tmp/hero.yaml');
     expect(listener).toHaveBeenCalled();
   });
 
-  it('swallows templateHistory errors silently (template not yet open)', async () => {
+  it('swallows template.history errors silently (template not yet open)', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockRejectedValue(new Error('not open'));
+    mockRunCommand.mockRejectedValue(new Error('not open'));
     // Should not throw
     await expect(store.setActiveTemplate('/tmp/hero.yaml')).resolves.toBeUndefined();
   });
@@ -139,64 +146,70 @@ describe('undo-history — undo()', () => {
     const store = await loadStore();
     await store.undo();
     expect(mockLogWarn).toHaveBeenCalledWith(expect.stringContaining('no template'));
-    expect(mockTemplateUndo).not.toHaveBeenCalled();
+    expect(mockRunCommand).not.toHaveBeenCalledWith('template.undo', expect.anything());
   });
 
-  it('undo calls templateUndo with the active path', async () => {
+  it('undo calls template.undo with the active path', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    // First call (setActiveTemplate → _refreshState): history = []
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockResolvedValue(42);
-    mockTemplateHistory.mockResolvedValue([]);
+    // Second call (undo): returns action id 42
+    mockRunCommand.mockResolvedValueOnce(ok(42));
+    // Third call (undo → _refreshState): returns []
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.undo();
-    expect(mockTemplateUndo).toHaveBeenCalledWith('/tmp/hero.yaml');
+    expect(mockRunCommand).toHaveBeenCalledWith('template.undo', { template_path: '/tmp/hero.yaml' });
   });
 
   it('undo with actionId returned → logs info with action id', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([{ action_id: 1, description: 'x' }]);
+    mockRunCommand.mockResolvedValueOnce(ok([{ action_id: 1, description: 'x' }]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockResolvedValue(7);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(7));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.undo();
     expect(mockLogInfo).toHaveBeenCalledWith(expect.stringContaining('7'));
   });
 
   it('undo with actionId returned → sets canRedo=true', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([{ action_id: 1, description: 'x' }]);
+    mockRunCommand.mockResolvedValueOnce(ok([{ action_id: 1, description: 'x' }]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockResolvedValue(1);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(1));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.undo();
     expect(store.getCanRedo()).toBe(true);
   });
 
   it('undo with null result (nothing to undo) → logs "Nothing to undo"', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockResolvedValue(null);
+    mockRunCommand.mockResolvedValueOnce(ok(null));
     await store.undo();
     expect(mockLogInfo).toHaveBeenCalledWith(expect.stringContaining('Nothing to undo'));
   });
 
-  it('undo refreshes state (calls templateHistory again)', async () => {
+  it('undo refreshes state (calls template.history again)', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockResolvedValue(1);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(1));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.undo();
-    // Once during setActiveTemplate, once after undo
-    expect(mockTemplateHistory).toHaveBeenCalledTimes(2);
+    // Once during setActiveTemplate (template.history), once after undo (template.history)
+    const historyCalls = mockRunCommand.mock.calls.filter(
+      (call) => call[0] === 'template.history'
+    );
+    expect(historyCalls).toHaveLength(2);
   });
 
   it('undo error → logs error message', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockRejectedValue(new Error('disk full'));
+    mockRunCommand.mockRejectedValueOnce(new Error('disk full'));
     await store.undo();
     expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('Undo failed'));
   });
@@ -220,62 +233,65 @@ describe('undo-history — redo()', () => {
     const store = await loadStore();
     await store.redo();
     expect(mockLogWarn).toHaveBeenCalledWith(expect.stringContaining('no template'));
-    expect(mockTemplateRedo).not.toHaveBeenCalled();
+    expect(mockRunCommand).not.toHaveBeenCalledWith('template.redo', expect.anything());
   });
 
-  it('redo calls templateRedo with the active path', async () => {
+  it('redo calls template.redo with the active path', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateRedo.mockResolvedValue(42);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(42));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.redo();
-    expect(mockTemplateRedo).toHaveBeenCalledWith('/tmp/hero.yaml');
+    expect(mockRunCommand).toHaveBeenCalledWith('template.redo', { template_path: '/tmp/hero.yaml' });
   });
 
   it('redo with actionId returned → logs info with action id', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateRedo.mockResolvedValue(3);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(3));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.redo();
     expect(mockLogInfo).toHaveBeenCalledWith(expect.stringContaining('3'));
   });
 
   it('redo with null result (nothing to redo) → logs "Nothing to redo"', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateRedo.mockResolvedValue(null);
+    mockRunCommand.mockResolvedValueOnce(ok(null));
     await store.redo();
     expect(mockLogInfo).toHaveBeenCalledWith(expect.stringContaining('Nothing to redo'));
   });
 
   it('redo with null result → canRedo becomes false', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateRedo.mockResolvedValue(null);
+    mockRunCommand.mockResolvedValueOnce(ok(null));
     await store.redo();
     expect(store.getCanRedo()).toBe(false);
   });
 
-  it('redo refreshes state (calls templateHistory again)', async () => {
+  it('redo refreshes state (calls template.history again)', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateRedo.mockResolvedValue(1);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(1));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.redo();
-    expect(mockTemplateHistory).toHaveBeenCalledTimes(2);
+    const historyCalls = mockRunCommand.mock.calls.filter(
+      (call) => call[0] === 'template.history'
+    );
+    expect(historyCalls).toHaveLength(2);
   });
 
   it('redo error → logs error message', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateRedo.mockRejectedValue(new Error('io error'));
+    mockRunCommand.mockRejectedValueOnce(new Error('io error'));
     await store.redo();
     expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('Redo failed'));
   });
@@ -298,35 +314,35 @@ describe('undo-history — onTemplateMutated()', () => {
   it('onTemplateMutated resets canRedo to false', async () => {
     const store = await loadStore();
     // Manually get canRedo to true by simulating undo
-    mockTemplateHistory.mockResolvedValue([{ action_id: 1, description: 'x' }]);
+    mockRunCommand.mockResolvedValueOnce(ok([{ action_id: 1, description: 'x' }]));
     await store.setActiveTemplate('/tmp/hero.yaml');
-    mockTemplateUndo.mockResolvedValue(1);
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok(1));
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.undo(); // canRedo becomes true
     // Now mutate — should clear canRedo
-    mockTemplateHistory.mockResolvedValue([{ action_id: 2, description: 'y' }]);
+    mockRunCommand.mockResolvedValueOnce(ok([{ action_id: 2, description: 'y' }]));
     await store.onTemplateMutated();
     expect(store.getCanRedo()).toBe(false);
   });
 
   it('onTemplateMutated refreshes canUndo from history', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
     // Now simulate a mutation that added to history
-    mockTemplateHistory.mockResolvedValue([{ action_id: 1, description: 'add entity' }]);
+    mockRunCommand.mockResolvedValueOnce(ok([{ action_id: 1, description: 'add entity' }]));
     await store.onTemplateMutated();
     expect(store.getCanUndo()).toBe(true);
   });
 
   it('onTemplateMutated notifies subscribers', async () => {
     const store = await loadStore();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.setActiveTemplate('/tmp/hero.yaml');
     const listener = vi.fn();
     store.subscribeUndoHistory(listener);
     listener.mockClear();
-    mockTemplateHistory.mockResolvedValue([]);
+    mockRunCommand.mockResolvedValueOnce(ok([]));
     await store.onTemplateMutated();
     expect(listener).toHaveBeenCalled();
   });

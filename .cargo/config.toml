@@ -3,6 +3,7 @@ rustflags = ["-D", "warnings"]  # Deny warnings in CI
 
 [build]
 jobs = 4  # Parallel compilation
+target-dir = "../../target"
 
 # =============================================================================
 # Platform-Specific Build Tiers

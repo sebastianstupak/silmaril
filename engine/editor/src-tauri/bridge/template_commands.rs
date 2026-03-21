@@ -32,9 +32,9 @@ fn get_processor<'a>(
     })
 }
 
-#[tauri::command]
-pub fn template_open(
-    state: State<'_, Mutex<EditorState>>,
+/// Opens a template file and registers its [`CommandProcessor`].
+pub fn template_open_inner(
+    state: &Mutex<EditorState>,
     template_path: String,
 ) -> Result<TemplateState, IpcError> {
     let path = PathBuf::from(&template_path);
@@ -45,8 +45,16 @@ pub fn template_open(
 }
 
 #[tauri::command]
-pub fn template_close(
+pub fn template_open(
     state: State<'_, Mutex<EditorState>>,
+    template_path: String,
+) -> Result<TemplateState, IpcError> {
+    template_open_inner(&state, template_path)
+}
+
+/// Closes a template and removes its processor from the active set.
+pub fn template_close_inner(
+    state: &Mutex<EditorState>,
     template_path: String,
 ) -> Result<(), IpcError> {
     let path = PathBuf::from(&template_path);
@@ -55,8 +63,16 @@ pub fn template_close(
 }
 
 #[tauri::command]
-pub fn template_execute(
+pub fn template_close(
     state: State<'_, Mutex<EditorState>>,
+    template_path: String,
+) -> Result<(), IpcError> {
+    template_close_inner(&state, template_path)
+}
+
+/// Executes a [`TemplateCommand`] and records it in the undo history.
+pub fn template_execute_inner(
+    state: &Mutex<EditorState>,
     template_path: String,
     command: TemplateCommand,
 ) -> Result<CommandResult, IpcError> {
@@ -66,8 +82,17 @@ pub fn template_execute(
 }
 
 #[tauri::command]
-pub fn template_undo(
+pub fn template_execute(
     state: State<'_, Mutex<EditorState>>,
+    template_path: String,
+    command: TemplateCommand,
+) -> Result<CommandResult, IpcError> {
+    template_execute_inner(&state, template_path, command)
+}
+
+/// Undoes the last command on the given template, returning the undone [`ActionId`].
+pub fn template_undo_inner(
+    state: &Mutex<EditorState>,
     template_path: String,
 ) -> Result<Option<ActionId>, IpcError> {
     let mut guard = state.lock().unwrap();
@@ -76,8 +101,16 @@ pub fn template_undo(
 }
 
 #[tauri::command]
-pub fn template_redo(
+pub fn template_undo(
     state: State<'_, Mutex<EditorState>>,
+    template_path: String,
+) -> Result<Option<ActionId>, IpcError> {
+    template_undo_inner(&state, template_path)
+}
+
+/// Redoes the last undone command on the given template, returning the redone [`ActionId`].
+pub fn template_redo_inner(
+    state: &Mutex<EditorState>,
     template_path: String,
 ) -> Result<Option<ActionId>, IpcError> {
     let mut guard = state.lock().unwrap();
@@ -86,8 +119,16 @@ pub fn template_redo(
 }
 
 #[tauri::command]
-pub fn template_history(
+pub fn template_redo(
     state: State<'_, Mutex<EditorState>>,
+    template_path: String,
+) -> Result<Option<ActionId>, IpcError> {
+    template_redo_inner(&state, template_path)
+}
+
+/// Returns a summary of all recorded actions for the given template.
+pub fn template_history_inner(
+    state: &Mutex<EditorState>,
     template_path: String,
 ) -> Result<Vec<ActionSummary>, IpcError> {
     let guard = state.lock().unwrap();
@@ -97,4 +138,12 @@ pub fn template_history(
         message: format!("Template not open: {template_path}"),
     })?;
     Ok(proc.history_summaries())
+}
+
+#[tauri::command]
+pub fn template_history(
+    state: State<'_, Mutex<EditorState>>,
+    template_path: String,
+) -> Result<Vec<ActionSummary>, IpcError> {
+    template_history_inner(&state, template_path)
 }

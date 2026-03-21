@@ -5,7 +5,8 @@
 // update the undo stack — this store just tracks can-undo / can-redo locally
 // so the UI can reflect the state without polling.
 
-import { templateUndo, templateRedo, templateHistory, sceneUndo as _sceneUndo, sceneRedo as _sceneRedo } from '$lib/api';
+import { commands } from '$lib/bindings';
+import { sceneUndo as _sceneUndo, sceneRedo as _sceneRedo } from '$lib/api';
 import { logInfo, logWarn, logError } from '$lib/stores/console';
 
 let _path: string | null = null;
@@ -103,7 +104,9 @@ export async function setActiveTemplate(path: string | null): Promise<void> {
 async function _refreshState(): Promise<void> {
   if (!_path) return;
   try {
-    const history = await templateHistory(_path);
+    const result = await commands.runCommand('template.history', { template_path: _path });
+    if (result.status === 'error') return;
+    const history = (result.data as Array<unknown>) ?? [];
     _canUndo = history.length > 0;
     notify();
   } catch {
@@ -118,7 +121,9 @@ export async function undo(): Promise<void> {
     return;
   }
   try {
-    const actionId = await templateUndo(_path);
+    const result = await commands.runCommand('template.undo', { template_path: _path });
+    if (result.status === 'error') { logError(`Undo failed: ${result.error}`); return; }
+    const actionId = result.data as number | null;
     if (actionId === null) {
       logInfo('Nothing to undo');
     } else {
@@ -138,7 +143,9 @@ export async function redo(): Promise<void> {
     return;
   }
   try {
-    const actionId = await templateRedo(_path);
+    const result = await commands.runCommand('template.redo', { template_path: _path });
+    if (result.status === 'error') { logError(`Redo failed: ${result.error}`); return; }
+    const actionId = result.data as number | null;
     if (actionId === null) {
       logInfo('Nothing to redo');
       _canRedo = false;
