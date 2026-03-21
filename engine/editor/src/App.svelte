@@ -33,6 +33,8 @@
   import ProfilerPanel from './lib/docking/panels/ProfilerPanel.svelte';
   import AssetsPanel from './lib/docking/panels/AssetsPanel.svelte';
   import FileExplorerWrapper from './lib/docking/panels/FileExplorerWrapper.svelte';
+  import TerminalWrapper from './lib/docking/panels/TerminalWrapper.svelte';
+  import OutputWrapper from './lib/docking/panels/OutputWrapper.svelte';
 
   /** Detect if running inside Tauri or standalone browser */
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
@@ -90,6 +92,8 @@
     profiler: ProfilerPanel,
     assets: AssetsPanel,
     'file-explorer': FileExplorerWrapper,
+    terminal: TerminalWrapper,
+    output: OutputWrapper,
   };
 
   async function handleOpenProject() {

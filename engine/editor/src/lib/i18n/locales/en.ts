@@ -65,6 +65,8 @@ const en = {
   'panel.profiler': 'Profiler',
   'panel.assets': 'Assets',
   'panel.file_explorer': 'File Explorer',
+  'panel.terminal': 'Terminal',
+  'panel.output': 'Output',
 
   // Placeholders
   'placeholder.no_project': 'No project loaded',
@@ -134,6 +136,20 @@ const en = {
   'console.error': 'Error',
   'console.debug': 'Debug',
   'console.no_logs': 'No logs',
+
+  // Terminal panel
+  'terminal.opening': 'Opening terminal...',
+  'terminal.new_tab': 'New Tab',
+  'terminal.close_tab': 'Close Tab',
+
+  // Output panel
+  'output.cancel': 'Cancel',
+  'output.clear': 'Clear',
+  'output.empty': 'Run a cargo command to see output',
+  'output.running': '...',
+  'output.cancelled': 'Cancelled',
+  'output.exit_ok': 'Build succeeded',
+  'output.exit_err': 'Build failed',
 
   // File explorer
   'explorer.new_file': 'New File',
