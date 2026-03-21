@@ -48,7 +48,7 @@ pub struct CommandSpec {
     pub keybind: Option<String>,             // "Ctrl+Shift+N"
     pub args_schema: Option<serde_json::Value>, // JSON Schema for parameters
     pub returns_data: bool,                  // false = fire-and-forget, true = awaits result
-    pub undoable: bool,                      // true = command mutates scene state and can be undone
+    pub non_undoable: bool,                  // false (default) = expects undo handler; true = explicitly not undoable (e.g. undo/redo ops, filesystem, UI-only state)
 }
 ```
 
@@ -76,7 +76,8 @@ impl CommandRegistry {
     pub fn get(&self, id: &str) -> Option<&CommandSpec>;
     pub fn by_module(&self, module_id: &str) -> Vec<&CommandSpec>;
     pub fn get_by_keybind(&self, keybind: &str) -> Option<&CommandSpec>;
-    pub fn undoable_commands(&self) -> Vec<&CommandSpec>; // filter by undoable == true
+    pub fn non_undoable_commands(&self) -> Vec<&CommandSpec>; // filter by non_undoable == true (explicitly not undoable)
+    pub fn requires_undo_handler(&self) -> Vec<&CommandSpec>; // filter by non_undoable == false (expects handler)
 }
 ```
 
@@ -736,7 +737,9 @@ let app_svelte = fs::read_to_string("engine/editor/src/App.svelte")?;
 
 The exact implementation is left to the developer. The invariant to enforce: **the keyboard handler calls exactly `registry.getByKeybind` and `dispatchCommand`, nothing else**.
 
-The lint must also verify the `undoable` manifest: every command with `undoable: true` in `CommandRegistry` must have a corresponding entry in a `RUST_UNDOABLE` constant (exported from the Rust-generated bindings) or a registered TypeScript undo handler map. Any `undoable: true` command without a corresponding undo handler registration must cause `cargo xtask lint` to fail.
+The lint must also verify undo coverage using `non_undoable: bool` semantics (inverted from the old `undoable: bool` flag): `non_undoable: false` is the **default** — it means the command is expected to have a wired undo handler. `non_undoable: true` must be set explicitly for commands that are intentionally not undoable (undo/redo ops, filesystem ops, UI-only state changes).
+
+The lint queries the live `CommandRegistry` via `requires_undo_handler()`, which returns all commands where `non_undoable == false` (dynamically from the registry — no static list). For each command id returned, the lint checks that a Rust handler exists in `RUST_HANDLED` and that handler returns `Option<Box<dyn UndoOperation>>` (not void), OR that a TypeScript undo handler is registered. New commands fail the lint by default unless they are explicitly marked `non_undoable: true` in their `CommandSpec`.
 
 ---
 

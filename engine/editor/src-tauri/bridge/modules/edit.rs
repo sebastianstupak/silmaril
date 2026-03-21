@@ -18,7 +18,7 @@ impl EditorModule for EditModule {
                 keybind: Some("Ctrl+Z".into()),
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "edit.redo".into(),
@@ -29,7 +29,7 @@ impl EditorModule for EditModule {
                 keybind: Some("Ctrl+Y".into()),
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
         ]
     }

@@ -18,7 +18,7 @@ impl EditorModule for ViewportModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: true,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "viewport.toggle_grid".into(),
@@ -29,7 +29,7 @@ impl EditorModule for ViewportModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "viewport.toggle_gizmos".into(),
@@ -40,7 +40,7 @@ impl EditorModule for ViewportModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
         ]
     }

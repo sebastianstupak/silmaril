@@ -24,7 +24,10 @@ pub struct CommandSpec {
     #[specta(type = Option<SpecUnknown>)]
     pub args_schema: Option<serde_json::Value>,
     pub returns_data: bool,
-    pub undoable: bool,
+    /// When `false` (the default), the command is expected to have a wired undo handler.
+    /// Set to `true` explicitly for commands that are intentionally not undoable
+    /// (e.g. undo/redo themselves, filesystem ops, UI-only state changes).
+    pub non_undoable: bool,
 }
 
 /// Implemented by every subsystem that exposes commands to the editor.
@@ -105,8 +108,15 @@ impl CommandRegistry {
             .find(|c| c.keybind.as_deref() == Some(keybind))
     }
 
-    pub fn undoable_commands(&self) -> Vec<&CommandSpec> {
-        self.commands.iter().filter(|c| c.undoable).collect()
+    /// Commands that are explicitly not undoable (e.g. undo/redo ops, filesystem, UI state).
+    pub fn non_undoable_commands(&self) -> Vec<&CommandSpec> {
+        self.commands.iter().filter(|c| c.non_undoable).collect()
+    }
+
+    /// Commands that are expected to have a wired undo handler.
+    /// Used by `xtask lint` to verify undo coverage dynamically from the registry.
+    pub fn requires_undo_handler(&self) -> Vec<&CommandSpec> {
+        self.commands.iter().filter(|c| !c.non_undoable).collect()
     }
 }
 
@@ -144,7 +154,7 @@ mod tests {
                 keybind: Some("Ctrl+T".into()),
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: false,
             }]
         }
     }
@@ -190,7 +200,7 @@ mod tests {
                     keybind: None,
                     args_schema: None,
                     returns_data: false,
-                    undoable: false,
+                    non_undoable: false,
                 }]
             }
         }
@@ -208,7 +218,7 @@ mod tests {
         impl EditorModule for Mod {
             fn id(&self) -> &str { "foo" }
             fn commands(&self) -> Vec<CommandSpec> {
-                vec![CommandSpec { id: "foo.bar".into(), module_id: String::new(), label: "Bar".into(), category: "General".into(), description: None, keybind: None, args_schema: None, returns_data: false, undoable: false }]
+                vec![CommandSpec { id: "foo.bar".into(), module_id: String::new(), label: "Bar".into(), category: "General".into(), description: None, keybind: None, args_schema: None, returns_data: false, non_undoable: false }]
             }
         }
         let (mut reg, _rx) = CommandRegistry::new();
@@ -227,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn undoable_commands_are_scene_and_template_execute() {
+    fn requires_undo_handler_includes_scene_mutations_and_template_execute() {
         use crate::bridge::modules::*;
         let (mut reg, _rx) = CommandRegistry::new();
         reg.register_module(&SceneModule);
@@ -235,18 +245,18 @@ mod tests {
         reg.register_module(&EditModule);
         reg.register_module(&FileModule);
 
-        let undoable: Vec<&str> = reg.undoable_commands().iter().map(|c| c.id.as_str()).collect();
+        let needs_handler: Vec<&str> = reg.requires_undo_handler().iter().map(|c| c.id.as_str()).collect();
 
-        // Scene mutations must be undoable
-        assert!(undoable.contains(&"scene.new_entity"));
-        assert!(undoable.contains(&"scene.delete_entity"));
-        assert!(undoable.contains(&"scene.duplicate_entity"));
-        assert!(undoable.contains(&"template.execute"));
+        // Scene mutations must require an undo handler (non_undoable: false)
+        assert!(needs_handler.contains(&"scene.new_entity"));
+        assert!(needs_handler.contains(&"scene.delete_entity"));
+        assert!(needs_handler.contains(&"scene.duplicate_entity"));
+        assert!(needs_handler.contains(&"template.execute"));
 
-        // These must NOT be undoable
-        assert!(!undoable.contains(&"scene.focus_entity"));
-        assert!(!undoable.contains(&"edit.undo"));
-        assert!(!undoable.contains(&"edit.redo"));
-        assert!(!undoable.contains(&"file.save_scene"));
+        // These must NOT require an undo handler (non_undoable: true)
+        assert!(!needs_handler.contains(&"scene.focus_entity"));
+        assert!(!needs_handler.contains(&"edit.undo"));
+        assert!(!needs_handler.contains(&"edit.redo"));
+        assert!(!needs_handler.contains(&"file.save_scene"));
     }
 }

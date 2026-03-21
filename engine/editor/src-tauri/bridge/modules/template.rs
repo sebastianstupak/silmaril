@@ -18,7 +18,7 @@ impl EditorModule for TemplateModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "template.close".into(),
@@ -29,7 +29,7 @@ impl EditorModule for TemplateModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "template.execute".into(),
@@ -40,7 +40,7 @@ impl EditorModule for TemplateModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: true,
+                non_undoable: false,
             },
             CommandSpec {
                 id: "template.undo".into(),
@@ -51,7 +51,7 @@ impl EditorModule for TemplateModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "template.redo".into(),
@@ -62,7 +62,7 @@ impl EditorModule for TemplateModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
             CommandSpec {
                 id: "template.history".into(),
@@ -73,7 +73,7 @@ impl EditorModule for TemplateModule {
                 keybind: None,
                 args_schema: None,
                 returns_data: false,
-                undoable: false,
+                non_undoable: true,
             },
         ]
     }
