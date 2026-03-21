@@ -151,6 +151,21 @@ std::thread::spawn(move || {
 });
 ```
 
+### OutputState (managed state)
+
+```rust
+// engine/editor/src-tauri/src/terminal/output.rs
+pub struct OutputState {
+    child: Mutex<Option<Child>>,  // currently running process, if any
+}
+
+impl OutputState {
+    pub fn new() -> Self { Self { child: Mutex::new(None) } }
+}
+```
+
+Add `.manage(OutputState::new())` alongside `TerminalState` in `lib.rs`.
+
 ### Tauri Commands — Output
 
 | Command | Args | Returns | Description |
@@ -252,7 +267,7 @@ export function subscribeOutput(fn: () => void): () => void
 export function appendLine(raw: string, stream: 'stdout' | 'stderr'): void   // parses ANSI internally
 export function setRunning(cmd: string): void
 export function setFinished(code: number | null, cancelled: boolean): void
-export function clearOutput(): void
+export function clearOutput(): void    // resets lines, exitCode, cancelled, command; does NOT change running (safe to clear mid-build)
 ```
 
 **ANSI parser** (internal to `output.ts`):
@@ -311,12 +326,16 @@ If `state.tabs` is empty: show `{t('placeholder.no_project')}` placeholder (reus
 2. If `isTauri` and `project_path` available: `invoke('terminal_new_tab')` → on success, `addTab(id)`, then set up per-tab listeners (see below)
 3. If no project: show placeholder (no tabs created)
 
-**Per-tab listener management** — `TerminalWrapper` maintains a `Map<tabId, UnlistenFn[]>` of event unlisteners:
+**Per-tab listener management** — `TerminalWrapper` does not own xterm.js instances (those live in `TerminalPanel`). The bridge works via a shared `pendingOutput: Map<tabId, string[]>` in the `terminal.ts` store, or more simply: `TerminalWrapper` writes incoming PTY data into a per-tab `pendingData` field on the store, and `TerminalPanel` reactively drains it by calling `term.write()`. Unlisteners are stored in a local `Map<tabId, UnlistenFn[]>`:
+
 ```typescript
 const unlisteners = new Map<string, Array<() => void>>();
 
-async function setupTabListeners(tabId: string, xterm: Terminal) {
-  const unlistenData = await listen(`terminal-data:${tabId}`, e => xterm.write(e.payload as string));
+async function setupTabListeners(tabId: string) {
+  // Write raw PTY data into store; TerminalPanel drains it reactively
+  const unlistenData = await listen(`terminal-data:${tabId}`, e =>
+    appendTerminalData(tabId, e.payload as string)  // store fn
+  );
   const unlistenExit = await listen(`terminal-exit:${tabId}`, () => {
     markExited(tabId);
     cleanupTabListeners(tabId);
@@ -329,6 +348,11 @@ function cleanupTabListeners(tabId: string) {
   unlisteners.delete(tabId);
 }
 ```
+
+`terminal.ts` adds:
+- `pendingData: Map<tabId, string>` field on `TerminalState` (last unread chunk)
+- `appendTerminalData(tabId, data): void` — appends to per-tab buffer, calls `notify()`
+- `drainTerminalData(tabId): string` — returns and clears the buffer (called by `TerminalPanel` in `$effect`)
 
 `onNewTab` (from TerminalTabs): calls `invoke('terminal_new_tab')` → `addTab(id)` → `setupTabListeners(id, xterm)`.
 
@@ -425,6 +449,7 @@ Auto-scrolls to bottom on new lines (unless user has manually scrolled up — de
 # engine/editor/Cargo.toml — new additions
 portable-pty = "0.8"
 which = "4"
+uuid = { version = "1", features = ["v4"] }   # for tab_id generation in terminal_new_tab
 ```
 
 ```json
