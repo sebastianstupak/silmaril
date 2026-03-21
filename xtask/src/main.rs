@@ -3,6 +3,7 @@ mod build;
 mod codegen;
 mod dev;
 mod docker;
+mod lint;
 mod phase2;
 mod pgo;
 mod quality;
@@ -100,6 +101,8 @@ enum Commands {
     RunClient,
     /// Run server
     RunServer,
+    /// Lint: enforce undo handler coverage invariant
+    Lint,
 }
 
 fn main() -> Result<()> {
@@ -211,5 +214,6 @@ fn main() -> Result<()> {
             utils::run_cargo_streaming(&["run", "--bin", "server"])?;
             Ok(())
         }
+        Commands::Lint => lint::run_lint(),
     }
 }

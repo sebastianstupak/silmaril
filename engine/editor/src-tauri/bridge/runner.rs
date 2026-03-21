@@ -17,6 +17,13 @@ pub const RUST_HANDLED: &[&str] = &[
     "template.history",
 ];
 
+/// Command ids in RUST_HANDLED that have a wired undo handler.
+/// The `cargo xtask lint` command verifies that every command where
+/// `non_undoable == false` and the id is in `RUST_HANDLED` appears here.
+pub const RUST_UNDO_HANDLED: &[&str] = &[
+    "template.execute",
+];
+
 /// Dispatch a command by id. Returns `Ok(Some(value))` for commands that produce data,
 /// `Ok(None)` for fire-and-forget commands, or `Err` if the id is not in `RUST_HANDLED`.
 ///
@@ -105,5 +112,16 @@ mod tests {
     fn run_command_inner_errors_on_unknown_id() {
         let result = run_command_inner("nonexistent.command", None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn rust_undo_handled_is_subset_of_rust_handled() {
+        for id in RUST_UNDO_HANDLED {
+            assert!(
+                RUST_HANDLED.contains(id),
+                "RUST_UNDO_HANDLED contains '{}' but it is not in RUST_HANDLED",
+                id
+            );
+        }
     }
 }

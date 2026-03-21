@@ -1,4 +1,4 @@
-use crate::bridge::{modules::*, registry::CommandRegistry, runner::RUST_HANDLED};
+use crate::bridge::{modules::*, registry::CommandRegistry, runner::{RUST_HANDLED, RUST_UNDO_HANDLED}};
 
 fn build_full_registry() -> CommandRegistry {
     let (mut reg, _rx) = CommandRegistry::new();
@@ -70,4 +70,28 @@ fn rust_handled_commands_exist_in_registry() {
             id
         );
     }
+}
+
+#[test]
+fn lint_undo_coverage() {
+    let reg = build_full_registry();
+    let needs_undo = reg.requires_undo_handler();
+
+    let mut missing: Vec<String> = Vec::new();
+    for cmd in &needs_undo {
+        if RUST_HANDLED.contains(&cmd.id.as_str()) {
+            // This command is Rust-handled and expects an undo handler.
+            // It must be listed in RUST_UNDO_HANDLED.
+            if !RUST_UNDO_HANDLED.contains(&cmd.id.as_str()) {
+                missing.push(cmd.id.clone());
+            }
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "Commands with non_undoable=false in RUST_HANDLED are missing from RUST_UNDO_HANDLED:\n  {}\n\
+         Either add them to RUST_UNDO_HANDLED after wiring undo, or set non_undoable=true if intentional.",
+        missing.join("\n  ")
+    );
 }
