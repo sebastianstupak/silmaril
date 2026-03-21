@@ -756,10 +756,12 @@ void main() {
 
     struct ViewportRenderer {
         // IMPORTANT: field declaration order matters for Drop order.
-        // `renderer` must come before `grid_pipeline` so that `Renderer::drop`
-        // (which calls device.wait_idle) runs before `GridPipeline::drop`.
+        // `renderer` must come before `grid_pipeline` / `gizmo_pipeline` so that
+        // `Renderer::drop` (which calls device.wait_idle) runs before the
+        // pipeline `Drop` impls attempt to destroy their Vulkan objects.
         renderer: engine_renderer::Renderer,
         grid_pipeline: GridPipeline,
+        gizmo_pipeline: crate::viewport::gizmo_pipeline::GizmoPipeline,
         width: u32,
         height: u32,
         needs_recreate: bool,
@@ -782,8 +784,13 @@ void main() {
                 renderer.context(),
             )?;
 
+            let gizmo_pipeline = crate::viewport::gizmo_pipeline::GizmoPipeline::new(
+                renderer.context(),
+                renderer.render_pass(),
+            )?;
+
             tracing::info!(width, height, "ViewportRenderer initialised");
-            Ok(Self { renderer, grid_pipeline, width, height, needs_recreate: false })
+            Ok(Self { renderer, grid_pipeline, gizmo_pipeline, width, height, needs_recreate: false })
         }
 
         fn notify_resize(&mut self, w: u32, h: u32) {
@@ -820,6 +827,57 @@ void main() {
             // Record grid overlay draw commands
             unsafe {
                 self.grid_pipeline.record(cmd, extent, viewports);
+            }
+
+            // Record gizmo draw commands — one call per viewport sub-rect so
+            // each sub-rect gets its own view/projection matrix.
+            // The grid pipeline's record already set viewport/scissor to the
+            // last sub-rect; we re-set them here for correctness.
+            //
+            // TODO(Task 19): read from NativeViewportState.gizmo_mode and selected entity
+            if let Ok(world_guard) = _world.read() {
+                unsafe {
+                    for (bounds, camera, _grid_visible, is_ortho) in viewports {
+                        let sx = bounds.x.max(0) as u32;
+                        let sy = bounds.y.max(0) as u32;
+                        let sw = bounds.width.min(extent.width.saturating_sub(sx)).max(1);
+                        let sh = bounds.height.min(extent.height.saturating_sub(sy)).max(1);
+
+                        self.renderer.device().cmd_set_viewport(
+                            cmd,
+                            0,
+                            &[vk::Viewport {
+                                x: sx as f32,
+                                y: sy as f32,
+                                width: sw as f32,
+                                height: sh as f32,
+                                min_depth: 0.0,
+                                max_depth: 1.0,
+                            }],
+                        );
+                        self.renderer.device().cmd_set_scissor(
+                            cmd,
+                            0,
+                            &[vk::Rect2D {
+                                offset: vk::Offset2D { x: sx as i32, y: sy as i32 },
+                                extent: vk::Extent2D { width: sw, height: sh },
+                            }],
+                        );
+
+                        let aspect = sw as f32 / sh as f32;
+                        let view_proj = camera.view_projection(aspect, *is_ortho);
+                        let camera_pos = camera.eye();
+
+                        self.gizmo_pipeline.record(
+                            cmd,
+                            &world_guard,
+                            None, // TODO(Task 19): read from NativeViewportState.gizmo_mode and selected entity
+                            crate::viewport::gizmo_pipeline::GizmoMode::Move, // stub
+                            view_proj,
+                            camera_pos,
+                        );
+                    }
+                }
             }
 
             // TODO(Task 8): wire render_meshes once SceneWorldState is available
