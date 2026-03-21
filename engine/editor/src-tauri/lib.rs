@@ -20,6 +20,11 @@ use file_explorer::{
     get_file_tree, expand_dir, get_git_status, start_file_watch, stop_file_watch,
     open_in_editor, create_file, create_dir, rename_path, delete_path,
 };
+use terminal::{
+    OutputState, TerminalState,
+    output::{output_cancel, output_run},
+    pty::{terminal_close_tab, terminal_new_tab, terminal_resize, terminal_write},
+};
 
 /// Installs a custom WNDPROC that overrides tao's `WM_NCCALCSIZE` handler.
 ///
@@ -252,6 +257,8 @@ pub fn run() {
         .manage(CommandRegistryState::new())
         .manage(file_explorer::FileWatcherState::new())
         .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
+        .manage(TerminalState::new())
+        .manage(OutputState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::get_component_schemas,
@@ -299,6 +306,12 @@ pub fn run() {
             bridge::template_commands::template_undo,
             bridge::template_commands::template_redo,
             bridge::template_commands::template_history,
+            terminal_new_tab,
+            terminal_write,
+            terminal_resize,
+            terminal_close_tab,
+            output_run,
+            output_cancel,
         ])
         .setup(|app| {
             use tauri::Manager;
