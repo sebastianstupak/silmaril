@@ -27,6 +27,7 @@ pub struct FieldSchema {
     pub name: String,
     /// Human-readable label shown in the inspector.
     pub label: String,
+    /// Field type (serialized as snake_case JSON key `"field_type"`, matching TypeScript FieldSchema).
     pub field_type: FieldType,
 }
 
@@ -106,6 +107,26 @@ mod tests {
     fn test_empty_registry_all() {
         let reg = ComponentSchemaRegistry::new();
         assert_eq!(reg.all().len(), 0);
+    }
+
+    #[test]
+    fn field_type_serializes_with_kind_tag() {
+        let v = serde_json::to_value(FieldType::Bool).unwrap();
+        assert_eq!(v["kind"], "bool");
+
+        let v = serde_json::to_value(FieldType::Vec3).unwrap();
+        assert_eq!(v["kind"], "vec3");
+
+        let f32_val = FieldType::F32 { min: Some(0.0), max: None, step: None };
+        let v = serde_json::to_value(f32_val).unwrap();
+        assert_eq!(v["kind"], "f32");
+        assert_eq!(v["min"], 0.0);
+        assert!(v["max"].is_null());
+
+        let enum_val = FieldType::Enum { options: vec!["A".into(), "B".into()] };
+        let v = serde_json::to_value(enum_val).unwrap();
+        assert_eq!(v["kind"], "enum");
+        assert_eq!(v["options"][0], "A");
     }
 
     #[test]
