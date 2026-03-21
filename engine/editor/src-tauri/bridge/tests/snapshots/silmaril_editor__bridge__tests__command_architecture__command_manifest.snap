@@ -1,0 +1,312 @@
+---
+source: engine/editor/src-tauri/bridge/tests/command_architecture.rs
+expression: commands
+---
+[
+  {
+    "category": "File",
+    "id": "file.new_project",
+    "keybind": null,
+    "label": "New Project",
+    "module_id": "file",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "File",
+    "id": "file.open_project",
+    "keybind": null,
+    "label": "Open Project",
+    "module_id": "file",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "File",
+    "id": "file.save_scene",
+    "keybind": "Ctrl+S",
+    "label": "Save Scene",
+    "module_id": "file",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "File",
+    "id": "file.save_scene_as",
+    "keybind": "Ctrl+Shift+S",
+    "label": "Save Scene As",
+    "module_id": "file",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "File",
+    "id": "file.open_scene",
+    "keybind": null,
+    "label": "Open Scene",
+    "module_id": "file",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Edit",
+    "id": "edit.undo",
+    "keybind": "Ctrl+Z",
+    "label": "Undo",
+    "module_id": "edit",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Edit",
+    "id": "edit.redo",
+    "keybind": "Ctrl+Y",
+    "label": "Redo",
+    "module_id": "edit",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.toggle_hierarchy",
+    "keybind": null,
+    "label": "Toggle Hierarchy",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.toggle_inspector",
+    "keybind": null,
+    "label": "Toggle Inspector",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.toggle_console",
+    "keybind": null,
+    "label": "Toggle Console",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.toggle_asset_browser",
+    "keybind": null,
+    "label": "Toggle Asset Browser",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.zoom_in",
+    "keybind": "Ctrl+=",
+    "label": "Zoom In",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.zoom_out",
+    "keybind": "Ctrl+-",
+    "label": "Zoom Out",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "View",
+    "id": "view.zoom_reset",
+    "keybind": "Ctrl+0",
+    "label": "Zoom Reset",
+    "module_id": "view",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.new_entity",
+    "keybind": null,
+    "label": "New Entity",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.delete_entity",
+    "keybind": "Delete",
+    "label": "Delete Entity",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.duplicate_entity",
+    "keybind": "Ctrl+D",
+    "label": "Duplicate Entity",
+    "module_id": "scene",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Scene",
+    "id": "scene.focus_entity",
+    "keybind": "F",
+    "label": "Focus Entity",
+    "module_id": "scene",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Asset",
+    "id": "asset.import",
+    "keybind": null,
+    "label": "Import Asset",
+    "module_id": "asset",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Asset",
+    "id": "asset.refresh",
+    "keybind": null,
+    "label": "Refresh Assets",
+    "module_id": "asset",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Asset",
+    "id": "asset.scan",
+    "keybind": null,
+    "label": "Scan Assets",
+    "module_id": "asset",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "build.run",
+    "keybind": null,
+    "label": "Run Project",
+    "module_id": "build",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "build.build",
+    "keybind": null,
+    "label": "Build Project",
+    "module_id": "build",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Build",
+    "id": "build.package",
+    "keybind": null,
+    "label": "Package Project",
+    "module_id": "build",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.screenshot",
+    "keybind": null,
+    "label": "Take Screenshot",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": true
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.toggle_grid",
+    "keybind": null,
+    "label": "Toggle Grid",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Viewport",
+    "id": "viewport.toggle_gizmos",
+    "keybind": null,
+    "label": "Toggle Gizmos",
+    "module_id": "viewport",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Template",
+    "id": "template.open",
+    "keybind": null,
+    "label": "Open Template",
+    "module_id": "template",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Template",
+    "id": "template.close",
+    "keybind": null,
+    "label": "Close Template",
+    "module_id": "template",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Template",
+    "id": "template.execute",
+    "keybind": null,
+    "label": "Execute Template",
+    "module_id": "template",
+    "non_undoable": false,
+    "returns_data": false
+  },
+  {
+    "category": "Template",
+    "id": "template.undo",
+    "keybind": null,
+    "label": "Undo Template Action",
+    "module_id": "template",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Template",
+    "id": "template.redo",
+    "keybind": null,
+    "label": "Redo Template Action",
+    "module_id": "template",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "Template",
+    "id": "template.history",
+    "keybind": null,
+    "label": "Template History",
+    "module_id": "template",
+    "non_undoable": true,
+    "returns_data": false
+  },
+  {
+    "category": "User",
+    "id": "user.placeholder",
+    "keybind": null,
+    "label": "User Command Placeholder",
+    "module_id": "user",
+    "non_undoable": true,
+    "returns_data": false
+  }
+]

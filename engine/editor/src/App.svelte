@@ -22,8 +22,11 @@
   import ResizeHandles from './lib/components/ResizeHandles.svelte';
   import { loadLayout, saveLayout, defaultLayout, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
+  import { setLayout as setLayoutStore, subscribeLayout, getLayout as getLayoutStore } from './lib/stores/layout';
   import { registerCommand } from './lib/omnibar/registry';
   import { dispatchSceneCommand } from './lib/scene/commands';
+  import { populateRegistry, listSpecs, dispatchCommand } from './lib/dispatch';
+  import { registerAllHandlers } from './lib/commands/index';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -60,6 +63,10 @@
   // Docking layout state
   let layout: EditorLayout = $state(loadLayout());
   let bottomHeight = $state(_initial.bottomPanelHeight);
+
+  // Keep the shared layout store in sync with App.svelte's authoritative state.
+  // setLayout() is called here once on init and again inside handleLayoutChange().
+  setLayoutStore(layout);
 
   function _collectPanels(node: LayoutNode, out: Set<string>) {
     if (node.type === 'tabs') { for (const p of node.panels) out.add(p); }
@@ -126,6 +133,7 @@
 
   function handleLayoutChange(newLayout: EditorLayout) {
     layout = newLayout;
+    setLayoutStore(layout);
     saveLayout(layout);
   }
 
@@ -301,39 +309,67 @@
     });
   });
 
-  // Keyboard shortcuts: Ctrl+Tab (tab cycle) + layout keybinds (per-slot).
+  // React to layout changes made by view command handlers (e.g. toggle_hierarchy).
+  // The store notifies when togglePanel() mutates the layout outside App.svelte.
+  $effect(() => {
+    return subscribeLayout(() => {
+      const updated = getLayoutStore();
+      if (updated !== null) {
+        layout = updated;
+        saveLayout(layout);
+      }
+    });
+  });
+
+  // Keyboard shortcuts: Ctrl+Tab (tab cycle) + dispatch layer + layout keybinds (per-slot).
   $effect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl+Tab: UI-only tab cycling (not a dispatchable command)
       if (e.key === 'Tab' && e.ctrlKey) {
         e.preventDefault();
         cycleActiveTab(e.shiftKey ? -1 : 1);
         return;
       }
-      // Undo: Ctrl+Z
-      if (e.key === 'z' && e.ctrlKey && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        undo();
-        return;
-      }
-      // Redo: Ctrl+Y or Ctrl+Shift+Z
-      if ((e.key === 'y' && e.ctrlKey && !e.shiftKey && !e.altKey) ||
-          (e.key === 'z' && e.ctrlKey && e.shiftKey && !e.altKey)) {
-        e.preventDefault();
-        redo();
-        return;
-      }
-      // Omnibar: Ctrl+K
+
+      // Ctrl+K: omnibar open (UI-only, not in command spec registry)
       if (e.key === 'k' && e.ctrlKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         omnibarOpen = true;
         return;
       }
-      // Settings: Ctrl+,
+
+      // Ctrl+,: settings open (UI-only, not in command spec registry)
       if (e.key === ',' && e.ctrlKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         showSettings = true;
         return;
       }
+
+      // Route through the dispatch layer for all registered command keybinds.
+      // Build a normalized keybind string (e.g. "Ctrl+Z", "Ctrl+Shift+Z", "Delete").
+      const parts: string[] = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.altKey) parts.push('Alt');
+      // Normalize single-char keys to uppercase; keep special keys as-is.
+      const keyName = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      parts.push(keyName);
+      const keybind = parts.join('+');
+
+      const spec = listSpecs().find(s => s.keybind === keybind);
+      if (spec) {
+        e.preventDefault();
+        dispatchCommand(spec.id).catch(console.error);
+        return;
+      }
+
+      // Ctrl+Shift+Z: alternate redo keybind (no spec, falls through from above)
+      if (e.key === 'z' && e.ctrlKey && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
       // Layout slot keybinds — format "ctrl+1", "ctrl+2", etc.
       if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
         const slot = savedLayouts.find(s => s.keybind === `ctrl+${e.key}`);
@@ -389,6 +425,18 @@
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
     logInfo('Silmaril Editor started');
+
+    // Wire the dispatch layer: register all TypeScript-side handlers first,
+    // then populate the spec registry from Rust so keybind lookup works.
+    registerAllHandlers();
+    try {
+      const { commands: bindingCommands } = await import('./lib/bindings');
+      const specs = await bindingCommands.listCommands();
+      populateRegistry(specs);
+    } catch {
+      // Non-fatal in browser/test environments where Tauri is not available.
+    }
+
     loadSchemas(); // fire-and-forget; store notifies subscribers when ready
     editorState = await getEditorState();
 
