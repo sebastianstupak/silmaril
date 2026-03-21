@@ -103,10 +103,7 @@ pub fn template_execute(
 
     if let Some(entity_id) = transform_entity_id {
         sync_transform_to_ecs(entity_id, &result.new_state, &world_state, &app)
-            .map_err(|e| IpcError {
-                code: engine_core::error::ErrorCode::TemplateNoTemplateOpen as u32,
-                message: e,
-            })?;
+            .map_err(|e| IpcError { code: 0, message: e })?;
     }
 
     Ok(result)
@@ -135,10 +132,7 @@ pub fn template_undo(
         let path = std::path::PathBuf::from(&template_path);
         if let Some(proc) = guard.processors.get(&path) {
             sync_all_transforms(proc.state_ref(), &world_state, &app)
-                .map_err(|e| IpcError {
-                    code: engine_core::error::ErrorCode::TemplateNoTemplateOpen as u32,
-                    message: e,
-                })?;
+                .map_err(|e| IpcError { code: 0, message: e })?;
         }
     }
     Ok(result)
@@ -167,10 +161,7 @@ pub fn template_redo(
         let path = std::path::PathBuf::from(&template_path);
         if let Some(proc) = guard.processors.get(&path) {
             sync_all_transforms(proc.state_ref(), &world_state, &app)
-                .map_err(|e| IpcError {
-                    code: engine_core::error::ErrorCode::TemplateNoTemplateOpen as u32,
-                    message: e,
-                })?;
+                .map_err(|e| IpcError { code: 0, message: e })?;
         }
     }
     Ok(result)
