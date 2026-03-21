@@ -2,6 +2,7 @@ pub mod bridge;
 pub mod file_explorer;
 pub mod plugins;
 pub mod state;
+pub mod terminal;
 pub mod viewport;
 pub mod world;
 
