@@ -159,11 +159,18 @@ pub fn terminal_resize(
 /// No-op if tab already closed.
 #[tauri::command]
 pub fn terminal_close_tab(tab_id: String, state: State<TerminalState>) {
-    let mut sessions = state.sessions.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(session_arc) = sessions.remove(&tab_id) {
-        if let Ok(mut session) = session_arc.lock() {
+    // Extract the Arc while holding the outer lock, then release it
+    // before acquiring the inner lock and calling kill() — avoids
+    // blocking all other tab operations during the kill syscall.
+    let session_arc = {
+        let mut sessions = state.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        sessions.remove(&tab_id)
+    };
+    if let Some(arc) = session_arc {
+        if let Ok(mut session) = arc.lock() {
             let _ = session.child.kill();
         }
+        // If the inner mutex is poisoned the child goes un-killed until process exit.
         debug!(tab_id = %tab_id, "terminal tab closed");
     }
 }
