@@ -4,7 +4,7 @@
   import { t } from '$lib/i18n';
   import type { SceneEntity } from '$lib/scene/state';
   import { subscribeSchemas, getSchemas } from '$lib/inspector/schema-store';
-  import { setComponentField } from '$lib/scene/commands';
+  import { setComponentField, addComponent, removeComponent } from '$lib/scene/commands';
   import type { ComponentSchemas } from '$lib/inspector/schema';
   import F32Field    from '$lib/inspector/widgets/F32Field.svelte';
   import BoolField   from '$lib/inspector/widgets/BoolField.svelte';
@@ -16,6 +16,8 @@
 
   let schemas: ComponentSchemas = $state(getSchemas());
   let collapsedSections: Record<string, boolean> = $state({});
+  let addingComponent = $state(false);
+  let componentFilter = $state('');
 
   // Refresh schemas when store loads (schemas arrive async after startup)
   const unsub = subscribeSchemas(() => { schemas = getSchemas(); });
@@ -70,6 +72,11 @@
           {#if schema}
             <span class="component-category">{schema.category}</span>
           {/if}
+          <button
+            class="remove-component-btn"
+            title="Remove {componentName}"
+            onclick={(e) => { e.stopPropagation(); removeComponent(entity.id, componentName); }}
+          >✕</button>
         </button>
 
         {#if !collapsedSections[componentName]}
@@ -140,7 +147,46 @@
       </div>
     {/each}
 
-    <button class="add-component-btn">+ {t('inspector.add_component')}</button>
+    <!-- Add Component picker -->
+    <div class="add-component-section">
+      {#if !addingComponent}
+        <button class="add-component-btn" onclick={() => { addingComponent = true; componentFilter = ''; }}>
+          + Add Component…
+        </button>
+      {:else}
+        <div class="component-picker">
+          <input
+            class="component-filter-input"
+            type="text"
+            placeholder="Filter components…"
+            bind:value={componentFilter}
+            autofocus
+            onkeydown={(e) => { if (e.key === 'Escape') addingComponent = false; }}
+          />
+          <ul class="component-picker-list">
+            {#each Object.values(schemas).filter(s =>
+              !entity.components.includes(s.name) &&
+              (componentFilter === '' || s.name.toLowerCase().includes(componentFilter.toLowerCase()))
+            ) as schema (schema.name)}
+              <li>
+                <button
+                  onclick={() => {
+                    addComponent(entity.id, schema.name);
+                    addingComponent = false;
+                  }}
+                >{schema.name}</button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+        <!-- backdrop to close picker -->
+        <div
+          class="picker-backdrop"
+          role="none"
+          onclick={() => { addingComponent = false; }}
+        ></div>
+      {/if}
+    </div>
   {/if}
 </div>
 
@@ -282,20 +328,85 @@
     font-size: 10px;
   }
 
-  .add-component-btn {
-    margin: 8px;
-    padding: 6px 12px;
-    background: var(--color-bg, #1e1e1e);
-    border: 1px dashed var(--color-border, #404040);
-    border-radius: 4px;
-    color: var(--color-textMuted, #999);
-    font-size: 11px;
+  .remove-component-btn {
+    all: unset;
+    margin-left: auto;
+    color: var(--color-textDim, #585b70);
     cursor: pointer;
-    text-align: center;
+    font-size: 11px;
+    padding: 0 3px;
+    border-radius: 2px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .remove-component-btn:hover { color: #f38ba8; }
+
+  .add-component-section {
+    padding: 4px 6px 6px;
+    position: relative;
   }
 
-  .add-component-btn:hover {
-    border-color: var(--color-accent, #007acc);
-    color: var(--color-accent, #007acc);
+  .add-component-btn {
+    all: unset;
+    display: block;
+    width: 100%;
+    background: none;
+    border: 1px dashed var(--color-border, #45475a);
+    color: var(--color-textDim, #6c7086);
+    border-radius: 4px;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    text-align: left;
+    box-sizing: border-box;
+    font-family: inherit;
   }
+  .add-component-btn:hover { border-color: var(--color-accent, #89b4fa); color: var(--color-text, #cdd6f4); }
+
+  .component-picker {
+    background: var(--color-bgPanel, #1e1e2e);
+    border: 1px solid var(--color-accent, #89b4fa);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    z-index: 100;
+  }
+
+  .component-filter-input {
+    width: 100%;
+    background: var(--color-bg, #181825);
+    border: none;
+    border-bottom: 1px solid var(--color-border, #313244);
+    padding: 5px 8px;
+    font-size: 11px;
+    color: var(--color-text, #cdd6f4);
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+
+  .component-picker-list {
+    list-style: none;
+    margin: 0;
+    padding: 3px 0;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  .component-picker-list button {
+    all: unset;
+    display: block;
+    width: 100%;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--color-textMuted, #a6adc8);
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .component-picker-list button:hover {
+    background: var(--color-bgHover, #313244);
+    color: var(--color-text, #cdd6f4);
+  }
+
+  .picker-backdrop { position: fixed; inset: 0; z-index: 99; }
 </style>
