@@ -31,6 +31,7 @@ pub fn generate_bindings(output_path: &str) {
 
 use std::sync::{Arc, Mutex};
 
+use bridge::ai_bridge::AiBridgeState;
 use bridge::commands;
 use bridge::modules::*;
 use bridge::registry::CommandRegistry;
@@ -283,6 +284,9 @@ pub fn run() {
     registry.register_module(&ViewportModule);
     registry.register_module(&TemplateModule);
     registry.register_module(&UserCommandsModule);
+    registry.register_module(&EditorCoreModule);
+    registry.register_module(&ProjectModule);
+    let ai_bridge_state = AiBridgeState::new(registry_rx.clone());
     let registry = Arc::new(Mutex::new(registry));
 
     tauri::Builder::default()
@@ -291,6 +295,7 @@ pub fn run() {
         .manage(commands::NativeViewportState::new())
         .manage(Mutex::new(bridge::template_commands::EditorState::new()))
         .manage(registry)
+        .manage(ai_bridge_state)
         .manage(file_explorer::FileWatcherState::new())
         .manage(ComponentSchemaState(std::sync::Mutex::new(schema_registry)))
         .manage(commands::ProjectState::new())
@@ -361,6 +366,11 @@ pub fn run() {
             bridge::gizmo_commands::gizmo_drag,
             bridge::gizmo_commands::gizmo_drag_end,
             bridge::gizmo_commands::set_gizmo_mode,
+            bridge::ai_bridge::ai_server_start,
+            bridge::ai_bridge::ai_server_stop,
+            bridge::ai_bridge::ai_server_status,
+            bridge::ai_bridge::ai_grant_permission,
+            bridge::ai_bridge::ai_scene_response,
         ])
         .setup(move |app| {
             bridge::registry_bridge::setup_registry_watch(registry_rx, app.handle().clone());

@@ -28,6 +28,8 @@
   import { populateRegistry, listSpecs, dispatchCommand, setUndoVerifier } from './lib/dispatch';
   import { registerAllHandlers } from './lib/commands/index';
   import { initTauriListeners } from './lib/scene/state';
+  import AiPermissionDialog from './lib/components/AiPermissionDialog.svelte';
+  import { aiServerRunning, aiServerPort, refreshAiServerStatus } from './lib/stores/ai-server';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -56,6 +58,7 @@
   let canRedoState = $state(false);
   let recentItems = $state<RecentItem[]>([]);
   let unlistenCatalog: (() => void) | undefined;
+  let unlistenAiCmd: (() => void) | undefined;
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -449,6 +452,7 @@
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
     logInfo('Silmaril Editor started');
+    refreshAiServerStatus(); // sync MCP badge with any previously running server
 
     // Wire the dispatch layer: register all TypeScript-side handlers first,
     // then populate the spec registry from Rust so keybind lookup works.
@@ -535,6 +539,7 @@
     if (isTauri && !popoutPanel) {
       try {
         const { listen } = await import('@tauri-apps/api/event');
+        const { invoke } = await import('@tauri-apps/api/core');
 
         // Panel docked back — use the per-panel drop target tracked by DockDropZone,
         // falling back to the whole-window zone from Rust if no panel was hovered.
@@ -577,6 +582,22 @@
             };
             mapping[id]?.();
           });
+
+          // editor-run-command-ai: routes MCP AI agent commands through the editor
+          // dispatch layer and sends results back via ai_scene_response.
+          unlistenAiCmd = await listen<{ id: string; args: unknown; request_id: string }>(
+            'editor-run-command-ai',
+            async (event) => {
+              const { id, args, request_id } = event.payload;
+              try {
+                const result = await invoke<{ status: string; data?: unknown }>('run_command', { id, args: args ?? null });
+                await invoke('ai_scene_response', { request_id, data: result?.data ?? null, error: null });
+              } catch (e) {
+                const errorMsg = e instanceof Error ? e.message : String(e);
+                await invoke('ai_scene_response', { request_id, data: null, error: errorMsg });
+              }
+            }
+          );
         }
       } catch (e) {
         console.error('[silmaril] Failed to listen for pop-out events:', e);
@@ -586,6 +607,7 @@
 
   onDestroy(() => {
     unlistenCatalog?.();
+    unlistenAiCmd?.();
   });
 </script>
 
@@ -710,6 +732,9 @@
   <!-- Invisible resize handles (frameless window — WebView2 blocks native NC hit-testing) -->
   <ResizeHandles />
 
+  <!-- AI permission dialog — shown when an MCP agent requests a command permission -->
+  <AiPermissionDialog />
+
 
   <!-- Status bar -->
   <div class="status-bar">
@@ -720,6 +745,16 @@
       <span class="status-item">{t('status.ready')}</span>
     </div>
     <div class="status-right">
+      {#if $aiServerRunning}
+        <button
+          class="status-item status-mcp-badge"
+          title="MCP server running — click to copy URL"
+          onclick={() => navigator.clipboard.writeText(`http://localhost:${$aiServerPort}/mcp`)}
+        >
+          MCP :{$aiServerPort}
+        </button>
+        <span class="status-divider"></span>
+      {/if}
       <span class="status-item">{t('status.fps')}: --</span>
       <span class="status-divider"></span>
       <span class="status-item">{t('status.memory')}: --</span>
@@ -907,5 +942,17 @@
     height: 12px;
     background: var(--color-border, #404040);
     flex-shrink: 0;
+  }
+  .status-mcp-badge {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: var(--font-mono, monospace);
+    color: #4ade80;
+  }
+  .status-mcp-badge:hover {
+    color: #86efac;
   }
 </style>

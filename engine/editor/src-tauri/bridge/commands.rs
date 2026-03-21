@@ -305,6 +305,11 @@ impl ViewportRegistry {
         let hwnd = self.hwnd_by_id.get(id)?;
         self.by_hwnd.get(hwnd)
     }
+
+    /// Return any one active viewport (used for screenshot capture).
+    pub fn first_viewport(&self) -> Option<&NativeViewport> {
+        self.by_hwnd.values().next()
+    }
 }
 
 /// Tauri managed state holding the component schema registry.

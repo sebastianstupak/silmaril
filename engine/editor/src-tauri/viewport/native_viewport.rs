@@ -93,6 +93,9 @@ mod platform {
         render_active: Arc<AtomicBool>,
         /// Shared ECS world for reading entity transforms during rendering.
         world: Arc<std::sync::RwLock<engine_core::World>>,
+        /// Screenshot request slot — main thread places a reply sender here;
+        /// the render thread takes it, captures the frame, and sends back PNG bytes.
+        screenshot_slot: Arc<Mutex<Option<std::sync::mpsc::SyncSender<Result<Vec<u8>, String>>>>>,
     }
 
     impl NativeViewport {
@@ -108,6 +111,7 @@ mod platform {
                 should_stop: Arc::new(AtomicBool::new(false)),
                 render_active: Arc::new(AtomicBool::new(true)),
                 world,
+                screenshot_slot: Arc::new(Mutex::new(None)),
             })
         }
 
@@ -117,6 +121,7 @@ mod platform {
             let instances = self.instances.clone();
             let hwnd_raw = self.parent_hwnd.0 .0 as isize;
             let world = self.world.clone();
+            let screenshot_slot = self.screenshot_slot.clone();
 
             let handle = std::thread::Builder::new()
                 .name("viewport-render".into())
@@ -124,7 +129,7 @@ mod platform {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        render_loop(hwnd, should_stop, render_active, instances, world);
+                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot);
                     })) {
                         Ok(()) => tracing::info!("Viewport render thread stopped"),
                         Err(e) => {
@@ -289,6 +294,32 @@ mod platform {
                 Mat4::perspective_rh(cam.fov_y, aspect, cam.near, cam.far)
             };
             Some((view, proj, eye, inst.bounds))
+        }
+
+        /// Capture a PNG screenshot of the current viewport frame.
+        ///
+        /// Posts a request to the render thread and blocks (up to 1 second) for the result.
+        /// The render thread fulfils the request on its next iteration after `render_frame`
+        /// completes, so the returned bytes reflect the last fully rendered frame.
+        pub fn capture_png_bytes(&self) -> Result<Vec<u8>, String> {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            *self.screenshot_slot.lock().unwrap_or_else(|p| p.into_inner()) = Some(reply_tx);
+            let result = reply_rx
+                .recv_timeout(std::time::Duration::from_secs(1))
+                .map_err(|e| match e {
+                    std::sync::mpsc::RecvTimeoutError::Timeout => {
+                        "Screenshot timed out".to_string()
+                    }
+                    std::sync::mpsc::RecvTimeoutError::Disconnected => {
+                        "Screenshot request displaced by concurrent call".to_string()
+                    }
+                })
+                .and_then(|r| r);
+            match &result {
+                Ok(bytes) => tracing::debug!(bytes = bytes.len(), "Screenshot captured"),
+                Err(e) => tracing::warn!(error = %e, "Screenshot capture failed"),
+            }
+            result
         }
 
         pub fn destroy(&mut self) {
@@ -926,6 +957,7 @@ void main() {
         render_active: Arc<AtomicBool>,
         instances: Arc<Mutex<HashMap<String, ViewportInstance>>>,
         world: Arc<std::sync::RwLock<engine_core::World>>,
+        screenshot_slot: Arc<Mutex<Option<std::sync::mpsc::SyncSender<Result<Vec<u8>, String>>>>>,
     ) {
         let (init_w, init_h) = client_size(hwnd);
         let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h) {
@@ -965,6 +997,12 @@ void main() {
             if let Err(e) = renderer.render_frame(&viewports, &world) {
                 tracing::error!(error = %e, "render_frame failed");
                 std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+
+            // Screenshot capture — if a request arrived, capture and reply.
+            if let Some(reply_tx) = screenshot_slot.lock().unwrap_or_else(|p| p.into_inner()).take() {
+                let result = renderer.renderer.get_frame_png().map_err(|e| e.to_string());
+                let _ = reply_tx.send(result);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(16));
@@ -1221,5 +1259,8 @@ impl NativeViewport {
     pub fn set_grid_visible(&self, _id: &str, _visible: bool) {}
     pub fn camera_set_orientation(&self, _id: &str, _yaw: f32, _pitch: f32) {}
     pub fn set_projection(&self, _id: &str, _is_ortho: bool) {}
+    pub fn capture_png_bytes(&self) -> Result<Vec<u8>, String> {
+        Err("Screenshot capture is only supported on Windows".into())
+    }
     pub fn destroy(&mut self) {}
 }

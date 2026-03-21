@@ -14,6 +14,7 @@ pub mod registry;
 pub mod registry_bridge;
 pub mod runner;
 pub mod template_commands;
+pub mod ai_bridge;
 
 #[cfg(test)]
 pub mod tests;
