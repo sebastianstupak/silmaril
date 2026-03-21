@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:writing-plans` to produce the implementation plan from this spec.
 
-**Goal:** Replace the three separate command execution paths in the editor (TypeScript registry, Rust registry, direct function calls) with a single `EditorModule` + `CommandRegistry` system. Every operation in the editor — from a panel button to an AI agent tool call — flows through one dispatch function. MCP is a consumer of this registry, not a separate tool list.
+**Goal:** Replace the three separate command execution paths in the editor (TypeScript registry, Rust registry, direct function calls) with a single `EditorModule` + `CommandRegistry` system. Every operation in the editor — from a panel button to an AI agent tool call — flows through one dispatch function. MCP is a consumer of this registry, not a separate tool list. All Tauri IPC types are generated from Rust via `tauri-specta` — no manually-maintained TypeScript type mirrors.
 
 ---
 
@@ -38,7 +38,7 @@ The module is the **source of truth** for its commands. Nobody registers a comma
 ### `CommandSpec` — the full descriptor
 
 ```rust
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct CommandSpec {
     pub id: String,                          // "hierarchy.create_entity"
     pub module_id: String,                   // "hierarchy" — set by register_module()
@@ -98,17 +98,8 @@ The TypeScript side maintains a mirrored `Map<string, CommandSpec>` (the "regist
 TypeScript, exported from `src/lib/commands/dispatch.ts`:
 
 ```typescript
-// TypeScript shape as returned by invoke('list_commands'):
-export interface CommandSpec {
-  id: string;
-  module_id: string;
-  label: string;
-  category: string;
-  description?: string;
-  keybind?: string;
-  args_schema?: Record<string, unknown>; // JSON Schema
-  returns_data: boolean;
-}
+// CommandSpec is imported from $lib/bindings (auto-generated from Rust via tauri-specta).
+// Do not define it here.
 
 // Populate the local registry snapshot from the Rust registry.
 // Called once at startup after invoke('list_commands') resolves.
@@ -256,6 +247,103 @@ args_schema = { type = "object", properties = { steps = { type = "integer", defa
 At project open, the editor scans installed modules, loads their manifests, and registers them. These commands appear in the omnibar, MCP `tools/list`, and anywhere else commands are consumed — automatically.
 
 **User module command execution path:** User module commands have no TypeScript handler and no match in `run_command_inner`'s built-in id match. They route via the `editor-run-command` event path to `run_command_inner`, which calls a free function `run_module_command(module_id, id, args, app)` defined in `src-tauri/bridge/modules/user_modules.rs`. This function looks up the module's registered handler in `UserModuleHandlerState` (Tauri managed state: `HashMap<String, Box<dyn ModuleCommandHandler>>`). For v1, user module commands that have no registered native handler return `Err("not implemented")`, which becomes `-32000 Server error (not implemented)` in MCP. `run_module_command` is a plain Rust function — not a Tauri IPC command — called directly from `run_command_inner`. Add `src-tauri/bridge/modules/user_modules.rs` to the new files list.
+
+---
+
+## Type Generation (`tauri-specta`)
+
+All Tauri IPC types are generated from Rust at build time using `tauri-specta` + `specta`. The generated file is `src/lib/bindings.ts` — it is committed to the repo and must not be manually edited.
+
+### Setup
+
+```toml
+# src-tauri/Cargo.toml
+[dependencies]
+specta = { version = "2", features = ["derive"] }
+tauri-specta = { version = "2", features = ["derive", "typescript"] }
+```
+
+### What gets the `#[derive(specta::Type)]`
+
+Every struct or enum that crosses the Tauri IPC boundary:
+
+- `CommandSpec` — already shown above
+- `PermissionLevel` — `#[derive(..., specta::Type)]`
+- All args structs for Tauri commands (e.g., `SetComponentFieldArgs`, `OpenProjectArgs`)
+- Return types of all `#[tauri::command]` functions
+
+### Build step
+
+In `src-tauri/build.rs` (or a `xtask codegen` subcommand):
+
+```rust
+tauri_specta::collect_commands![
+    list_commands,
+    set_component_field,
+    open_project,
+    scan_assets,
+    ai_grant_permission,
+    // ... all tauri commands
+]
+.export_to_typescript("../src/lib/bindings.ts")
+.unwrap();
+```
+
+This emits `src/lib/bindings.ts`:
+
+```typescript
+// @generated — do not edit. Run `cargo xtask codegen` to regenerate.
+export interface CommandSpec {
+  id: string;
+  module_id: string;
+  label: string;
+  category: string;
+  description: string | null;
+  keybind: string | null;
+  args_schema: unknown | null;
+  returns_data: boolean;
+}
+
+export type PermissionLevel = "Once" | "Session" | "Always" | "Deny";
+
+export const commands = {
+  listCommands: () => invoke<CommandSpec[]>("list_commands"),
+  setComponentField: (args: { id: number; component: string; field: string; value: unknown }) =>
+    invoke<void>("set_component_field", args),
+  openProject: (args: { path: string }) => invoke<void>("open_project", args),
+  scanAssets: (args: { projectPath: string }) => invoke<Asset[]>("scan_assets", args),
+  aiGrantPermission: (args: { requestId: string; level: PermissionLevel }) =>
+    invoke<void>("ai_grant_permission", args),
+  // ...
+}
+```
+
+### Enforcement
+
+- All TypeScript code imports IPC types from `$lib/bindings` — **never manually written**.
+- The manually-written `CommandSpec` interface in `dispatch.ts` is removed and replaced by the import from `$lib/bindings`.
+- All bare `invoke('...')` calls in the existing codebase are replaced with typed `commands.*` calls from `$lib/bindings`.
+- CI runs `cargo xtask codegen` and fails if `src/lib/bindings.ts` is out of sync with the Rust source (`git diff --exit-code src/lib/bindings.ts`).
+- `populateRegistry(specs: CommandSpec[])` in `dispatch.ts` is typed using the generated `CommandSpec` from `$lib/bindings`.
+
+### Existing IPC calls to refactor
+
+All current bare `invoke(...)` calls in the editor are replaced with typed wrappers:
+
+| Current call | Becomes |
+|---|---|
+| `invoke('list_commands')` | `commands.listCommands()` |
+| `invoke('set_component_field', {...})` | `commands.setComponentField({...})` |
+| `invoke('open_project', {...})` | `commands.openProject({...})` |
+| `invoke('scan_assets', {...})` | `commands.scanAssets({...})` |
+| `invoke('add_component', {...})` | `commands.addComponent({...})` |
+| `invoke('remove_component', {...})` | `commands.removeComponent({...})` |
+| `invoke('run_command', {...})` | removed (replaced by event path) |
+| `invoke('template_undo')` | `commands.templateUndo()` |
+| `invoke('template_redo')` | `commands.templateRedo()` |
+| `invoke('template_open', {...})` | `commands.templateOpen({...})` |
+| `invoke('template_close')` | `commands.templateClose()` |
+| `invoke('template_execute', {...})` | `commands.templateExecute({...})` |
 
 ---
 
@@ -705,7 +793,8 @@ These remain as direct `dispatchSceneCommand` calls from the viewport interactio
 ## File Structure Summary
 
 **New files:**
-- `src/lib/commands/dispatch.ts` — `dispatchCommand()`, `populateRegistry()`, `registerCommandHandler()`, handler table
+- `src/lib/bindings.ts` — **generated by `cargo xtask codegen`** — typed `commands.*` wrappers and all IPC types including `CommandSpec`, `PermissionLevel`
+- `src/lib/commands/dispatch.ts` — `dispatchCommand()`, `populateRegistry()`, `registerCommandHandler()`, handler table (imports `CommandSpec` from `$lib/bindings`)
 - `src/lib/modules/index.ts` — barrel file; exports `registerAll()` which calls `register()` on each module in order; `App.svelte` `onMount` calls `registerAll()` as step 1 of the startup sequence
 - `src/lib/modules/hierarchy.ts`, `inspector.ts`, `viewport.ts`, `console.ts`, `assets.ts`, `scene.ts`, `project.ts`, `editor.ts` — one file per built-in module
 - `src/lib/stores/layout.ts` — layout slot state (moved from App.svelte)
