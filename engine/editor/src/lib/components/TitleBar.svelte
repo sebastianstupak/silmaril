@@ -718,7 +718,21 @@
   }
 
   /* ── Center ─────────────────────────────────────────────────────────────── */
-  .titlebar-center { flex: 1; min-width: 0; }
+  /* Absolutely positioned so it's centred relative to the full bar width,
+     not just the remaining space between left and right sections. */
+  .titlebar-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none; /* let clicks fall through to drag region by default */
+  }
+  .titlebar-center > :global(*) {
+    pointer-events: auto; /* re-enable pointer events for the omnibar itself */
+  }
 
   /* ── Right ──────────────────────────────────────────────────────────────── */
   .titlebar-right {
