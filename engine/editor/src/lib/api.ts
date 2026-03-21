@@ -1,5 +1,6 @@
 // Tauri API wrapper with browser fallback for Playwright testing
 import { getPanelInfo } from '$lib/docking/types';
+import type { ComponentSchema } from '$lib/inspector/schema';
 
 export interface EditorState {
   mode: string;
@@ -40,6 +41,28 @@ const mockEntities: EntityInfo[] = [
   { id: 5, name: 'Ground', components: ['Transform', 'MeshRenderer', 'Collider'] },
 ];
 
+const mockSchemas: ComponentSchema[] = [
+  {
+    name: 'Transform',
+    label: 'Transform',
+    category: 'Core',
+    fields: [
+      { name: 'position', label: 'Position', field_type: { kind: 'vec3' } },
+      { name: 'rotation', label: 'Rotation', field_type: { kind: 'vec3' } },
+      { name: 'scale',    label: 'Scale',    field_type: { kind: 'vec3' } },
+    ],
+  },
+  {
+    name: 'Health',
+    label: 'Health',
+    category: 'Core',
+    fields: [
+      { name: 'current', label: 'Current HP', field_type: { kind: 'f32', min: 0, max: 10000 } },
+      { name: 'max',     label: 'Max HP',     field_type: { kind: 'f32', min: 1, max: 10000 } },
+    ],
+  },
+];
+
 function browserMock<T>(cmd: string, args?: Record<string, unknown>): T {
   const mocks: Record<string, unknown> = {
     get_editor_state: {
@@ -54,6 +77,8 @@ function browserMock<T>(cmd: string, args?: Record<string, unknown>): T {
     } satisfies EditorState,
     open_project_dialog: '/mock/project/path',
     scan_project_entities: mockEntities,
+    get_component_schemas: mockSchemas,
+    set_component_field: null,
   };
   return (mocks[cmd] ?? null) as T;
 }
@@ -216,4 +241,17 @@ export async function executeSceneCommand(
   // Browser fallback — dispatch through local scene commands
   const mod = await import('$lib/scene/commands');
   return mod.dispatchSceneCommand(command, args);
+}
+
+export async function getComponentSchemas(): Promise<ComponentSchema[]> {
+  return tauriInvoke<ComponentSchema[]>('get_component_schemas');
+}
+
+export async function setComponentField(
+  entityId: number,
+  component: string,
+  field: string,
+  value: unknown,
+): Promise<void> {
+  return tauriInvoke<void>('set_component_field', { entityId, component, field, value });
 }
