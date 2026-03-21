@@ -28,6 +28,7 @@
   import { populateRegistry, listSpecs, dispatchCommand, setUndoVerifier } from './lib/dispatch';
   import { registerAllHandlers } from './lib/commands/index';
   import { initTauriListeners } from './lib/scene/state';
+  import AiPermissionDialog from './lib/components/AiPermissionDialog.svelte';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -56,6 +57,7 @@
   let canRedoState = $state(false);
   let recentItems = $state<RecentItem[]>([]);
   let unlistenCatalog: (() => void) | undefined;
+  let unlistenAiCmd: (() => void) | undefined;
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -535,6 +537,7 @@
     if (isTauri && !popoutPanel) {
       try {
         const { listen } = await import('@tauri-apps/api/event');
+        const { invoke } = await import('@tauri-apps/api/core');
 
         // Panel docked back — use the per-panel drop target tracked by DockDropZone,
         // falling back to the whole-window zone from Rust if no panel was hovered.
@@ -577,6 +580,21 @@
             };
             mapping[id]?.();
           });
+
+          // editor-run-command-ai: routes MCP AI agent commands through the editor
+          // dispatch layer and sends results back via ai_scene_response.
+          unlistenAiCmd = await listen<{ id: string; args: unknown; request_id: string }>(
+            'editor-run-command-ai',
+            async (event) => {
+              const { id, args, request_id } = event.payload;
+              try {
+                const result = await invoke<{ status: string; data?: unknown }>('run_command', { id, args: args ?? null });
+                await invoke('ai_scene_response', { request_id, data: result?.data ?? null });
+              } catch (e) {
+                await invoke('ai_scene_response', { request_id, data: null });
+              }
+            }
+          );
         }
       } catch (e) {
         console.error('[silmaril] Failed to listen for pop-out events:', e);
@@ -586,6 +604,7 @@
 
   onDestroy(() => {
     unlistenCatalog?.();
+    unlistenAiCmd?.();
   });
 </script>
 
@@ -709,6 +728,9 @@
 
   <!-- Invisible resize handles (frameless window — WebView2 blocks native NC hit-testing) -->
   <ResizeHandles />
+
+  <!-- AI permission dialog — shown when an MCP agent requests a command permission -->
+  <AiPermissionDialog />
 
 
   <!-- Status bar -->
