@@ -17,6 +17,8 @@
   import TitleBar from './lib/components/TitleBar.svelte';
   import { loadLayout, saveLayout, defaultLayout, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
+  import { registerCommand } from './lib/omnibar/registry';
+  import { dispatchSceneCommand } from './lib/scene/commands';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -38,6 +40,7 @@
   const isViewportOverlay = new URLSearchParams(window.location.search).get('overlay') === 'viewport';
 
   let editorState: EditorState | null = $state(null);
+  let omnibarOpen = $state(false);
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -274,6 +277,12 @@
         cycleActiveTab(e.shiftKey ? -1 : 1);
         return;
       }
+      // Omnibar: Ctrl+K
+      if (e.key === 'k' && e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        omnibarOpen = true;
+        return;
+      }
       // Settings: Ctrl+,
       if (e.key === ',' && e.ctrlKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
@@ -352,6 +361,27 @@
       if (hydratedLayouts) savedLayouts = hydratedLayouts;
     }
 
+    // Register UI-only commands in the frontend registry
+    registerCommand({
+      id: 'ui.open_settings',
+      label: 'Open Settings',
+      category: 'Editor',
+      keybind: 'Ctrl+,',
+      run: () => { showSettings = true; },
+    });
+    registerCommand({
+      id: 'ui.open_project',
+      label: 'Open Project…',
+      category: 'File',
+      run: handleOpenProject,
+    });
+    registerCommand({
+      id: 'ui.layout.reset',
+      label: 'Reset Layout',
+      category: 'Layout',
+      run: handleLayoutReset,
+    });
+
     // Listen for events from pop-out windows
     if (isTauri && !popoutPanel) {
       try {
@@ -381,6 +411,24 @@
             endDrag();
           }
         });
+        // editor-run-command: routes Tauri backend commands to the scene
+        if (!isViewportOverlay) {
+          await listen<{ id: string }>('editor-run-command', (event) => {
+            const { id } = event.payload;
+            const mapping: Record<string, () => void> = {
+              'editor.toggle_grid':       () => dispatchSceneCommand('toggle_grid', {}),
+              'editor.toggle_snap':       () => dispatchSceneCommand('toggle_snap', {}),
+              'editor.toggle_projection': () => dispatchSceneCommand('toggle_projection', {}),
+              'editor.new_scene':         () => dispatchSceneCommand('new_scene', {}),
+              'editor.reset_camera':      () => dispatchSceneCommand('reset_camera', {}),
+              'editor.set_tool.select':   () => dispatchSceneCommand('set_tool', { tool: 'select' }),
+              'editor.set_tool.move':     () => dispatchSceneCommand('set_tool', { tool: 'move' }),
+              'editor.set_tool.rotate':   () => dispatchSceneCommand('set_tool', { tool: 'rotate' }),
+              'editor.set_tool.scale':    () => dispatchSceneCommand('set_tool', { tool: 'scale' }),
+            };
+            mapping[id]?.();
+          });
+        }
       } catch (e) {
         console.error('[silmaril] Failed to listen for pop-out events:', e);
       }
@@ -413,6 +461,10 @@
         onOpenProject={handleOpenProject}
         onLayoutReset={handleLayoutReset}
         compactMenu={settings.compactMenu}
+        bind:omnibarOpen
+        projectPath={editorState?.project_path ?? null}
+        onOmnibarOpen={() => { omnibarOpen = true; }}
+        onOmnibarClose={() => { omnibarOpen = false; }}
       />
   {/if}
 
