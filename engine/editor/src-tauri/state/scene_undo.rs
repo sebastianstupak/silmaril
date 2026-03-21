@@ -20,6 +20,7 @@ pub struct SerializedTransform {
 }
 
 /// A discrete, reversible scene operation.
+#[derive(Clone, Debug)]
 pub enum SceneAction {
     /// A transform was changed on an entity.
     ///
@@ -84,15 +85,7 @@ impl SceneUndoStack {
         let action = self.undo.pop()?;
         // Clone the action onto redo — the same record stores both before/after,
         // so redo can re-apply `after` without any field swapping.
-        match &action {
-            SceneAction::SetTransform { entity_id, before, after } => {
-                self.redo.push(SceneAction::SetTransform {
-                    entity_id: *entity_id,
-                    before: before.clone(),
-                    after: after.clone(),
-                });
-            }
-        }
+        self.redo.push(action.clone());
         Some(action)
     }
 
@@ -104,16 +97,14 @@ impl SceneUndoStack {
     /// Returns `None` if the redo stack is empty.
     pub fn pop_redo(&mut self) -> Option<SceneAction> {
         let action = self.redo.pop()?;
-        match &action {
-            SceneAction::SetTransform { entity_id, before, after } => {
-                self.undo.push(SceneAction::SetTransform {
-                    entity_id: *entity_id,
-                    before: before.clone(),
-                    after: after.clone(),
-                });
-            }
-        }
+        self.undo.push(action.clone());
         Some(action)
+    }
+}
+
+impl Default for SceneUndoStack {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -1235,8 +1235,7 @@ pub fn scene_undo(
         stack.pop_undo()
     };
     let Some(action) = action else {
-        let stack = undo_state.lock().map_err(|e| e.to_string())?;
-        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
+        return Ok(serde_json::json!({ "canUndo": false, "canRedo": false }));
     };
     // For undo, apply `before`.
     let (entity_id, target) = match &action {
@@ -1263,8 +1262,7 @@ pub fn scene_redo(
         stack.pop_redo()
     };
     let Some(action) = action else {
-        let stack = undo_state.lock().map_err(|e| e.to_string())?;
-        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
+        return Ok(serde_json::json!({ "canUndo": false, "canRedo": false }));
     };
     // For redo, apply `after`.
     let (entity_id, target) = match &action {
@@ -1287,7 +1285,9 @@ fn apply_scene_action(
     app: &tauri::AppHandle,
 ) -> Result<(), String> {
     use tauri::Emitter;
-    debug_assert!(entity_id <= u32::MAX as u64, "entity_id truncation");
+    if entity_id > u32::MAX as u64 {
+        return Err(format!("entity_id {entity_id} exceeds u32::MAX"));
+    }
     // FIXME: hardcodes generation 0 — will break after any entity slot reuse
     let entity = engine_core::Entity::new(entity_id as u32, 0);
     let mut world = world_state.0.write().map_err(|e| e.to_string())?;
@@ -1295,6 +1295,10 @@ fn apply_scene_action(
         t.position = glam::Vec3::from(target.position);
         t.rotation = glam::Quat::from_array(target.rotation);
         t.scale = glam::Vec3::from(target.scale);
+    } else {
+        tracing::warn!(entity_id = entity_id, "apply_scene_action: entity has no Transform (may have been deleted)");
+        drop(world);
+        return Ok(());
     }
     drop(world);
     app.emit(
