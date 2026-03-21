@@ -45,14 +45,46 @@ unsafe extern "system" fn nc_wndproc(
 ) -> windows::Win32::Foundation::LRESULT {
     use windows::Win32::Foundation::LRESULT;
     use windows::Win32::UI::WindowsAndMessaging::{
-        CallWindowProcW, DefWindowProcW, IsZoomed, WM_NCCALCSIZE,
+        CallWindowProcW, DefWindowProcW, GetWindowRect, IsZoomed, WM_NCCALCSIZE, WM_NCHITTEST,
     };
 
     if msg == WM_NCCALCSIZE && wparam.0 != 0 && !IsZoomed(hwnd).as_bool() {
-        // Returning 0 makes the entire window rect the client rect.
-        // This eliminates tao's 1px top NC inset without removing WS_THICKFRAME,
-        // so edge-resize hit-testing continues to work.
+        // Returning 0 makes the entire window rect the client rect, eliminating
+        // tao's 1px top NC inset. WS_THICKFRAME is kept but the NC border area
+        // is now 0 px, so WM_NCHITTEST must return resize codes manually.
         return LRESULT(0);
+    }
+
+    if msg == WM_NCHITTEST && !IsZoomed(hwnd).as_bool() {
+        // With NC area = 0 (from NCCALCSIZE above), Windows never generates
+        // HTLEFT/HTRIGHT/etc. on its own — we must emit them when the cursor
+        // is within BORDER pixels of any edge.
+        let x = (lparam.0 & 0xFFFF) as i16 as i32; // sign-extend for multi-monitor
+        let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+        let mut r = windows::Win32::Foundation::RECT::default();
+        if GetWindowRect(hwnd, &mut r).is_ok() {
+            const B: i32 = 8; // resize border width (physical pixels)
+            let left   = x < r.left   + B;
+            let right  = x >= r.right  - B;
+            let top    = y < r.top     + B;
+            let bottom = y >= r.bottom - B;
+            // HTTOPLEFT=13, HTTOPRIGHT=14, HTBOTTOMLEFT=16, HTBOTTOMRIGHT=17
+            // HTLEFT=10, HTRIGHT=11, HTTOP=12, HTBOTTOM=15
+            let hit: isize = match (left, right, top, bottom) {
+                (true,  _,     true,  _)     => 13, // HTTOPLEFT
+                (_,     true,  true,  _)     => 14, // HTTOPRIGHT
+                (true,  _,     _,     true)  => 16, // HTBOTTOMLEFT
+                (_,     true,  _,     true)  => 17, // HTBOTTOMRIGHT
+                (true,  _,     _,     _)     => 10, // HTLEFT
+                (_,     true,  _,     _)     => 11, // HTRIGHT
+                (_,     _,     true,  _)     => 12, // HTTOP
+                (_,     _,     _,     true)  => 15, // HTBOTTOM
+                _                            =>  0, // not on an edge
+            };
+            if hit != 0 {
+                return LRESULT(hit);
+            }
+        }
     }
 
     let orig = ORIG_WNDPROC.load(std::sync::atomic::Ordering::SeqCst);
@@ -244,6 +276,7 @@ pub fn run() {
             commands::window_toggle_maximize,
             commands::window_close,
             commands::window_start_drag,
+            commands::window_start_resize,
             commands::start_dock_drag,
             commands::broadcast_settings,
             get_file_tree,

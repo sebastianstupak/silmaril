@@ -35,6 +35,10 @@
     onSettingsOpen?: () => void;
     onOpenProject?: () => void;
     onLayoutReset?: () => void;
+    onUndo?: () => void;
+    onRedo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
     compactMenu?: boolean;
     omnibarOpen?: boolean;
     onOmnibarOpen?: () => void;
@@ -58,6 +62,10 @@
     onSettingsOpen,
     onOpenProject,
     onLayoutReset,
+    onUndo,
+    onRedo,
+    canUndo = false,
+    canRedo = false,
     compactMenu = false,
     omnibarOpen = false,
     onOmnibarOpen,
@@ -250,11 +258,11 @@
           <span class="menu-label">{t('menu.edit')}</span>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="start" sideOffset={4} class="min-w-[200px]">
-          <DropdownMenu.Item>
+          <DropdownMenu.Item onclick={onUndo} disabled={!canUndo}>
             {t('menu.edit.undo')}
             <DropdownMenu.Shortcut>Ctrl+Z</DropdownMenu.Shortcut>
           </DropdownMenu.Item>
-          <DropdownMenu.Item>
+          <DropdownMenu.Item onclick={onRedo} disabled={!canRedo}>
             {t('menu.edit.redo')}
             <DropdownMenu.Shortcut>Ctrl+Y</DropdownMenu.Shortcut>
           </DropdownMenu.Item>

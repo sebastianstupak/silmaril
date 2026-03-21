@@ -10,11 +10,13 @@
   import { loadSettings, saveSettings, hydrateSettings, type EditorSettings } from './lib/stores/settings';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
   import { logInfo, logWarn } from './lib/stores/console';
+  import { undo, redo, getCanUndo, getCanRedo, subscribeUndoHistory } from './lib/stores/undo-history';
   import { loadSchemas } from './lib/inspector/schema-store';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
   import DragOverlay from './lib/docking/DragOverlay.svelte';
   import TitleBar from './lib/components/TitleBar.svelte';
+  import ResizeHandles from './lib/components/ResizeHandles.svelte';
   import { loadLayout, saveLayout, defaultLayout, resizeSplit, cycleActiveTab, startDrag, endDrag, getDragState, dropPanel, loadSavedLayouts, saveSavedLayouts, hydrateLayout, hydrateSavedLayouts, type SavedLayout } from './lib/docking/store';
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
   import { registerCommand } from './lib/omnibar/registry';
@@ -41,6 +43,8 @@
 
   let editorState: EditorState | null = $state(null);
   let omnibarOpen = $state(false);
+  let canUndoState = $state(false);
+  let canRedoState = $state(false);
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -548,6 +552,9 @@
 
   <!-- Drag overlay (ghost tab + backdrop during panel drag) -->
   <DragOverlay />
+
+  <!-- Invisible resize handles (frameless window — WebView2 blocks native NC hit-testing) -->
+  <ResizeHandles />
 
 
   <!-- Status bar -->

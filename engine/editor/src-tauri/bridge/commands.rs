@@ -514,6 +514,63 @@ pub fn window_start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())
 }
 
+/// Begin a window resize from JavaScript.
+///
+/// `direction` is one of: "n", "s", "e", "w", "ne", "nw", "se", "sw".
+///
+/// Uses the same WM_NCLBUTTONDOWN technique as window_start_drag but with
+/// the appropriate resize hit code instead of HTCAPTION.  This is needed
+/// because WebView2 intercepts WM_NCHITTEST before it reaches the parent
+/// HWND, so cursor-based hit testing in the WNDPROC never fires.
+#[tauri::command]
+pub fn window_start_resize(window: tauri::WebviewWindow, direction: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+        use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            PostMessageW, WM_NCLBUTTONDOWN,
+            HTLEFT, HTRIGHT, HTTOP, HTBOTTOM,
+            HTTOPLEFT, HTTOPRIGHT, HTBOTTOMLEFT, HTBOTTOMRIGHT,
+        };
+        let hit: usize = match direction.as_str() {
+            "n"  => HTTOP.0 as usize,
+            "s"  => HTBOTTOM.0 as usize,
+            "e"  => HTRIGHT.0 as usize,
+            "w"  => HTLEFT.0 as usize,
+            "ne" => HTTOPRIGHT.0 as usize,
+            "nw" => HTTOPLEFT.0 as usize,
+            "se" => HTBOTTOMRIGHT.0 as usize,
+            "sw" => HTBOTTOMLEFT.0 as usize,
+            other => return Err(format!("unknown resize direction: {other}")),
+        };
+        let raw = window.hwnd().map_err(|e| format!("get HWND: {e}"))?;
+        let hwnd = HWND(raw.0);
+        unsafe {
+            let _ = ReleaseCapture();
+            let _ = PostMessageW(Some(hwnd), WM_NCLBUTTONDOWN, WPARAM(hit), LPARAM(0));
+        }
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    {
+        use tauri::window::ResizeDirection;
+        let dir = match direction.as_str() {
+            "n"  => ResizeDirection::North,
+            "s"  => ResizeDirection::South,
+            "e"  => ResizeDirection::East,
+            "w"  => ResizeDirection::West,
+            "ne" => ResizeDirection::NorthEast,
+            "nw" => ResizeDirection::NorthWest,
+            "se" => ResizeDirection::SouthEast,
+            "sw" => ResizeDirection::SouthWest,
+            other => return Err(format!("unknown resize direction: {other}")),
+        };
+        window.start_resizing(dir).map_err(|e| e.to_string())
+    }
+}
+
 /// Check if a pop-out window cursor is over the main editor window.
 /// Returns `{ near: true, zone: "left"|"right"|"top"|"bottom"|"center" }`.
 /// Also emits `popout-near` event to main window with zone info.
