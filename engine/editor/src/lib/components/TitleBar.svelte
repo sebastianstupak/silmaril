@@ -643,8 +643,9 @@
   /* ── Titlebar shell ─────────────────────────────────────────────────────── */
   .titlebar {
     height: 32px;
-    display: flex;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
     background: var(--color-bgTitleBar, #141414);
     border-bottom: 1px solid color-mix(in srgb, var(--color-border, #404040) 60%, transparent);
     user-select: none;
@@ -659,8 +660,8 @@
   .titlebar-left {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
     min-width: 0;
+    justify-self: start;
   }
 
   /* Logo sub-area: drag-through, non-interactive */
@@ -718,27 +719,18 @@
   }
 
   /* ── Center ─────────────────────────────────────────────────────────────── */
-  /* Absolutely positioned so it's centred relative to the full bar width,
-     not just the remaining space between left and right sections. */
   .titlebar-center {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: none; /* let clicks fall through to drag region by default */
-  }
-  .titlebar-center > :global(*) {
-    pointer-events: auto; /* re-enable pointer events for the omnibar itself */
+    min-width: 0;
   }
 
   /* ── Right ──────────────────────────────────────────────────────────────── */
   .titlebar-right {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
+    justify-self: end;
     gap: 1px;
     padding-right: 0;
   }
