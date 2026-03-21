@@ -23,6 +23,7 @@ members = [
     "engine/shared",
     "engine/auth",
     "engine/templating",
+    "engine/ai",
     "engine/editor",
     "engine/dev-tools/hot-reload",
     "engine/binaries/client",
