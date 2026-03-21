@@ -16,6 +16,10 @@
     viewportSetGridVisible,
     viewportCameraSetOrientation,
     viewportSetProjection,
+    gizmoHitTest,
+    gizmoDrag,
+    gizmoDragEnd,
+    setGizmoMode,
   } from '$lib/api';
   import type { SceneTool, ProjectionMode } from '$lib/scene/state';
   import {
@@ -28,6 +32,7 @@
     focusEntity,
   } from '$lib/scene/commands';
   import { saveViewportSettings, loadViewportSettings } from '$lib/viewport-settings';
+  import { setViewportFocused } from '$lib/stores/undo-history';
   import type { Component } from 'svelte';
   import {
     MousePointer2, Move, RotateCw, Maximize2,
@@ -110,6 +115,13 @@
   let dragMode: DragMode = $state('none');
   let dragStartX = 0;
   let dragStartY = 0;
+
+  /** True while the user is dragging a gizmo axis handle.
+   *  Gizmo drag takes priority — camera orbit/pan are suppressed. */
+  let isDraggingGizmo = $state(false);
+
+  /** Active gizmo mode — kept in sync with the Rust backend via set_gizmo_mode. */
+  let gizmoMode: 'move' | 'rotate' | 'scale' = $state('move');
 
   /** Cursor CSS value — reactive, recalculated on every relevant state change. */
   let cursor = $state('default');
@@ -206,9 +218,20 @@
       // Allow $effect to start saving now that defaults have been overwritten.
       settingsLoaded = true;
 
+      // Clear isDraggingGizmo if the mouse is released outside the viewport
+      // element — the viewport's own mouseup handler won't fire in that case.
+      function handleWindowPointerUp() {
+        if (isDraggingGizmo) {
+          isDraggingGizmo = false;
+          gizmoDragEnd(viewportId).catch(err => console.error('gizmo_drag_end failed:', err));
+        }
+      }
+      window.addEventListener('pointerup', handleWindowPointerUp);
+
       return () => {
         unsub();
         observer.disconnect();
+        window.removeEventListener('pointerup', handleWindowPointerUp);
         // Remove this instance from the Rust registry on unmount.
         if (isTauri && viewportRegistered) {
           destroyNativeViewport(viewportId);
@@ -267,11 +290,13 @@
    *
    *  Tool interactions (Left mouse, no modifier):
    *    Q (Select)  : Left click         = select entity
-   *    W (Move)    : Left click + drag  = move entity
-   *    E (Rotate)  : Left click + drag  = rotate entity
-   *    R (Scale)   : Left click + drag  = scale entity
+   *    W (Move)    : Left click + drag  = gizmo move (if handle hit) or move entity
+   *    E (Rotate)  : Left click + drag  = gizmo rotate (if handle hit) or rotate entity
+   *    R (Scale)   : Left click + drag  = gizmo scale (if handle hit) or scale entity
+   *
+   *  Gizmo handles take priority over the legacy entity drag path.
    */
-  function handleMouseDown(event: MouseEvent) {
+  async function handleMouseDown(event: MouseEvent) {
     const tool = activeTool;
 
     // Middle mouse → pan
@@ -309,9 +334,23 @@
       return;
     }
 
-    // Left click with manipulation tool on selected entity → entity drag
+    // Left click with manipulation tool on selected entity:
+    // First try gizmo hit test — if a handle is hit, gizmo drag takes priority.
     if (event.button === 0 && tool !== 'select' && selectedEntityId != null) {
       event.preventDefault();
+      let hit = null;
+      try {
+        hit = await gizmoHitTest(viewportId, event.clientX, event.clientY, selectedEntityId);
+      } catch (err) {
+        console.error('gizmo_hit_test failed:', err);
+      }
+      if (hit) {
+        isDraggingGizmo = true;
+        event.stopPropagation();
+        cursor = cursorForTool(tool);
+        return;
+      }
+      // No gizmo handle hit — fall through to legacy entity drag
       const mode: DragMode =
         tool === 'move' ? 'move_entity' :
         tool === 'rotate' ? 'rotate_entity' : 'scale_entity';
@@ -330,7 +369,18 @@
     cursor = cursorForDrag(mode);
   }
 
-  function handleMouseMove(event: MouseEvent) {
+  async function handleMouseMove(event: MouseEvent) {
+    // Gizmo drag takes priority over camera/entity drag.
+    if (isDraggingGizmo) {
+      try {
+        await gizmoDrag(viewportId, event.clientX, event.clientY);
+      } catch (err) {
+        console.error('gizmo_drag failed:', err);
+        isDraggingGizmo = false;  // clear on error to prevent stuck state
+      }
+      return;
+    }
+
     if (!isDragging) return;
 
     const dy = event.clientY - dragStartY;
@@ -399,7 +449,19 @@
     }
   }
 
-  function handleMouseUp() {
+  async function handleMouseUp() {
+    // Finalise gizmo drag first — clears DragState on Rust side and pushes undo.
+    if (isDraggingGizmo) {
+      isDraggingGizmo = false;  // clear first so state is always cleaned up even if IPC fails
+      try {
+        await gizmoDragEnd(viewportId);
+      } catch (err) {
+        console.error('gizmo_drag_end failed:', err);
+      }
+      cursor = cursorForTool(activeTool);
+      return;
+    }
+
     if (isDragging) {
       isDragging = false;
       dragMode = 'none';
@@ -423,13 +485,26 @@
   // ---------------------------------------------------------------------------
 
   /** Handle keyboard shortcuts when viewport is focused. */
-  function handleKeyDown(event: KeyboardEvent) {
+  async function handleKeyDown(event: KeyboardEvent) {
     // Tool switching: Q/W/E/R
+    // W/E/R also sync gizmo mode to the Rust backend so the gizmo renders the
+    // correct handle style and hit-test uses the correct mode.
     const toolKey = TOOL_KEYS[event.key.toLowerCase()];
     if (toolKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       activeTool = toolKey;
       cursor = cursorForTool(toolKey);
+      // Sync gizmo mode for manipulation tools
+      if (toolKey === 'move') {
+        gizmoMode = 'move';
+        setGizmoMode('move');
+      } else if (toolKey === 'rotate') {
+        gizmoMode = 'rotate';
+        setGizmoMode('rotate');
+      } else if (toolKey === 'scale') {
+        gizmoMode = 'scale';
+        setGizmoMode('scale');
+      }
       return;
     }
 
@@ -506,7 +581,8 @@
   onmousedown={handleMouseDown}
   onmousemove={handleMouseMove}
   onmouseup={handleMouseUp}
-  onmouseleave={handleMouseUp}
+  onmouseenter={() => setViewportFocused(true)}
+  onmouseleave={() => { handleMouseUp(); setViewportFocused(false); }}
   oncontextmenu={handleContextMenu}
   onkeydown={handleKeyDown}
 >

@@ -296,6 +296,8 @@ pub fn run() {
         .manage(commands::ProjectState::new())
         .manage(TerminalState::new())
         .manage(OutputState::new())
+        .manage(crate::state::SceneWorldState::new())
+        .manage(std::sync::Mutex::new(crate::state::SceneUndoStack::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::get_component_schemas,
@@ -351,6 +353,14 @@ pub fn run() {
             terminal_close_tab,
             output_run,
             output_cancel,
+            commands::create_entity,
+            commands::delete_entity,
+            commands::scene_undo,
+            commands::scene_redo,
+            bridge::gizmo_commands::gizmo_hit_test,
+            bridge::gizmo_commands::gizmo_drag,
+            bridge::gizmo_commands::gizmo_drag_end,
+            bridge::gizmo_commands::set_gizmo_mode,
         ])
         .setup(|app| {
             use tauri::Manager;

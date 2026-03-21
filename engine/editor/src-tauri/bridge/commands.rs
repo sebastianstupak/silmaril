@@ -39,14 +39,17 @@ pub fn get_component_schemas(
 
 /// Sets a single component field value for an entity.
 ///
-/// Design-time: updates are tracked in the frontend scene state.
-/// Play-time (future): this will forward to the live ECS.
+/// Updates both the frontend scene state (via Tauri event) and the live ECS
+/// world.  For Transform fields the ECS component is mutated in-place and an
+/// `entity-transform-changed` event is emitted so the frontend stays in sync.
 #[tauri::command]
 pub fn set_component_field(
     entity_id: u64,
     component: String,
     field: String,
     value: serde_json::Value,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     tracing::debug!(
         entity_id,
@@ -55,6 +58,98 @@ pub fn set_component_field(
         value = %value,
         "set_component_field"
     );
+
+    // For Transform component fields, also update the live ECS world.
+    if component == "Transform" {
+        debug_assert!(entity_id <= u32::MAX as u64, "entity_id truncation");
+        let entity = engine_core::Entity::new(entity_id as u32, 0); // FIXME: hardcodes generation 0 — will break after any entity slot reuse
+        let val = value.as_f64().ok_or("value must be a number")? as f32;
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
+            match field.as_str() {
+                "position.x" => t.position.x = val,
+                "position.y" => t.position.y = val,
+                "position.z" => t.position.z = val,
+                "rotation.x" => t.rotation.x = val,
+                "rotation.y" => t.rotation.y = val,
+                "rotation.z" => t.rotation.z = val,
+                "rotation.w" => t.rotation.w = val,
+                "scale.x" => t.scale.x = val,
+                "scale.y" => t.scale.y = val,
+                "scale.z" => t.scale.z = val,
+                _ => {}
+            }
+        } else {
+            return Err(format!("Entity {entity_id} has no Transform component"));
+        }
+        // Read back the full transform to emit the event.
+        if let Some(t) = world.get::<engine_core::Transform>(entity) {
+            let pos = [t.position.x, t.position.y, t.position.z];
+            let rot = [t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w];
+            let scl = [t.scale.x, t.scale.y, t.scale.z];
+            use tauri::Emitter;
+            app.emit(
+                "entity-transform-changed",
+                serde_json::json!({
+                    "id": entity_id, "position": pos, "rotation": rot, "scale": scl
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Create a new entity in the live ECS world with a default Transform.
+///
+/// Emits `entity-created` so the frontend can add it to the scene graph.
+#[tauri::command]
+pub fn create_entity(
+    name: Option<String>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<u64, String> {
+    use tauri::Emitter;
+
+    let entity_id = {
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        let entity = world.spawn();
+        world.add(entity, engine_core::Transform::default());
+        entity.id() as u64
+    };
+    let entity_name = name.unwrap_or_else(|| format!("Entity {entity_id}"));
+    app.emit(
+        "entity-created",
+        serde_json::json!({ "id": entity_id, "name": entity_name }),
+    )
+    .map_err(|e| e.to_string())?;
+    tracing::info!(entity_id, name = %entity_name, "Entity created");
+    Ok(entity_id)
+}
+
+/// Remove an entity from the live ECS world.
+///
+/// Emits `entity-deleted` so the frontend can remove it from the scene graph.
+#[tauri::command]
+pub fn delete_entity(
+    entity_id: u64,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Emitter;
+
+    let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+    debug_assert!(entity_id <= u32::MAX as u64, "entity_id truncation");
+    world.despawn(engine_core::Entity::new(entity_id as u32, 0)); // FIXME: hardcodes generation 0 — will break after any entity slot reuse
+    drop(world);
+
+    app.emit(
+        "entity-deleted",
+        serde_json::json!({ "id": entity_id }),
+    )
+    .map_err(|e| e.to_string())?;
+    tracing::info!(entity_id, "Entity deleted");
     Ok(())
 }
 
@@ -206,7 +301,7 @@ impl ViewportRegistry {
         Self::default()
     }
 
-    fn get_for_id(&self, id: &str) -> Option<&NativeViewport> {
+    pub fn get_for_id(&self, id: &str) -> Option<&NativeViewport> {
         let hwnd = self.hwnd_by_id.get(id)?;
         self.by_hwnd.get(hwnd)
     }
@@ -224,11 +319,21 @@ impl ProjectState {
     }
 }
 
-pub struct NativeViewportState(pub Mutex<ViewportRegistry>);
+pub struct NativeViewportState {
+    pub registry: Mutex<ViewportRegistry>,
+    /// Active gizmo drag operation, if any. Cleared on `gizmo_drag_end`.
+    pub drag_state: Mutex<Option<crate::bridge::gizmo_commands::DragState>>,
+    /// Current gizmo mode: 0 = Move, 1 = Rotate, 2 = Scale.
+    pub gizmo_mode: std::sync::atomic::AtomicU8,
+}
 
 impl Default for NativeViewportState {
     fn default() -> Self {
-        Self(Mutex::new(ViewportRegistry::new()))
+        Self {
+            registry: Mutex::new(ViewportRegistry::new()),
+            drag_state: Mutex::new(None),
+            gizmo_mode: std::sync::atomic::AtomicU8::new(0),
+        }
     }
 }
 
@@ -248,6 +353,7 @@ impl NativeViewportState {
 pub fn create_native_viewport(
     window: tauri::WebviewWindow,
     viewport_state: tauri::State<NativeViewportState>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
     viewport_id: String,
     x: i32,
     y: i32,
@@ -261,12 +367,12 @@ pub fn create_native_viewport(
         let parent_hwnd = window.hwnd().map_err(|e| format!("Failed to get HWND: {e}"))?;
         let hwnd_isize = parent_hwnd.0 as isize;
 
-        let mut registry = viewport_state.0.lock().unwrap();
+        let mut registry = viewport_state.registry.lock().unwrap();
 
         // Create a NativeViewport for this HWND if one doesn't exist yet.
         if let std::collections::hash_map::Entry::Vacant(e) = registry.by_hwnd.entry(hwnd_isize) {
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
-            let mut vp = NativeViewport::new(parent_hwnd).map_err(|e| {
+            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone()).map_err(|e| {
                 tracing::error!(error = %e, "NativeViewport::new failed");
                 e
             })?;
@@ -313,7 +419,7 @@ pub fn resize_native_viewport(
     width: u32,
     height: u32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_instance_bounds(&viewport_id, ViewportBounds { x, y, width, height });
     }
@@ -333,7 +439,7 @@ pub fn destroy_native_viewport(
     viewport_state: tauri::State<NativeViewportState>,
     viewport_id: String,
 ) -> Result<(), String> {
-    let mut registry = viewport_state.0.lock().unwrap();
+    let mut registry = viewport_state.registry.lock().unwrap();
     // .copied() gives an owned isize — releases the borrow on hwnd_by_id before the block.
     if let Some(hwnd) = registry.hwnd_by_id.get(&viewport_id).copied() {
         // Save camera (owned return value, borrow of by_hwnd ends after .and_then).
@@ -434,7 +540,7 @@ pub async fn dock_panel_back(
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {
         let hwnd_isize = hwnd.0 as isize;
-        let mut registry = viewport_state.0.lock().unwrap();
+        let mut registry = viewport_state.registry.lock().unwrap();
         let saved_cam = registry
             .by_hwnd
             .get(&hwnd_isize)
@@ -656,7 +762,7 @@ pub fn set_viewport_visible(
     viewport_id: String,
     visible: bool,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_instance_visible(&viewport_id, visible);
     }
@@ -671,7 +777,7 @@ pub fn viewport_camera_orbit(
     dx: f32,
     dy: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_orbit(&viewport_id, dx, dy);
     }
@@ -686,7 +792,7 @@ pub fn viewport_camera_pan(
     dx: f32,
     dy: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_pan(&viewport_id, dx, dy);
     }
@@ -700,7 +806,7 @@ pub fn viewport_camera_zoom(
     viewport_id: String,
     delta: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_zoom(&viewport_id, delta);
     }
@@ -713,7 +819,7 @@ pub fn viewport_camera_reset(
     viewport_state: tauri::State<NativeViewportState>,
     viewport_id: String,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_reset(&viewport_id);
     }
@@ -727,7 +833,7 @@ pub fn viewport_set_grid_visible(
     viewport_id: String,
     visible: bool,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_grid_visible(&viewport_id, visible);
     }
@@ -744,7 +850,7 @@ pub fn viewport_camera_set_orientation(
     yaw: f32,
     pitch: f32,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.camera_set_orientation(&viewport_id, yaw, pitch);
     }
@@ -758,7 +864,7 @@ pub fn viewport_set_projection(
     viewport_id: String,
     is_ortho: bool,
 ) -> Result<(), String> {
-    let registry = viewport_state.0.lock().unwrap();
+    let registry = viewport_state.registry.lock().unwrap();
     if let Some(vp) = registry.get_for_id(&viewport_id) {
         vp.set_projection(&viewport_id, is_ortho);
     }
@@ -917,7 +1023,7 @@ fn dock_drag_thread(
                 // createNativeViewport is called after the dock-panel-back event.
                 let vp_state = app.state::<NativeViewportState>();
                 {
-                    let mut registry = vp_state.0.lock().unwrap();
+                    let mut registry = vp_state.registry.lock().unwrap();
                     let saved_cam = registry
                         .by_hwnd
                         .get(&popout_hwnd_raw)
@@ -1118,4 +1224,163 @@ pub fn remove_component(
     save_scene(project_path, &scene)?;
     tracing::info!(entity_id, component = %component, "remove_component");
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scene undo / redo IPC
+// ---------------------------------------------------------------------------
+
+/// Undo the last scene action, applying its `before` state to the live ECS world.
+///
+/// Returns `{ canUndo, canRedo }` so the frontend can update toolbar button state.
+/// Returns the same payload with both fields `false` when the undo stack is empty.
+#[tauri::command]
+pub fn scene_undo(
+    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<serde_json::Value, String> {
+    let action = {
+        let mut stack = undo_state.lock().map_err(|e| e.to_string())?;
+        stack.pop_undo()
+    };
+    let Some(action) = action else {
+        let stack = undo_state.lock().map_err(|e| e.to_string())?;
+        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
+    };
+    // For undo, apply `before`.
+    let (entity_id, target) = match &action {
+        crate::state::SceneAction::SetTransform { entity_id, before, .. } => (*entity_id, before.clone()),
+    };
+    apply_scene_action(entity_id, &target, &world_state, &app)?;
+    let stack = undo_state.lock().map_err(|e| e.to_string())?;
+    tracing::debug!(can_undo = stack.can_undo(), can_redo = stack.can_redo(), "scene_undo applied");
+    Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }))
+}
+
+/// Redo the last undone scene action, applying its `after` state to the live ECS world.
+///
+/// Returns `{ canUndo, canRedo }` so the frontend can update toolbar button state.
+/// Returns the same payload with both fields `false` when the redo stack is empty.
+#[tauri::command]
+pub fn scene_redo(
+    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<serde_json::Value, String> {
+    let action = {
+        let mut stack = undo_state.lock().map_err(|e| e.to_string())?;
+        stack.pop_redo()
+    };
+    let Some(action) = action else {
+        let stack = undo_state.lock().map_err(|e| e.to_string())?;
+        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
+    };
+    // For redo, apply `after`.
+    let (entity_id, target) = match &action {
+        crate::state::SceneAction::SetTransform { entity_id, after, .. } => (*entity_id, after.clone()),
+    };
+    apply_scene_action(entity_id, &target, &world_state, &app)?;
+    let stack = undo_state.lock().map_err(|e| e.to_string())?;
+    tracing::debug!(can_undo = stack.can_undo(), can_redo = stack.can_redo(), "scene_redo applied");
+    Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }))
+}
+
+/// Apply a desired transform `target` to the entity identified by `entity_id` in the live ECS
+/// world and emit an `entity-transform-changed` event.
+///
+/// Used by both undo (pass `before`) and redo (pass `after`) so the logic is not duplicated.
+fn apply_scene_action(
+    entity_id: u64,
+    target: &crate::state::SerializedTransform,
+    world_state: &crate::state::SceneWorldState,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    if entity_id > u32::MAX as u64 {
+        return Err(format!("entity_id {entity_id} exceeds u32::MAX"));
+    }
+    // FIXME: hardcodes generation 0 — will break after any entity slot reuse
+    let entity = engine_core::Entity::new(entity_id as u32, 0);
+    let mut world = world_state.0.write().map_err(|e| e.to_string())?;
+    if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
+        t.position = glam::Vec3::from(target.position);
+        t.rotation = glam::Quat::from_array(target.rotation);
+        t.scale = glam::Vec3::from(target.scale);
+    } else {
+        tracing::warn!(entity_id = entity_id, "apply_scene_action: entity has no Transform (may have been deleted)");
+        drop(world);
+        return Ok(());
+    }
+    drop(world);
+    app.emit(
+        "entity-transform-changed",
+        serde_json::json!({
+            "id": entity_id,
+            "position": target.position,
+            "rotation": target.rotation,
+            "scale": target.scale,
+        }),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use engine_core::{Transform, World};
+    use std::sync::{Arc, RwLock};
+
+    #[test]
+    fn create_entity_adds_transform_to_world() {
+        let world = Arc::new(RwLock::new(World::new()));
+        let entity = {
+            let mut w = world.write().unwrap();
+            w.register::<Transform>();
+            let e = w.spawn();
+            w.add(e, Transform::default());
+            e
+        };
+        let w = world.read().unwrap();
+        assert!(w.get::<Transform>(entity).is_some());
+    }
+
+    #[test]
+    fn set_component_field_updates_transform_position() {
+        let world = Arc::new(RwLock::new(World::new()));
+        let entity = {
+            let mut w = world.write().unwrap();
+            w.register::<Transform>();
+            let e = w.spawn();
+            w.add(e, Transform::default());
+            e
+        };
+        {
+            let mut w = world.write().unwrap();
+            if let Some(t) = w.get_mut::<Transform>(entity) {
+                t.position.x = 5.0;
+            }
+        }
+        let w = world.read().unwrap();
+        let t = w.get::<Transform>(entity).unwrap();
+        assert_eq!(t.position.x, 5.0);
+    }
+
+    #[test]
+    fn despawn_removes_entity_from_world() {
+        let world = Arc::new(RwLock::new(World::new()));
+        let entity = {
+            let mut w = world.write().unwrap();
+            w.register::<Transform>();
+            let e = w.spawn();
+            w.add(e, Transform::default());
+            e
+        };
+        {
+            let mut w = world.write().unwrap();
+            w.despawn(entity);
+        }
+        let w = world.read().unwrap();
+        assert!(w.get::<Transform>(entity).is_none());
+    }
 }

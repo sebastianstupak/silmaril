@@ -7,33 +7,12 @@
 
 use rotating_cube_shared::components::{MeshRenderer, RotationSpeed, Transform};
 use rotating_cube_shared::systems::rotation_system;
-use silmaril_assets::{AssetId, MeshData};
-use silmaril_core::{Camera, Entity, World};
-use silmaril_renderer::{Renderer, WindowConfig};
-use std::collections::HashMap;
+use engine_assets::{AssetId, AssetManager, MeshData};
+use engine_core::{Camera, Entity, World};
+use engine_renderer::{Renderer, ViewportDescriptor, WindowConfig};
+use engine_render_context::Rect;
 use std::time::Instant;
 use tracing::{info, Level};
-
-// Simple asset manager for demo (just stores meshes in memory)
-struct SimpleAssetManager {
-    meshes: HashMap<AssetId, MeshData>,
-}
-
-impl SimpleAssetManager {
-    fn new() -> Self {
-        Self {
-            meshes: HashMap::new(),
-        }
-    }
-
-    fn add_mesh(&mut self, id: AssetId, mesh: MeshData) {
-        self.meshes.insert(id, mesh);
-    }
-
-    fn get_mesh(&self, id: AssetId) -> Option<&MeshData> {
-        self.meshes.get(&id)
-    }
-}
 
 fn main() -> anyhow::Result<()> {
     // Initialize logging
@@ -44,11 +23,11 @@ fn main() -> anyhow::Result<()> {
     info!("rotating-cube client starting...");
 
     // 1. Create asset manager and load cube mesh
-    let mut assets = SimpleAssetManager::new();
+    let assets = AssetManager::new();
     let cube_mesh = MeshData::cube();
     let mesh_id = AssetId::from_seed_and_params(1, b"mesh"); // mesh_id = 1
-    assets.add_mesh(mesh_id, cube_mesh);
-    info!("Loaded cube mesh with {} vertices", assets.get_mesh(mesh_id).unwrap().vertex_count());
+    assets.meshes().insert(mesh_id, cube_mesh);
+    info!("Loaded cube mesh");
 
     // 2. Create ECS world and spawn entities
     let mut world = World::new();
@@ -61,7 +40,8 @@ fn main() -> anyhow::Result<()> {
         glam::Vec3::ONE,
     );
     world.add(camera_entity, camera_transform);
-    world.add(camera_entity, Camera::new(std::f32::consts::FRAC_PI_4, 16.0 / 9.0));
+    let camera = Camera::new(std::f32::consts::FRAC_PI_4, 16.0 / 9.0);
+    world.add(camera_entity, camera);
     info!("Created camera entity at {:?}", camera_transform.position);
 
     // Load cube template (manual parsing for simplicity)
@@ -165,28 +145,35 @@ fn main() -> anyhow::Result<()> {
         }
 
         // Render frame
-        match renderer.render_meshes(&world, &assets) {
-            Ok(_) => {
-                frame_count += 1;
+        if let Some(recorder) = renderer.begin_frame() {
+            // Build viewport descriptor from the camera entity in the ECS world.
+            let vp_desc = {
+                let cam_transform = world
+                    .get::<engine_math::Transform>(camera_entity)
+                    .map(|t| *t)
+                    .unwrap_or_default();
+                let cam = world
+                    .get::<Camera>(camera_entity)
+                    .map(|c| *c)
+                    .unwrap_or_else(|| Camera::new(std::f32::consts::FRAC_PI_4, 16.0 / 9.0));
 
-                // Log FPS every second
-                if frame_count % 60 == 0 {
-                    let elapsed = start_time.elapsed().as_secs_f32();
-                    let fps = frame_count as f32 / elapsed;
-                    info!(frame = frame_count, fps = fps as u32, "Running");
+                ViewportDescriptor {
+                    bounds: Rect { x: 0, y: 0, width: 1280, height: 720 },
+                    view: cam.view_matrix(&cam_transform),
+                    proj: cam.projection_matrix_const(),
                 }
-            }
-            Err(e) => {
-                // Handle swapchain out of date (window resize)
-                if e.to_string().contains("out of date") {
-                    info!("Swapchain out of date, recreating...");
-                    // In a real app, you'd recreate the swapchain here
-                    // For now, just continue
-                    continue;
-                } else {
-                    tracing::error!(error = ?e, "Render failed");
-                    break;
-                }
+            };
+
+            renderer.render_meshes(&recorder, &world, Some(&assets), &[vp_desc]);
+            renderer.end_frame(recorder);
+
+            frame_count += 1;
+
+            // Log FPS every second
+            if frame_count % 60 == 0 {
+                let elapsed = start_time.elapsed().as_secs_f32();
+                let fps = frame_count as f32 / elapsed;
+                info!(frame = frame_count, fps = fps as u32, "Running");
             }
         }
 

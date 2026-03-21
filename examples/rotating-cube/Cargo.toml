@@ -26,6 +26,7 @@ engine-math = { path = "../../engine/math" }
 engine-core = { path = "../../engine/core" }
 engine-assets = { path = "../../engine/assets" }
 engine-renderer = { path = "../../engine/renderer" }
+engine-render-context = { path = "../../engine/render-context" }
 
 # Common dependencies
 serde = { version = "1.0", features = ["derive"] }

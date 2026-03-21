@@ -138,4 +138,79 @@ export function _resetState(): void {
   notify();
 }
 
+// ---------------------------------------------------------------------------
+// Tauri event listeners — mirror backend ECS changes into frontend state
+// ---------------------------------------------------------------------------
+
+let tauriListenersInitialised = false;
+
+/**
+ * Initialise Tauri event listeners that keep the frontend scene state in sync
+ * with the backend ECS world.  Safe to call multiple times — only the first
+ * call registers the listeners.
+ */
+export async function initTauriListeners(): Promise<void> {
+  if (tauriListenersInitialised) return;
+  tauriListenersInitialised = true;
+
+  const { listen } = await import('@tauri-apps/api/event');
+
+  await listen<{ id: number; name: string }>('entity-created', (event) => {
+    const { id, name } = event.payload;
+    // Avoid duplicates
+    if (state.entities.some((e) => e.id === id)) return;
+    const newEntity: SceneEntity = {
+      id,
+      name,
+      components: ['Transform'],
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      visible: true,
+      locked: false,
+      componentValues: {},
+    };
+    state = {
+      ...state,
+      entities: [...state.entities, newEntity],
+      nextEntityId: Math.max(state.nextEntityId, id + 1),
+    };
+    notify();
+  });
+
+  await listen<{ id: number }>('entity-deleted', (event) => {
+    const { id } = event.payload;
+    state = {
+      ...state,
+      entities: state.entities.filter((e) => e.id !== id),
+      selectedEntityId: state.selectedEntityId === id ? null : state.selectedEntityId,
+    };
+    notify();
+  });
+
+  await listen<{
+    id: number;
+    position: [number, number, number];
+    rotation: [number, number, number, number];
+    scale: [number, number, number];
+  }>('entity-transform-changed', (event) => {
+    const { id, position, rotation, scale } = event.payload;
+    state = {
+      ...state,
+      entities: state.entities.map((e) => {
+        if (e.id !== id) return e;
+        return {
+          ...e,
+          position: { x: position[0], y: position[1], z: position[2] },
+          // Store quaternion x/y/z as euler-like values for display;
+          // a proper quaternion-to-euler conversion can be added later.
+          rotation: { x: rotation[0], y: rotation[1], z: rotation[2] },
+          scale: { x: scale[0], y: scale[1], z: scale[2] },
+        };
+      }),
+    };
+    notify();
+  });
+}
+
 export { defaultCamera };

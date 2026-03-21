@@ -300,3 +300,72 @@ export async function scanAssets(
   if (!isTauri) return [];
   return tauriInvoke('scan_assets', { projectPath });
 }
+
+// ---------------------------------------------------------------------------
+// Gizmo IPC
+// ---------------------------------------------------------------------------
+
+export interface GizmoHit {
+  axis: string;
+  mode: string;
+}
+
+/** Test whether a screen-space position hits any gizmo handle for an entity.
+ *  Returns the hit axis/mode if a handle was hit, or null if not. */
+export async function gizmoHitTest(
+  viewportId: string,
+  screenX: number,
+  screenY: number,
+  entityId: number,
+): Promise<GizmoHit | null> {
+  if (!isTauri) return null;
+  return tauriInvoke<GizmoHit | null>('gizmo_hit_test', {
+    viewportId,
+    screenX,
+    screenY,
+    entityId,
+  });
+}
+
+/** Apply one mouse-move step to the active gizmo drag. */
+export async function gizmoDrag(
+  viewportId: string,
+  screenX: number,
+  screenY: number,
+): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('gizmo_drag', { viewportId, screenX, screenY });
+}
+
+/** Finalise an active gizmo drag: clears drag state and pushes undo entry. */
+export async function gizmoDragEnd(viewportId: string): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('gizmo_drag_end', { viewportId });
+}
+
+/** Set the active gizmo mode. Accepted values: "move", "rotate", "scale". */
+export async function setGizmoMode(mode: 'move' | 'rotate' | 'scale'): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('set_gizmo_mode', { mode });
+}
+
+// ---------------------------------------------------------------------------
+// Scene undo / redo
+// ---------------------------------------------------------------------------
+
+export interface UndoRedoState {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+/** Undo the last scene action. Returns the new undo/redo availability. */
+export async function sceneUndo(): Promise<UndoRedoState> {
+  if (!isTauri) return { canUndo: false, canRedo: false };
+  return tauriInvoke<UndoRedoState>('scene_undo');
+}
+
+/** Redo the last undone scene action. Returns the new undo/redo availability. */
+export async function sceneRedo(): Promise<UndoRedoState> {
+  if (!isTauri) return { canUndo: false, canRedo: false };
+  return tauriInvoke<UndoRedoState>('scene_redo');
+}

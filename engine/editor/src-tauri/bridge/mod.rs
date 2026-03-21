@@ -6,6 +6,7 @@
 pub mod builtin_schemas;
 pub mod commands;
 pub mod events;
+pub mod gizmo_commands;
 pub mod modules;
 pub mod schema_registry;
 pub mod subscriptions;
