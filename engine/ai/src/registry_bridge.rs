@@ -191,6 +191,20 @@ mod tests {
     }
 
     #[test]
+    fn command_to_mcp_tool_falls_back_to_label_when_no_description() {
+        let cmd = McpCommand {
+            id: "scene.list".into(),
+            label: "List Scene".into(),
+            category: "scene".into(),
+            description: None,
+            args_schema: None,
+            returns_data: false,
+        };
+        let tool = command_to_mcp_tool(&cmd);
+        assert_eq!(tool.description, "List Scene");
+    }
+
+    #[test]
     fn commands_to_tools_preserves_count() {
         let cmds = vec![
             make_cmd("scene.create_entity", None),
