@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { dispatchCommand } from '$lib/dispatch';
+  import { aiServerRunning, startAiServer, stopAiServer } from '$lib/stores/ai-server';
   import type { SavedLayout } from '../docking/store';
   import type { EditorLayout } from '../docking/types';
   import { buildMinimap, buildIcon } from '../docking/minimap';
@@ -323,6 +324,10 @@
           </DropdownMenu.Sub>
           <DropdownMenu.Separator />
           <DropdownMenu.Item onclick={() => onLayoutReset?.()}>{t('layout.reset')}</DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item onclick={() => $aiServerRunning ? stopAiServer() : startAiServer('')}>
+            {$aiServerRunning ? 'Stop AI Server' : 'Start AI Server'}
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
 

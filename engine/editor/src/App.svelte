@@ -29,6 +29,7 @@
   import { registerAllHandlers } from './lib/commands/index';
   import { initTauriListeners } from './lib/scene/state';
   import AiPermissionDialog from './lib/components/AiPermissionDialog.svelte';
+  import { aiServerRunning, aiServerPort, refreshAiServerStatus } from './lib/stores/ai-server';
 
   // Panel components (no-prop wrappers for docking)
   import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
@@ -451,6 +452,7 @@
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
     logInfo('Silmaril Editor started');
+    refreshAiServerStatus(); // sync MCP badge with any previously running server
 
     // Wire the dispatch layer: register all TypeScript-side handlers first,
     // then populate the spec registry from Rust so keybind lookup works.
@@ -743,6 +745,16 @@
       <span class="status-item">{t('status.ready')}</span>
     </div>
     <div class="status-right">
+      {#if $aiServerRunning}
+        <button
+          class="status-item status-mcp-badge"
+          title="MCP server running — click to copy URL"
+          onclick={() => navigator.clipboard.writeText(`http://localhost:${$aiServerPort}/mcp`)}
+        >
+          MCP :{$aiServerPort}
+        </button>
+        <span class="status-divider"></span>
+      {/if}
       <span class="status-item">{t('status.fps')}: --</span>
       <span class="status-divider"></span>
       <span class="status-item">{t('status.memory')}: --</span>
@@ -930,5 +942,17 @@
     height: 12px;
     background: var(--color-border, #404040);
     flex-shrink: 0;
+  }
+  .status-mcp-badge {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: var(--font-mono, monospace);
+    color: #4ade80;
+  }
+  .status-mcp-badge:hover {
+    color: #86efac;
   }
 </style>
