@@ -1404,6 +1404,135 @@ pub fn assign_mesh(
 // Scene undo / redo IPC
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Hierarchy utilities
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if making `entity_id` a child of `new_parent_id` would
+/// create a cycle in the parent-child hierarchy.
+///
+/// Walks the parent chain of `new_parent_id` upward; if it reaches
+/// `entity_id`, a cycle would result.
+pub fn would_create_cycle(
+    world: &engine_core::World,
+    entity_id: u32,
+    new_parent_id: u32,
+) -> bool {
+    let mut current = new_parent_id;
+    loop {
+        if current == entity_id {
+            return true;
+        }
+        match world.get::<engine_core::Parent>(engine_core::Entity::new(current, 0)) {
+            Some(p) => current = p.0,
+            None    => return false,
+        }
+    }
+}
+
+/// Reparent an entity in the live ECS world.
+///
+/// Pass `new_parent_id: None` to make the entity a root (removes the `Parent`
+/// component). Emits `entity-reparented` so the frontend updates its tree.
+#[tauri::command]
+pub fn reparent_entity(
+    entity_id: u64,
+    new_parent_id: Option<u64>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    debug_assert!(entity_id <= u32::MAX as u64, "entity_id overflows u32");
+
+    let entity = engine_core::Entity::new(entity_id as u32, 0);
+    let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+
+    if !world.is_alive(entity) {
+        return Err(format!("entity {entity_id} not found"));
+    }
+
+    match new_parent_id {
+        Some(pid) => {
+            debug_assert!(pid <= u32::MAX as u64, "new_parent_id overflows u32");
+            let parent_entity = engine_core::Entity::new(pid as u32, 0);
+            if !world.is_alive(parent_entity) {
+                return Err(format!("parent entity {pid} not found"));
+            }
+            if would_create_cycle(&world, entity_id as u32, pid as u32) {
+                return Err("cycle detected".into());
+            }
+            world.add(entity, engine_core::Parent(pid as u32));
+        }
+        None => {
+            world.remove::<engine_core::Parent>(entity);
+        }
+    }
+
+    tracing::debug!(entity_id, new_parent_id = ?new_parent_id, "reparent_entity");
+
+    app.emit(
+        "entity-reparented",
+        serde_json::json!({ "entityId": entity_id, "newParentId": new_parent_id }),
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod hierarchy_tests {
+    use super::would_create_cycle;
+    use engine_core::{Parent, World};
+
+    fn make_world() -> World {
+        let mut w = World::new();
+        w.register::<Parent>();
+        w
+    }
+
+    #[test]
+    fn test_cycle_detection_direct() {
+        let mut world = make_world();
+        let a = world.spawn();
+        let b = world.spawn();
+        world.add(b, Parent(a.id()));
+        assert!(would_create_cycle(&world, a.id(), b.id()));
+    }
+
+    #[test]
+    fn test_cycle_detection_indirect() {
+        let mut world = make_world();
+        let a = world.spawn();
+        let b = world.spawn();
+        let c = world.spawn();
+        world.add(b, Parent(a.id()));
+        world.add(c, Parent(b.id()));
+        assert!(would_create_cycle(&world, a.id(), c.id()));
+    }
+
+    #[test]
+    fn test_no_cycle() {
+        let mut world = make_world();
+        let a = world.spawn();
+        let b = world.spawn();
+        let c = world.spawn();
+        world.add(b, Parent(a.id()));
+        assert!(!would_create_cycle(&world, c.id(), b.id()));
+    }
+
+    #[test]
+    fn test_reparent_sets_parent_component() {
+        let mut world = make_world();
+        let parent = world.spawn();
+        let child  = world.spawn();
+
+        world.add(child, Parent(parent.id()));
+        assert_eq!(world.get::<Parent>(child).map(|p| p.0), Some(parent.id()));
+
+        world.remove::<Parent>(child);
+        assert!(world.get::<Parent>(child).is_none());
+    }
+}
 
 #[cfg(test)]
 mod tests {

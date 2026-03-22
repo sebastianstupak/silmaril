@@ -16,6 +16,7 @@ impl SceneWorldState {
         // Pre-register components used by the editor so `world.add()` never panics.
         world.register::<engine_core::Transform>();
         world.register::<engine_core::MeshRenderer>();
+        world.register::<engine_core::Parent>();
         Self(Arc::new(RwLock::new(world)))
     }
 }
