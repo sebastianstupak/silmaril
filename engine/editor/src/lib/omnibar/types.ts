@@ -24,7 +24,7 @@ export function isFrontendCommand(cmd: AnyCommand): cmd is FrontendCommand {
 }
 
 export type OmnibarResult =
-  | { kind: 'command'; command: AnyCommand }
-  | { kind: 'entity'; id: number; name: string; components: string[] }
-  | { kind: 'asset'; path: string; assetType: string }
-  | { kind: 'recent'; label: string; path: string; itemType: 'project' | 'scene' };
+  | { kind: 'command'; command: AnyCommand; group?: string }
+  | { kind: 'entity'; id: number; name: string; components: string[]; group?: string }
+  | { kind: 'asset'; path: string; assetType: string; group?: string }
+  | { kind: 'recent'; label: string; path: string; itemType: 'project' | 'scene'; group?: string };
