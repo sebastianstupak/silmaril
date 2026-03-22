@@ -5,6 +5,7 @@
 
 pub mod builtin_schemas;
 pub mod commands;
+pub mod contributions;
 pub mod events;
 pub mod gizmo_commands;
 pub mod modules;
