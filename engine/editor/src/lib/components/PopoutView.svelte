@@ -8,31 +8,17 @@
   import { setLocale } from '$lib/i18n';
   import { loadSettings } from '$lib/stores/settings';
   import { themes, applyTheme } from '$lib/theme/tokens';
-  import { getPanelTitle } from '$lib/contributions/registry';
-  import HierarchyWrapper from '$lib/docking/panels/HierarchyWrapper.svelte';
-  import InspectorWrapper from '$lib/docking/panels/InspectorWrapper.svelte';
-  import ConsoleWrapper from '$lib/docking/panels/ConsoleWrapper.svelte';
-  import ViewportPanel from '$lib/docking/panels/ViewportPanel.svelte';
-  import ProfilerPanel from '$lib/docking/panels/ProfilerPanel.svelte';
-  import AssetsPanel from '$lib/docking/panels/AssetsPanel.svelte';
-  import type { Component } from 'svelte';
+  import { registerBuiltinPanels } from '$lib/contributions/builtins';
+  import { getPanelComponent, getPanelTitle } from '$lib/contributions/registry';
+
+  registerBuiltinPanels();
 
   let { panelId }: { panelId: string } = $props();
 
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
-  const panels: Record<string, Component> = {
-    hierarchy: HierarchyWrapper,
-    inspector: InspectorWrapper,
-    console: ConsoleWrapper,
-    viewport: ViewportPanel,
-    profiler: ProfilerPanel,
-    assets: AssetsPanel,
-  };
-
-  const basePanelId = panelId.split(':')[0];
-  const PanelComponent = panels[basePanelId];
-  const panelTitle = getPanelTitle(basePanelId);
+  const PanelComponent = getPanelComponent(panelId);
+  const panelTitle = getPanelTitle(panelId);
 
   onMount(() => {
     const SETTINGS_KEY = 'silmaril-editor-settings';
