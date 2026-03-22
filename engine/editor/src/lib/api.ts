@@ -19,6 +19,7 @@ export interface EntityInfo {
   id: number;
   name: string;
   components: string[];
+  parentId?: number;
 }
 
 /** Detect if running inside Tauri or standalone browser */
@@ -348,6 +349,11 @@ export async function gizmoDragEnd(viewportId: string, templatePath: string): Pr
 export async function setSelectedEntity(entityId: number | null): Promise<void> {
   if (!isTauri) return;
   return tauriInvoke<void>('set_selected_entity', { entityId });
+}
+
+/** Create a child entity under the given parent. Returns the new entity id. */
+export async function createEntityChild(parentId: number, name?: string): Promise<number> {
+  return tauriInvoke<number>('create_entity_child', { parentId, name });
 }
 
 /** Set the active gizmo mode. Accepted values: "move", "rotate", "scale". */

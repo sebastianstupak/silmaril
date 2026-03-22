@@ -14,12 +14,20 @@ export const defaultLayout: EditorLayout = {
     direction: 'horizontal',
     sizes: [20, 55, 25],
     children: [
-      { type: 'tabs', activeTab: 0, panels: ['hierarchy'] },
+      {
+        type: 'split',
+        direction: 'vertical',
+        sizes: [65, 35],
+        children: [
+          { type: 'tabs', activeTab: 0, panels: ['hierarchy'] },
+          { type: 'tabs', activeTab: 0, panels: ['assets', 'file-explorer'] },
+        ],
+      },
       { type: 'tabs', activeTab: 0, panels: ['viewport'] },
       { type: 'tabs', activeTab: 0, panels: ['inspector'] },
     ],
   },
-  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console'] },
+  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console', 'terminal', 'output'] },
 };
 
 export const tallLayout: EditorLayout = {

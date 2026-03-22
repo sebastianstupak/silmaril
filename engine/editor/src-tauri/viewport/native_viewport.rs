@@ -253,6 +253,16 @@ mod platform {
             }
         }
 
+        /// Move the camera target to the given world-space position, keeping
+        /// the current yaw/pitch/distance so the user's orientation is preserved.
+        pub fn camera_focus(&self, id: &str, target: [f32; 3]) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera.target = glam::Vec3::from_array(target);
+                }
+            }
+        }
+
         /// Snapshot the camera state for a viewport instance.
         /// Used to preserve state when the panel moves to a different OS window.
         pub fn get_instance_camera(&self, id: &str) -> Option<CameraState> {
@@ -1294,6 +1304,7 @@ impl NativeViewport {
     pub fn set_instance_camera(&self, _id: &str, _state: CameraState) {}
     pub fn set_grid_visible(&self, _id: &str, _visible: bool) {}
     pub fn camera_set_orientation(&self, _id: &str, _yaw: f32, _pitch: f32) {}
+    pub fn camera_focus(&self, _id: &str, _target: [f32; 3]) {}
     pub fn set_projection(&self, _id: &str, _is_ortho: bool) {}
     pub fn capture_png_bytes(&self) -> Result<Vec<u8>, String> {
         Err("Screenshot capture is only supported on Windows".into())

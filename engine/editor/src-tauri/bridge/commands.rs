@@ -18,6 +18,8 @@ pub struct EntityInfo {
     pub id: u64,
     pub name: String,
     pub components: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<u64>,
 }
 
 #[tauri::command]
@@ -153,6 +155,46 @@ pub fn delete_entity(
     Ok(())
 }
 
+/// Create a new child entity under an existing parent.
+///
+/// Spawns the entity in the ECS world and emits `entity-created` with a
+/// `parentId` field so the frontend can place it under the right node.
+#[tauri::command]
+pub fn create_entity_child(
+    parent_id: u64,
+    name: Option<String>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    app: tauri::AppHandle,
+) -> Result<u64, String> {
+    use tauri::Emitter;
+
+    // Ensure the parent exists before creating the child.
+    {
+        debug_assert!(parent_id <= u32::MAX as u64, "parent_id truncation");
+        let parent_entity = engine_core::Entity::new(parent_id as u32, 0);
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        if !world.is_alive(parent_entity) {
+            world.spawn_with_id(parent_entity);
+            world.add(parent_entity, engine_core::Transform::default());
+        }
+    }
+
+    let entity_id = {
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        let entity = world.spawn();
+        world.add(entity, engine_core::Transform::default());
+        entity.id() as u64
+    };
+    let entity_name = name.unwrap_or_else(|| format!("Entity {entity_id}"));
+    app.emit(
+        "entity-created",
+        serde_json::json!({ "id": entity_id, "name": entity_name, "parentId": parent_id }),
+    )
+    .map_err(|e| e.to_string())?;
+    tracing::info!(entity_id, parent_id, name = %entity_name, "Child entity created");
+    Ok(entity_id)
+}
+
 #[tauri::command]
 pub fn open_project(
     project_state: tauri::State<ProjectState>,
@@ -218,6 +260,7 @@ pub fn scan_project_entities(project_path: String) -> Result<Vec<EntityInfo>, St
             id: (i + 1) as u64,
             name: name.clone(),
             components: vec![name.clone()],
+            parent_id: None,
         })
         .collect();
 
@@ -887,16 +930,49 @@ pub fn viewport_set_projection(
 ///
 /// Called by the frontend whenever `selectedEntityId` changes in the hierarchy.
 /// Pass `None` to deselect.
+///
+/// Also ensures the entity exists in the ECS world (the frontend creates
+/// entities optimistically without always going through Tauri IPC) and focuses
+/// every active viewport camera on the entity's Transform position.
 #[tauri::command]
 pub fn set_selected_entity(
     entity_id: Option<u64>,
     viewport_state: tauri::State<'_, NativeViewportState>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
 ) -> Result<(), String> {
     tracing::debug!(entity_id = ?entity_id, "set_selected_entity");
     *viewport_state
         .selected_entity_id
         .lock()
         .map_err(|e| e.to_string())? = entity_id;
+
+    if let Some(id) = entity_id {
+        debug_assert!(id <= u32::MAX as u64, "entity_id truncation");
+        let entity = engine_core::Entity::new(id as u32, 0);
+
+        // Ensure entity exists in the ECS world.
+        let pos = {
+            let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+            if !world.is_alive(entity) {
+                world.spawn_with_id(entity);
+                world.add(entity, engine_core::Transform::default());
+            }
+            world
+                .get::<engine_core::Transform>(entity)
+                .map(|t| [t.position.x, t.position.y, t.position.z])
+                .unwrap_or([0.0, 0.0, 0.0])
+        };
+
+        // Focus every active viewport camera to the entity's position.
+        let registry = viewport_state.registry.lock().map_err(|e| e.to_string())?;
+        let ids: Vec<String> = registry.hwnd_by_id.keys().cloned().collect();
+        for vid in ids {
+            if let Some(vp) = registry.get_for_id(&vid) {
+                vp.camera_focus(&vid, pos);
+            }
+        }
+    }
+
     Ok(())
 }
 

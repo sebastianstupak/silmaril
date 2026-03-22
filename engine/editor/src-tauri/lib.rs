@@ -359,6 +359,7 @@ pub fn run() {
             output_cancel,
             commands::create_entity,
             commands::delete_entity,
+            commands::create_entity_child,
             bridge::gizmo_commands::gizmo_hit_test,
             bridge::gizmo_commands::gizmo_drag,
             bridge::gizmo_commands::gizmo_drag_end,

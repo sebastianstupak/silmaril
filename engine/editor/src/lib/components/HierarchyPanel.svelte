@@ -4,6 +4,7 @@
   import type { EntityInfo } from '$lib/api';
   import {
     createEntity,
+    createEntityChild,
     deleteEntity,
     duplicateEntity,
     renameEntity,
@@ -20,16 +21,77 @@
   let renamingId = $state<number | null>(null);
   let renameValue = $state('');
   let contextMenu = $state<{ x: number; y: number; entityId: number } | null>(null);
+  // Track expanded state per entity id
+  let expanded = $state<Set<number>>(new Set());
 
-  let filtered = $derived(
-    filter
-      ? entities.filter((e) => e.name.toLowerCase().includes(filter.toLowerCase()))
-      : entities,
-  );
+  // Build a tree structure from flat entity list
+  type TreeNode = { entity: EntityInfo; children: TreeNode[] };
+
+  function buildTree(list: EntityInfo[]): TreeNode[] {
+    const byId = new Map<number, TreeNode>();
+    for (const e of list) byId.set(e.id, { entity: e, children: [] });
+    const roots: TreeNode[] = [];
+    for (const e of list) {
+      const node = byId.get(e.id)!;
+      if (e.parentId != null && byId.has(e.parentId)) {
+        byId.get(e.parentId)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+    return roots;
+  }
+
+  function filterTree(nodes: TreeNode[], q: string): TreeNode[] {
+    if (!q) return nodes;
+    const result: TreeNode[] = [];
+    for (const n of nodes) {
+      const childMatches = filterTree(n.children, q);
+      if (n.entity.name.toLowerCase().includes(q.toLowerCase()) || childMatches.length > 0) {
+        result.push({ entity: n.entity, children: childMatches });
+      }
+    }
+    return result;
+  }
+
+  let tree = $derived(filterTree(buildTree(entities), filter));
+
+  // Auto-expand parents of nodes when filter is active
+  $effect(() => {
+    if (filter) {
+      const toExpand = new Set<number>();
+      function collectParents(nodes: TreeNode[]) {
+        for (const n of nodes) {
+          if (n.children.length > 0) {
+            toExpand.add(n.entity.id);
+            collectParents(n.children);
+          }
+        }
+      }
+      collectParents(tree);
+      expanded = toExpand;
+    }
+  });
+
+  function toggleExpand(id: number, e: Event) {
+    e.stopPropagation();
+    const next = new Set(expanded);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    expanded = next;
+  }
 
   function handleNew() {
     const e = createEntity();
     onSelect(e.id);
+  }
+
+  function handleAddChild(parentId: number) {
+    createEntityChild(parentId).then((id) => {
+      expanded = new Set([...expanded, parentId]);
+      onSelect(id);
+    });
+    contextMenu = null;
   }
 
   function startRename(id: number, currentName: string) {
@@ -67,6 +129,11 @@
     }
     if (e.key === 'Escape') cancelRename();
   }
+
+  // Count total visible entities for the count line
+  function countNodes(nodes: TreeNode[]): number {
+    return nodes.reduce((acc, n) => acc + 1 + countNodes(n.children), 0);
+  }
 </script>
 
 <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -89,20 +156,24 @@
 
   {#if entities.length === 0}
     <p class="hierarchy-empty">{t('placeholder.no_project')}</p>
-  {:else if filtered.length === 0}
+  {:else if tree.length === 0}
     <p class="hierarchy-empty">{t('hierarchy.empty')}</p>
   {:else}
     <div class="hierarchy-count">
-      {t('hierarchy.count').replace('{count}', String(filtered.length))}
+      {t('hierarchy.count').replace('{count}', String(countNodes(tree)))}
     </div>
     <ul class="entity-list" role="listbox" aria-label={t('panel.hierarchy')}>
-      {#each filtered as entity (entity.id)}
+      {#snippet entityRow(node: TreeNode, depth: number)}
+        {@const entity = node.entity}
+        {@const hasChildren = node.children.length > 0}
+        {@const isExpanded = expanded.has(entity.id)}
         <li
           class="entity-row"
           class:selected={selectedId === entity.id}
           role="option"
           aria-selected={selectedId === entity.id}
           tabindex="0"
+          style="padding-left: {8 + depth * 14}px"
           onmouseenter={() => { hoveredId = entity.id; }}
           onmouseleave={() => { if (!contextMenu) hoveredId = null; }}
           onclick={() => {
@@ -114,10 +185,19 @@
           oncontextmenu={(e) => openContextMenu(e, entity.id)}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onSelect(entity.id); } }}
         >
-          <span class="entity-chevron">
-            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+          <!-- Expand/collapse chevron -->
+          <span
+            class="entity-chevron"
+            class:has-children={hasChildren}
+            class:expanded={isExpanded}
+            onclick={hasChildren ? (e) => toggleExpand(entity.id, e) : undefined}
+            role={hasChildren ? 'button' : undefined}
+          >
+            {#if hasChildren}
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            {/if}
           </span>
           <span class="entity-icon">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -153,7 +233,7 @@
               <button
                 class="action-btn"
                 title="Add Child"
-                onclick={(e) => { e.stopPropagation(); const c = createEntity(); onSelect(c.id); }}
+                onclick={(e) => { e.stopPropagation(); handleAddChild(entity.id); }}
               >+</button>
               <button
                 class="action-btn delete-btn"
@@ -167,6 +247,15 @@
             </span>
           {/if}
         </li>
+        {#if hasChildren && isExpanded}
+          {#each node.children as child (child.entity.id)}
+            {@render entityRow(child, depth + 1)}
+          {/each}
+        {/if}
+      {/snippet}
+
+      {#each tree as node (node.entity.id)}
+        {@render entityRow(node, 0)}
       {/each}
     </ul>
   {/if}
@@ -181,7 +270,7 @@
     >
       <button role="menuitem" onclick={() => { startRename(cid, cname); }}>Rename</button>
       <button role="menuitem" onclick={() => { duplicateEntity(cid); closeContextMenu(); }}>Duplicate</button>
-      <button role="menuitem" onclick={() => { const c = createEntity(); onSelect(c.id); closeContextMenu(); }}>Add Child</button>
+      <button role="menuitem" onclick={() => { handleAddChild(cid); }}>Add Child</button>
       <hr />
       <button role="menuitem" class="danger" onclick={() => { deleteEntity(cid); closeContextMenu(); }}>Delete</button>
     </div>
@@ -272,7 +361,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 8px;
+    padding: 3px 8px; /* left padding overridden inline for depth */
     cursor: pointer;
     font-size: 12px;
     color: var(--color-text, #ccc);
@@ -284,7 +373,18 @@
   .entity-row.selected { background: var(--color-accent, #007acc); color: #fff; }
   .entity-row:focus-visible { outline: 1px solid var(--color-accent, #007acc); outline-offset: -1px; }
 
-  .entity-chevron { display: flex; align-items: center; color: var(--color-textDim, #666); flex-shrink: 0; width: 14px; }
+  .entity-chevron {
+    display: flex;
+    align-items: center;
+    color: var(--color-textDim, #666);
+    flex-shrink: 0;
+    width: 14px;
+    cursor: default;
+    transition: transform 0.1s ease;
+  }
+  .entity-chevron.has-children { cursor: pointer; }
+  .entity-chevron.has-children.expanded svg { transform: rotate(90deg); }
+  .entity-chevron svg { transition: transform 0.1s ease; }
   .entity-icon { display: flex; align-items: center; color: var(--color-textMuted, #999); flex-shrink: 0; }
   .entity-row.selected .entity-icon, .entity-row.selected .entity-chevron { color: rgba(255,255,255,0.7); }
 

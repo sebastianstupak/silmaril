@@ -3,6 +3,7 @@
 // that the undo system (when wired) has a single choke-point.
 
 import type { EntityInfo } from '$lib/api';
+import { createEntityChild as apiCreateEntityChild } from '$lib/api';
 import {
   getSceneState,
   getEntityById,
@@ -83,6 +84,20 @@ export function createEntity(name?: string): SceneEntity {
   });
   logInfo(`Entity created: ${created.name} (#${created.id})`);
   return created;
+}
+
+/**
+ * Create a child entity under a parent.
+ * Calls the Tauri IPC so the child appears in the ECS and gets a real id.
+ * Returns a promise that resolves with the new entity id.
+ */
+export async function createEntityChild(parentId: number, name?: string): Promise<number> {
+  const childId = await apiCreateEntityChild(parentId, name);
+  // The `entity-created` Tauri event (with parentId set) will update the scene state,
+  // but we also need to select the new child.
+  _mutate((s) => ({ ...s, selectedEntityId: childId }));
+  logInfo(`Child entity created under #${parentId}: #${childId}`);
+  return childId;
 }
 
 /** Delete an entity by id. Deselects if currently selected. */

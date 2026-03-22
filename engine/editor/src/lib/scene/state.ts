@@ -155,14 +155,15 @@ export async function initTauriListeners(): Promise<void> {
 
   const { listen } = await import('@tauri-apps/api/event');
 
-  await listen<{ id: number; name: string }>('entity-created', (event) => {
-    const { id, name } = event.payload;
+  await listen<{ id: number; name: string; parentId?: number }>('entity-created', (event) => {
+    const { id, name, parentId } = event.payload;
     // Avoid duplicates
     if (state.entities.some((e) => e.id === id)) return;
     const newEntity: SceneEntity = {
       id,
       name,
       components: ['Transform'],
+      parentId,
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
