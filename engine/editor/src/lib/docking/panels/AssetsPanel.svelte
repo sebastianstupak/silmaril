@@ -48,6 +48,10 @@
     toast = 'Path copied';
     toastTimer = setTimeout(() => { toast = ''; }, 1500);
   }
+
+  function onDragStartMesh(event: DragEvent, path: string): void {
+    event.dataTransfer?.setData('application/x-mesh-path', path);
+  }
 </script>
 
 <div class="assets-panel">
@@ -77,7 +81,12 @@
               {#each items as asset (asset.path)}
                 <button
                   class="asset-row"
+                  class:asset-row--draggable={group === 'mesh'}
+                  draggable={group === 'mesh'}
                   onclick={() => copyPath(asset.path)}
+                  ondragstart={group === 'mesh'
+                    ? (e: DragEvent) => onDragStartMesh(e, asset.path)
+                    : undefined}
                   title={asset.path}
                 >
                   {asset.filename}
@@ -182,6 +191,9 @@
     background: var(--color-bgHeader, #2d2d2d);
     color: var(--color-text, #ccc);
   }
+
+  .asset-row--draggable { cursor: grab; }
+  .asset-row--draggable:active { cursor: grabbing; }
 
   .toast {
     position: absolute;
