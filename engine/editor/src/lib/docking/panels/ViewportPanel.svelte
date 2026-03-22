@@ -622,7 +622,7 @@
                 aria-label={tool.label}
                 onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
               >
-                <tool.Icon width={12} height={12} />
+                <tool.Icon width={14} height={14} />
               </button>
             {/snippet}
           </Tooltip.Trigger>
@@ -651,7 +651,7 @@
                 viewportSetGridVisible(viewportId, gridVisible);
               }}
             >
-              <Grid2X2 width={12} height={12} />
+              <Grid2X2 width={14} height={14} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -668,7 +668,7 @@
               aria-label="Snap to grid"
               onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
             >
-              <Magnet width={12} height={12} />
+              <Magnet width={14} height={14} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -691,9 +691,9 @@
               onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
             >
               {#if projection === 'ortho'}
-                <ScanLine width={12} height={12} />
+                <ScanLine width={14} height={14} />
               {:else}
-                <Video width={12} height={12} />
+                <Video width={14} height={14} />
               {/if}
             </button>
           {/snippet}
@@ -717,7 +717,7 @@
               aria-label="Add entity"
               onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
             >
-              <CirclePlus width={12} height={12} />
+              <CirclePlus width={14} height={14} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
