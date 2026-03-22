@@ -73,7 +73,7 @@ impl MeshData {
     /// Create a unit cube mesh (2x2x2, centered at origin)
     #[instrument]
     pub fn cube() -> Self {
-        info!("Creating cube mesh");
+        debug!("Cube mesh created");
 
         let vertices = vec![
             // Front face (Z+)
