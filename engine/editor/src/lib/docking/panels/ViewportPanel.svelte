@@ -965,21 +965,24 @@
   }
 
   :global(.tooltip-content) {
-    background: rgba(20, 20, 20, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #ccc;
+    background: rgba(28, 28, 28, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    color: #d4d4d4;
     font-size: 11px;
-    padding: 4px 8px;
+    line-height: 1.4;
+    padding: 3px 7px;
     pointer-events: none;
     white-space: nowrap;
     z-index: 9999;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   }
 
   :global(.tooltip-shortcut) {
     color: #888;
-    margin-left: 4px;
+    margin-left: 5px;
     font-family: monospace;
+    font-size: 10px;
   }
 
   /* Axis gizmo */
