@@ -1334,6 +1334,68 @@ pub fn remove_component(
 }
 
 // ---------------------------------------------------------------------------
+// Mesh assignment
+// ---------------------------------------------------------------------------
+
+/// Assign a mesh to an entity by writing to its template and syncing to ECS.
+///
+/// `mesh_path` is either `"builtin://cube"` (etc.) or a project-relative path
+/// like `"assets/models/robot.glb"`.
+///
+/// Executes a `SetComponent { type_name: "MeshRenderer", data: { mesh_path } }`
+/// command via the template's `CommandProcessor`, then calls
+/// [`crate::bridge::template_commands::sync_mesh_renderer_to_ecs`] to push the
+/// change into the live ECS world.
+#[tauri::command]
+pub fn assign_mesh(
+    entity_id: u64,
+    template_path: String,
+    mesh_path: String,
+    template_state: tauri::State<'_, std::sync::Mutex<crate::bridge::template_commands::EditorState>>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    asset_state: tauri::State<'_, crate::state::AssetManagerState>,
+    project_state: tauri::State<'_, ProjectState>,
+) -> Result<(), String> {
+    use crate::bridge::template_commands::{sync_mesh_renderer_to_ecs, template_execute_inner};
+    use engine_ops::command::TemplateCommand;
+
+    // Build SetComponent payload for MeshRenderer
+    let component_data = serde_json::json!({ "mesh_path": mesh_path });
+
+    // Write to template via CommandProcessor
+    let new_template_state = {
+        let cmd = TemplateCommand::SetComponent {
+            id: entity_id,
+            type_name: "MeshRenderer".to_string(),
+            data: component_data,
+        };
+        template_execute_inner(&template_state, template_path, cmd)
+            .map_err(|e| e.message)?
+            .new_state
+    };
+
+    // Derive project root from ProjectState
+    let project_root_buf = {
+        let guard = project_state.0.lock().map_err(|e| e.to_string())?;
+        guard
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+    };
+
+    // Sync MeshRenderer component to the live ECS world
+    sync_mesh_renderer_to_ecs(
+        entity_id,
+        &new_template_state,
+        &world_state,
+        &asset_state.0,
+        &project_root_buf,
+    )?;
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Scene undo / redo IPC
 // ---------------------------------------------------------------------------
 

@@ -374,6 +374,7 @@ pub fn run() {
             bridge::ai_bridge::ai_grant_permission,
             bridge::ai_bridge::ai_scene_response,
             commands::set_selected_entity,
+            commands::assign_mesh,
         ])
         .setup(move |app| {
             bridge::registry_bridge::setup_registry_watch(registry_rx, app.handle().clone());
