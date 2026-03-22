@@ -37,6 +37,11 @@ export function setSelectedEntityId(id: number | null) {
   selectEntity(id);
 }
 
+/** Get the id of the currently selected entity (or null). */
+export function getSelectedEntityId(): number | null {
+  return getSceneState().selectedEntityId;
+}
+
 /** Get the currently selected entity from scene state. */
 export function getSelectedEntity(): SceneEntity | null {
   return _getSelectedEntity();

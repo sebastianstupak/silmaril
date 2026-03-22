@@ -329,7 +329,11 @@ pub struct NativeViewportState {
     /// Active gizmo drag operation, if any. Cleared on `gizmo_drag_end`.
     pub drag_state: Mutex<Option<crate::bridge::gizmo_commands::DragState>>,
     /// Current gizmo mode: 0 = Move, 1 = Rotate, 2 = Scale.
-    pub gizmo_mode: std::sync::atomic::AtomicU8,
+    /// Stored as `Arc<AtomicU8>` so it can be cloned into the render thread.
+    pub gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+    /// The entity currently selected in the hierarchy, or `None`.
+    /// Stored as `Arc<Mutex<Option<u64>>>` so the render thread can read it.
+    pub selected_entity_id: std::sync::Arc<Mutex<Option<u64>>>,
 }
 
 impl Default for NativeViewportState {
@@ -337,7 +341,8 @@ impl Default for NativeViewportState {
         Self {
             registry: Mutex::new(ViewportRegistry::new()),
             drag_state: Mutex::new(None),
-            gizmo_mode: std::sync::atomic::AtomicU8::new(0),
+            gizmo_mode: std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            selected_entity_id: std::sync::Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -377,7 +382,9 @@ pub fn create_native_viewport(
         // Create a NativeViewport for this HWND if one doesn't exist yet.
         if let std::collections::hash_map::Entry::Vacant(e) = registry.by_hwnd.entry(hwnd_isize) {
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
-            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone()).map_err(|e| {
+            let selected_entity_id = std::sync::Arc::clone(&viewport_state.selected_entity_id);
+            let gizmo_mode = std::sync::Arc::clone(&viewport_state.gizmo_mode);
+            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone(), selected_entity_id, gizmo_mode).map_err(|e| {
                 tracing::error!(error = %e, "NativeViewport::new failed");
                 e
             })?;
@@ -876,6 +883,23 @@ pub fn viewport_set_projection(
     Ok(())
 }
 
+/// Update which entity is selected in the viewport gizmo renderer.
+///
+/// Called by the frontend whenever `selectedEntityId` changes in the hierarchy.
+/// Pass `None` to deselect.
+#[tauri::command]
+pub fn set_selected_entity(
+    entity_id: Option<u64>,
+    viewport_state: tauri::State<'_, NativeViewportState>,
+) -> Result<(), String> {
+    tracing::debug!(entity_id = ?entity_id, "set_selected_entity");
+    *viewport_state
+        .selected_entity_id
+        .lock()
+        .map_err(|e| e.to_string())? = entity_id;
+    Ok(())
+}
+
 /// Begin monitoring a pop-out window drag for dock-back gesture.
 ///
 /// Spawns a background thread that polls `GetAsyncKeyState(VK_LBUTTON)` to
@@ -1235,104 +1259,10 @@ pub fn remove_component(
 // Scene undo / redo IPC
 // ---------------------------------------------------------------------------
 
-/// Undo the last scene action, applying its `before` state to the live ECS world.
-///
-/// Returns `{ canUndo, canRedo }` so the frontend can update toolbar button state.
-/// Returns the same payload with both fields `false` when the undo stack is empty.
-#[tauri::command]
-pub fn scene_undo(
-    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
-    world_state: tauri::State<'_, crate::state::SceneWorldState>,
-    app: tauri::AppHandle,
-) -> Result<serde_json::Value, String> {
-    let action = {
-        let mut stack = undo_state.lock().map_err(|e| e.to_string())?;
-        stack.pop_undo()
-    };
-    let Some(action) = action else {
-        let stack = undo_state.lock().map_err(|e| e.to_string())?;
-        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
-    };
-    // For undo, apply `before`.
-    let (entity_id, target) = match &action {
-        crate::state::SceneAction::SetTransform { entity_id, before, .. } => (*entity_id, before.clone()),
-    };
-    apply_scene_action(entity_id, &target, &world_state, &app)?;
-    let stack = undo_state.lock().map_err(|e| e.to_string())?;
-    tracing::debug!(can_undo = stack.can_undo(), can_redo = stack.can_redo(), "scene_undo applied");
-    Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }))
-}
-
-/// Redo the last undone scene action, applying its `after` state to the live ECS world.
-///
-/// Returns `{ canUndo, canRedo }` so the frontend can update toolbar button state.
-/// Returns the same payload with both fields `false` when the redo stack is empty.
-#[tauri::command]
-pub fn scene_redo(
-    undo_state: tauri::State<'_, std::sync::Mutex<crate::state::SceneUndoStack>>,
-    world_state: tauri::State<'_, crate::state::SceneWorldState>,
-    app: tauri::AppHandle,
-) -> Result<serde_json::Value, String> {
-    let action = {
-        let mut stack = undo_state.lock().map_err(|e| e.to_string())?;
-        stack.pop_redo()
-    };
-    let Some(action) = action else {
-        let stack = undo_state.lock().map_err(|e| e.to_string())?;
-        return Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }));
-    };
-    // For redo, apply `after`.
-    let (entity_id, target) = match &action {
-        crate::state::SceneAction::SetTransform { entity_id, after, .. } => (*entity_id, after.clone()),
-    };
-    apply_scene_action(entity_id, &target, &world_state, &app)?;
-    let stack = undo_state.lock().map_err(|e| e.to_string())?;
-    tracing::debug!(can_undo = stack.can_undo(), can_redo = stack.can_redo(), "scene_redo applied");
-    Ok(serde_json::json!({ "canUndo": stack.can_undo(), "canRedo": stack.can_redo() }))
-}
-
-/// Apply a desired transform `target` to the entity identified by `entity_id` in the live ECS
-/// world and emit an `entity-transform-changed` event.
-///
-/// Used by both undo (pass `before`) and redo (pass `after`) so the logic is not duplicated.
-fn apply_scene_action(
-    entity_id: u64,
-    target: &crate::state::SerializedTransform,
-    world_state: &crate::state::SceneWorldState,
-    app: &tauri::AppHandle,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    if entity_id > u32::MAX as u64 {
-        return Err(format!("entity_id {entity_id} exceeds u32::MAX"));
-    }
-    // FIXME: hardcodes generation 0 — will break after any entity slot reuse
-    let entity = engine_core::Entity::new(entity_id as u32, 0);
-    let mut world = world_state.0.write().map_err(|e| e.to_string())?;
-    if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
-        t.position = glam::Vec3::from(target.position);
-        t.rotation = glam::Quat::from_array(target.rotation);
-        t.scale = glam::Vec3::from(target.scale);
-    } else {
-        tracing::warn!(entity_id = entity_id, "apply_scene_action: entity has no Transform (may have been deleted)");
-        drop(world);
-        return Ok(());
-    }
-    drop(world);
-    app.emit(
-        "entity-transform-changed",
-        serde_json::json!({
-            "id": entity_id,
-            "position": target.position,
-            "rotation": target.rotation,
-            "scale": target.scale,
-        }),
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use engine_core::{Transform, World};
     use std::sync::{Arc, RwLock};
 
@@ -1387,5 +1317,20 @@ mod tests {
         }
         let w = world.read().unwrap();
         assert!(w.get::<Transform>(entity).is_none());
+    }
+
+    #[test]
+    fn selected_entity_id_default_is_none() {
+        let state = NativeViewportState::new();
+        assert_eq!(*state.selected_entity_id.lock().unwrap(), None);
+    }
+
+    #[test]
+    fn selected_entity_id_can_be_set_and_cleared() {
+        let state = NativeViewportState::new();
+        *state.selected_entity_id.lock().unwrap() = Some(42);
+        assert_eq!(*state.selected_entity_id.lock().unwrap(), Some(42));
+        *state.selected_entity_id.lock().unwrap() = None;
+        assert_eq!(*state.selected_entity_id.lock().unwrap(), None);
     }
 }

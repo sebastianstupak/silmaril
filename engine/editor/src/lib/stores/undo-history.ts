@@ -6,17 +6,12 @@
 // so the UI can reflect the state without polling.
 
 import { commands } from '$lib/bindings';
-import { sceneUndo as _sceneUndo, sceneRedo as _sceneRedo } from '$lib/api';
 import { logInfo, logWarn, logError } from '$lib/stores/console';
 
 let _path: string | null = null;
 let _canUndo = false;
 let _canRedo = false;
 let _listeners: (() => void)[] = [];
-
-// Scene undo/redo state (independent of the template undo stack).
-let _sceneCanUndo = false;
-let _sceneCanRedo = false;
 
 function notify(): void {
   _listeners.forEach((fn) => fn());
@@ -31,9 +26,6 @@ export function subscribeUndoHistory(fn: () => void): () => void {
 export function getCanUndo(): boolean { return _canUndo; }
 export function getCanRedo(): boolean { return _canRedo; }
 export function getActiveTemplatePath(): string | null { return _path; }
-
-export function getSceneCanUndo(): boolean { return _sceneCanUndo; }
-export function getSceneCanRedo(): boolean { return _sceneCanRedo; }
 
 // Track whether the viewport panel is currently under the mouse cursor.
 // ViewportPanel sets this via setViewportFocused(); App.svelte reads it to
@@ -54,15 +46,15 @@ if (typeof window !== 'undefined') {
 // Guard against concurrent in-flight IPC calls from rapid Ctrl+Z/Ctrl+Y holds.
 let _sceneUndoRedoInFlight = false;
 
-/** Undo the last scene action and update local canUndo/canRedo state. */
+/** Undo the last transform change, routed through the active template. */
 export async function sceneUndo(): Promise<void> {
   if (_sceneUndoRedoInFlight) return;
+  const path = getActiveTemplatePath();
+  if (!path) return;
   _sceneUndoRedoInFlight = true;
   try {
-    const result = await _sceneUndo();
-    _sceneCanUndo = result.canUndo;
-    _sceneCanRedo = result.canRedo;
-    notify();
+    await commands.runCommand('template.undo', { template_path: path });
+    await _refreshState();
   } catch (e) {
     logError(`Scene undo failed: ${e}`);
   } finally {
@@ -70,15 +62,15 @@ export async function sceneUndo(): Promise<void> {
   }
 }
 
-/** Redo the last undone scene action and update local canUndo/canRedo state. */
+/** Redo the last undone transform change, routed through the active template. */
 export async function sceneRedo(): Promise<void> {
   if (_sceneUndoRedoInFlight) return;
+  const path = getActiveTemplatePath();
+  if (!path) return;
   _sceneUndoRedoInFlight = true;
   try {
-    const result = await _sceneRedo();
-    _sceneCanUndo = result.canUndo;
-    _sceneCanRedo = result.canRedo;
-    notify();
+    await commands.runCommand('template.redo', { template_path: path });
+    await _refreshState();
   } catch (e) {
     logError(`Scene redo failed: ${e}`);
   } finally {

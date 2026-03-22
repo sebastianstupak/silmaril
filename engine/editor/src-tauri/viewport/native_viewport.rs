@@ -96,12 +96,18 @@ mod platform {
         /// Screenshot request slot — main thread places a reply sender here;
         /// the render thread takes it, captures the frame, and sends back PNG bytes.
         screenshot_slot: Arc<Mutex<Option<std::sync::mpsc::SyncSender<Result<Vec<u8>, String>>>>>,
+        /// Currently selected entity ID, shared with the render thread.
+        selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
+        /// Current gizmo mode (0=Move, 1=Rotate, 2=Scale), shared with the render thread.
+        gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
     }
 
     impl NativeViewport {
         pub fn new(
             parent_hwnd: HWND,
             world: Arc<std::sync::RwLock<engine_core::World>>,
+            selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
+            gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
         ) -> Result<Self, String> {
             tracing::info!(hwnd = ?parent_hwnd, "NativeViewport created for window");
             Ok(Self {
@@ -112,6 +118,8 @@ mod platform {
                 render_active: Arc::new(AtomicBool::new(true)),
                 world,
                 screenshot_slot: Arc::new(Mutex::new(None)),
+                selected_entity_id,
+                gizmo_mode,
             })
         }
 
@@ -122,6 +130,8 @@ mod platform {
             let hwnd_raw = self.parent_hwnd.0 .0 as isize;
             let world = self.world.clone();
             let screenshot_slot = self.screenshot_slot.clone();
+            let selected_entity_id = self.selected_entity_id.clone();
+            let gizmo_mode = self.gizmo_mode.clone();
 
             let handle = std::thread::Builder::new()
                 .name("viewport-render".into())
@@ -129,7 +139,7 @@ mod platform {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot);
+                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode);
                     })) {
                         Ok(()) => tracing::info!("Viewport render thread stopped"),
                         Err(e) => {
@@ -866,6 +876,8 @@ void main() {
             &mut self,
             viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
             _world: &std::sync::RwLock<engine_core::World>,
+            selected_entity_id: Option<u64>,
+            gizmo_mode: crate::viewport::gizmo_pipeline::GizmoMode,
         ) -> Result<(), String> {
             if self.needs_recreate {
                 self.renderer
@@ -892,8 +904,6 @@ void main() {
             // each sub-rect gets its own view/projection matrix.
             // The grid pipeline's record already set viewport/scissor to the
             // last sub-rect; we re-set them here for correctness.
-            //
-            // TODO(Task 19): read from NativeViewportState.gizmo_mode and selected entity
             if let Ok(world_guard) = _world.read() {
                 unsafe {
                     for (bounds, camera, _grid_visible, is_ortho) in viewports {
@@ -930,8 +940,8 @@ void main() {
                         self.gizmo_pipeline.record(
                             cmd,
                             &world_guard,
-                            None, // TODO(Task 19): read from NativeViewportState.gizmo_mode and selected entity
-                            crate::viewport::gizmo_pipeline::GizmoMode::Move, // stub
+                            selected_entity_id,
+                            gizmo_mode,
                             view_proj,
                             camera_pos,
                         );
@@ -958,6 +968,8 @@ void main() {
         instances: Arc<Mutex<HashMap<String, ViewportInstance>>>,
         world: Arc<std::sync::RwLock<engine_core::World>>,
         screenshot_slot: Arc<Mutex<Option<std::sync::mpsc::SyncSender<Result<Vec<u8>, String>>>>>,
+        selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
+        gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
     ) {
         let (init_w, init_h) = client_size(hwnd);
         let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h) {
@@ -994,7 +1006,13 @@ void main() {
                 continue;
             }
 
-            if let Err(e) = renderer.render_frame(&viewports, &world) {
+            let selected_id = selected_entity_id.lock().ok().and_then(|g| *g);
+            let gizmo_mode_val = match gizmo_mode.load(std::sync::atomic::Ordering::Relaxed) {
+                1 => crate::viewport::gizmo_pipeline::GizmoMode::Rotate,
+                2 => crate::viewport::gizmo_pipeline::GizmoMode::Scale,
+                _ => crate::viewport::gizmo_pipeline::GizmoMode::Move,
+            };
+            if let Err(e) = renderer.render_frame(&viewports, &world, selected_id, gizmo_mode_val) {
                 tracing::error!(error = %e, "render_frame failed");
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
@@ -1159,6 +1177,19 @@ void main() {
             );
         }
 
+        // ── render_loop Arc read pattern ─────────────────────────────────────
+
+        #[test]
+        fn render_loop_reads_selected_entity_from_arc() {
+            use std::sync::{Arc, Mutex};
+            let selected = Arc::new(Mutex::new(Some(7u64)));
+            let val = selected.lock().ok().and_then(|g| *g);
+            assert_eq!(val, Some(7));
+            *selected.lock().unwrap() = None;
+            let val = selected.lock().ok().and_then(|g| *g);
+            assert_eq!(val, None);
+        }
+
         // ── ViewportInstance ─────────────────────────────────────────────────
 
         #[test]
@@ -1236,7 +1267,12 @@ pub struct NativeViewport;
 
 #[cfg(not(windows))]
 impl NativeViewport {
-    pub fn new(_parent_hwnd: isize) -> Result<Self, String> {
+    pub fn new(
+        _parent_hwnd: isize,
+        _world: std::sync::Arc<std::sync::RwLock<engine_core::World>>,
+        _selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
+        _gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+    ) -> Result<Self, String> {
         Err("Native viewport not yet implemented for this platform".into())
     }
     pub fn start_rendering(&mut self) -> Result<(), String> {
