@@ -904,10 +904,11 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 4px 10px;
-    background: rgba(0, 0, 0, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 6px;
+    padding: 3px 6px;
+    background: rgba(37, 37, 37, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
     z-index: 10;
     pointer-events: auto;
   }
