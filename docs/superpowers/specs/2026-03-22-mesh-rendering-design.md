@@ -80,16 +80,26 @@ always maps to the same handle).
 | `builtin://capsule`          | Constant `5`                                      |
 | `assets/models/foo.glb`      | `blake3(b"assets/models/foo.glb")` → first 8 bytes as u64 |
 
-The renderer then derives `AssetId` from the seed:
-```rust
-AssetId::from_seed_and_params(mesh_renderer.mesh_id, b"mesh")
-```
-This pattern already exists in `render_meshes` — no changes needed there.
+**Built-in primitives** are inserted directly into the `AssetManager` under
+`AssetId::from_seed_and_params(seed, b"mesh")`, so the seed IS the stable ID.
 
-**Why path-hashing, not content-hashing:** content hashes change when the artist
-exports an updated mesh (fixed seam, adjusted normals), breaking all template
-references to that asset. Path hashing is stable across content updates — the same
-tradeoff made by Bevy and Unreal.
+**File-based meshes** use a different identity chain:
+1. `load_sync::<MeshData>` loads the file, stores it under a **content-hash** `AssetId`
+   (derived from vertex + index data by `MeshData::generate_id`).
+2. `sync_mesh_renderer_to_ecs` reads `handle.id()` from the returned handle and
+   stores the raw `AssetId` bytes (first 8) as `mesh_id` in `MeshRenderer`.
+3. `render_meshes` looks up by `AssetId::from_seed_and_params(mesh_renderer.mesh_id, b"mesh")`
+   for built-ins, and by the raw `AssetId` for file assets.
+
+> **Note:** `render_meshes` must be updated to support both lookup paths. Built-in
+> lookup uses `from_seed_and_params`; file-asset lookup uses the stored `AssetId`
+> directly. A wrapper enum or a two-step lookup resolves this.
+
+**Why content-hashing for files:** updating `robot.glb` on disk changes the hash,
+but `load_sync` will re-register it under the new ID and `sync_mesh_renderer_to_ecs`
+will update the ECS `mesh_id` on next template load — the same re-import flow used
+by Unreal and Godot when an asset is updated. The template stores the path (stable);
+the ECS stores the current content ID (authoritative for the current session).
 
 ---
 
@@ -124,14 +134,26 @@ impl MeshUniform {
 
 A per-frame dynamic storage buffer holds `Vec<MeshUniform>` (one entry per
 renderable entity). The descriptor set layout exposes it at `binding = 0`.
-VP matrix is passed via push constants (64 bytes — unchanged from today).
+VP matrix is passed via push constants (64 bytes).
 
-`render_meshes` is updated:
+**This replaces the current per-draw MVP push constant.** Today `render_meshes`
+pushes a full MVP (model × view × projection) per draw call. The new design pushes
+VP once and reads the model matrix from the storage buffer per instance via
+`gl_InstanceIndex`. The inner draw loop in `render_meshes` is fully rewritten.
+
+`render_meshes` updated flow:
 1. Iterate ECS, build `Vec<MeshUniform>` and a matching `Vec<(AssetId, u32)>` (mesh id + instance index).
-2. Upload `Vec<MeshUniform>` to the storage buffer.
-3. Bind descriptor set.
-4. Push VP matrix.
-5. One instanced draw call per unique mesh (or per-draw if instancing adds complexity for MVP).
+2. Upload `Vec<MeshUniform>` to the per-frame storage buffer (resize if capacity exceeded).
+3. `cmd_bind_descriptor_sets` — binds the storage buffer descriptor set.
+4. `cmd_push_constants` — pushes VP matrix (64 bytes).
+5. Per entity: `cmd_bind_vertex_buffers` / `cmd_bind_index_buffer` / `cmd_draw_indexed` with `firstInstance = instance_index`.
+
+**Descriptor infrastructure required (new):**
+- `vk::DescriptorSetLayout` with one binding: `STORAGE_BUFFER` at `binding = 0`, `VERTEX` stage.
+- `vk::DescriptorPool` sized for `MAX_FRAMES_IN_FLIGHT` sets.
+- One `vk::DescriptorSet` per frame-in-flight, updated each frame with the current buffer.
+- Storage buffer: host-visible + host-coherent (`MemoryLocation::CpuToGpu`), capacity starts at 256 entities and doubles on overflow.
+- Pipeline layout rebuilt to include the descriptor set layout alongside the existing push constant range.
 
 ### 2. Shaders
 
@@ -183,7 +205,7 @@ pub fn register_primitives(manager: &AssetManager) {
     ];
     for (seed, mesh) in primitives {
         let id = AssetId::from_seed_and_params(seed, b"mesh");
-        MeshData::insert(manager, id, mesh).ok();
+        <MeshData as AssetLoader>::insert(manager, id, mesh).ok();
     }
 }
 ```
@@ -195,8 +217,8 @@ pub fn register_primitives(manager: &AssetManager) {
 
 `native_viewport.rs`:
 - Add `Arc<AssetManager>` field; clone into render thread.
-- `OrbitCamera` gains `fn view_matrix(&self) -> Mat4` and `fn proj_matrix(&self, aspect: f32, is_ortho: bool) -> Mat4` (currently only combined `view_projection` exists).
-- `render_frame` calls `render_meshes` with proper `ViewportDescriptor` array built from the viewport tuples.
+- `OrbitCamera` gains `fn view_matrix(&self) -> Mat4` and `fn proj_matrix(&self, aspect: f32, is_ortho: bool) -> Mat4` (currently only combined `view_projection` exists). The existing `view_projection` call site in the **gizmo pipeline pass** (line ~947) must be preserved — it takes the combined matrix and must remain unchanged.
+- `render_frame` calls `render_meshes` with proper `ViewportDescriptor` array built from the viewport tuples, using the new separate `view_matrix` + `proj_matrix`.
 - Remove the TODO comment.
 
 ### 6. `sync_mesh_renderer_to_ecs`
@@ -230,17 +252,23 @@ fn resolve_mesh_path(path: &str, project_root: &Path, manager: &AssetManager) ->
         "builtin://cylinder" => 4,
         "builtin://capsule"  => 5,
         other => {
-            // Path-based hash (stable across content updates — Bevy pattern)
-            let seed = u64::from_le_bytes(
-                blake3::hash(other.as_bytes()).as_bytes()[..8].try_into().unwrap()
-            );
-            // Lazy load if not yet in AssetManager
-            let asset_id = AssetId::from_seed_and_params(seed, b"mesh");
-            if manager.get_mesh(asset_id).is_none() {
-                let full_path = project_root.join(other);
-                manager.load_sync::<MeshData>(&full_path).ok();
+            // Load file into AssetManager (load_sync is idempotent for cached paths).
+            // Use handle.id() as the mesh_id — content-hash based, authoritative for
+            // the current session. Template stores the path (stable); ECS stores the
+            // current content ID.
+            let full_path = project_root.join(other);
+            match manager.load_sync::<MeshData>(&full_path) {
+                Ok(handle) => {
+                    // Extract first 8 bytes of AssetId as mesh_id seed.
+                    // render_meshes must look up file assets by raw AssetId, not
+                    // via from_seed_and_params (see § "Mesh Identity").
+                    u64::from_le_bytes(handle.id().as_bytes()[..8].try_into().unwrap())
+                }
+                Err(e) => {
+                    tracing::warn!(path = other, error = ?e, "Failed to load mesh asset");
+                    return Err(IpcError { code: 0, message: e.to_string() });
+                }
             }
-            seed
         }
     }
 }
