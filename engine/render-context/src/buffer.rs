@@ -3,8 +3,9 @@
 use crate::context::VulkanContext;
 use crate::error::RendererError;
 use ash::vk;
-use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme};
+use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, Allocator};
 use gpu_allocator::MemoryLocation;
+use std::sync::{Arc, Mutex};
 use tracing::{info, instrument};
 
 /// GPU buffer with automatic memory management
@@ -17,6 +18,8 @@ pub struct GpuBuffer {
     pub size: u64,
     /// Vulkan device (for cleanup)
     device: ash::Device,
+    /// GPU memory allocator (needed to properly free the allocation in Drop)
+    allocator: Arc<Mutex<Allocator>>,
 }
 
 impl std::fmt::Debug for GpuBuffer {
@@ -97,7 +100,13 @@ impl GpuBuffer {
 
         info!(size = size, usage = ?usage, "GPU buffer created");
 
-        Ok(Self { buffer, allocation: Some(allocation), size, device: context.device.clone() })
+        Ok(Self {
+            buffer,
+            allocation: Some(allocation),
+            size,
+            device: context.device.clone(),
+            allocator: (*context.allocator).clone(),
+        })
     }
 
     /// Upload data to buffer (for CPU-visible buffers)
@@ -148,7 +157,13 @@ impl Drop for GpuBuffer {
         unsafe {
             self.device.destroy_buffer(self.buffer, None);
         }
-        // Allocation is automatically freed when dropped
+        // Return the allocation to the allocator so it can reclaim the VkDeviceMemory.
+        // This must happen before the Allocator itself is dropped (see VulkanContext::Drop).
+        if let Some(allocation) = self.allocation.take() {
+            if let Ok(mut alloc) = self.allocator.lock() {
+                let _ = alloc.free(allocation);
+            }
+        }
     }
 }
 

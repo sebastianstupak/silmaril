@@ -9,6 +9,7 @@ use gpu_allocator::vulkan as gpu_alloc;
 use lazy_static::lazy_static;
 use smallvec::SmallVec;
 use std::ffi::{CStr, CString};
+use std::mem::ManuallyDrop;
 use std::sync::{Arc, Mutex};
 use tracing::{error, info, instrument, warn};
 
@@ -96,8 +97,12 @@ pub struct VulkanContext {
     pub compute_queue: vk::Queue,
     /// Present queue
     pub present_queue: vk::Queue,
-    /// GPU memory allocator
-    pub allocator: Arc<std::sync::Mutex<gpu_alloc::Allocator>>,
+    /// GPU memory allocator.
+    ///
+    /// Wrapped in `ManuallyDrop` so we can explicitly drop the allocator
+    /// (which calls `vkFreeMemory` internally) **before** `vkDestroyDevice`.
+    /// Dropping in the wrong order causes an access-violation inside the driver.
+    pub allocator: ManuallyDrop<Arc<std::sync::Mutex<gpu_alloc::Allocator>>>,
 }
 
 impl VulkanContext {
@@ -213,7 +218,7 @@ impl VulkanContext {
             transfer_queue: queues.1,
             compute_queue: queues.2,
             present_queue: queues.3,
-            allocator: Arc::new(std::sync::Mutex::new(allocator)),
+            allocator: ManuallyDrop::new(Arc::new(std::sync::Mutex::new(allocator))),
         })
     }
 
@@ -281,15 +286,16 @@ impl Drop for VulkanContext {
             // Ignore errors - we're already in Drop, nothing we can do
             let _ = self.device.device_wait_idle();
 
-            // Drop allocator first (it owns GPU memory)
-            // Note: If the lock is poisoned, we can't recover anyway since we're in Drop
-            if let Ok(_allocator) = self.allocator.lock() {
-                // The allocator will be dropped when the MutexGuard goes out of scope
-                // This ensures memory is freed before destroying the device
-            } else {
-                // Lock poisoned - log error but continue cleanup
-                error!("Allocator lock poisoned during cleanup, memory may leak");
-            }
+            // Drop the allocator BEFORE destroying the device.
+            //
+            // gpu_allocator's Allocator::drop calls vkFreeMemory for each tracked
+            // VkDeviceMemory block.  If vkDestroyDevice runs first, those calls
+            // land on a destroyed device and produce a STATUS_ACCESS_VIOLATION
+            // inside the Vulkan driver DLL.
+            //
+            // ManuallyDrop lets us take ownership here and drop it explicitly
+            // while the VkDevice handle is still valid.
+            ManuallyDrop::drop(&mut self.allocator);
 
             // Destroy device
             self.device.destroy_device(None);

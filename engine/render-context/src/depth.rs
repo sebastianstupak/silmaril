@@ -39,12 +39,13 @@ use crate::error::RendererError;
 pub struct DepthBuffer {
     image: vk::Image,
     image_view: vk::ImageView,
-    /// GPU memory allocation (kept alive for automatic cleanup)
-    #[allow(dead_code)]
+    /// GPU memory allocation; freed explicitly via `allocator.free()` in Drop.
     allocation: Option<Allocation>,
     format: vk::Format,
     extent: vk::Extent2D,
     device: ash::Device,
+    /// Needed to return the allocation to the allocator in Drop.
+    allocator: Arc<Mutex<Allocator>>,
 }
 
 impl DepthBuffer {
@@ -190,6 +191,7 @@ impl DepthBuffer {
             format,
             extent,
             device: device.clone(),
+            allocator: allocator.clone(),
         })
     }
 
@@ -225,7 +227,13 @@ impl Drop for DepthBuffer {
             self.device.destroy_image_view(self.image_view, None);
             self.device.destroy_image(self.image, None);
         }
-        // Allocation is automatically freed when dropped
+        // Return the allocation to the allocator so it can reclaim VkDeviceMemory.
+        // This must happen before the Allocator itself is dropped (see VulkanContext::Drop).
+        if let Some(allocation) = self.allocation.take() {
+            if let Ok(mut alloc) = self.allocator.lock() {
+                let _ = alloc.free(allocation);
+            }
+        }
     }
 }
 
