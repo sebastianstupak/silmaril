@@ -2,7 +2,7 @@ use anyhow::Result;
 use engine_core::ecs::World;
 use engine_renderer::{Renderer, WindowConfig};
 use std::time::{Duration, Instant};
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() -> Result<()> {
@@ -65,13 +65,9 @@ fn main() -> Result<()> {
         // Update ECS world (stubbed for now)
         // run_client_systems(&mut world, dt.as_secs_f32());
 
-        // Render frame using the combined render_frame method
-        match renderer.render_frame() {
-            Ok(_) => {}
-            Err(e) => {
-                warn!(error = ?e, "Failed to render frame, continuing");
-                continue;
-            }
+        // Render frame
+        if let Some(recorder) = renderer.begin_frame() {
+            renderer.end_frame(recorder);
         }
 
         frame_count += 1;
