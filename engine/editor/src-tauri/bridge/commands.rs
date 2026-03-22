@@ -985,6 +985,41 @@ pub fn set_selected_entity(
     Ok(())
 }
 
+/// Smoothly animate every active viewport camera to orbit the given entity.
+///
+/// Reads the entity's `Transform` position from the ECS world. Falls back to
+/// `Vec3::ZERO` if the entity has no `Transform` (matches `set_selected_entity`
+/// behaviour). Camera orientation (yaw/pitch) is preserved.
+#[tauri::command]
+pub fn focus_entity_animated(
+    entity_id: u64,
+    viewport_state: tauri::State<'_, NativeViewportState>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+) -> Result<(), String> {
+    debug_assert!(entity_id <= u32::MAX as u64, "entity_id overflows u32");
+
+    let entity = engine_core::Entity::new(entity_id as u32, 0);
+
+    let pos = {
+        let world = world_state.inner().0.read().map_err(|e| e.to_string())?;
+        world
+            .get::<engine_core::Transform>(entity)
+            .map(|t| glam::Vec3::new(t.position.x, t.position.y, t.position.z))
+            .unwrap_or(glam::Vec3::ZERO)
+    };
+
+    let registry = viewport_state.registry.lock().map_err(|e| e.to_string())?;
+    let ids: Vec<String> = registry.hwnd_by_id.keys().cloned().collect();
+    for id in &ids {
+        if let Some(vp) = registry.get_for_id(id) {
+            vp.start_camera_animation(id, pos, 5.0);
+        }
+    }
+
+    tracing::debug!(entity_id, ?pos, "focus_entity_animated");
+    Ok(())
+}
+
 /// Begin monitoring a pop-out window drag for dock-back gesture.
 ///
 /// Spawns a background thread that polls `GetAsyncKeyState(VK_LBUTTON)` to

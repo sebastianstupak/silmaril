@@ -92,6 +92,20 @@ impl EditorModule for ViewportModule {
                 })),
                 returns_data: false, non_undoable: true,
             },
+            CommandSpec {
+                id: "viewport.focus_entity_animated".into(), module_id: String::new(),
+                label: "Focus Entity (Animated)".into(), category: "Viewport".into(),
+                description: Some(
+                    "Smoothly animate the viewport camera to orbit the selected entity".into()
+                ),
+                keybind: None,
+                args_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": { "entityId": { "type": "number" } },
+                    "required": ["entityId"]
+                })),
+                returns_data: false, non_undoable: true,
+            },
         ]
     }
 }

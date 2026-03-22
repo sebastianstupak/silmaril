@@ -378,6 +378,7 @@ pub fn run() {
             commands::set_selected_entity,
             commands::assign_mesh,
             commands::reparent_entity,
+            commands::focus_entity_animated,
         ])
         .setup(move |app| {
             bridge::registry_bridge::setup_registry_watch(registry_rx, app.handle().clone());
