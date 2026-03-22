@@ -35,6 +35,24 @@
   let selectedIndex = $state(0);
   let inputEl: HTMLInputElement | undefined = $state(undefined);
 
+  const showGroups = $derived(
+    new Set(results.map(r => r.group)).size > 1
+  );
+
+  const groupedResults = $derived((() => {
+    const groups: { label: string; items: typeof results }[] = [];
+    const seen = new Map<string, typeof results>();
+    for (const r of results) {
+      const key = r.group ?? '';
+      if (!seen.has(key)) {
+        seen.set(key, []);
+        groups.push({ label: key, items: seen.get(key)! });
+      }
+      seen.get(key)!.push(r);
+    }
+    return groups;
+  })());
+
   // Cached assets — kept in sync with the assets store
   let assets: { path: string; assetType: string }[] = $state(getAssets());
 
@@ -216,22 +234,47 @@
         </ul>
       {:else if results.length > 0}
         <ul class="omnibar-results" role="listbox">
-          {#each results as result, i}
-            <li
-              class="omnibar-result"
-              class:selected={i === selectedIndex}
-              role="option"
-              aria-selected={i === selectedIndex}
-              onmouseenter={() => selectedIndex = i}
-              onclick={() => execute(result)}
-            >
-              <span class="result-label">{resultLabel(result)}</span>
-              <span class="result-meta">{resultMeta(result)}</span>
-              {#if resultKeybind(result)}
-                <kbd class="result-keybind">{resultKeybind(result)}</kbd>
+          {#if showGroups}
+            {#each groupedResults as group}
+              {#if group.label}
+                <li class="omnibar-section-header" role="presentation">{group.label}</li>
               {/if}
-            </li>
-          {/each}
+              {#each group.items as result}
+                {@const i = results.indexOf(result)}
+                <li
+                  class="omnibar-result"
+                  class:selected={i === selectedIndex}
+                  role="option"
+                  aria-selected={i === selectedIndex}
+                  onmouseenter={() => selectedIndex = i}
+                  onclick={() => execute(result)}
+                >
+                  <span class="result-label">{resultLabel(result)}</span>
+                  <span class="result-meta">{resultMeta(result)}</span>
+                  {#if resultKeybind(result)}
+                    <kbd class="result-keybind">{resultKeybind(result)}</kbd>
+                  {/if}
+                </li>
+              {/each}
+            {/each}
+          {:else}
+            {#each results as result, i}
+              <li
+                class="omnibar-result"
+                class:selected={i === selectedIndex}
+                role="option"
+                aria-selected={i === selectedIndex}
+                onmouseenter={() => selectedIndex = i}
+                onclick={() => execute(result)}
+              >
+                <span class="result-label">{resultLabel(result)}</span>
+                <span class="result-meta">{resultMeta(result)}</span>
+                {#if resultKeybind(result)}
+                  <kbd class="result-keybind">{resultKeybind(result)}</kbd>
+                {/if}
+              </li>
+            {/each}
+          {/if}
         </ul>
       {/if}
     </div>
@@ -395,5 +438,16 @@
     min-width: 18px;
     text-align: center;
     flex-shrink: 0;
+  }
+
+  .omnibar-section-header {
+    padding: 4px 10px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-textDim, #555);
+    user-select: none;
+    pointer-events: none;
   }
 </style>
