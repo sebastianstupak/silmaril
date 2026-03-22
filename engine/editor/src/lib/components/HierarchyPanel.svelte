@@ -3,6 +3,7 @@
   import { t } from '$lib/i18n';
   import type { EntityInfo } from '$lib/api';
   import { assignMesh } from '$lib/api';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     createEntity,
     createEntityChild,
@@ -17,6 +18,8 @@
     selectedId: number | null;
     onSelect: (id: number) => void;
   } = $props();
+
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
   let filter = $state('');
   let hoveredId = $state<number | null>(null);
@@ -115,6 +118,11 @@
     renameValue = '';
   }
 
+  async function focusEntity(id: number): Promise<void> {
+    if (!isTauri) return;
+    await invoke('focus_entity_animated', { entityId: id });
+  }
+
   function openContextMenu(e: MouseEvent, entityId: number) {
     e.preventDefault();
     contextMenu = { x: e.clientX, y: e.clientY, entityId };
@@ -143,6 +151,10 @@
 
   let dropTargetId = $state<number | null>(null);
 
+  const ENTITY_MIME = 'application/x-entity-id';
+  let draggedEntityId  = $state<number | null>(null);
+  let reparentTargetId = $state<number | null>(null);
+
   function onDragOver(event: DragEvent, entityId: number): void {
     if (event.dataTransfer?.types.includes('application/x-mesh-path')) {
       event.preventDefault();
@@ -163,6 +175,43 @@
     const templatePath = getActiveTemplatePath();
     if (!templatePath) return;
     await assignMesh(entityId, templatePath, meshPath);
+  }
+
+  function startEntityDrag(e: DragEvent, id: number): void {
+    draggedEntityId = id;
+    e.dataTransfer!.setData(ENTITY_MIME, String(id));
+    e.dataTransfer!.effectAllowed = 'move';
+  }
+
+  function onEntityDragOver(e: DragEvent, target: EntityInfo): void {
+    if (!e.dataTransfer?.types.includes(ENTITY_MIME)) return;
+    if (draggedEntityId === null) return;
+    if (draggedEntityId === target.id) return;
+    if (isDescendant(target.id, draggedEntityId)) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+    reparentTargetId = target.id;
+  }
+
+  async function onEntityDrop(e: DragEvent, newParentId: number): Promise<void> {
+    if (!e.dataTransfer?.types.includes(ENTITY_MIME)) return;
+    const entityId = draggedEntityId;
+    draggedEntityId   = null;
+    reparentTargetId  = null;
+    if (entityId === null || entityId === newParentId) return;
+    if (!isTauri) return;
+    await invoke('reparent_entity', { entityId, newParentId });
+  }
+
+  function isDescendant(candidateId: number, ancestorId: number): boolean {
+    let current: number | undefined = candidateId;
+    while (current !== undefined) {
+      const info = entities.find((e) => e.id === current);
+      if (!info) return false;
+      if (info.parentId === ancestorId) return true;
+      current = info.parentId;
+    }
+    return false;
   }
 </script>
 
@@ -201,9 +250,11 @@
           class="entity-row"
           class:selected={selectedId === entity.id}
           class:drop-target={dropTargetId === entity.id}
+          class:reparent-target={reparentTargetId === entity.id}
           role="option"
           aria-selected={selectedId === entity.id}
           tabindex="0"
+          draggable="true"
           style="padding-left: {8 + depth * 14}px"
           onmouseenter={() => { hoveredId = entity.id; }}
           onmouseleave={() => { if (!contextMenu) hoveredId = null; }}
@@ -212,12 +263,14 @@
               onSelect(entity.id);
             }
           }}
-          ondblclick={() => startRename(entity.id, entity.name)}
+          ondblclick={() => focusEntity(entity.id)}
           oncontextmenu={(e) => openContextMenu(e, entity.id)}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onSelect(entity.id); } }}
-          ondragover={(e) => onDragOver(e, entity.id)}
-          ondragleave={() => onDragLeave(entity.id)}
-          ondrop={(e) => onDropMesh(e, entity.id)}
+          ondragstart={(e) => startEntityDrag(e, entity.id)}
+          ondragover={(e) => { onDragOver(e, entity.id); onEntityDragOver(e, entity); }}
+          ondragleave={() => { onDragLeave(entity.id); reparentTargetId = null; }}
+          ondrop={(e) => { onDropMesh(e, entity.id); onEntityDrop(e, entity.id); }}
+          ondragend={() => { draggedEntityId = null; reparentTargetId = null; }}
         >
           <!-- Expand/collapse chevron -->
           <span
@@ -254,7 +307,10 @@
               onclick={(e) => e.stopPropagation()}
             />
           {:else}
-            <span class="entity-name">{entity.name}</span>
+            <span
+              class="entity-name"
+              ondblclick={(e) => { e.stopPropagation(); startRename(entity.id, entity.name); }}
+            >{entity.name}</span>
           {/if}
 
           {#if hoveredId === entity.id && renamingId !== entity.id}
@@ -407,6 +463,10 @@
   .entity-row.selected { background: var(--color-accent, #007acc); color: #fff; }
   .entity-row:focus-visible { outline: 1px solid var(--color-accent, #007acc); outline-offset: -1px; }
   .entity-row.drop-target { outline: 1px dashed var(--color-accent, #007acc); outline-offset: -1px; background: rgba(0, 122, 204, 0.15); }
+  .entity-row.reparent-target {
+    outline: 2px dashed var(--accent-color, #7c5cbf);
+    outline-offset: -2px;
+  }
 
   .entity-chevron {
     display: flex;
