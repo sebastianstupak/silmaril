@@ -243,13 +243,13 @@ Called from `template_execute` when a `SetComponent{MeshRenderer}` action is pro
 
 Path resolution helper:
 ```rust
-fn resolve_mesh_path(path: &str, project_root: &Path, manager: &AssetManager) -> u64 {
+fn resolve_mesh_path(path: &str, project_root: &Path, manager: &AssetManager) -> Result<u64, IpcError> {
     match path {
-        "builtin://cube"     => 1,
-        "builtin://sphere"   => 2,
-        "builtin://plane"    => 3,
-        "builtin://cylinder" => 4,
-        "builtin://capsule"  => 5,
+        "builtin://cube"     => Ok(1),
+        "builtin://sphere"   => Ok(2),
+        "builtin://plane"    => Ok(3),
+        "builtin://cylinder" => Ok(4),
+        "builtin://capsule"  => Ok(5),
         other => {
             // Derive stable seed from path string — same path always → same seed,
             // stable across content updates (Bevy / Unreal pattern).
@@ -269,7 +269,7 @@ fn resolve_mesh_path(path: &str, project_root: &Path, manager: &AssetManager) ->
             {
                 Ok(mesh_data) => {
                     <MeshData as AssetLoader>::insert(manager, asset_id, mesh_data).ok();
-                    seed
+                    Ok(seed)
                 }
                 Err(e) => {
                     tracing::warn!(path = other, error = ?e, "Failed to load mesh asset");
