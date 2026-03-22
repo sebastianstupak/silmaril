@@ -31,16 +31,9 @@
   import AiPermissionDialog from './lib/components/AiPermissionDialog.svelte';
   import { aiServerRunning, aiServerPort, refreshAiServerStatus } from './lib/stores/ai-server';
 
-  // Panel components (no-prop wrappers for docking)
-  import HierarchyWrapper from './lib/docking/panels/HierarchyWrapper.svelte';
-  import InspectorWrapper from './lib/docking/panels/InspectorWrapper.svelte';
-  import ConsoleWrapper from './lib/docking/panels/ConsoleWrapper.svelte';
-  import ViewportPanel from './lib/docking/panels/ViewportPanel.svelte';
-  import ProfilerPanel from './lib/docking/panels/ProfilerPanel.svelte';
-  import AssetsPanel from './lib/docking/panels/AssetsPanel.svelte';
-  import FileExplorerWrapper from './lib/docking/panels/FileExplorerWrapper.svelte';
-  import TerminalWrapper from './lib/docking/panels/TerminalWrapper.svelte';
-  import OutputWrapper from './lib/docking/panels/OutputWrapper.svelte';
+  import { registerBuiltinPanels } from './lib/contributions/builtins';
+  import { getPanelContributions, subscribePanelContributions } from './lib/contributions/registry';
+  import type { PanelContribution } from './lib/contributions/registry';
 
   /** Detect if running inside Tauri or standalone browser */
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
@@ -59,6 +52,7 @@
   let recentItems = $state<RecentItem[]>([]);
   let unlistenCatalog: (() => void) | undefined;
   let unlistenAiCmd: (() => void) | undefined;
+  let _unsubPanels: (() => void) | undefined;
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
   const _initial = loadSettings();
@@ -96,17 +90,10 @@
   const MIN_BOTTOM = 150;
   const MAX_BOTTOM_RATIO = 0.6;
 
-  const panelComponents: Record<string, any> = {
-    hierarchy: HierarchyWrapper,
-    viewport: ViewportPanel,
-    inspector: InspectorWrapper,
-    console: ConsoleWrapper,
-    profiler: ProfilerPanel,
-    assets: AssetsPanel,
-    'file-explorer': FileExplorerWrapper,
-    terminal: TerminalWrapper,
-    output: OutputWrapper,
-  };
+  // Call before first render so DockContainer can resolve components immediately
+  registerBuiltinPanels();
+
+  let panelContributions = $state<PanelContribution[]>(getPanelContributions());
 
   async function handleOpenProject() {
     const path = await openProjectDialog();
@@ -448,6 +435,9 @@
 
   onMount(async () => {
     await initTauriListeners();
+    _unsubPanels = subscribePanelContributions(() => {
+      panelContributions = getPanelContributions();
+    });
     setLocale(settings.language);
     applyTheme(themes[settings.theme] ?? themes.dark);
     document.documentElement.style.fontSize = `${settings.fontSize}px`;
@@ -608,6 +598,7 @@
   onDestroy(() => {
     unlistenCatalog?.();
     unlistenAiCmd?.();
+    _unsubPanels?.();
   });
 </script>
 
