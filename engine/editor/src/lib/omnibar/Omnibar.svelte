@@ -14,6 +14,12 @@
   import { addRecentItem } from '$lib/stores/recent-items';
   import { getAssets, subscribeAssets, clearAssets, setAssets, type AssetEntry } from '$lib/stores/assets';
 
+  const PREFIX_HINTS = [
+    { prefix: '>',  label: 'Commands',       description: 'Run editor commands' },
+    { prefix: '@',  label: 'Scene entities', description: 'Find entities in the scene' },
+    { prefix: '#',  label: 'Assets',         description: 'Find project assets' },
+  ] as const;
+
   interface Props {
     projectPath?: string | null;
     open?: boolean;
@@ -193,7 +199,22 @@
         <kbd class="omnibar-hint">Esc</kbd>
       </div>
 
-      {#if results.length > 0}
+      {#if query.trim() === ''}
+        <!-- Prefix hint list (shown when input is empty) -->
+        <ul class="omnibar-results" role="listbox">
+          {#each PREFIX_HINTS as hint}
+            <li
+              class="omnibar-result omnibar-prefix-hint"
+              role="option"
+              onclick={() => { query = hint.prefix; inputEl?.focus(); }}
+            >
+              <span class="hint-prefix">{hint.prefix}</span>
+              <span class="result-label">{hint.label}</span>
+              <span class="result-meta">{hint.description}</span>
+            </li>
+          {/each}
+        </ul>
+      {:else if results.length > 0}
         <ul class="omnibar-results" role="listbox">
           {#each results as result, i}
             <li
@@ -356,5 +377,23 @@
     position: fixed;
     inset: 0;
     z-index: 9999;
+  }
+
+  .omnibar-prefix-hint {
+    opacity: 0.75;
+  }
+
+  .omnibar-prefix-hint:hover {
+    opacity: 1;
+  }
+
+  .hint-prefix {
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-accent, #89b4fa);
+    min-width: 18px;
+    text-align: center;
+    flex-shrink: 0;
   }
 </style>
