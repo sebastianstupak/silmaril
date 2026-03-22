@@ -189,6 +189,19 @@ export async function initTauriListeners(): Promise<void> {
     notify();
   });
 
+  await listen<{ entityId: number; newParentId: number | null }>('entity-reparented', (event) => {
+    const { entityId, newParentId } = event.payload;
+    state = {
+      ...state,
+      entities: state.entities.map((e) =>
+        e.id === entityId
+          ? { ...e, parentId: newParentId ?? undefined }
+          : e
+      ),
+    };
+    notify();
+  });
+
   await listen<{
     id: number;
     position: [number, number, number];
