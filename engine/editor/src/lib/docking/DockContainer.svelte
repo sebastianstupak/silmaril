@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { LayoutNode, DropZone } from './types';
   import { getBasePanelId } from './types';
-  import type { Component } from 'svelte';
+  import { getPanelComponent } from '$lib/contributions/registry';
   import DockContainer from './DockContainer.svelte';
   import DockTabBar from './DockTabBar.svelte';
   import DockSplitter from './DockSplitter.svelte';
@@ -15,7 +15,6 @@
     node: LayoutNode;
     layout: EditorLayout;
     path?: number[];
-    panelComponents: Record<string, Component>;
     onLayoutChange: (layout: EditorLayout) => void;
     isBottomPanel?: boolean;
   }
@@ -24,7 +23,6 @@
     node,
     layout,
     path = [],
-    panelComponents,
     onLayoutChange,
     isBottomPanel = false,
   }: Props = $props();
@@ -132,10 +130,6 @@
     });
   });
 
-  /** Resolve panel component, supporting instance IDs like 'viewport:2' */
-  function resolveComponent(id: string): Component | undefined {
-    return panelComponents[id] ?? panelComponents[getBasePanelId(id)];
-  }
 </script>
 
 {#if node.type === 'split'}
@@ -157,7 +151,6 @@
           node={child}
           {layout}
           path={[...path, i]}
-          {panelComponents}
           {onLayoutChange}
           {isBottomPanel}
         />
@@ -183,7 +176,7 @@
            Viewport panels need setViewportVisible() to pause GPU rendering
            when hidden — handled by the $effect below. -->
       {#each node.panels as panelId, i (panelId)}
-        {@const Comp = resolveComponent(panelId)}
+        {@const Comp = getPanelComponent(panelId)}
         <div class="dock-panel-slot" class:active={i === node.activeTab}>
           {#if Comp}
             <Comp {panelId} />

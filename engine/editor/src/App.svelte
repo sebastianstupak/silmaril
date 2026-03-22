@@ -697,7 +697,6 @@
       <DockContainer
         node={layout.root}
         {layout}
-        {panelComponents}
         onLayoutChange={handleLayoutChange}
       />
     </div>
@@ -709,7 +708,6 @@
         <DockContainer
           node={layout.bottomPanel}
           {layout}
-          {panelComponents}
           onLayoutChange={handleLayoutChange}
           isBottomPanel={true}
         />
