@@ -1,5 +1,4 @@
 // Tauri API wrapper with browser fallback for Playwright testing
-import { getPanelInfo } from '$lib/docking/types';
 import type { ComponentSchema } from '$lib/inspector/schema';
 
 export interface EditorState {

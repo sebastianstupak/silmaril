@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { getPanelInfo } from './types';
-  import { t } from '$lib/i18n';
+  import { getPanelTitle } from '$lib/contributions/registry';
   import { getDragState, subscribeDrag } from './store';
   import { onMount } from 'svelte';
 
@@ -22,8 +21,7 @@
   });
 
   function getLabel(id: string): string {
-    const info = getPanelInfo(id);
-    return info ? t(info.titleKey) : id;
+    return getPanelTitle(id);
   }
 </script>
 

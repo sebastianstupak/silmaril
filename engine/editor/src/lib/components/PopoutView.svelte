@@ -8,7 +8,7 @@
   import { setLocale } from '$lib/i18n';
   import { loadSettings } from '$lib/stores/settings';
   import { themes, applyTheme } from '$lib/theme/tokens';
-  import { getPanelInfo } from '$lib/docking/types';
+  import { getPanelTitle } from '$lib/contributions/registry';
   import HierarchyWrapper from '$lib/docking/panels/HierarchyWrapper.svelte';
   import InspectorWrapper from '$lib/docking/panels/InspectorWrapper.svelte';
   import ConsoleWrapper from '$lib/docking/panels/ConsoleWrapper.svelte';
@@ -32,8 +32,7 @@
 
   const basePanelId = panelId.split(':')[0];
   const PanelComponent = panels[basePanelId];
-  const info = getPanelInfo(basePanelId);
-  const panelTitle = info ? t(info.titleKey) : panelId;
+  const panelTitle = getPanelTitle(basePanelId);
 
   onMount(() => {
     const SETTINGS_KEY = 'silmaril-editor-settings';

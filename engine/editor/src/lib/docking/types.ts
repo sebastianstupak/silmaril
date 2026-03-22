@@ -34,35 +34,10 @@ export interface DragPayload {
   sourceNodePath: number[];
 }
 
-/** Panel metadata for the registry */
-export interface PanelInfo {
-  id: string;
-  titleKey: string;
-  icon?: string;
-}
-
-/** All known panels */
-export const panelRegistry: PanelInfo[] = [
-  { id: 'hierarchy', titleKey: 'panel.hierarchy' },
-  { id: 'viewport', titleKey: 'panel.viewport' },
-  { id: 'inspector', titleKey: 'panel.inspector' },
-  { id: 'console', titleKey: 'panel.console' },
-  { id: 'profiler', titleKey: 'panel.profiler' },
-  { id: 'assets', titleKey: 'panel.assets' },
-  { id: 'file-explorer', titleKey: 'panel.file_explorer' },
-  { id: 'terminal', titleKey: 'panel.terminal' },
-  { id: 'output', titleKey: 'panel.output' },
-];
-
 /** Get the base panel ID (strip instance suffix like 'viewport:2' → 'viewport') */
 export function getBasePanelId(id: string): string {
   const colonIdx = id.indexOf(':');
   return colonIdx === -1 ? id : id.substring(0, colonIdx);
-}
-
-/** Get panel info by ID (supports instance IDs like 'viewport:2') */
-export function getPanelInfo(id: string): PanelInfo | undefined {
-  return panelRegistry.find(p => p.id === getBasePanelId(id));
 }
 
 let _instanceCounter = 0;
