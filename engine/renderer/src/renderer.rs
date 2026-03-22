@@ -906,83 +906,110 @@ impl Renderer {
         viewports: &[ViewportDescriptor],
     ) {
         use engine_core::{MeshRenderer, Transform};
+        use crate::mesh_uniform::MeshUniform;
 
-        // Deferred / gizmo-only phase: skip mesh rendering entirely.
         let Some(assets) = assets else { return; };
-
-        // Nothing to do with no viewports.
-        if viewports.is_empty() {
-            return;
-        }
+        if viewports.is_empty() { return; }
 
         let cmd = recorder.command_buffer;
+        let frame_idx = self.current_frame;
 
-        // Bind the mesh pipeline once for all viewports.
         let Some(pipeline) = &self.mesh_pipeline else {
-            warn!("render_meshes: no mesh pipeline available, skipping");
+            warn!("render_meshes: no mesh pipeline, skipping");
             return;
         };
 
-        unsafe {
-            self.context.device.cmd_bind_pipeline(
-                cmd,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.handle(),
-            );
-        }
+        // ── 1. Build MeshUniform list + draw list ─────────────────────────────
+        let mut uniforms: Vec<MeshUniform> = Vec::new();
+        let mut draw_list: Vec<(engine_assets::AssetId, u32)> = Vec::new();
 
-        // Collect renderable entities (model matrices + mesh ids).
-        let mut renderables: Vec<(engine_assets::AssetId, glam::Mat4)> = Vec::new();
         for entity in world.entities() {
-            if let (Some(transform), Some(mesh_renderer)) =
+            let (Some(transform), Some(mesh_renderer)) =
                 (world.get::<Transform>(entity), world.get::<MeshRenderer>(entity))
+            else { continue; };
+
+            if !mesh_renderer.is_visible() { continue; }
+
+            let mesh_id = engine_assets::AssetId::from_seed_and_params(
+                mesh_renderer.mesh_id, b"mesh",
+            );
+
+            // Upload mesh to GPU cache if absent
             {
-                if !mesh_renderer.is_visible() {
-                    continue;
-                }
-
-                let mesh_id = engine_assets::AssetId::from_seed_and_params(
-                    mesh_renderer.mesh_id,
-                    b"mesh",
-                );
-
-                // Upload mesh to GPU cache if not already present.
-                {
-                    let mut cache = self.gpu_cache.borrow_mut();
-                    if !cache.contains(mesh_id) {
-                        match assets.get_mesh(mesh_id) {
-                            Some(mesh_data) => {
-                                if let Err(e) =
-                                    cache.upload_mesh(&self.context, mesh_id, &mesh_data)
-                                {
-                                    warn!(
-                                        error = ?e,
-                                        mesh_id = ?mesh_id,
-                                        "render_meshes: failed to upload mesh, skipping"
-                                    );
-                                    continue;
-                                }
-                            }
-                            None => {
-                                warn!(
-                                    mesh_id = ?mesh_id,
-                                    "render_meshes: mesh not found in AssetManager, skipping"
-                                );
+                let mut cache = self.gpu_cache.borrow_mut();
+                if !cache.contains(mesh_id) {
+                    match assets.get_mesh(mesh_id) {
+                        Some(mesh_data) => {
+                            if let Err(e) = cache.upload_mesh(&self.context, mesh_id, &mesh_data) {
+                                warn!(error = ?e, mesh_id = ?mesh_id, "render_meshes: GPU upload failed, skipping entity");
                                 continue;
                             }
                         }
+                        None => {
+                            warn!(mesh_id = ?mesh_id, "render_meshes: mesh not in AssetManager, skipping entity");
+                            continue;
+                        }
                     }
                 }
+            }
 
-                renderables.push((mesh_id, transform.matrix()));
+            let instance_index = uniforms.len() as u32;
+            uniforms.push(MeshUniform::from_transform(transform));
+            draw_list.push((mesh_id, instance_index));
+        }
+
+        if draw_list.is_empty() { return; }
+
+        // ── 2. Upload MeshUniform data via RefCell borrow_mut ─────────────────
+        if let Some(buf_cell) = self.mesh_uniform_buffers.get(frame_idx) {
+            let mut buf = buf_cell.borrow_mut();
+            match buf.upload(&self.context, &uniforms) {
+                Ok(resized) if resized => {
+                    // Buffer reallocated — rebind descriptor set to new VkBuffer
+                    if let Some(&set) = self.mesh_descriptor_sets.get(frame_idx) {
+                        let buf_info = vk::DescriptorBufferInfo::default()
+                            .buffer(buf.buffer.handle())
+                            .offset(0)
+                            .range(vk::WHOLE_SIZE);
+                        let write = vk::WriteDescriptorSet::default()
+                            .dst_set(set)
+                            .dst_binding(0)
+                            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                            .buffer_info(std::slice::from_ref(&buf_info));
+                        unsafe { self.context.device.update_descriptor_sets(&[write], &[]); }
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    warn!(error = ?e, "render_meshes: buffer upload failed");
+                    return;
+                }
             }
         }
 
-        // Emit draw calls per viewport.
+        // ── 3. Bind pipeline + descriptor set ─────────────────────────────────
+        unsafe {
+            self.context.device.cmd_bind_pipeline(
+                cmd, vk::PipelineBindPoint::GRAPHICS, pipeline.handle(),
+            );
+
+            if let Some(&set) = self.mesh_descriptor_sets.get(frame_idx) {
+                self.context.device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline.layout(),
+                    0,
+                    &[set],
+                    &[],
+                );
+            }
+        }
+
+        // ── 4. Emit draw calls per viewport ───────────────────────────────────
+        let cache = self.gpu_cache.borrow();
         for vp in viewports {
             let vp_matrix = vp.proj * vp.view;
 
-            // Dynamic viewport.
             let viewport = vk::Viewport::default()
                 .x(vp.bounds.x as f32)
                 .y(vp.bounds.y as f32)
@@ -1007,51 +1034,32 @@ impl Renderer {
             unsafe {
                 self.context.device.cmd_set_viewport(cmd, 0, &[viewport]);
                 self.context.device.cmd_set_scissor(cmd, 0, &[scissor]);
+
+                // Push VP matrix (64 bytes) — matches new shader push_constant layout
+                let vp_bytes = vp_matrix.as_ref();
+                let vp_slice = std::slice::from_raw_parts(
+                    vp_bytes.as_ptr() as *const u8,
+                    std::mem::size_of::<glam::Mat4>(),
+                );
+                self.context.device.cmd_push_constants(
+                    cmd, pipeline.layout(), vk::ShaderStageFlags::VERTEX, 0, vp_slice,
+                );
             }
 
-            let cache = self.gpu_cache.borrow();
-            for &(mesh_id, model_matrix) in &renderables {
-                let mvp_matrix = vp_matrix * model_matrix;
-
+            for &(mesh_id, instance_index) in &draw_list {
                 if let (Some((vertex_buf, index_buf)), Some(mesh_info)) =
                     (cache.get_buffers(mesh_id), cache.get_mesh_info(mesh_id))
                 {
                     unsafe {
-                        // Push MVP via push constants.
-                        let mvp_bytes = mvp_matrix.as_ref();
-                        let mvp_slice = std::slice::from_raw_parts(
-                            mvp_bytes.as_ptr() as *const u8,
-                            std::mem::size_of::<glam::Mat4>(),
-                        );
-                        self.context.device.cmd_push_constants(
-                            cmd,
-                            pipeline.layout(),
-                            vk::ShaderStageFlags::VERTEX,
-                            0,
-                            mvp_slice,
-                        );
-
-                        self.context.device.cmd_bind_vertex_buffers(
-                            cmd,
-                            0,
-                            &[vertex_buf],
-                            &[0],
-                        );
-
-                        self.context.device.cmd_bind_index_buffer(
-                            cmd,
-                            index_buf,
-                            0,
-                            vk::IndexType::UINT32,
-                        );
-
+                        self.context.device.cmd_bind_vertex_buffers(cmd, 0, &[vertex_buf], &[0]);
+                        self.context.device.cmd_bind_index_buffer(cmd, index_buf, 0, vk::IndexType::UINT32);
                         self.context.device.cmd_draw_indexed(
                             cmd,
                             mesh_info.index_count,
-                            1,
-                            0,
-                            0,
-                            0,
+                            1,              // instance count = 1 per entity
+                            0,              // first index
+                            0,              // vertex offset
+                            instance_index, // firstInstance → gl_InstanceIndex in shader
                         );
                     }
                 }
@@ -1059,7 +1067,7 @@ impl Renderer {
         }
 
         info!(
-            draw_count = renderables.len(),
+            draw_count = draw_list.len(),
             viewport_count = viewports.len(),
             "render_meshes: issued draw calls"
         );
