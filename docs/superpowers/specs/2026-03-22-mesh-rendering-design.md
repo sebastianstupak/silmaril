@@ -80,26 +80,25 @@ always maps to the same handle).
 | `builtin://capsule`          | Constant `5`                                      |
 | `assets/models/foo.glb`      | `blake3(b"assets/models/foo.glb")` → first 8 bytes as u64 |
 
-**Built-in primitives** are inserted directly into the `AssetManager` under
-`AssetId::from_seed_and_params(seed, b"mesh")`, so the seed IS the stable ID.
+**All meshes** — both built-ins and file assets — are stored in the `AssetManager`
+under `AssetId::from_seed_and_params(seed, b"mesh")`. This keeps `render_meshes`
+uniform: it always looks up by `from_seed_and_params(mesh_renderer.mesh_id, b"mesh")`
+with no special-casing.
 
-**File-based meshes** use a different identity chain:
-1. `load_sync::<MeshData>` loads the file, stores it under a **content-hash** `AssetId`
-   (derived from vertex + index data by `MeshData::generate_id`).
-2. `sync_mesh_renderer_to_ecs` reads `handle.id()` from the returned handle and
-   stores the raw `AssetId` bytes (first 8) as `mesh_id` in `MeshRenderer`.
-3. `render_meshes` looks up by `AssetId::from_seed_and_params(mesh_renderer.mesh_id, b"mesh")`
-   for built-ins, and by the raw `AssetId` for file assets.
+- **Built-ins:** seed is a compile-time constant (1–5). Inserted directly.
+- **File assets:** seed is derived from the **path string** —
+  `blake3(b"assets/models/foo.glb")` → first 8 bytes as u64. The file is loaded,
+  parsed, and inserted under this path-derived `AssetId` (bypassing `load_sync`'s
+  internal content-hash ID). `render_meshes` finds it via the same `from_seed_and_params`
+  call it already uses.
 
-> **Note:** `render_meshes` must be updated to support both lookup paths. Built-in
-> lookup uses `from_seed_and_params`; file-asset lookup uses the stored `AssetId`
-> directly. A wrapper enum or a two-step lookup resolves this.
-
-**Why content-hashing for files:** updating `robot.glb` on disk changes the hash,
-but `load_sync` will re-register it under the new ID and `sync_mesh_renderer_to_ecs`
-will update the ECS `mesh_id` on next template load — the same re-import flow used
-by Unreal and Godot when an asset is updated. The template stores the path (stable);
-the ECS stores the current content ID (authoritative for the current session).
+**Why path-hashing for files (not content-hashing):** `load_sync` internally derives
+IDs from vertex + index content. If a file is updated on disk, the content hash
+changes and the old ID is stale — breaking the lookup in `render_meshes`. Path
+hashing is stable across content updates (the same tradeoff as Bevy and Unreal):
+the artist re-exports `robot.glb`, `sync_mesh_renderer_to_ecs` calls the insert path
+again, the new mesh data overwrites the old entry under the same path-derived ID,
+and the next frame renders the updated mesh with no ID changes anywhere.
 
 ---
 
@@ -252,17 +251,25 @@ fn resolve_mesh_path(path: &str, project_root: &Path, manager: &AssetManager) ->
         "builtin://cylinder" => 4,
         "builtin://capsule"  => 5,
         other => {
-            // Load file into AssetManager (load_sync is idempotent for cached paths).
-            // Use handle.id() as the mesh_id — content-hash based, authoritative for
-            // the current session. Template stores the path (stable); ECS stores the
-            // current content ID.
+            // Derive stable seed from path string — same path always → same seed,
+            // stable across content updates (Bevy / Unreal pattern).
+            let seed = u64::from_le_bytes(
+                blake3::hash(other.as_bytes()).as_bytes()[..8].try_into().unwrap()
+            );
+            let asset_id = AssetId::from_seed_and_params(seed, b"mesh");
+
+            // Insert (or overwrite) under the path-derived AssetId so render_meshes
+            // can find it via its existing from_seed_and_params lookup.
+            // Bypasses load_sync to avoid the content-hash ID mismatch.
             let full_path = project_root.join(other);
-            match manager.load_sync::<MeshData>(&full_path) {
-                Ok(handle) => {
-                    // Extract first 8 bytes of AssetId as mesh_id seed.
-                    // render_meshes must look up file assets by raw AssetId, not
-                    // via from_seed_and_params (see § "Mesh Identity").
-                    u64::from_le_bytes(handle.id().as_bytes()[..8].try_into().unwrap())
+            match std::fs::read(&full_path).map_err(|e| e.to_string())
+                .and_then(|bytes| MeshData::from_gltf(&bytes, None)
+                    .or_else(|_| MeshData::from_obj(&String::from_utf8_lossy(&bytes)))
+                    .map_err(|e| e.to_string()))
+            {
+                Ok(mesh_data) => {
+                    <MeshData as AssetLoader>::insert(manager, asset_id, mesh_data).ok();
+                    seed
                 }
                 Err(e) => {
                     tracing::warn!(path = other, error = ?e, "Failed to load mesh asset");
