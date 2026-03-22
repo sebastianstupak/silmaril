@@ -1337,6 +1337,7 @@ impl NativeViewport {
         _world: std::sync::Arc<std::sync::RwLock<engine_core::World>>,
         _selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
         _gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+        _hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
     ) -> Result<Self, String> {
         Err("Native viewport not yet implemented for this platform".into())
     }
