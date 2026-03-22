@@ -17,7 +17,7 @@ use crate::*;
 use ash::vk;
 use std::marker::PhantomData;
 use std::path::Path;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Describes one viewport sub-rect within the swapchain surface.
 ///
@@ -1066,7 +1066,7 @@ impl Renderer {
             }
         }
 
-        info!(
+        debug!(
             draw_count = draw_list.len(),
             viewport_count = viewports.len(),
             "render_meshes: issued draw calls"

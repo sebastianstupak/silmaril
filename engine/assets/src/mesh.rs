@@ -10,7 +10,7 @@ use crate::validation::{check_f32, compute_hash, AssetValidator, ValidationError
 use engine_core::{EngineError, ErrorCode, ErrorSeverity};
 use engine_macros::define_error;
 use glam::{Vec2, Vec3};
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
 
 define_error! {
     pub enum MeshError {
@@ -605,7 +605,7 @@ impl MeshData {
             }
         }
 
-        info!(vertices = vertices.len(), indices = indices.len(), "Sphere mesh created");
+        debug!(vertices = vertices.len(), indices = indices.len(), "Sphere mesh created");
         Self { vertices, indices }
     }
 
@@ -636,7 +636,7 @@ impl MeshData {
             },
         ];
         let indices = vec![0u32, 1, 2, 0, 2, 3];
-        info!("Plane mesh created");
+        debug!("Plane mesh created");
         Self { vertices, indices }
     }
 
@@ -712,7 +712,7 @@ impl MeshData {
             indices.extend_from_slice(&[top_center, top_start + seg, top_start + seg + 1]);
         }
 
-        info!(vertices = vertices.len(), indices = indices.len(), "Cylinder mesh created");
+        debug!(vertices = vertices.len(), indices = indices.len(), "Cylinder mesh created");
         Self { vertices, indices }
     }
 
@@ -767,7 +767,7 @@ impl MeshData {
             }
         }
 
-        info!(vertices = vertices.len(), indices = indices.len(), "Capsule mesh created");
+        debug!(vertices = vertices.len(), indices = indices.len(), "Capsule mesh created");
         Self { vertices, indices }
     }
 

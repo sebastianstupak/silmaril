@@ -89,14 +89,19 @@ pub fn template_execute(
     template_path: String,
     command: TemplateCommand,
     world_state: State<'_, crate::state::SceneWorldState>,
+    asset_state: State<'_, crate::state::AssetManagerState>,
+    project_state: State<'_, crate::bridge::commands::ProjectState>,
     app: tauri::AppHandle,
 ) -> Result<CommandResult, IpcError> {
     // Extract entity_id before moving command into inner (TemplateCommand is Clone).
-    let transform_entity_id = match &command {
+    let (transform_entity_id, mesh_renderer_entity_id) = match &command {
         TemplateCommand::SetComponent { id, type_name, .. } if type_name == "Transform" => {
-            Some(*id)
+            (Some(*id), None)
         }
-        _ => None,
+        TemplateCommand::SetComponent { id, type_name, .. } if type_name == "MeshRenderer" => {
+            (None, Some(*id))
+        }
+        _ => (None, None),
     };
 
     let result = template_execute_inner(&state, template_path, command)?;
@@ -104,6 +109,21 @@ pub fn template_execute(
     if let Some(entity_id) = transform_entity_id {
         sync_transform_to_ecs(entity_id, &result.new_state, &world_state, &app)
             .map_err(|e| IpcError { code: 0, message: e })?;
+    }
+
+    if let Some(entity_id) = mesh_renderer_entity_id {
+        let project_root = {
+            let guard = project_state.0.lock().map_err(|e| IpcError { code: 0, message: e.to_string() })?;
+            guard.as_ref().cloned().unwrap_or_else(|| std::path::PathBuf::from("."))
+        };
+        sync_mesh_renderer_to_ecs(
+            entity_id,
+            &result.new_state,
+            &world_state,
+            &asset_state.0,
+            &project_root,
+        )
+        .map_err(|e| IpcError { code: 0, message: e })?;
     }
 
     Ok(result)
@@ -124,6 +144,8 @@ pub fn template_undo(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
     world_state: State<'_, crate::state::SceneWorldState>,
+    asset_state: State<'_, crate::state::AssetManagerState>,
+    project_state: State<'_, crate::bridge::commands::ProjectState>,
     app: tauri::AppHandle,
 ) -> Result<Option<ActionId>, IpcError> {
     let result = template_undo_inner(&state, template_path.clone())?;
@@ -131,7 +153,14 @@ pub fn template_undo(
         let guard = state.lock().unwrap();
         let path = std::path::PathBuf::from(&template_path);
         if let Some(proc) = guard.processors.get(&path) {
-            sync_all_transforms(proc.state_ref(), &world_state, &app)
+            let template_state = proc.state_ref();
+            sync_all_transforms(template_state, &world_state, &app)
+                .map_err(|e| IpcError { code: 0, message: e })?;
+            let project_root = {
+                let g = project_state.0.lock().map_err(|e| IpcError { code: 0, message: e.to_string() })?;
+                g.as_ref().cloned().unwrap_or_else(|| std::path::PathBuf::from("."))
+            };
+            sync_all_mesh_renderers(template_state, &world_state, &asset_state.0, &project_root)
                 .map_err(|e| IpcError { code: 0, message: e })?;
         }
     }
@@ -153,6 +182,8 @@ pub fn template_redo(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
     world_state: State<'_, crate::state::SceneWorldState>,
+    asset_state: State<'_, crate::state::AssetManagerState>,
+    project_state: State<'_, crate::bridge::commands::ProjectState>,
     app: tauri::AppHandle,
 ) -> Result<Option<ActionId>, IpcError> {
     let result = template_redo_inner(&state, template_path.clone())?;
@@ -160,7 +191,14 @@ pub fn template_redo(
         let guard = state.lock().unwrap();
         let path = std::path::PathBuf::from(&template_path);
         if let Some(proc) = guard.processors.get(&path) {
-            sync_all_transforms(proc.state_ref(), &world_state, &app)
+            let template_state = proc.state_ref();
+            sync_all_transforms(template_state, &world_state, &app)
+                .map_err(|e| IpcError { code: 0, message: e })?;
+            let project_root = {
+                let g = project_state.0.lock().map_err(|e| IpcError { code: 0, message: e.to_string() })?;
+                g.as_ref().cloned().unwrap_or_else(|| std::path::PathBuf::from("."))
+            };
+            sync_all_mesh_renderers(template_state, &world_state, &asset_state.0, &project_root)
                 .map_err(|e| IpcError { code: 0, message: e })?;
         }
     }
@@ -395,6 +433,25 @@ pub(crate) fn sync_all_transforms(
     for entity in &template_state.entities {
         if entity.components.iter().any(|c| c.type_name == "Transform") {
             sync_transform_to_ecs(entity.id, template_state, world_state, app)?;
+        }
+    }
+    Ok(())
+}
+
+/// Sync ECS world for every entity in `template_state` that has a MeshRenderer.
+///
+/// Called after template undo/redo alongside [`sync_all_transforms`] to ensure
+/// mesh assignments are correctly reverted or reapplied.  Non-fatal per entity
+/// (missing mesh path or resolve error logs a warning and continues).
+pub(crate) fn sync_all_mesh_renderers(
+    template_state: &TemplateState,
+    world_state: &crate::state::SceneWorldState,
+    asset_manager: &engine_assets::AssetManager,
+    project_root: &std::path::Path,
+) -> Result<(), String> {
+    for entity in &template_state.entities {
+        if entity.components.iter().any(|c| c.type_name == "MeshRenderer") {
+            sync_mesh_renderer_to_ecs(entity.id, template_state, world_state, asset_manager, project_root)?;
         }
     }
     Ok(())
