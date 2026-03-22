@@ -10,7 +10,56 @@ use crate::error::RendererError;
 use crate::render_pass::RenderPass;
 use crate::shader::ShaderModule;
 use ash::vk;
+use std::sync::OnceLock;
 use tracing::{info, instrument};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inline GLSL sources (compiled once via naga)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MESH_VERT_GLSL: &str = include_str!("../shaders/mesh.vert");
+const MESH_FRAG_GLSL: &str = include_str!("../shaders/mesh.frag");
+
+static MESH_VERT_SPIRV: OnceLock<Vec<u32>> = OnceLock::new();
+static MESH_FRAG_SPIRV: OnceLock<Vec<u32>> = OnceLock::new();
+
+fn get_or_compile_mesh_shaders() -> Result<(&'static Vec<u32>, &'static Vec<u32>), RendererError> {
+    let vert = if let Some(v) = MESH_VERT_SPIRV.get() {
+        v
+    } else {
+        info!("Compiling mesh vertex shader (once)");
+        let compiled = compile_glsl_to_spirv(MESH_VERT_GLSL, naga::ShaderStage::Vertex)
+            .map_err(|e| RendererError::shadercompilationfailed(e))?;
+        let _ = MESH_VERT_SPIRV.set(compiled);
+        MESH_VERT_SPIRV.get().unwrap()
+    };
+    let frag = if let Some(v) = MESH_FRAG_SPIRV.get() {
+        v
+    } else {
+        info!("Compiling mesh fragment shader (once)");
+        let compiled = compile_glsl_to_spirv(MESH_FRAG_GLSL, naga::ShaderStage::Fragment)
+            .map_err(|e| RendererError::shadercompilationfailed(e))?;
+        let _ = MESH_FRAG_SPIRV.set(compiled);
+        MESH_FRAG_SPIRV.get().unwrap()
+    };
+    Ok((vert, frag))
+}
+
+fn compile_glsl_to_spirv(source: &str, stage: naga::ShaderStage) -> Result<Vec<u32>, String> {
+    use naga::back::spv;
+    use naga::front::glsl;
+    use naga::valid::{Capabilities, ValidationFlags, Validator};
+
+    let mut frontend = glsl::Frontend::default();
+    let module = frontend
+        .parse(&glsl::Options::from(stage), source)
+        .map_err(|e| format!("GLSL parse: {:?}", e))?;
+    let info = Validator::new(ValidationFlags::all(), Capabilities::all())
+        .validate(&module)
+        .map_err(|e| format!("Shader validation: {e}"))?;
+    spv::write_vec(&module, &info, &spv::Options { lang_version: (1, 0), ..Default::default() }, None)
+        .map_err(|e| format!("SPIR-V gen: {e}"))
+}
 
 /// Graphics pipeline for mesh rendering
 pub struct GraphicsPipeline {
@@ -37,23 +86,12 @@ impl GraphicsPipeline {
     ) -> Result<Self, RendererError> {
         info!("Creating mesh graphics pipeline");
 
-        // Load compiled shaders from OUT_DIR
-        let out_dir = env!("OUT_DIR");
-        let vert_path_str = format!("{}/shaders/mesh.vert.spv", out_dir);
-        let frag_path_str = format!("{}/shaders/mesh.frag.spv", out_dir);
-
-        let vert_shader = ShaderModule::from_spirv_file(
-            device,
-            std::path::Path::new(&vert_path_str),
-            vk::ShaderStageFlags::VERTEX,
-            "main",
-        )?;
-        let frag_shader = ShaderModule::from_spirv_file(
-            device,
-            std::path::Path::new(&frag_path_str),
-            vk::ShaderStageFlags::FRAGMENT,
-            "main",
-        )?;
+        // Compile shaders via naga (cached after first call)
+        let (vert_spirv, frag_spirv) = get_or_compile_mesh_shaders()?;
+        let vert_shader =
+            ShaderModule::from_spirv(device, vert_spirv, vk::ShaderStageFlags::VERTEX, "main")?;
+        let frag_shader =
+            ShaderModule::from_spirv(device, frag_spirv, vk::ShaderStageFlags::FRAGMENT, "main")?;
 
         // Create pipeline layout with push constants
         let push_constant_range = vk::PushConstantRange::default()
@@ -219,23 +257,12 @@ impl GraphicsPipeline {
     ) -> Result<Self, RendererError> {
         info!("Creating mesh graphics pipeline with descriptor sets");
 
-        // Load compiled shaders from OUT_DIR
-        let out_dir = env!("OUT_DIR");
-        let vert_path_str = format!("{}/shaders/mesh.vert.spv", out_dir);
-        let frag_path_str = format!("{}/shaders/mesh.frag.spv", out_dir);
-
-        let vert_shader = ShaderModule::from_spirv_file(
-            device,
-            std::path::Path::new(&vert_path_str),
-            vk::ShaderStageFlags::VERTEX,
-            "main",
-        )?;
-        let frag_shader = ShaderModule::from_spirv_file(
-            device,
-            std::path::Path::new(&frag_path_str),
-            vk::ShaderStageFlags::FRAGMENT,
-            "main",
-        )?;
+        // Compile shaders via naga (cached after first call)
+        let (vert_spirv, frag_spirv) = get_or_compile_mesh_shaders()?;
+        let vert_shader =
+            ShaderModule::from_spirv(device, vert_spirv, vk::ShaderStageFlags::VERTEX, "main")?;
+        let frag_shader =
+            ShaderModule::from_spirv(device, frag_spirv, vk::ShaderStageFlags::FRAGMENT, "main")?;
 
         // Create descriptor set layout for camera uniform buffer
         let ubo_binding = vk::DescriptorSetLayoutBinding::default()

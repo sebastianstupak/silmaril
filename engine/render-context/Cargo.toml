@@ -20,6 +20,7 @@ tracing = "0.1"
 bytemuck = "1.14"
 smallvec = "1.13"
 lazy_static = "1.5"
+naga = { version = "24", features = ["glsl-in", "spv-out"] }
 winit = "0.30"
 engine-core = { path = "../core" }
 engine-macros = { path = "../macros" }
