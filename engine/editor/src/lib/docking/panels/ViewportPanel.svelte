@@ -622,7 +622,7 @@
                 aria-label={tool.label}
                 onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
               >
-                <tool.Icon width={12} height={12} />
+                <tool.Icon width={14} height={14} />
               </button>
             {/snippet}
           </Tooltip.Trigger>
@@ -651,7 +651,7 @@
                 viewportSetGridVisible(viewportId, gridVisible);
               }}
             >
-              <Grid2X2 width={12} height={12} />
+              <Grid2X2 width={14} height={14} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -668,7 +668,7 @@
               aria-label="Snap to grid"
               onclick={(e: MouseEvent) => { e.stopPropagation(); snapToGrid = !snapToGrid; }}
             >
-              <Magnet width={12} height={12} />
+              <Magnet width={14} height={14} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -691,9 +691,9 @@
               onclick={(e: MouseEvent) => { e.stopPropagation(); toggleProjection(); }}
             >
               {#if projection === 'ortho'}
-                <ScanLine width={12} height={12} />
+                <ScanLine width={14} height={14} />
               {:else}
-                <Video width={12} height={12} />
+                <Video width={14} height={14} />
               {/if}
             </button>
           {/snippet}
@@ -717,7 +717,7 @@
               aria-label="Add entity"
               onclick={(e: MouseEvent) => { e.stopPropagation(); createEntity(); }}
             >
-              <CirclePlus width={12} height={12} />
+              <CirclePlus width={14} height={14} />
             </button>
           {/snippet}
         </Tooltip.Trigger>
@@ -920,55 +920,69 @@
 
   .toolbar-separator {
     width: 1px;
-    height: 16px;
-    background: rgba(255, 255, 255, 0.1);
-    margin: 0 5px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.12);
+    margin: 0 3px;
+    flex-shrink: 0;
   }
 
   .tool-btn {
     background: none;
     border: 1px solid transparent;
     border-radius: 4px;
-    color: #666;
+    color: rgba(204, 204, 204, 0.55);
     padding: 0;
     cursor: pointer;
     line-height: 1;
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: color 80ms ease, background 80ms ease, border-color 80ms ease;
   }
 
   .tool-btn:hover {
-    color: #ccc;
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
+    color: rgba(204, 204, 204, 0.9);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: transparent;
+  }
+
+  .tool-btn:active {
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .tool-btn.active {
     color: #61afef;
-    border-color: rgba(97, 175, 239, 0.4);
-    background: rgba(97, 175, 239, 0.12);
+    background: rgba(97, 175, 239, 0.14);
+    border-color: rgba(97, 175, 239, 0.35);
+  }
+
+  .tool-btn.active:hover {
+    background: rgba(97, 175, 239, 0.2);
+    border-color: rgba(97, 175, 239, 0.5);
   }
 
   :global(.tooltip-content) {
-    background: rgba(20, 20, 20, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #ccc;
+    background: rgba(28, 28, 28, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    color: #d4d4d4;
     font-size: 11px;
-    padding: 4px 8px;
+    line-height: 1.4;
+    padding: 3px 7px;
     pointer-events: none;
     white-space: nowrap;
     z-index: 9999;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   }
 
   :global(.tooltip-shortcut) {
     color: #888;
-    margin-left: 4px;
+    margin-left: 5px;
     font-family: monospace;
+    font-size: 10px;
   }
 
   /* Axis gizmo */
