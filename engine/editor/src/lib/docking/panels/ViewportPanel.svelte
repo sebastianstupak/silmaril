@@ -19,6 +19,8 @@
     gizmoHitTest,
     gizmoDrag,
     gizmoDragEnd,
+    gizmoHoverTest,
+    setHoveredGizmoAxis,
     setGizmoMode,
   } from '$lib/api';
   import type { SceneTool, ProjectionMode } from '$lib/scene/state';
@@ -448,6 +450,16 @@
         break;
       }
     }
+
+    // Hover test — update hovered axis for visual highlight (non-drag only)
+    if (!isDraggingGizmo && !isDragging && isTauri) {
+      try {
+        const hit = await gizmoHoverTest(viewportId, event.clientX, event.clientY);
+        await setHoveredGizmoAxis(hit ?? null);
+      } catch {
+        // Non-critical — hover state may be stale for one frame; silently ignore errors.
+      }
+    }
   }
 
   async function handleMouseUp() {
@@ -584,7 +596,13 @@
   onmousemove={handleMouseMove}
   onmouseup={handleMouseUp}
   onmouseenter={() => setViewportFocused(true)}
-  onmouseleave={() => { handleMouseUp(); setViewportFocused(false); }}
+  onmouseleave={async () => {
+    handleMouseUp();
+    setViewportFocused(false);
+    if (isTauri) {
+      try { await setHoveredGizmoAxis(null); } catch {}
+    }
+  }}
   oncontextmenu={handleContextMenu}
   onkeydown={handleKeyDown}
 >

@@ -361,6 +361,26 @@ export async function setGizmoMode(mode: 'move' | 'rotate' | 'scale'): Promise<v
   return tauriInvoke<void>('set_gizmo_mode', { mode });
 }
 
+/** Test whether the mouse is hovering over a gizmo axis handle.
+ *  Returns the hit axis string (e.g. "x", "y", "z") or null if no handle is
+ *  under the cursor.  Does NOT require a selected entity — the Rust side reads
+ *  the current selection from viewport state. */
+export async function gizmoHoverTest(
+  viewportId: string,
+  screenX: number,
+  screenY: number,
+): Promise<string | null> {
+  if (!isTauri) return null;
+  return tauriInvoke<string | null>('gizmo_hover_test', { viewportId, screenX, screenY });
+}
+
+/** Push the currently-hovered gizmo axis to the Rust renderer so it can
+ *  brighten the matching handle.  Pass null to clear the hover highlight. */
+export async function setHoveredGizmoAxis(axis: string | null): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('set_hovered_gizmo_axis', { axis });
+}
+
 // ---------------------------------------------------------------------------
 // Mesh assignment IPC
 // ---------------------------------------------------------------------------
