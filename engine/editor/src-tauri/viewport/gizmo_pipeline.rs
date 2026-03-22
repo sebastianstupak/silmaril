@@ -1,7 +1,6 @@
 //! GizmoPipeline — procedural 3D gizmos rendered as line segments.
 //!
-//! Draws axis-crosshairs on every entity with a Transform, and
-//! move/rotate/scale handles on the selected entity.
+//! Draws axis-crosshairs and move/rotate/scale handles on the selected entity.
 //!
 //! All geometry uses LINE_LIST topology so a single pipeline serves every
 //! gizmo type.  Geometry is generated once at pipeline creation and stored
@@ -434,50 +433,6 @@ mod imp {
                 let dist = (camera_pos - origin).length().max(0.1);
                 let scale = dist * 0.15;
 
-                // ── Crosshair (every entity) ──────────────────────────────
-                // X axis — red
-                self.draw_buf(
-                    cmd,
-                    device,
-                    &self.crosshair_buf,
-                    // Only the X line is verts [0..2]; we draw all 6 in
-                    // three separate draw calls, one per axis color.
-                    // But for simplicity we draw the full crosshair in one
-                    // call (the vertex buffer is: X0,X1,Y0,Y1,Z0,Z1).
-                    // We use firstVertex to select which pair to draw:
-                    // X=0, Y=2, Z=4.
-                    view_proj,
-                    origin.into(),
-                    [1.0, 0.2, 0.2, 0.9],
-                    scale,
-                    0,
-                    2,
-                );
-                // Y axis — green
-                self.draw_buf(
-                    cmd,
-                    device,
-                    &self.crosshair_buf,
-                    view_proj,
-                    origin.into(),
-                    [0.2, 1.0, 0.2, 0.9],
-                    scale,
-                    2,
-                    2,
-                );
-                // Z axis — blue
-                self.draw_buf(
-                    cmd,
-                    device,
-                    &self.crosshair_buf,
-                    view_proj,
-                    origin.into(),
-                    [0.2, 0.4, 1.0, 0.9],
-                    scale,
-                    4,
-                    2,
-                );
-
                 // ── Mode handles (selected entity only) ──────────────────
                 let is_selected = selected_entity_id.map_or(false, |id| {
                     if id > u32::MAX as u64 {
@@ -486,6 +441,47 @@ mod imp {
                     entity.id() == id as u32
                 });
                 if is_selected {
+                    // ── Crosshair (selected entity only) ─────────────────
+                    // X axis — red
+                    // Vertex buffer layout: X0,X1,Y0,Y1,Z0,Z1 (2 verts each).
+                    // We use firstVertex to select which pair to draw:
+                    // X=0, Y=2, Z=4.
+                    self.draw_buf(
+                        cmd,
+                        device,
+                        &self.crosshair_buf,
+                        view_proj,
+                        origin.into(),
+                        [1.0, 0.2, 0.2, 0.9],
+                        scale,
+                        0,
+                        2,
+                    );
+                    // Y axis — green
+                    self.draw_buf(
+                        cmd,
+                        device,
+                        &self.crosshair_buf,
+                        view_proj,
+                        origin.into(),
+                        [0.2, 1.0, 0.2, 0.9],
+                        scale,
+                        2,
+                        2,
+                    );
+                    // Z axis — blue
+                    self.draw_buf(
+                        cmd,
+                        device,
+                        &self.crosshair_buf,
+                        view_proj,
+                        origin.into(),
+                        [0.2, 0.4, 1.0, 0.9],
+                        scale,
+                        4,
+                        2,
+                    );
+
                     match mode {
                         GizmoMode::Move => {
                             self.draw_buf(cmd, device, &self.move_x_buf, view_proj, origin.into(), [1.0, 0.2, 0.2, 1.0], scale, 0, self.move_x_count);
