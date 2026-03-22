@@ -867,12 +867,10 @@ void main() {
         renderer: engine_renderer::Renderer,
         grid_pipeline: GridPipeline,
         gizmo_pipeline: crate::viewport::gizmo_pipeline::GizmoPipeline,
+        gizmo_solid_pipeline: crate::viewport::gizmo_pipeline::GizmoSolidPipeline,
         width: u32,
         height: u32,
         needs_recreate: bool,
-        /// Retained so GizmoSolidPipeline (Task 6) can share it without re-cloning.
-        #[allow(dead_code)]
-        hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
     }
 
     impl ViewportRenderer {
@@ -898,8 +896,14 @@ void main() {
                 std::sync::Arc::clone(&hovered_gizmo_axis),
             )?;
 
+            let gizmo_solid_pipeline = crate::viewport::gizmo_pipeline::GizmoSolidPipeline::new(
+                renderer.context(),
+                renderer.render_pass(),
+                hovered_gizmo_axis,
+            )?;
+
             tracing::info!(width, height, "ViewportRenderer initialised");
-            Ok(Self { renderer, grid_pipeline, gizmo_pipeline, width, height, needs_recreate: false, hovered_gizmo_axis })
+            Ok(Self { renderer, grid_pipeline, gizmo_pipeline, gizmo_solid_pipeline, width, height, needs_recreate: false })
         }
 
         fn notify_resize(&mut self, w: u32, h: u32) {
@@ -1001,6 +1005,15 @@ void main() {
                         let camera_pos = camera.eye();
 
                         self.gizmo_pipeline.record(
+                            cmd,
+                            &world_guard,
+                            selected_entity_id,
+                            gizmo_mode,
+                            view_proj,
+                            camera_pos,
+                        );
+
+                        self.gizmo_solid_pipeline.record(
                             cmd,
                             &world_guard,
                             selected_entity_id,
