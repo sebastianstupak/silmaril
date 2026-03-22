@@ -169,7 +169,7 @@ impl Renderer {
         }
 
         // 10. Create mesh pipeline
-        let mesh_pipeline = GraphicsPipeline::new_mesh_pipeline(
+        let mesh_pipeline = GraphicsPipeline::new_mesh_pipeline_with_descriptors(
             &context.device,
             &render_pass,
             swapchain.extent,
@@ -352,7 +352,7 @@ impl Renderer {
         }
 
         // 8. Create mesh pipeline
-        let mesh_pipeline = GraphicsPipeline::new_mesh_pipeline(
+        let mesh_pipeline = GraphicsPipeline::new_mesh_pipeline_with_descriptors(
             &context.device,
             &render_pass,
             swapchain.extent,
