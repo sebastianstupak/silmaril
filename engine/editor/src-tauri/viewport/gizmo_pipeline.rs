@@ -136,41 +136,19 @@ mod imp {
         ]
     }
 
-    /// Move-arrow: shaft from origin to 0.8 along axis, then cone outline
-    /// from 0.8 to 1.0 using 8-spoke lines (LINE_LIST pairs).
+    /// Move-arrow: shaft from origin to 0.8 along axis (LINE_LIST).
+    ///
+    /// The cone tip is rendered separately as solid geometry via
+    /// `generate_move_cone_solid_vertices`.
     pub fn generate_move_arrow_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
         let dir = axis_dir(axis);
-        let perp1 = perpendicular(dir);
-        let perp2 = dir.cross(perp1);
-
         let shaft_tip = dir * 0.8;
-        let arrow_tip = dir * 1.0;
-        const CONE_R: f32 = 0.06;
-        const SPOKES: usize = 8;
 
-        let mut verts = Vec::new();
-
-        // Shaft: origin → shaft_tip
-        verts.push(GizmoVertex { pos: [0.0, 0.0, 0.0] });
-        verts.push(GizmoVertex { pos: shaft_tip.into() });
-
-        // Cone spokes: shaft_tip ring → arrow_tip
-        for i in 0..SPOKES {
-            let angle = (i as f32) * std::f32::consts::TAU / (SPOKES as f32);
-            let (s, c) = angle.sin_cos();
-            let rim = shaft_tip + perp1 * (c * CONE_R) + perp2 * (s * CONE_R);
-            // spoke from rim to tip
-            verts.push(GizmoVertex { pos: rim.into() });
-            verts.push(GizmoVertex { pos: arrow_tip.into() });
-            // ring segment connecting adjacent rim points
-            let next_angle = ((i + 1) as f32) * std::f32::consts::TAU / (SPOKES as f32);
-            let (ns, nc) = next_angle.sin_cos();
-            let next_rim = shaft_tip + perp1 * (nc * CONE_R) + perp2 * (ns * CONE_R);
-            verts.push(GizmoVertex { pos: rim.into() });
-            verts.push(GizmoVertex { pos: next_rim.into() });
-        }
-
-        verts
+        // Shaft only: origin → shaft_tip (wireframe cone tip removed)
+        vec![
+            GizmoVertex { pos: [0.0, 0.0, 0.0] },
+            GizmoVertex { pos: shaft_tip.into() },
+        ]
     }
 
     /// Rotation ring: a circle of N segments in the plane perpendicular to the axis.
@@ -193,47 +171,109 @@ mod imp {
         verts
     }
 
-    /// Scale handle: shaft + small box outline at the tip.
-    pub fn generate_scale_handle_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
+    /// Solid cone for move-arrow tip: 6-sided cone, base at 0.8, tip at 1.0.
+    ///
+    /// Produces 36 vertices (12 triangles × 3 verts each):
+    /// - 6 side triangles: (base_i, base_{i+1}, tip)
+    /// - 6 cap triangles: (base_center, base_i, base_{i+1})
+    pub fn generate_move_cone_solid_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
         let dir = axis_dir(axis);
         let perp1 = perpendicular(dir);
         let perp2 = dir.cross(perp1);
 
-        let shaft_tip = dir * 0.85;
-        const HALF: f32 = 0.06;
+        const SIDES: usize = 6;
+        const CONE_R: f32 = 0.06;
+        let base_center = dir * 0.8;
+        let tip = dir * 1.0;
 
-        let mut verts = Vec::new();
+        let mut ring = Vec::with_capacity(SIDES);
+        for i in 0..SIDES {
+            let angle = (i as f32) * std::f32::consts::TAU / (SIDES as f32);
+            let (s, c) = angle.sin_cos();
+            ring.push(base_center + perp1 * (c * CONE_R) + perp2 * (s * CONE_R));
+        }
 
-        // Shaft
-        verts.push(GizmoVertex { pos: [0.0, 0.0, 0.0] });
-        verts.push(GizmoVertex { pos: shaft_tip.into() });
+        let mut verts = Vec::with_capacity(36);
 
-        // Box: 8 corners
-        let corners: Vec<glam::Vec3> = [[-1.0f32, -1.0, -1.0], [1.0, -1.0, -1.0],
-                        [1.0, 1.0, -1.0], [-1.0, 1.0, -1.0],
-                        [-1.0, -1.0, 1.0], [1.0, -1.0, 1.0],
-                        [1.0, 1.0, 1.0], [-1.0, 1.0, 1.0]]
-            .iter()
-            .map(|o| {
-                shaft_tip
-                    + dir * (o[2] * HALF)
-                    + perp1 * (o[0] * HALF)
-                    + perp2 * (o[1] * HALF)
-            })
-            .collect();
-
-        // 12 edges of the cube as LINE_LIST pairs
-        let edges = [
-            (0, 1), (1, 2), (2, 3), (3, 0), // bottom face
-            (4, 5), (5, 6), (6, 7), (7, 4), // top face
-            (0, 4), (1, 5), (2, 6), (3, 7), // vertical edges
-        ];
-        for (a, b) in edges {
-            verts.push(GizmoVertex { pos: corners[a].into() });
-            verts.push(GizmoVertex { pos: corners[b].into() });
+        for i in 0..SIDES {
+            let next = (i + 1) % SIDES;
+            // Side triangle: base_i → base_{i+1} → tip
+            verts.push(GizmoVertex { pos: ring[i].into() });
+            verts.push(GizmoVertex { pos: ring[next].into() });
+            verts.push(GizmoVertex { pos: tip.into() });
+            // Cap triangle: base_center → base_i → base_{i+1}  (facing away from tip)
+            verts.push(GizmoVertex { pos: base_center.into() });
+            verts.push(GizmoVertex { pos: ring[i].into() });
+            verts.push(GizmoVertex { pos: ring[next].into() });
         }
 
         verts
+    }
+
+    /// Solid cube for scale-handle tip: axis-aligned cube centred at 0.85 along axis, half-size 0.06.
+    ///
+    /// Produces 36 vertices (6 faces × 2 triangles × 3 verts each).
+    pub fn generate_scale_cube_solid_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
+        let dir = axis_dir(axis);
+        let perp1 = perpendicular(dir);
+        let perp2 = dir.cross(perp1);
+
+        let center = dir * 0.85;
+        const HALF: f32 = 0.06;
+
+        // 8 corners: sign combinations of (perp1, perp2, dir)
+        let c = |s1: f32, s2: f32, sd: f32| -> [f32; 3] {
+            (center + perp1 * (s1 * HALF) + perp2 * (s2 * HALF) + dir * (sd * HALF)).into()
+        };
+
+        // Named corners: (perp1, perp2, dir) signs
+        let lbb = c(-1.0, -1.0, -1.0);
+        let rbb = c( 1.0, -1.0, -1.0);
+        let rtb = c( 1.0,  1.0, -1.0);
+        let ltb = c(-1.0,  1.0, -1.0);
+        let lbf = c(-1.0, -1.0,  1.0);
+        let rbf = c( 1.0, -1.0,  1.0);
+        let rtf = c( 1.0,  1.0,  1.0);
+        let ltf = c(-1.0,  1.0,  1.0);
+
+        // Each face: 2 CCW triangles (from outside)
+        let faces: [[[f32; 3]; 6]; 6] = [
+            // -dir face (back)
+            [lbb, ltb, rtb, lbb, rtb, rbb],
+            // +dir face (front)
+            [lbf, rbf, rtf, lbf, rtf, ltf],
+            // -perp1 face (left)
+            [lbb, lbf, ltf, lbb, ltf, ltb],
+            // +perp1 face (right)
+            [rbb, rtb, rtf, rbb, rtf, rbf],
+            // -perp2 face (bottom)
+            [lbb, rbb, rbf, lbb, rbf, lbf],
+            // +perp2 face (top)
+            [ltb, ltf, rtf, ltb, rtf, rtb],
+        ];
+
+        let mut verts = Vec::with_capacity(36);
+        for face in &faces {
+            for pos in face {
+                verts.push(GizmoVertex { pos: *pos });
+            }
+        }
+        verts
+    }
+
+    /// Scale handle: shaft from origin to 0.85 along axis (LINE_LIST).
+    ///
+    /// The cube tip is rendered separately as solid geometry via
+    /// `generate_scale_cube_solid_vertices`.
+    pub fn generate_scale_handle_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
+        let dir = axis_dir(axis);
+        let shaft_tip = dir * 0.85;
+
+        // Shaft only: origin → shaft_tip (wireframe cube tip removed)
+        vec![
+            GizmoVertex { pos: [0.0, 0.0, 0.0] },
+            GizmoVertex { pos: shaft_tip.into() },
+        ]
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -802,6 +842,64 @@ mod imp {
             let z = axis_color(GizmoAxis::Z, false);
             assert_eq!(z[1], 0.4, "Z axis G channel must be 0.4");
         }
+
+        #[test]
+        fn test_cone_vertex_count() {
+            let verts = generate_move_cone_solid_vertices(GizmoAxis::X);
+            assert_eq!(
+                verts.len(),
+                36,
+                "6-sided cone: 6 side triangles + 6 cap triangles = 12 triangles = 36 verts"
+            );
+        }
+
+        #[test]
+        fn test_cone_vertex_count_all_axes() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                let verts = generate_move_cone_solid_vertices(axis);
+                assert_eq!(
+                    verts.len(),
+                    36,
+                    "6-sided cone must have 36 verts for {axis:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn test_cube_vertex_count() {
+            let verts = generate_scale_cube_solid_vertices(GizmoAxis::X);
+            assert_eq!(
+                verts.len(),
+                36,
+                "6 faces * 2 triangles * 3 verts = 36 verts"
+            );
+        }
+
+        #[test]
+        fn test_cube_vertex_count_all_axes() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                let verts = generate_scale_cube_solid_vertices(axis);
+                assert_eq!(
+                    verts.len(),
+                    36,
+                    "cube must have 36 verts for {axis:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn test_move_arrow_shaft_only() {
+            // After stripping wireframe cone, shaft is exactly 2 vertices
+            let verts = generate_move_arrow_vertices(GizmoAxis::X);
+            assert_eq!(verts.len(), 2, "move arrow shaft must be exactly 2 verts (1 line segment)");
+        }
+
+        #[test]
+        fn test_scale_handle_shaft_only() {
+            // After stripping wireframe cube, shaft is exactly 2 vertices
+            let verts = generate_scale_handle_vertices(GizmoAxis::X);
+            assert_eq!(verts.len(), 2, "scale handle shaft must be exactly 2 verts (1 line segment)");
+        }
     }
 } // mod imp
 
@@ -813,7 +911,8 @@ mod imp {
 #[cfg(windows)]
 pub use imp::{
     generate_crosshair_vertices, generate_move_arrow_vertices,
-    generate_rotate_ring_vertices, generate_scale_handle_vertices, GizmoAxis,
+    generate_move_cone_solid_vertices, generate_rotate_ring_vertices,
+    generate_scale_cube_solid_vertices, generate_scale_handle_vertices, GizmoAxis,
     GizmoMode, GizmoPipeline, GizmoVertex,
 };
 
@@ -897,28 +996,40 @@ mod portable {
 
     pub fn generate_move_arrow_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
         let dir = axis_dir(axis);
+        let shaft_tip = dir * 0.8;
+        // Shaft only: origin → shaft_tip (wireframe cone tip removed)
+        vec![
+            GizmoVertex { pos: [0.0, 0.0, 0.0] },
+            GizmoVertex { pos: shaft_tip.into() },
+        ]
+    }
+
+    pub fn generate_move_cone_solid_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
+        let dir = axis_dir(axis);
         let perp1 = perpendicular(dir);
         let perp2 = dir.cross(perp1);
-        let shaft_tip = dir * 0.8;
-        let arrow_tip = dir * 1.0;
+
+        const SIDES: usize = 6;
         const CONE_R: f32 = 0.06;
-        const SPOKES: usize = 8;
-        let mut verts = Vec::new();
-        verts.push(GizmoVertex { pos: [0.0, 0.0, 0.0] });
-        verts.push(GizmoVertex { pos: shaft_tip.into() });
-        for i in 0..SPOKES {
-            let angle = (i as f32) * std::f32::consts::TAU / (SPOKES as f32);
+        let base_center = dir * 0.8;
+        let tip = dir * 1.0;
+
+        let mut ring = Vec::with_capacity(SIDES);
+        for i in 0..SIDES {
+            let angle = (i as f32) * std::f32::consts::TAU / (SIDES as f32);
             let (s, c) = angle.sin_cos();
-            let rim = shaft_tip + perp1 * (c * CONE_R) + perp2 * (s * CONE_R);
-            verts.push(GizmoVertex { pos: rim.into() });
-            verts.push(GizmoVertex { pos: arrow_tip.into() });
-            let next_angle =
-                ((i + 1) as f32) * std::f32::consts::TAU / (SPOKES as f32);
-            let (ns, nc) = next_angle.sin_cos();
-            let next_rim =
-                shaft_tip + perp1 * (nc * CONE_R) + perp2 * (ns * CONE_R);
-            verts.push(GizmoVertex { pos: rim.into() });
-            verts.push(GizmoVertex { pos: next_rim.into() });
+            ring.push(base_center + perp1 * (c * CONE_R) + perp2 * (s * CONE_R));
+        }
+
+        let mut verts = Vec::with_capacity(36);
+        for i in 0..SIDES {
+            let next = (i + 1) % SIDES;
+            verts.push(GizmoVertex { pos: ring[i].into() });
+            verts.push(GizmoVertex { pos: ring[next].into() });
+            verts.push(GizmoVertex { pos: tip.into() });
+            verts.push(GizmoVertex { pos: base_center.into() });
+            verts.push(GizmoVertex { pos: ring[i].into() });
+            verts.push(GizmoVertex { pos: ring[next].into() });
         }
         verts
     }
@@ -943,33 +1054,49 @@ mod portable {
 
     pub fn generate_scale_handle_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
         let dir = axis_dir(axis);
+        let shaft_tip = dir * 0.85;
+        // Shaft only: origin → shaft_tip (wireframe cube tip removed)
+        vec![
+            GizmoVertex { pos: [0.0, 0.0, 0.0] },
+            GizmoVertex { pos: shaft_tip.into() },
+        ]
+    }
+
+    pub fn generate_scale_cube_solid_vertices(axis: GizmoAxis) -> Vec<GizmoVertex> {
+        let dir = axis_dir(axis);
         let perp1 = perpendicular(dir);
         let perp2 = dir.cross(perp1);
-        let shaft_tip = dir * 0.85;
+
+        let center = dir * 0.85;
         const HALF: f32 = 0.06;
-        let mut verts = Vec::new();
-        verts.push(GizmoVertex { pos: [0.0, 0.0, 0.0] });
-        verts.push(GizmoVertex { pos: shaft_tip.into() });
-        let corners: Vec<Vec3> = [[-1.0f32, -1.0, -1.0], [1.0, -1.0, -1.0],
-                        [1.0, 1.0, -1.0], [-1.0, 1.0, -1.0],
-                        [-1.0, -1.0, 1.0], [1.0, -1.0, 1.0],
-                        [1.0, 1.0, 1.0], [-1.0, 1.0, 1.0]]
-            .iter()
-            .map(|o| {
-                shaft_tip
-                    + dir * (o[2] * HALF)
-                    + perp1 * (o[0] * HALF)
-                    + perp2 * (o[1] * HALF)
-            })
-            .collect();
-        let edges = [
-            (0, 1), (1, 2), (2, 3), (3, 0),
-            (4, 5), (5, 6), (6, 7), (7, 4),
-            (0, 4), (1, 5), (2, 6), (3, 7),
+
+        let c = |s1: f32, s2: f32, sd: f32| -> [f32; 3] {
+            (center + perp1 * (s1 * HALF) + perp2 * (s2 * HALF) + dir * (sd * HALF)).into()
+        };
+
+        let lbb = c(-1.0, -1.0, -1.0);
+        let rbb = c( 1.0, -1.0, -1.0);
+        let rtb = c( 1.0,  1.0, -1.0);
+        let ltb = c(-1.0,  1.0, -1.0);
+        let lbf = c(-1.0, -1.0,  1.0);
+        let rbf = c( 1.0, -1.0,  1.0);
+        let rtf = c( 1.0,  1.0,  1.0);
+        let ltf = c(-1.0,  1.0,  1.0);
+
+        let faces: [[[f32; 3]; 6]; 6] = [
+            [lbb, ltb, rtb, lbb, rtb, rbb],
+            [lbf, rbf, rtf, lbf, rtf, ltf],
+            [lbb, lbf, ltf, lbb, ltf, ltb],
+            [rbb, rtb, rtf, rbb, rtf, rbf],
+            [lbb, rbb, rbf, lbb, rbf, lbf],
+            [ltb, ltf, rtf, ltb, rtf, rtb],
         ];
-        for (a, b) in edges {
-            verts.push(GizmoVertex { pos: corners[a].into() });
-            verts.push(GizmoVertex { pos: corners[b].into() });
+
+        let mut verts = Vec::with_capacity(36);
+        for face in &faces {
+            for pos in face {
+                verts.push(GizmoVertex { pos: *pos });
+            }
         }
         verts
     }
@@ -1020,6 +1147,50 @@ mod portable {
         }
 
         #[test]
+        fn test_cone_vertex_count() {
+            let verts = generate_move_cone_solid_vertices(GizmoAxis::X);
+            assert_eq!(
+                verts.len(),
+                36,
+                "6-sided cone: 6 side triangles + 6 cap triangles = 12 triangles = 36 verts"
+            );
+        }
+
+        #[test]
+        fn test_cone_vertex_count_all_axes() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                let verts = generate_move_cone_solid_vertices(axis);
+                assert_eq!(verts.len(), 36, "6-sided cone must have 36 verts for {axis:?}");
+            }
+        }
+
+        #[test]
+        fn test_cube_vertex_count() {
+            let verts = generate_scale_cube_solid_vertices(GizmoAxis::X);
+            assert_eq!(verts.len(), 36, "6 faces * 2 triangles * 3 verts = 36 verts");
+        }
+
+        #[test]
+        fn test_cube_vertex_count_all_axes() {
+            for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
+                let verts = generate_scale_cube_solid_vertices(axis);
+                assert_eq!(verts.len(), 36, "cube must have 36 verts for {axis:?}");
+            }
+        }
+
+        #[test]
+        fn test_move_arrow_shaft_only() {
+            let verts = generate_move_arrow_vertices(GizmoAxis::X);
+            assert_eq!(verts.len(), 2, "move arrow shaft must be exactly 2 verts");
+        }
+
+        #[test]
+        fn test_scale_handle_shaft_only() {
+            let verts = generate_scale_handle_vertices(GizmoAxis::X);
+            assert_eq!(verts.len(), 2, "scale handle shaft must be exactly 2 verts");
+        }
+
+        #[test]
         fn test_axis_color_hover() {
             let normal_x = axis_color(GizmoAxis::X, false);
             let hovered_x = axis_color(GizmoAxis::X, true);
@@ -1052,6 +1223,7 @@ mod portable {
 #[cfg(not(windows))]
 pub use portable::{
     generate_crosshair_vertices, generate_move_arrow_vertices,
-    generate_rotate_ring_vertices, generate_scale_handle_vertices, GizmoAxis,
+    generate_move_cone_solid_vertices, generate_rotate_ring_vertices,
+    generate_scale_cube_solid_vertices, generate_scale_handle_vertices, GizmoAxis,
     GizmoMode, GizmoVertex,
 };
