@@ -929,28 +929,38 @@
     background: none;
     border: 1px solid transparent;
     border-radius: 4px;
-    color: #666;
+    color: rgba(204, 204, 204, 0.55);
     padding: 0;
     cursor: pointer;
     line-height: 1;
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: color 80ms ease, background 80ms ease, border-color 80ms ease;
   }
 
   .tool-btn:hover {
-    color: #ccc;
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
+    color: rgba(204, 204, 204, 0.9);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: transparent;
+  }
+
+  .tool-btn:active {
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .tool-btn.active {
     color: #61afef;
-    border-color: rgba(97, 175, 239, 0.4);
-    background: rgba(97, 175, 239, 0.12);
+    background: rgba(97, 175, 239, 0.14);
+    border-color: rgba(97, 175, 239, 0.35);
+  }
+
+  .tool-btn.active:hover {
+    background: rgba(97, 175, 239, 0.2);
+    border-color: rgba(97, 175, 239, 0.5);
   }
 
   :global(.tooltip-content) {
