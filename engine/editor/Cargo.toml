@@ -2,6 +2,7 @@
 name = "silmaril-editor"
 version = "0.1.0"
 edition = "2021"
+default-run = "silmaril-editor"
 authors = ["Silmaril Team"]
 license = "Apache-2.0"
 description = "Silmaril game engine visual editor"
