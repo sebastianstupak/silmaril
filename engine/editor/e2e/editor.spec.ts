@@ -329,4 +329,36 @@ test.describe('Silmaril Editor', () => {
 
     await page.screenshot({ path: 'e2e/screenshots/mesh-04-inspector-ready-for-mesh.png' });
   });
+
+  // ---------------------------------------------------------------------------
+  // Hierarchy double-click behaviour
+  // ---------------------------------------------------------------------------
+
+  test('rename triggers on name span dblclick', async ({ page }) => {
+    await page.goto('http://localhost:4173');
+
+    // Create an entity so the hierarchy is not empty.
+    const row = await createEntity(page);
+
+    // Double-click the entity name span specifically.
+    const nameSpan = row.locator(SEL.entityName);
+    await nameSpan.dblclick();
+
+    // The rename input should appear.
+    await expect(row.locator(SEL.renameInput)).toBeVisible();
+  });
+
+  test('dblclick row padding does not open rename', async ({ page }) => {
+    await page.goto('http://localhost:4173');
+
+    const row = await createEntity(page);
+
+    // Double-click the far left edge of the row (chevron/padding area), NOT the name.
+    const box = await row.boundingBox();
+    if (!box) throw new Error('entity row has no bounding box');
+    await page.mouse.dblclick(box.x + 4, box.y + box.height / 2);
+
+    // The rename input must NOT appear.
+    await expect(row.locator(SEL.renameInput)).not.toBeVisible();
+  });
 });
