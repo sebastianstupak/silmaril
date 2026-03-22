@@ -407,6 +407,7 @@ pub fn create_native_viewport(
     window: tauri::WebviewWindow,
     viewport_state: tauri::State<NativeViewportState>,
     world_state: tauri::State<'_, crate::state::SceneWorldState>,
+    asset_manager_state: tauri::State<'_, crate::state::AssetManagerState>,
     viewport_id: String,
     x: i32,
     y: i32,
@@ -427,7 +428,8 @@ pub fn create_native_viewport(
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
             let selected_entity_id = std::sync::Arc::clone(&viewport_state.selected_entity_id);
             let gizmo_mode = std::sync::Arc::clone(&viewport_state.gizmo_mode);
-            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone(), selected_entity_id, gizmo_mode).map_err(|e| {
+            let asset_manager = asset_manager_state.0.clone();
+            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone(), selected_entity_id, gizmo_mode, asset_manager).map_err(|e| {
                 tracing::error!(error = %e, "NativeViewport::new failed");
                 e
             })?;
