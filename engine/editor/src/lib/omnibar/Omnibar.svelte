@@ -14,6 +14,12 @@
   import { addRecentItem } from '$lib/stores/recent-items';
   import { getAssets, subscribeAssets, clearAssets, setAssets, type AssetEntry } from '$lib/stores/assets';
 
+  const PREFIX_HINTS = [
+    { prefix: '>',  label: 'Commands',       description: 'Run editor commands' },
+    { prefix: '@',  label: 'Scene entities', description: 'Find entities in the scene' },
+    { prefix: '#',  label: 'Assets',         description: 'Find project assets' },
+  ] as const;
+
   interface Props {
     projectPath?: string | null;
     open?: boolean;
@@ -28,6 +34,24 @@
   let results: OmnibarResult[] = $state([]);
   let selectedIndex = $state(0);
   let inputEl: HTMLInputElement | undefined = $state(undefined);
+
+  const showGroups = $derived(
+    new Set(results.map(r => r.group)).size > 1
+  );
+
+  const groupedResults = $derived((() => {
+    const groups: { label: string; items: typeof results }[] = [];
+    const seen = new Map<string, typeof results>();
+    for (const r of results) {
+      const key = r.group ?? '';
+      if (!seen.has(key)) {
+        seen.set(key, []);
+        groups.push({ label: key, items: seen.get(key)! });
+      }
+      seen.get(key)!.push(r);
+    }
+    return groups;
+  })());
 
   // Cached assets — kept in sync with the assets store
   let assets: { path: string; assetType: string }[] = $state(getAssets());
@@ -193,24 +217,64 @@
         <kbd class="omnibar-hint">Esc</kbd>
       </div>
 
-      {#if results.length > 0}
+      {#if query.trim() === ''}
+        <!-- Prefix hint list (shown when input is empty) -->
         <ul class="omnibar-results" role="listbox">
-          {#each results as result, i}
+          {#each PREFIX_HINTS as hint}
             <li
-              class="omnibar-result"
-              class:selected={i === selectedIndex}
+              class="omnibar-result omnibar-prefix-hint"
               role="option"
-              aria-selected={i === selectedIndex}
-              onmouseenter={() => selectedIndex = i}
-              onclick={() => execute(result)}
+              onclick={() => { query = hint.prefix; inputEl?.focus(); }}
             >
-              <span class="result-label">{resultLabel(result)}</span>
-              <span class="result-meta">{resultMeta(result)}</span>
-              {#if resultKeybind(result)}
-                <kbd class="result-keybind">{resultKeybind(result)}</kbd>
-              {/if}
+              <span class="hint-prefix">{hint.prefix}</span>
+              <span class="result-label">{hint.label}</span>
+              <span class="result-meta">{hint.description}</span>
             </li>
           {/each}
+        </ul>
+      {:else if results.length > 0}
+        <ul class="omnibar-results" role="listbox">
+          {#if showGroups}
+            {#each groupedResults as group}
+              {#if group.label}
+                <li class="omnibar-section-header" role="presentation">{group.label}</li>
+              {/if}
+              {#each group.items as result}
+                {@const i = results.indexOf(result)}
+                <li
+                  class="omnibar-result"
+                  class:selected={i === selectedIndex}
+                  role="option"
+                  aria-selected={i === selectedIndex}
+                  onmouseenter={() => selectedIndex = i}
+                  onclick={() => execute(result)}
+                >
+                  <span class="result-label">{resultLabel(result)}</span>
+                  <span class="result-meta">{resultMeta(result)}</span>
+                  {#if resultKeybind(result)}
+                    <kbd class="result-keybind">{resultKeybind(result)}</kbd>
+                  {/if}
+                </li>
+              {/each}
+            {/each}
+          {:else}
+            {#each results as result, i}
+              <li
+                class="omnibar-result"
+                class:selected={i === selectedIndex}
+                role="option"
+                aria-selected={i === selectedIndex}
+                onmouseenter={() => selectedIndex = i}
+                onclick={() => execute(result)}
+              >
+                <span class="result-label">{resultLabel(result)}</span>
+                <span class="result-meta">{resultMeta(result)}</span>
+                {#if resultKeybind(result)}
+                  <kbd class="result-keybind">{resultKeybind(result)}</kbd>
+                {/if}
+              </li>
+            {/each}
+          {/if}
         </ul>
       {/if}
     </div>
@@ -266,11 +330,11 @@
   }
 
   .omnibar-active {
-    position: absolute;
-    top: 0;
+    position: fixed;
+    top: calc(var(--titlebar-height, 32px) + 2px);
     left: 50%;
     transform: translateX(-50%);
-    width: 360px;
+    width: clamp(360px, 40vw, 580px);
     z-index: 10000;
     background: var(--color-bgPanel, #1e1e2e);
     border: 1px solid var(--color-accent, #89b4fa);
@@ -356,5 +420,34 @@
     position: fixed;
     inset: 0;
     z-index: 9999;
+  }
+
+  .omnibar-prefix-hint {
+    opacity: 0.75;
+  }
+
+  .omnibar-prefix-hint:hover {
+    opacity: 1;
+  }
+
+  .hint-prefix {
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-accent, #89b4fa);
+    min-width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .omnibar-section-header {
+    padding: 4px 10px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-textDim, #555);
+    user-select: none;
+    pointer-events: none;
   }
 </style>

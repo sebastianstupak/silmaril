@@ -48,23 +48,23 @@ export function buildResults(
 
   if (!prefix || prefix === 'command') {
     for (const cmd of filterCommandResults(commands, q)) {
-      results.push({ kind: 'command', command: cmd });
+      results.push({ kind: 'command', command: cmd, group: 'Commands' });
     }
   }
   if (!prefix || prefix === 'entity') {
     for (const e of filterEntityResults(entities, q)) {
-      results.push({ kind: 'entity', ...e });
+      results.push({ kind: 'entity', ...e, group: 'Entities' });
     }
   }
   if (!prefix || prefix === 'asset') {
     for (const a of filterAssetResults(assets, q)) {
-      results.push({ kind: 'asset', ...a });
+      results.push({ kind: 'asset', ...a, group: 'Assets' });
     }
   }
   if (!prefix && !q) {
     // Empty input: show recent
     for (const r of recent) {
-      results.push({ kind: 'recent', ...r });
+      results.push({ kind: 'recent', ...r, group: 'Recent' });
     }
   }
 
