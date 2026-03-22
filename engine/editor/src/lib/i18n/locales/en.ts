@@ -182,7 +182,10 @@ const en = {
   'dialog.open_project_title': 'Open Silmaril Project',
 
   // Layout
-  'layout.default': 'Default',
+  'layout.default': 'Scene',
+  'layout.scene': 'Scene',
+  'layout.code': 'Code',
+  'layout.perf': 'Perf',
   'layout.tall': 'Tall',
   'layout.wide': 'Wide',
   'layout.reset': 'Reset Layout',

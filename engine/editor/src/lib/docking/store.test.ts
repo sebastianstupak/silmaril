@@ -373,17 +373,17 @@ describe('layout lifecycle — integration', () => {
     expect(JSON.stringify(current)).toEqual(JSON.stringify(slot.layout));
   });
 
-  it('keybind ctrl+1 resolves to the Edit slot', () => {
+  it('keybind ctrl+1 resolves to the Scene slot', () => {
     const slots = loadSavedLayouts();
     const matched = slots.find(s => s.keybind === 'ctrl+1');
-    expect(matched?.name).toBe('Edit');
+    expect(matched?.name).toBe('Scene');
   });
 
   it('keybind follows the slot after rename (not position)', () => {
     let slots = loadSavedLayouts();
-    slots = slots.map(s => s.id === 'builtin-edit' ? { ...s, name: 'Scene' } : s);
+    slots = slots.map(s => s.id === 'builtin-scene' ? { ...s, name: 'Custom' } : s);
     const matched = slots.find(s => s.keybind === 'ctrl+1');
-    expect(matched?.name).toBe('Scene');
+    expect(matched?.name).toBe('Custom');
   });
 
   it('duplicated slot has an independent layout copy', () => {
@@ -395,8 +395,8 @@ describe('layout lifecycle — integration', () => {
 
   it('deleting a slot removes it from the list', () => {
     let slots = loadSavedLayouts();
-    slots = slots.filter(s => s.id !== 'builtin-edit');
+    slots = slots.filter(s => s.id !== 'builtin-scene');
     expect(slots).toHaveLength(2);
-    expect(slots.find(s => s.id === 'builtin-edit')).toBeUndefined();
+    expect(slots.find(s => s.id === 'builtin-scene')).toBeUndefined();
   });
 });

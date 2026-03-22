@@ -8,7 +8,8 @@ const STORAGE_KEY = 'silmaril-editor-layout';
 // Layout Templates
 // ---------------------------------------------------------------------------
 
-export const defaultLayout: EditorLayout = {
+// Scene — scene composition, viewport dominant
+export const sceneLayout: EditorLayout = {
   root: {
     type: 'split',
     direction: 'horizontal',
@@ -27,14 +28,15 @@ export const defaultLayout: EditorLayout = {
       { type: 'tabs', activeTab: 0, panels: ['inspector'] },
     ],
   },
-  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console', 'terminal', 'output'] },
+  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console', 'output'] },
 };
 
-export const tallLayout: EditorLayout = {
+// Code — dev iteration, full tool strip at bottom
+export const codeLayout: EditorLayout = {
   root: {
     type: 'split',
     direction: 'horizontal',
-    sizes: [20, 60, 20],
+    sizes: [20, 50, 30],
     children: [
       {
         type: 'split',
@@ -49,37 +51,42 @@ export const tallLayout: EditorLayout = {
       { type: 'tabs', activeTab: 0, panels: ['inspector'] },
     ],
   },
-  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console'] },
+  bottomPanel: { type: 'tabs', activeTab: 0, panels: ['console', 'terminal', 'output'] },
 };
 
-export const wideLayout: EditorLayout = {
+// Perf — profiler in main area strip, empty bottom panel
+export const perfLayout: EditorLayout = {
   root: {
     type: 'split',
     direction: 'vertical',
-    sizes: [70, 30],
+    sizes: [65, 35],
     children: [
       {
         type: 'split',
         direction: 'horizontal',
-        sizes: [20, 80],
+        sizes: [15, 55, 30],
         children: [
           { type: 'tabs', activeTab: 0, panels: ['hierarchy'] },
           { type: 'tabs', activeTab: 0, panels: ['viewport'] },
+          { type: 'tabs', activeTab: 0, panels: ['inspector'] },
         ],
       },
       {
         type: 'split',
         direction: 'horizontal',
-        sizes: [50, 50],
+        sizes: [70, 30],
         children: [
-          { type: 'tabs', activeTab: 0, panels: ['inspector'] },
-          { type: 'tabs', activeTab: 0, panels: ['console'] },
+          { type: 'tabs', activeTab: 0, panels: ['profiler'] },
+          { type: 'tabs', activeTab: 0, panels: ['console', 'output'] },
         ],
       },
     ],
   },
   bottomPanel: { type: 'tabs', activeTab: 0, panels: [] },
 };
+
+// Default for new installs — same as Scene
+export const defaultLayout = sceneLayout;
 
 // ---------------------------------------------------------------------------
 // Deep clone utility
@@ -464,22 +471,37 @@ export interface SavedLayout {
 const SAVED_LAYOUTS_KEY = 'silmaril-saved-layouts';
 
 export const initialSavedLayouts: SavedLayout[] = [
-  { id: 'builtin-edit',   name: 'Edit',   layout: defaultLayout, keybind: 'ctrl+1' },
-  { id: 'builtin-assets', name: 'Assets', layout: tallLayout,    keybind: 'ctrl+2' },
-  { id: 'builtin-review', name: 'Review', layout: wideLayout,    keybind: 'ctrl+3' },
+  { id: 'builtin-scene', name: 'Scene', layout: sceneLayout, keybind: 'ctrl+1' },
+  { id: 'builtin-code',  name: 'Code',  layout: codeLayout,  keybind: 'ctrl+2' },
+  { id: 'builtin-perf',  name: 'Perf',  layout: perfLayout,  keybind: 'ctrl+3' },
 ];
+
+const OLD_BUILTIN_IDS = new Set(['builtin-edit', 'builtin-assets', 'builtin-review']);
+
+function cloneLayout_arr(layouts: SavedLayout[]): SavedLayout[] {
+  return JSON.parse(JSON.stringify(layouts));
+}
+
+function migrateIfNeeded(layouts: SavedLayout[]): SavedLayout[] {
+  const hasOldBuiltins = layouts.some((l) => OLD_BUILTIN_IDS.has(l.id));
+  if (!hasOldBuiltins) return layouts;
+  const userLayouts = layouts.filter((l) => !OLD_BUILTIN_IDS.has(l.id));
+  return [...cloneLayout_arr(initialSavedLayouts), ...userLayouts];
+}
 
 export function loadSavedLayouts(): SavedLayout[] {
   try {
     const stored = localStorage.getItem(SAVED_LAYOUTS_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as SavedLayout[];
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return migrateIfNeeded(parsed);
+      }
     }
   } catch {
     // ignore parse errors
   }
-  return JSON.parse(JSON.stringify(initialSavedLayouts));
+  return cloneLayout_arr(initialSavedLayouts);
 }
 
 let _saveLayoutsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -500,8 +522,12 @@ export function saveSavedLayouts(layouts: SavedLayout[]) {
 export async function hydrateSavedLayouts(): Promise<SavedLayout[] | null> {
   const stored = await persistLoad<SavedLayout[]>('savedLayouts', null as any);
   if (Array.isArray(stored) && stored.length > 0) {
-    try { localStorage.setItem(SAVED_LAYOUTS_KEY, JSON.stringify(stored)); } catch { /* ignore */ }
-    return stored;
+    const migrated = migrateIfNeeded(stored);
+    try { localStorage.setItem(SAVED_LAYOUTS_KEY, JSON.stringify(migrated)); } catch { /* ignore */ }
+    if (migrated !== stored) {
+      persistSave('savedLayouts', migrated);
+    }
+    return migrated;
   }
   return null;
 }

@@ -317,9 +317,9 @@
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger>{t('menu.view.layout')}</DropdownMenu.SubTrigger>
             <DropdownMenu.SubContent>
-              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-edit')}>{t('layout.default')}</DropdownMenu.Item>
-              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-assets')}>{t('layout.tall')}</DropdownMenu.Item>
-              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-review')}>{t('layout.wide')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-scene')}>{t('layout.scene')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-code')}>{t('layout.code')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-perf')}>{t('layout.perf')}</DropdownMenu.Item>
             </DropdownMenu.SubContent>
           </DropdownMenu.Sub>
           <DropdownMenu.Separator />
