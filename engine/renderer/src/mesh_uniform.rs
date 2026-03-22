@@ -32,6 +32,56 @@ impl MeshUniform {
     }
 }
 
+use ash::vk;
+use gpu_allocator::MemoryLocation;
+
+/// Minimum capacity (in entity count) when first allocating the storage buffer.
+pub const MESH_UNIFORM_INITIAL_CAPACITY: usize = 256;
+
+/// Per-frame host-visible storage buffer for MeshUniform data.
+///
+/// Wrapped in `RefCell` by callers — same pattern as `GpuCache`.
+pub struct MeshUniformBuffer {
+    /// The underlying GPU storage buffer.
+    pub buffer: engine_render_context::GpuBuffer,
+    /// Number of `MeshUniform` entries the buffer can currently hold.
+    pub capacity: usize,
+}
+
+impl MeshUniformBuffer {
+    /// Allocate a new storage buffer with the given entity capacity.
+    pub fn new(
+        context: &engine_render_context::VulkanContext,
+        capacity: usize,
+    ) -> Result<Self, engine_render_context::RendererError> {
+        let byte_size = (capacity * std::mem::size_of::<MeshUniform>()) as u64;
+        let buffer = engine_render_context::GpuBuffer::new(
+            context,
+            byte_size,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            MemoryLocation::CpuToGpu,
+        )?;
+        Ok(Self { buffer, capacity })
+    }
+
+    /// Upload uniforms slice to the buffer. Returns `true` if the buffer was
+    /// reallocated (caller must rebind the descriptor set).
+    pub fn upload(
+        &mut self,
+        context: &engine_render_context::VulkanContext,
+        uniforms: &[MeshUniform],
+    ) -> Result<bool, engine_render_context::RendererError> {
+        if uniforms.len() > self.capacity {
+            let new_cap = (self.capacity * 2).max(uniforms.len());
+            *self = Self::new(context, new_cap)?;
+            self.buffer.upload(uniforms)?;
+            return Ok(true); // resized
+        }
+        self.buffer.upload(uniforms)?;
+        Ok(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
