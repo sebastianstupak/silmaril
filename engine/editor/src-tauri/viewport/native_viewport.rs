@@ -57,6 +57,13 @@ mod platform {
     // Per-instance state (one per viewport panel)
     // ──────────────────────────────────────────────────────────────────────
 
+    /// Target state for a smooth camera animation (lerped per-frame).
+    #[derive(Clone)]
+    struct CameraAnimation {
+        target_pos:  glam::Vec3,
+        target_dist: f32,
+    }
+
     #[derive(Clone)]
     struct ViewportInstance {
         bounds: ViewportBounds,
@@ -64,6 +71,7 @@ mod platform {
         visible: bool,
         grid_visible: bool,
         is_ortho: bool,
+        camera_anim: Option<CameraAnimation>,
     }
 
     impl ViewportInstance {
@@ -74,6 +82,7 @@ mod platform {
                 visible: true,
                 grid_visible: true,
                 is_ortho: false,
+                camera_anim: None,
             }
         }
     }
@@ -104,6 +113,8 @@ mod platform {
         hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
         /// Asset manager shared with the render thread for mesh GPU upload.
         asset_manager: Arc<engine_assets::AssetManager>,
+        /// Active gizmo drag state shared with the render thread (for animation pause during drag).
+        drag_state: std::sync::Arc<std::sync::Mutex<Option<crate::bridge::gizmo_commands::DragState>>>,
     }
 
     impl NativeViewport {
@@ -114,6 +125,7 @@ mod platform {
             gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
             hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
             asset_manager: Arc<engine_assets::AssetManager>,
+            drag_state: std::sync::Arc<std::sync::Mutex<Option<crate::bridge::gizmo_commands::DragState>>>,
         ) -> Result<Self, String> {
             tracing::info!(hwnd = ?parent_hwnd, "NativeViewport created for window");
             Ok(Self {
@@ -128,6 +140,7 @@ mod platform {
                 gizmo_mode,
                 hovered_gizmo_axis,
                 asset_manager,
+                drag_state,
             })
         }
 
@@ -142,6 +155,7 @@ mod platform {
             let gizmo_mode = self.gizmo_mode.clone();
             let hovered_gizmo_axis = self.hovered_gizmo_axis.clone();
             let asset_manager = self.asset_manager.clone();
+            let drag_state = self.drag_state.clone();
 
             let handle = std::thread::Builder::new()
                 .name("viewport-render".into())
@@ -149,7 +163,7 @@ mod platform {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode, hovered_gizmo_axis, asset_manager);
+                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode, hovered_gizmo_axis, asset_manager, drag_state);
                     })) {
                         Ok(()) => tracing::info!("Viewport render thread stopped"),
                         Err(e) => {
@@ -269,6 +283,24 @@ mod platform {
             if let Ok(mut instances) = self.instances.lock() {
                 if let Some(inst) = instances.get_mut(id) {
                     inst.camera.target = glam::Vec3::from_array(target);
+                }
+            }
+        }
+
+        /// Begin a smooth camera animation towards `target_pos` at `target_dist`.
+        ///
+        /// The render thread lerps the camera each frame until it arrives, then
+        /// clears the animation.  If a gizmo drag is in progress the animation is
+        /// paused so it doesn't fight with the user's manipulation.
+        pub fn start_camera_animation(
+            &self,
+            id: &str,
+            target_pos: glam::Vec3,
+            target_dist: f32,
+        ) {
+            if let Ok(mut instances) = self.instances.lock() {
+                if let Some(inst) = instances.get_mut(id) {
+                    inst.camera_anim = Some(CameraAnimation { target_pos, target_dist });
                 }
             }
         }
@@ -1048,6 +1080,7 @@ void main() {
         gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
         hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
         asset_manager: Arc<engine_assets::AssetManager>,
+        drag_state: std::sync::Arc<std::sync::Mutex<Option<crate::bridge::gizmo_commands::DragState>>>,
     ) {
         let (init_w, init_h) = client_size(hwnd);
         let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h, hovered_gizmo_axis) {
@@ -1070,9 +1103,33 @@ void main() {
             let (win_w, win_h) = client_size(hwnd);
             renderer.notify_resize(win_w, win_h);
 
-            // Snapshot visible instances for this frame
+            // Advance camera animations, then snapshot visible instances for this frame.
             let viewports: Vec<(ViewportBounds, OrbitCamera, bool, bool)> = {
-                let lock = instances.lock().unwrap();
+                let mut lock = instances.lock().unwrap();
+
+                for inst in lock.values_mut().filter(|i| i.visible) {
+                    if let Some(ref anim) = inst.camera_anim {
+                        let dragging = drag_state.lock().ok()
+                            .map_or(false, |g| g.is_some());
+                        if !dragging {
+                            const LERP: f32 = 0.12;
+                            const EPS:  f32 = 0.001;
+                            inst.camera.target +=
+                                (anim.target_pos - inst.camera.target) * LERP;
+                            inst.camera.distance +=
+                                (anim.target_dist - inst.camera.distance) * LERP;
+                            let done =
+                                (inst.camera.target - anim.target_pos).length() < EPS
+                                && (inst.camera.distance - anim.target_dist).abs() < EPS;
+                            if done {
+                                inst.camera.target   = anim.target_pos;
+                                inst.camera.distance = anim.target_dist;
+                                inst.camera_anim = None;
+                            }
+                        }
+                    }
+                }
+
                 lock.values()
                     .filter(|i| i.visible)
                     .map(|i| (i.bounds, i.camera.clone(), i.grid_visible, i.is_ortho))
