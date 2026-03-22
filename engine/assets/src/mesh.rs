@@ -563,6 +563,214 @@ impl MeshData {
         Err(MeshError::invalidfbxformat("FBX loading not yet fully implemented".to_string()))
     }
 
+    /// Create a UV sphere mesh
+    pub fn sphere(radius: f32, lon_segs: u32, lat_segs: u32) -> Self {
+        use std::f32::consts::PI;
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        for lat in 0..=lat_segs {
+            let theta = lat as f32 * PI / lat_segs as f32;
+            let sin_theta = theta.sin();
+            let cos_theta = theta.cos();
+            for lon in 0..=lon_segs {
+                let phi = lon as f32 * 2.0 * PI / lon_segs as f32;
+                let x = sin_theta * phi.cos();
+                let y = cos_theta;
+                let z = sin_theta * phi.sin();
+                let normal = glam::Vec3::new(x, y, z);
+                vertices.push(Vertex {
+                    position: normal * radius,
+                    normal,
+                    uv: glam::Vec2::new(
+                        lon as f32 / lon_segs as f32,
+                        lat as f32 / lat_segs as f32,
+                    ),
+                });
+            }
+        }
+
+        for lat in 0..lat_segs {
+            for lon in 0..lon_segs {
+                let first = lat * (lon_segs + 1) + lon;
+                let second = first + lon_segs + 1;
+                indices.extend_from_slice(&[
+                    first,
+                    second,
+                    first + 1,
+                    second,
+                    second + 1,
+                    first + 1,
+                ]);
+            }
+        }
+
+        info!(vertices = vertices.len(), indices = indices.len(), "Sphere mesh created");
+        Self { vertices, indices }
+    }
+
+    /// Create a flat plane mesh centered at origin, lying on the XZ plane
+    pub fn plane(size: f32) -> Self {
+        let h = size / 2.0;
+        let normal = glam::Vec3::Y;
+        let vertices = vec![
+            Vertex {
+                position: glam::Vec3::new(-h, 0.0, -h),
+                normal,
+                uv: glam::Vec2::new(0.0, 0.0),
+            },
+            Vertex {
+                position: glam::Vec3::new(h, 0.0, -h),
+                normal,
+                uv: glam::Vec2::new(1.0, 0.0),
+            },
+            Vertex {
+                position: glam::Vec3::new(h, 0.0, h),
+                normal,
+                uv: glam::Vec2::new(1.0, 1.0),
+            },
+            Vertex {
+                position: glam::Vec3::new(-h, 0.0, h),
+                normal,
+                uv: glam::Vec2::new(0.0, 1.0),
+            },
+        ];
+        let indices = vec![0u32, 1, 2, 0, 2, 3];
+        info!("Plane mesh created");
+        Self { vertices, indices }
+    }
+
+    /// Create a cylinder mesh centered at origin, aligned on the Y axis
+    pub fn cylinder(radius: f32, height: f32, segs: u32) -> Self {
+        use std::f32::consts::PI;
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let half_h = height / 2.0;
+
+        // Side rings (bottom ring = 0, top ring = 1)
+        for ring in 0..=1u32 {
+            let y = if ring == 0 { -half_h } else { half_h };
+            for seg in 0..=segs {
+                let angle = seg as f32 * 2.0 * PI / segs as f32;
+                let x = angle.cos();
+                let z = angle.sin();
+                vertices.push(Vertex {
+                    position: glam::Vec3::new(x * radius, y, z * radius),
+                    normal: glam::Vec3::new(x, 0.0, z),
+                    uv: glam::Vec2::new(seg as f32 / segs as f32, ring as f32),
+                });
+            }
+        }
+        let stride = segs + 1;
+        for seg in 0..segs {
+            let b = seg;
+            let t = seg + stride;
+            indices.extend_from_slice(&[b, t, b + 1, t, t + 1, b + 1]);
+        }
+
+        // Bottom cap
+        let bottom_center = vertices.len() as u32;
+        vertices.push(Vertex {
+            position: glam::Vec3::new(0.0, -half_h, 0.0),
+            normal: -glam::Vec3::Y,
+            uv: glam::Vec2::new(0.5, 0.5),
+        });
+        let bottom_start = vertices.len() as u32;
+        for seg in 0..=segs {
+            let angle = seg as f32 * 2.0 * PI / segs as f32;
+            vertices.push(Vertex {
+                position: glam::Vec3::new(angle.cos() * radius, -half_h, angle.sin() * radius),
+                normal: -glam::Vec3::Y,
+                uv: glam::Vec2::new(angle.cos() * 0.5 + 0.5, angle.sin() * 0.5 + 0.5),
+            });
+        }
+        for seg in 0..segs {
+            indices.extend_from_slice(&[
+                bottom_center,
+                bottom_start + seg + 1,
+                bottom_start + seg,
+            ]);
+        }
+
+        // Top cap
+        let top_center = vertices.len() as u32;
+        vertices.push(Vertex {
+            position: glam::Vec3::new(0.0, half_h, 0.0),
+            normal: glam::Vec3::Y,
+            uv: glam::Vec2::new(0.5, 0.5),
+        });
+        let top_start = vertices.len() as u32;
+        for seg in 0..=segs {
+            let angle = seg as f32 * 2.0 * PI / segs as f32;
+            vertices.push(Vertex {
+                position: glam::Vec3::new(angle.cos() * radius, half_h, angle.sin() * radius),
+                normal: glam::Vec3::Y,
+                uv: glam::Vec2::new(angle.cos() * 0.5 + 0.5, angle.sin() * 0.5 + 0.5),
+            });
+        }
+        for seg in 0..segs {
+            indices.extend_from_slice(&[top_center, top_start + seg, top_start + seg + 1]);
+        }
+
+        info!(vertices = vertices.len(), indices = indices.len(), "Cylinder mesh created");
+        Self { vertices, indices }
+    }
+
+    /// Create a capsule mesh (cylinder body capped by two hemispheres), aligned on the Y axis
+    pub fn capsule(radius: f32, height: f32, lon_segs: u32, lat_segs: u32) -> Self {
+        use std::f32::consts::PI;
+        let mut vertices = Vec::new();
+        let mut indices: Vec<u32> = Vec::new();
+        let half_h = height / 2.0;
+        let total_lat = lat_segs * 2;
+
+        for lat in 0..=total_lat {
+            let half_theta = lat as f32 * PI / total_lat as f32;
+            let sin_t = half_theta.sin();
+            let cos_t = half_theta.cos();
+            // Top hemisphere shifts up, bottom shifts down
+            let y_offset = if lat <= lat_segs { half_h } else { -half_h };
+
+            for lon in 0..=lon_segs {
+                let phi = lon as f32 * 2.0 * PI / lon_segs as f32;
+                let nx = sin_t * phi.cos();
+                let ny = cos_t;
+                let nz = sin_t * phi.sin();
+                let normal = glam::Vec3::new(nx, ny, nz).normalize();
+                vertices.push(Vertex {
+                    position: glam::Vec3::new(
+                        nx * radius,
+                        ny * radius + y_offset,
+                        nz * radius,
+                    ),
+                    normal,
+                    uv: glam::Vec2::new(
+                        lon as f32 / lon_segs as f32,
+                        lat as f32 / total_lat as f32,
+                    ),
+                });
+            }
+        }
+
+        for lat in 0..total_lat {
+            for lon in 0..lon_segs {
+                let first = lat * (lon_segs + 1) + lon;
+                let second = first + lon_segs + 1;
+                indices.extend_from_slice(&[
+                    first,
+                    second,
+                    first + 1,
+                    second,
+                    second + 1,
+                    first + 1,
+                ]);
+            }
+        }
+
+        info!(vertices = vertices.len(), indices = indices.len(), "Capsule mesh created");
+        Self { vertices, indices }
+    }
+
     // ========================================================================
     // Helper methods for glTF loading
     // ========================================================================
@@ -897,6 +1105,39 @@ mod tests {
         let centroid = cube.centroid();
         // Cube is centered, so centroid should be near origin
         assert!((centroid - Vec3::ZERO).length() < 0.01);
+    }
+
+    #[test]
+    fn test_sphere_has_vertices_and_indices() {
+        let m = MeshData::sphere(1.0, 8, 4);
+        assert!(!m.vertices.is_empty(), "sphere must have vertices");
+        assert!(!m.indices.is_empty(), "sphere must have indices");
+        assert_eq!(m.indices.len() % 3, 0, "indices must be a multiple of 3");
+        for v in &m.vertices {
+            let len = v.normal.length();
+            assert!((len - 1.0).abs() < 1e-4, "normal not unit length: {}", len);
+        }
+    }
+
+    #[test]
+    fn test_plane_has_four_vertices() {
+        let m = MeshData::plane(1.0);
+        assert_eq!(m.vertices.len(), 4);
+        assert_eq!(m.indices.len(), 6);
+    }
+
+    #[test]
+    fn test_cylinder_has_correct_ring_structure() {
+        let m = MeshData::cylinder(0.5, 1.0, 8);
+        assert!(!m.vertices.is_empty());
+        assert_eq!(m.indices.len() % 3, 0);
+    }
+
+    #[test]
+    fn test_capsule_has_vertices_and_indices() {
+        let m = MeshData::capsule(0.5, 1.0, 8, 4);
+        assert!(!m.vertices.is_empty());
+        assert_eq!(m.indices.len() % 3, 0);
     }
 
     // ========================================================================
