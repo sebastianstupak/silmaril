@@ -28,7 +28,7 @@ pub mod spatial;
 pub use allocators::{Arena, FrameAllocator, PoolAllocator};
 pub use ecs::{Component, ComponentDescriptor, Entity, EntityAllocator, SparseSet, World};
 pub use error::{EngineError, ErrorCode, ErrorSeverity};
-pub use gameplay::Health;
+pub use gameplay::{Health, Parent};
 pub use math::{Quat, Transform, Vec3};
 pub use physics_components::Velocity;
 pub use platform::PlatformError;

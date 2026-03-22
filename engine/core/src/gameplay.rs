@@ -14,6 +14,22 @@ pub struct Health {
 
 impl Component for Health {}
 
+/// Marks an entity as a child of another entity.
+///
+/// # Example
+/// ```
+/// use engine_core::{World, Entity, Parent};
+///
+/// let mut world = World::new();
+/// let parent = world.spawn();
+/// let child  = world.spawn();
+/// world.add(child, Parent(parent.id()));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Parent(pub u32);
+
+impl Component for Parent {}
+
 impl Health {
     /// Create a new health component
     pub const fn new(current: f32, max: f32) -> Self {
@@ -88,5 +104,45 @@ mod tests {
 
         assert!(full.is_full());
         assert!(!not_full.is_full());
+    }
+
+    #[test]
+    fn test_parent_component_round_trip() {
+        use crate::ecs::World;
+
+        let mut world = World::new();
+        world.register::<Parent>();
+        let child  = world.spawn();
+        let parent = world.spawn();
+
+        // Add
+        world.add(child, Parent(parent.id()));
+        let got = world.get::<Parent>(child).expect("Parent should be present");
+        assert_eq!(got.0, parent.id());
+
+        // Remove
+        world.remove::<Parent>(child);
+        assert!(world.get::<Parent>(child).is_none(), "Parent should be absent after remove");
+    }
+
+    #[test]
+    fn test_parent_read_from_world() {
+        use crate::ecs::World;
+
+        let mut world = World::new();
+        world.register::<Parent>();
+        let parent = world.spawn();
+        let child  = world.spawn();
+        world.add(child, Parent(parent.id()));
+
+        let parent_id: Option<u64> = world
+            .get::<Parent>(child)
+            .map(|p| p.0 as u64);
+
+        assert_eq!(parent_id, Some(parent.id() as u64));
+
+        // Entity without Parent returns None
+        let orphan = world.spawn();
+        assert!(world.get::<Parent>(orphan).is_none());
     }
 }
