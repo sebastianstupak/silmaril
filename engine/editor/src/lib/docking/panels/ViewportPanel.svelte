@@ -920,9 +920,10 @@
 
   .toolbar-separator {
     width: 1px;
-    height: 16px;
-    background: rgba(255, 255, 255, 0.1);
-    margin: 0 5px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.12);
+    margin: 0 3px;
+    flex-shrink: 0;
   }
 
   .tool-btn {
