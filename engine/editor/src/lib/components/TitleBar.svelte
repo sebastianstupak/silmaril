@@ -177,19 +177,31 @@
     function close(e: MouseEvent) {
       if (!(e.target as HTMLElement).closest('.panels-btn-wrapper')) showPanelsMenu = false;
     }
-    const id = setTimeout(() => document.addEventListener('click', close), 0);
+    const id = setTimeout(() => document.addEventListener('click', close, { once: true }), 0);
     return () => { clearTimeout(id); document.removeEventListener('click', close); };
   });
 
   // ── Drag / window controls ─────────────────────────────────────────────────
   function onTitlebarMousedown(e: MouseEvent) {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('button, input, .slot-wrapper, .overflow-wrapper, .panels-btn-wrapper, .omnibar-wrapper')) return;
+    if ((e.target as HTMLElement).closest(
+      'button, input, .slot-wrapper, .overflow-wrapper, ' +
+      '.panels-btn-wrapper, .omnibar-wrapper, ' +
+      '.titlebar-menus, [data-dropdown-menu-content], ' +
+      '[data-dropdown-menu-item], ' +
+      '[data-dropdown-menu-trigger][data-state="open"]'
+    )) return;
     invoke('window_start_drag').catch(() => {});
   }
 
   function onTitlebarDblclick(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('button, input, .slot-wrapper, .overflow-wrapper, .panels-btn-wrapper, .omnibar-wrapper')) return;
+    if ((e.target as HTMLElement).closest(
+      'button, input, .slot-wrapper, .overflow-wrapper, ' +
+      '.panels-btn-wrapper, .omnibar-wrapper, ' +
+      '.titlebar-menus, [data-dropdown-menu-content], ' +
+      '[data-dropdown-menu-item], ' +
+      '[data-dropdown-menu-trigger][data-state="open"]'
+    )) return;
     invoke('window_toggle_maximize').catch(() => {});
   }
 
