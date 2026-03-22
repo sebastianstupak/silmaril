@@ -46,3 +46,10 @@ html, body {
   font-family: var(--font-body, system-ui, -apple-system, sans-serif);
   font-size: 13px;
 }
+
+/* Remove rounded corners when the Tauri window is fullscreen */
+html[data-fullscreen="true"],
+html[data-fullscreen="true"] body,
+html[data-fullscreen="true"] #app {
+  border-radius: 0 !important;
+}

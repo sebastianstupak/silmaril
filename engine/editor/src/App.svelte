@@ -52,6 +52,7 @@
   let recentItems = $state<RecentItem[]>([]);
   let unlistenCatalog: (() => void) | undefined;
   let unlistenAiCmd: (() => void) | undefined;
+  let unlistenFullscreen: (() => void) | undefined;
   let _unsubPanels: (() => void) | undefined;
 
   // Load settings once; reuse for both the reactive state and the initial bottomHeight.
@@ -435,6 +436,28 @@
 
   onMount(async () => {
     await initTauriListeners();
+
+    // Set up fullscreen border-radius fix
+    if (isTauri) {
+      try {
+        const tauriWindow = await import('@tauri-apps/api/window');
+        const win = tauriWindow.getCurrentWindow();
+
+        // Set initial state
+        document.documentElement.dataset.fullscreen = String(await win.isFullscreen());
+
+        // React to resize events (fullscreen toggle changes the window size)
+        const unlisten = await win.onResized(async () => {
+          document.documentElement.dataset.fullscreen = String(await win.isFullscreen());
+        });
+
+        // Store unlisten function for cleanup in onDestroy
+        unlistenFullscreen = unlisten;
+      } catch (e) {
+        logWarn('Failed to set up fullscreen listener', { error: String(e) });
+      }
+    }
+
     _unsubPanels = subscribePanelContributions(() => {
       panelContributions = getPanelContributions();
     });
@@ -598,6 +621,7 @@
   onDestroy(() => {
     unlistenCatalog?.();
     unlistenAiCmd?.();
+    unlistenFullscreen?.();
     _unsubPanels?.();
   });
 </script>
