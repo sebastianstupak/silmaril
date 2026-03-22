@@ -362,3 +362,20 @@ export async function setGizmoMode(mode: 'move' | 'rotate' | 'scale'): Promise<v
   return tauriInvoke<void>('set_gizmo_mode', { mode });
 }
 
+// ---------------------------------------------------------------------------
+// Mesh assignment IPC
+// ---------------------------------------------------------------------------
+
+/**
+ * Assign a mesh asset to an entity within a template.
+ * Invokes the `assign_mesh` Tauri command which adds/updates the
+ * MeshRenderer component on the target entity.
+ */
+export async function assignMesh(
+  entityId: number,
+  templatePath: string,
+  meshPath: string,
+): Promise<void> {
+  if (!isTauri) return;
+  return tauriInvoke<void>('assign_mesh', { entityId, templatePath, meshPath });
+}

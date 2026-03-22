@@ -17,7 +17,7 @@ use crate::*;
 use ash::vk;
 use std::marker::PhantomData;
 use std::path::Path;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Describes one viewport sub-rect within the swapchain surface.
 ///
@@ -87,6 +87,12 @@ pub struct Renderer {
     _depth_buffer: Option<DepthBuffer>,
     mesh_pipeline: Option<GraphicsPipeline>,
     gpu_cache: std::cell::RefCell<GpuCache>,
+
+    // Storage buffer descriptor infrastructure for per-mesh uniforms (Phase 1.8)
+    // RefCell mirrors gpu_cache — render_meshes has &self but must upload data each frame
+    mesh_uniform_buffers: Vec<std::cell::RefCell<crate::mesh_uniform::MeshUniformBuffer>>,
+    mesh_descriptor_pool: Option<vk::DescriptorPool>,
+    mesh_descriptor_sets: Vec<vk::DescriptorSet>,
 }
 
 impl Renderer {
@@ -204,7 +210,7 @@ impl Renderer {
             "Renderer created successfully"
         );
 
-        Ok(Self {
+        let mut renderer = Self {
             window: Some(window),
             dimensions: (width, height),
             context,
@@ -234,7 +240,17 @@ impl Renderer {
             _depth_buffer: Some(depth_buffer),
             mesh_pipeline: Some(mesh_pipeline),
             gpu_cache: std::cell::RefCell::new(gpu_cache),
-        })
+
+            mesh_uniform_buffers: Vec::new(),
+            mesh_descriptor_pool: None,
+            mesh_descriptor_sets: Vec::new(),
+        };
+
+        let frames_in_flight = renderer.sync_objects.len();
+        if let Err(e) = renderer.init_mesh_descriptor_resources(frames_in_flight) {
+            warn!(error = ?e, "Failed to init mesh descriptor resources — mesh rendering will be unavailable");
+        }
+        Ok(renderer)
     }
 
     /// Create a renderer attached to an externally-managed Win32 window.
@@ -381,7 +397,7 @@ impl Renderer {
             "Renderer (raw HWND) created successfully"
         );
 
-        Ok(Self {
+        let mut renderer = Self {
             window: None,
             dimensions: (width, height),
             context,
@@ -408,7 +424,122 @@ impl Renderer {
             _depth_buffer: Some(depth_buffer),
             mesh_pipeline: Some(mesh_pipeline),
             gpu_cache: std::cell::RefCell::new(gpu_cache),
-        })
+
+            mesh_uniform_buffers: Vec::new(),
+            mesh_descriptor_pool: None,
+            mesh_descriptor_sets: Vec::new(),
+        };
+
+        let frames_in_flight = renderer.sync_objects.len();
+        if let Err(e) = renderer.init_mesh_descriptor_resources(frames_in_flight) {
+            warn!(error = ?e, "Failed to init mesh descriptor resources — mesh rendering will be unavailable");
+        }
+        Ok(renderer)
+    }
+
+    /// Begin a new frame and open the render pass.
+    ///
+    /// Returns a [`FrameRecorder`] that gives the caller access to the active
+    /// Vulkan command buffer so additional draw calls (e.g. gizmos, overlays)
+    /// can be injected before the frame is submitted.
+    ///
+    /// Returns `None` if the swapchain is out of date and needs to be rebuilt
+    /// (the caller should handle resizing and retry on the next tick).
+    ///
+    /// # Usage
+    ///
+    /// ```no_run
+    /// # use engine_renderer::{Renderer, WindowConfig};
+    /// # let mut renderer = Renderer::new(WindowConfig::default(), "test")?;
+    /// if let Some(recorder) = renderer.begin_frame() {
+    ///     // inject extra draw calls into recorder.command_buffer …
+    ///     renderer.end_frame(recorder);
+    /// }
+    /// # Ok::<(), engine_renderer::RendererError>(())
+    /// ```
+    /// Initialise per-frame descriptor pool, descriptor sets, and storage
+    /// buffers for [`crate::mesh_uniform::MeshUniform`] data.
+    ///
+    /// Called once after the mesh pipeline is created.  Safe to call when
+    /// no pipeline (or a pipeline built without descriptors) is present —
+    /// it returns `Ok(())` immediately in both cases.
+    pub(crate) fn init_mesh_descriptor_resources(
+        &mut self,
+        frames_in_flight: usize,
+    ) -> Result<(), RendererError> {
+        use crate::mesh_uniform::{MeshUniformBuffer, MESH_UNIFORM_INITIAL_CAPACITY};
+
+        let pipeline = match &self.mesh_pipeline {
+            Some(p) => p,
+            None => return Ok(()), // no pipeline yet — skip
+        };
+        let layout = pipeline.descriptor_set_layout();
+        if layout == vk::DescriptorSetLayout::null() {
+            return Ok(()); // pipeline built without descriptors — skip
+        }
+
+        // Create per-frame storage buffers
+        let buffers: Result<Vec<_>, _> = (0..frames_in_flight)
+            .map(|_| {
+                MeshUniformBuffer::new(&self.context, MESH_UNIFORM_INITIAL_CAPACITY)
+                    .map(std::cell::RefCell::new)
+            })
+            .collect();
+        self.mesh_uniform_buffers = buffers?;
+
+        // Descriptor pool
+        let pool_size = vk::DescriptorPoolSize::default()
+            .ty(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(frames_in_flight as u32);
+
+        let pool_info = vk::DescriptorPoolCreateInfo::default()
+            .pool_sizes(std::slice::from_ref(&pool_size))
+            .max_sets(frames_in_flight as u32);
+
+        let pool = unsafe {
+            self.context
+                .device
+                .create_descriptor_pool(&pool_info, None)
+                .map_err(|e| {
+                    RendererError::pipelinecreationfailed(format!("descriptor pool: {:?}", e))
+                })?
+        };
+        self.mesh_descriptor_pool = Some(pool);
+
+        // Allocate one descriptor set per frame
+        let layouts: Vec<vk::DescriptorSetLayout> = vec![layout; frames_in_flight];
+        let alloc_info = vk::DescriptorSetAllocateInfo::default()
+            .descriptor_pool(pool)
+            .set_layouts(&layouts);
+
+        self.mesh_descriptor_sets = unsafe {
+            self.context
+                .device
+                .allocate_descriptor_sets(&alloc_info)
+                .map_err(|e| {
+                    RendererError::pipelinecreationfailed(format!(
+                        "descriptor set alloc: {:?}",
+                        e
+                    ))
+                })?
+        };
+
+        // Initial write — bind each set to its buffer
+        for (i, set) in self.mesh_descriptor_sets.iter().enumerate() {
+            let buf_info = vk::DescriptorBufferInfo::default()
+                .buffer(self.mesh_uniform_buffers[i].borrow().buffer.handle())
+                .offset(0)
+                .range(vk::WHOLE_SIZE);
+            let write = vk::WriteDescriptorSet::default()
+                .dst_set(*set)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(std::slice::from_ref(&buf_info));
+            unsafe { self.context.device.update_descriptor_sets(&[write], &[]) };
+        }
+
+        tracing::info!(frames_in_flight, "Mesh descriptor resources initialised");
+        Ok(())
     }
 
     /// Begin a new frame and open the render pass.
@@ -775,83 +906,110 @@ impl Renderer {
         viewports: &[ViewportDescriptor],
     ) {
         use engine_core::{MeshRenderer, Transform};
+        use crate::mesh_uniform::MeshUniform;
 
-        // Deferred / gizmo-only phase: skip mesh rendering entirely.
         let Some(assets) = assets else { return; };
-
-        // Nothing to do with no viewports.
-        if viewports.is_empty() {
-            return;
-        }
+        if viewports.is_empty() { return; }
 
         let cmd = recorder.command_buffer;
+        let frame_idx = self.current_frame;
 
-        // Bind the mesh pipeline once for all viewports.
         let Some(pipeline) = &self.mesh_pipeline else {
-            warn!("render_meshes: no mesh pipeline available, skipping");
+            warn!("render_meshes: no mesh pipeline, skipping");
             return;
         };
 
-        unsafe {
-            self.context.device.cmd_bind_pipeline(
-                cmd,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.handle(),
-            );
-        }
+        // ── 1. Build MeshUniform list + draw list ─────────────────────────────
+        let mut uniforms: Vec<MeshUniform> = Vec::new();
+        let mut draw_list: Vec<(engine_assets::AssetId, u32)> = Vec::new();
 
-        // Collect renderable entities (model matrices + mesh ids).
-        let mut renderables: Vec<(engine_assets::AssetId, glam::Mat4)> = Vec::new();
         for entity in world.entities() {
-            if let (Some(transform), Some(mesh_renderer)) =
+            let (Some(transform), Some(mesh_renderer)) =
                 (world.get::<Transform>(entity), world.get::<MeshRenderer>(entity))
+            else { continue; };
+
+            if !mesh_renderer.is_visible() { continue; }
+
+            let mesh_id = engine_assets::AssetId::from_seed_and_params(
+                mesh_renderer.mesh_id, b"mesh",
+            );
+
+            // Upload mesh to GPU cache if absent
             {
-                if !mesh_renderer.is_visible() {
-                    continue;
-                }
-
-                let mesh_id = engine_assets::AssetId::from_seed_and_params(
-                    mesh_renderer.mesh_id,
-                    b"mesh",
-                );
-
-                // Upload mesh to GPU cache if not already present.
-                {
-                    let mut cache = self.gpu_cache.borrow_mut();
-                    if !cache.contains(mesh_id) {
-                        match assets.get_mesh(mesh_id) {
-                            Some(mesh_data) => {
-                                if let Err(e) =
-                                    cache.upload_mesh(&self.context, mesh_id, &mesh_data)
-                                {
-                                    warn!(
-                                        error = ?e,
-                                        mesh_id = ?mesh_id,
-                                        "render_meshes: failed to upload mesh, skipping"
-                                    );
-                                    continue;
-                                }
-                            }
-                            None => {
-                                warn!(
-                                    mesh_id = ?mesh_id,
-                                    "render_meshes: mesh not found in AssetManager, skipping"
-                                );
+                let mut cache = self.gpu_cache.borrow_mut();
+                if !cache.contains(mesh_id) {
+                    match assets.get_mesh(mesh_id) {
+                        Some(mesh_data) => {
+                            if let Err(e) = cache.upload_mesh(&self.context, mesh_id, &mesh_data) {
+                                warn!(error = ?e, mesh_id = ?mesh_id, "render_meshes: GPU upload failed, skipping entity");
                                 continue;
                             }
                         }
+                        None => {
+                            warn!(mesh_id = ?mesh_id, "render_meshes: mesh not in AssetManager, skipping entity");
+                            continue;
+                        }
                     }
                 }
+            }
 
-                renderables.push((mesh_id, transform.matrix()));
+            let instance_index = uniforms.len() as u32;
+            uniforms.push(MeshUniform::from_transform(transform));
+            draw_list.push((mesh_id, instance_index));
+        }
+
+        if draw_list.is_empty() { return; }
+
+        // ── 2. Upload MeshUniform data via RefCell borrow_mut ─────────────────
+        if let Some(buf_cell) = self.mesh_uniform_buffers.get(frame_idx) {
+            let mut buf = buf_cell.borrow_mut();
+            match buf.upload(&self.context, &uniforms) {
+                Ok(resized) if resized => {
+                    // Buffer reallocated — rebind descriptor set to new VkBuffer
+                    if let Some(&set) = self.mesh_descriptor_sets.get(frame_idx) {
+                        let buf_info = vk::DescriptorBufferInfo::default()
+                            .buffer(buf.buffer.handle())
+                            .offset(0)
+                            .range(vk::WHOLE_SIZE);
+                        let write = vk::WriteDescriptorSet::default()
+                            .dst_set(set)
+                            .dst_binding(0)
+                            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                            .buffer_info(std::slice::from_ref(&buf_info));
+                        unsafe { self.context.device.update_descriptor_sets(&[write], &[]); }
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    warn!(error = ?e, "render_meshes: buffer upload failed");
+                    return;
+                }
             }
         }
 
-        // Emit draw calls per viewport.
+        // ── 3. Bind pipeline + descriptor set ─────────────────────────────────
+        unsafe {
+            self.context.device.cmd_bind_pipeline(
+                cmd, vk::PipelineBindPoint::GRAPHICS, pipeline.handle(),
+            );
+
+            if let Some(&set) = self.mesh_descriptor_sets.get(frame_idx) {
+                self.context.device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline.layout(),
+                    0,
+                    &[set],
+                    &[],
+                );
+            }
+        }
+
+        // ── 4. Emit draw calls per viewport ───────────────────────────────────
+        let cache = self.gpu_cache.borrow();
         for vp in viewports {
             let vp_matrix = vp.proj * vp.view;
 
-            // Dynamic viewport.
             let viewport = vk::Viewport::default()
                 .x(vp.bounds.x as f32)
                 .y(vp.bounds.y as f32)
@@ -876,59 +1034,40 @@ impl Renderer {
             unsafe {
                 self.context.device.cmd_set_viewport(cmd, 0, &[viewport]);
                 self.context.device.cmd_set_scissor(cmd, 0, &[scissor]);
+
+                // Push VP matrix (64 bytes) — matches new shader push_constant layout
+                let vp_bytes = vp_matrix.as_ref();
+                let vp_slice = std::slice::from_raw_parts(
+                    vp_bytes.as_ptr() as *const u8,
+                    std::mem::size_of::<glam::Mat4>(),
+                );
+                self.context.device.cmd_push_constants(
+                    cmd, pipeline.layout(), vk::ShaderStageFlags::VERTEX, 0, vp_slice,
+                );
             }
 
-            let cache = self.gpu_cache.borrow();
-            for &(mesh_id, model_matrix) in &renderables {
-                let mvp_matrix = vp_matrix * model_matrix;
-
+            for &(mesh_id, instance_index) in &draw_list {
                 if let (Some((vertex_buf, index_buf)), Some(mesh_info)) =
                     (cache.get_buffers(mesh_id), cache.get_mesh_info(mesh_id))
                 {
                     unsafe {
-                        // Push MVP via push constants.
-                        let mvp_bytes = mvp_matrix.as_ref();
-                        let mvp_slice = std::slice::from_raw_parts(
-                            mvp_bytes.as_ptr() as *const u8,
-                            std::mem::size_of::<glam::Mat4>(),
-                        );
-                        self.context.device.cmd_push_constants(
-                            cmd,
-                            pipeline.layout(),
-                            vk::ShaderStageFlags::VERTEX,
-                            0,
-                            mvp_slice,
-                        );
-
-                        self.context.device.cmd_bind_vertex_buffers(
-                            cmd,
-                            0,
-                            &[vertex_buf],
-                            &[0],
-                        );
-
-                        self.context.device.cmd_bind_index_buffer(
-                            cmd,
-                            index_buf,
-                            0,
-                            vk::IndexType::UINT32,
-                        );
-
+                        self.context.device.cmd_bind_vertex_buffers(cmd, 0, &[vertex_buf], &[0]);
+                        self.context.device.cmd_bind_index_buffer(cmd, index_buf, 0, vk::IndexType::UINT32);
                         self.context.device.cmd_draw_indexed(
                             cmd,
                             mesh_info.index_count,
-                            1,
-                            0,
-                            0,
-                            0,
+                            1,              // instance count = 1 per entity
+                            0,              // first index
+                            0,              // vertex offset
+                            instance_index, // firstInstance → gl_InstanceIndex in shader
                         );
                     }
                 }
             }
         }
 
-        info!(
-            draw_count = renderables.len(),
+        debug!(
+            draw_count = draw_list.len(),
             viewport_count = viewports.len(),
             "render_meshes: issued draw calls"
         );
@@ -1137,6 +1276,13 @@ impl Drop for Renderer {
 
         // Drop mesh pipeline (references render pass)
         drop(self.mesh_pipeline.take());
+
+        // Descriptor pool (implicitly frees all descriptor sets)
+        if let Some(pool) = self.mesh_descriptor_pool.take() {
+            unsafe { self.context.device.destroy_descriptor_pool(pool, None) };
+        }
+        // mesh_uniform_buffers drop automatically via GpuBuffer::Drop
+        self.mesh_uniform_buffers.clear();
 
         // Drop GPU cache (has GPU buffer allocations)
         // Note: This has its own Drop that properly frees GPU memory

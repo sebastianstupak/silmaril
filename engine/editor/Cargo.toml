@@ -28,6 +28,7 @@ codegen = []
 engine-ops = { path = "../ops" }
 engine-core = { path = "../core" }
 engine-ai = { path = "../ai" }
+engine-assets = { path = "../assets" }
 tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
@@ -46,6 +47,7 @@ ignore = "0.4"
 portable-pty = "0.8"
 which = "4"
 uuid = { version = "1", features = ["v4"] }
+blake3 = "1"
 specta = { version = "2.0.0-rc.21", features = ["derive", "serde_json"] }
 specta-typescript = "0.0.9"
 tauri-specta = { version = "2.0.0-rc.21", features = ["derive", "typescript"] }

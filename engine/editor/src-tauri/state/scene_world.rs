@@ -15,6 +15,7 @@ impl SceneWorldState {
         let mut world = World::new();
         // Pre-register components used by the editor so `world.add()` never panics.
         world.register::<engine_core::Transform>();
+        world.register::<engine_core::MeshRenderer>();
         Self(Arc::new(RwLock::new(world)))
     }
 }

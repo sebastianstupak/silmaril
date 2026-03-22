@@ -2,6 +2,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import type { EntityInfo } from '$lib/api';
+  import { assignMesh } from '$lib/api';
   import {
     createEntity,
     createEntityChild,
@@ -9,6 +10,7 @@
     duplicateEntity,
     renameEntity,
   } from '$lib/scene/commands';
+  import { getActiveTemplatePath } from '$lib/stores/undo-history';
 
   let { entities = [], selectedId = null, onSelect }: {
     entities: EntityInfo[];
@@ -134,6 +136,34 @@
   function countNodes(nodes: TreeNode[]): number {
     return nodes.reduce((acc, n) => acc + 1 + countNodes(n.children), 0);
   }
+
+  // ---------------------------------------------------------------------------
+  // Mesh drag-drop
+  // ---------------------------------------------------------------------------
+
+  let dropTargetId = $state<number | null>(null);
+
+  function onDragOver(event: DragEvent, entityId: number): void {
+    if (event.dataTransfer?.types.includes('application/x-mesh-path')) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      dropTargetId = entityId;
+    }
+  }
+
+  function onDragLeave(entityId: number): void {
+    if (dropTargetId === entityId) dropTargetId = null;
+  }
+
+  async function onDropMesh(event: DragEvent, entityId: number): Promise<void> {
+    event.preventDefault();
+    dropTargetId = null;
+    const meshPath = event.dataTransfer?.getData('application/x-mesh-path');
+    if (!meshPath) return;
+    const templatePath = getActiveTemplatePath();
+    if (!templatePath) return;
+    await assignMesh(entityId, templatePath, meshPath);
+  }
 </script>
 
 <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -170,6 +200,7 @@
         <li
           class="entity-row"
           class:selected={selectedId === entity.id}
+          class:drop-target={dropTargetId === entity.id}
           role="option"
           aria-selected={selectedId === entity.id}
           tabindex="0"
@@ -184,6 +215,9 @@
           ondblclick={() => startRename(entity.id, entity.name)}
           oncontextmenu={(e) => openContextMenu(e, entity.id)}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onSelect(entity.id); } }}
+          ondragover={(e) => onDragOver(e, entity.id)}
+          ondragleave={() => onDragLeave(entity.id)}
+          ondrop={(e) => onDropMesh(e, entity.id)}
         >
           <!-- Expand/collapse chevron -->
           <span
@@ -372,6 +406,7 @@
   .entity-row:hover { background: var(--color-bgHeader, #2d2d2d); }
   .entity-row.selected { background: var(--color-accent, #007acc); color: #fff; }
   .entity-row:focus-visible { outline: 1px solid var(--color-accent, #007acc); outline-offset: -1px; }
+  .entity-row.drop-target { outline: 1px dashed var(--color-accent, #007acc); outline-offset: -1px; background: rgba(0, 122, 204, 0.15); }
 
   .entity-chevron {
     display: flex;

@@ -42,6 +42,7 @@
 
 pub mod agentic_debug;
 pub mod asset_bridge;
+pub mod mesh_uniform;
 pub mod buffer;
 pub mod capture;
 pub mod command;
@@ -63,6 +64,7 @@ pub mod window;
 
 // Re-export commonly used types
 pub use asset_bridge::{AssetBridge, AssetBridgeStats, GpuShader, GpuTexture};
+pub use mesh_uniform::MeshUniform;
 pub use buffer::{GpuBuffer, GpuMesh, IndexBuffer, VertexBuffer};
 pub use capture::{
     CaptureConfig, CaptureFormat, CaptureManager, CaptureMetrics, FrameEncoder, FrameReadback,

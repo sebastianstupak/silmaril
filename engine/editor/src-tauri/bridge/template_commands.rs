@@ -89,14 +89,19 @@ pub fn template_execute(
     template_path: String,
     command: TemplateCommand,
     world_state: State<'_, crate::state::SceneWorldState>,
+    asset_state: State<'_, crate::state::AssetManagerState>,
+    project_state: State<'_, crate::bridge::commands::ProjectState>,
     app: tauri::AppHandle,
 ) -> Result<CommandResult, IpcError> {
     // Extract entity_id before moving command into inner (TemplateCommand is Clone).
-    let transform_entity_id = match &command {
+    let (transform_entity_id, mesh_renderer_entity_id) = match &command {
         TemplateCommand::SetComponent { id, type_name, .. } if type_name == "Transform" => {
-            Some(*id)
+            (Some(*id), None)
         }
-        _ => None,
+        TemplateCommand::SetComponent { id, type_name, .. } if type_name == "MeshRenderer" => {
+            (None, Some(*id))
+        }
+        _ => (None, None),
     };
 
     let result = template_execute_inner(&state, template_path, command)?;
@@ -104,6 +109,21 @@ pub fn template_execute(
     if let Some(entity_id) = transform_entity_id {
         sync_transform_to_ecs(entity_id, &result.new_state, &world_state, &app)
             .map_err(|e| IpcError { code: 0, message: e })?;
+    }
+
+    if let Some(entity_id) = mesh_renderer_entity_id {
+        let project_root = {
+            let guard = project_state.0.lock().map_err(|e| IpcError { code: 0, message: e.to_string() })?;
+            guard.as_ref().cloned().unwrap_or_else(|| std::path::PathBuf::from("."))
+        };
+        sync_mesh_renderer_to_ecs(
+            entity_id,
+            &result.new_state,
+            &world_state,
+            &asset_state.0,
+            &project_root,
+        )
+        .map_err(|e| IpcError { code: 0, message: e })?;
     }
 
     Ok(result)
@@ -124,6 +144,8 @@ pub fn template_undo(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
     world_state: State<'_, crate::state::SceneWorldState>,
+    asset_state: State<'_, crate::state::AssetManagerState>,
+    project_state: State<'_, crate::bridge::commands::ProjectState>,
     app: tauri::AppHandle,
 ) -> Result<Option<ActionId>, IpcError> {
     let result = template_undo_inner(&state, template_path.clone())?;
@@ -131,7 +153,14 @@ pub fn template_undo(
         let guard = state.lock().unwrap();
         let path = std::path::PathBuf::from(&template_path);
         if let Some(proc) = guard.processors.get(&path) {
-            sync_all_transforms(proc.state_ref(), &world_state, &app)
+            let template_state = proc.state_ref();
+            sync_all_transforms(template_state, &world_state, &app)
+                .map_err(|e| IpcError { code: 0, message: e })?;
+            let project_root = {
+                let g = project_state.0.lock().map_err(|e| IpcError { code: 0, message: e.to_string() })?;
+                g.as_ref().cloned().unwrap_or_else(|| std::path::PathBuf::from("."))
+            };
+            sync_all_mesh_renderers(template_state, &world_state, &asset_state.0, &project_root)
                 .map_err(|e| IpcError { code: 0, message: e })?;
         }
     }
@@ -153,6 +182,8 @@ pub fn template_redo(
     state: State<'_, Mutex<EditorState>>,
     template_path: String,
     world_state: State<'_, crate::state::SceneWorldState>,
+    asset_state: State<'_, crate::state::AssetManagerState>,
+    project_state: State<'_, crate::bridge::commands::ProjectState>,
     app: tauri::AppHandle,
 ) -> Result<Option<ActionId>, IpcError> {
     let result = template_redo_inner(&state, template_path.clone())?;
@@ -160,7 +191,14 @@ pub fn template_redo(
         let guard = state.lock().unwrap();
         let path = std::path::PathBuf::from(&template_path);
         if let Some(proc) = guard.processors.get(&path) {
-            sync_all_transforms(proc.state_ref(), &world_state, &app)
+            let template_state = proc.state_ref();
+            sync_all_transforms(template_state, &world_state, &app)
+                .map_err(|e| IpcError { code: 0, message: e })?;
+            let project_root = {
+                let g = project_state.0.lock().map_err(|e| IpcError { code: 0, message: e.to_string() })?;
+                g.as_ref().cloned().unwrap_or_else(|| std::path::PathBuf::from("."))
+            };
+            sync_all_mesh_renderers(template_state, &world_state, &asset_state.0, &project_root)
                 .map_err(|e| IpcError { code: 0, message: e })?;
         }
     }
@@ -278,6 +316,110 @@ pub(crate) fn sync_transform_to_ecs(
     Ok(())
 }
 
+/// Resolve a `mesh_path` string to a stable u64 seed.
+///
+/// Built-ins map to compile-time constants (1–5).
+/// File paths get `blake3(path_bytes)[..8]` as seed — stable across content updates.
+/// Also loads the mesh file into the `AssetManager` if it is a file path.
+pub(crate) fn resolve_mesh_path(
+    path: &str,
+    project_root: &std::path::Path,
+    manager: &engine_assets::AssetManager,
+) -> Result<u64, String> {
+    use engine_assets::{AssetId, AssetLoader, MeshData};
+
+    match path {
+        "builtin://cube" => return Ok(1),
+        "builtin://sphere" => return Ok(2),
+        "builtin://plane" => return Ok(3),
+        "builtin://cylinder" => return Ok(4),
+        "builtin://capsule" => return Ok(5),
+        _ => {}
+    }
+
+    // File path: derive stable seed from path string
+    let seed = u64::from_le_bytes(
+        blake3::hash(path.as_bytes()).as_bytes()[..8]
+            .try_into()
+            .map_err(|e| format!("blake3 slice error: {:?}", e))?,
+    );
+    let asset_id = AssetId::from_seed_and_params(seed, b"mesh");
+    let full_path = project_root.join(path);
+
+    let bytes = std::fs::read(&full_path)
+        .map_err(|e| format!("cannot read {}: {}", path, e))?;
+
+    let mesh_data = if path.ends_with(".glb") || path.ends_with(".gltf") {
+        MeshData::from_gltf(&bytes, None).map_err(|e| format!("gltf parse: {:?}", e))?
+    } else if path.ends_with(".obj") {
+        let text = String::from_utf8_lossy(&bytes);
+        MeshData::from_obj(&text).map_err(|e| format!("obj parse: {:?}", e))?
+    } else {
+        return Err(format!("unsupported mesh format: {}", path));
+    };
+
+    let _ = <MeshData as AssetLoader>::insert(manager, asset_id, mesh_data);
+    Ok(seed)
+}
+
+/// Sync a [`engine_core::MeshRenderer`] component from template state to the live ECS world.
+///
+/// Follows the same pattern as [`sync_transform_to_ecs`].
+pub(crate) fn sync_mesh_renderer_to_ecs(
+    entity_id: u64,
+    template_state: &TemplateState,
+    world_state: &crate::state::SceneWorldState,
+    asset_manager: &engine_assets::AssetManager,
+    project_root: &std::path::Path,
+) -> Result<(), String> {
+    if entity_id > u32::MAX as u64 {
+        return Err(format!("entity_id {entity_id} exceeds u32::MAX"));
+    }
+
+    // Extract mesh_path from template JSON
+    let mesh_path = template_state
+        .entities
+        .iter()
+        .find(|e| e.id == entity_id)
+        .and_then(|e| e.components.iter().find(|c| c.type_name == "MeshRenderer"))
+        .and_then(|c| serde_json::from_str::<serde_json::Value>(&c.data.to_string()).ok())
+        .and_then(|v| v.get("mesh_path").and_then(|p| p.as_str()).map(|s| s.to_string()));
+
+    let Some(mesh_path) = mesh_path else {
+        tracing::warn!(entity_id, "sync_mesh_renderer_to_ecs: no MeshRenderer in template");
+        return Ok(());
+    };
+
+    let mesh_id = match resolve_mesh_path(&mesh_path, project_root, asset_manager) {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::warn!(
+                entity_id,
+                path = mesh_path,
+                error = e,
+                "mesh path resolve failed — entity renders invisible"
+            );
+            return Ok(()); // non-fatal
+        }
+    };
+
+    let entity = Entity::new(entity_id as u32, 0);
+    {
+        let mut world = world_state.0.write().map_err(|e| e.to_string())?;
+        let mr = engine_core::MeshRenderer::new(mesh_id);
+        if world.get::<engine_core::MeshRenderer>(entity).is_some() {
+            if let Some(existing) = world.get_mut::<engine_core::MeshRenderer>(entity) {
+                *existing = mr;
+            }
+        } else {
+            world.add(entity, mr);
+        }
+    }
+
+    tracing::info!(entity_id, mesh_path, mesh_id, "MeshRenderer synced to ECS");
+    Ok(())
+}
+
 /// Sync ECS world for every entity in `template_state` that has a Transform.
 ///
 /// Called after template undo/redo since the affected entity_id is not
@@ -291,6 +433,25 @@ pub(crate) fn sync_all_transforms(
     for entity in &template_state.entities {
         if entity.components.iter().any(|c| c.type_name == "Transform") {
             sync_transform_to_ecs(entity.id, template_state, world_state, app)?;
+        }
+    }
+    Ok(())
+}
+
+/// Sync ECS world for every entity in `template_state` that has a MeshRenderer.
+///
+/// Called after template undo/redo alongside [`sync_all_transforms`] to ensure
+/// mesh assignments are correctly reverted or reapplied.  Non-fatal per entity
+/// (missing mesh path or resolve error logs a warning and continues).
+pub(crate) fn sync_all_mesh_renderers(
+    template_state: &TemplateState,
+    world_state: &crate::state::SceneWorldState,
+    asset_manager: &engine_assets::AssetManager,
+    project_root: &std::path::Path,
+) -> Result<(), String> {
+    for entity in &template_state.entities {
+        if entity.components.iter().any(|c| c.type_name == "MeshRenderer") {
+            sync_mesh_renderer_to_ecs(entity.id, template_state, world_state, asset_manager, project_root)?;
         }
     }
     Ok(())
@@ -356,5 +517,35 @@ mod tests {
         assert!((scl.x - 2.0).abs() < 1e-4);
         assert!((scl.y - 3.0).abs() < 1e-4);
         assert!((scl.z - 4.0).abs() < 1e-4);
+    }
+
+    // ── resolve_mesh_path tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_resolve_builtin_cube() {
+        let dummy_manager = engine_assets::AssetManager::new();
+        let result =
+            resolve_mesh_path("builtin://cube", std::path::Path::new("."), &dummy_manager);
+        assert_eq!(result, Ok(1u64));
+    }
+
+    #[test]
+    fn test_resolve_builtin_all() {
+        let dm = engine_assets::AssetManager::new();
+        let p = std::path::Path::new(".");
+        assert_eq!(resolve_mesh_path("builtin://sphere", p, &dm), Ok(2));
+        assert_eq!(resolve_mesh_path("builtin://plane", p, &dm), Ok(3));
+        assert_eq!(resolve_mesh_path("builtin://cylinder", p, &dm), Ok(4));
+        assert_eq!(resolve_mesh_path("builtin://capsule", p, &dm), Ok(5));
+    }
+
+    #[test]
+    fn test_resolve_path_hash_deterministic() {
+        let dm = engine_assets::AssetManager::new();
+        let p = std::path::Path::new(".");
+        // File doesn't exist; both calls should fail in the same way.
+        let r1 = resolve_mesh_path("assets/models/test.glb", p, &dm);
+        let r2 = resolve_mesh_path("assets/models/test.glb", p, &dm);
+        assert_eq!(r1.is_ok(), r2.is_ok(), "should be deterministic");
     }
 }

@@ -100,6 +100,8 @@ mod platform {
         selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
         /// Current gizmo mode (0=Move, 1=Rotate, 2=Scale), shared with the render thread.
         gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+        /// Asset manager shared with the render thread for mesh GPU upload.
+        asset_manager: Arc<engine_assets::AssetManager>,
     }
 
     impl NativeViewport {
@@ -108,6 +110,7 @@ mod platform {
             world: Arc<std::sync::RwLock<engine_core::World>>,
             selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
             gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+            asset_manager: Arc<engine_assets::AssetManager>,
         ) -> Result<Self, String> {
             tracing::info!(hwnd = ?parent_hwnd, "NativeViewport created for window");
             Ok(Self {
@@ -120,6 +123,7 @@ mod platform {
                 screenshot_slot: Arc::new(Mutex::new(None)),
                 selected_entity_id,
                 gizmo_mode,
+                asset_manager,
             })
         }
 
@@ -132,6 +136,7 @@ mod platform {
             let screenshot_slot = self.screenshot_slot.clone();
             let selected_entity_id = self.selected_entity_id.clone();
             let gizmo_mode = self.gizmo_mode.clone();
+            let asset_manager = self.asset_manager.clone();
 
             let handle = std::thread::Builder::new()
                 .name("viewport-render".into())
@@ -139,7 +144,7 @@ mod platform {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode);
+                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode, asset_manager);
                     })) {
                         Ok(()) => tracing::info!("Viewport render thread stopped"),
                         Err(e) => {
@@ -417,6 +422,22 @@ mod platform {
             } else {
                 let proj = Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far);
                 proj * view
+            }
+        }
+
+        /// View matrix (world → camera space). Used to construct separate ViewportDescriptor.
+        fn view_matrix(&self) -> Mat4 {
+            Mat4::look_at_rh(self.eye(), self.target, Vec3::Y)
+        }
+
+        /// Projection matrix. Used to construct separate ViewportDescriptor.
+        fn proj_matrix(&self, aspect: f32, is_ortho: bool) -> Mat4 {
+            if is_ortho {
+                let half_h = self.distance * (self.fov_y * 0.5).tan();
+                let half_w = half_h * aspect;
+                Mat4::orthographic_rh(-half_w, half_w, -half_h, half_h, self.near, self.far * 2.0)
+            } else {
+                Mat4::perspective_rh(self.fov_y, aspect, self.near, self.far)
             }
         }
 
@@ -885,9 +906,10 @@ void main() {
         fn render_frame(
             &mut self,
             viewports: &[(ViewportBounds, OrbitCamera, bool, bool)],
-            _world: &std::sync::RwLock<engine_core::World>,
+            world: &std::sync::RwLock<engine_core::World>,
             selected_entity_id: Option<u64>,
             gizmo_mode: crate::viewport::gizmo_pipeline::GizmoMode,
+            asset_manager: &engine_assets::AssetManager,
         ) -> Result<(), String> {
             if self.needs_recreate {
                 self.renderer
@@ -910,11 +932,33 @@ void main() {
                 self.grid_pipeline.record(cmd, extent, viewports);
             }
 
+            // Build ViewportDescriptors with separate view/proj for render_meshes
+            let vp_descs: Vec<engine_renderer::ViewportDescriptor> = viewports
+                .iter()
+                .map(|(bounds, cam, _grid_visible, is_ortho)| {
+                    let aspect = if bounds.height > 0 {
+                        bounds.width as f32 / bounds.height as f32
+                    } else {
+                        1.0
+                    };
+                    engine_renderer::ViewportDescriptor {
+                        bounds: engine_render_context::Rect {
+                            x: bounds.x,
+                            y: bounds.y,
+                            width: bounds.width,
+                            height: bounds.height,
+                        },
+                        view: cam.view_matrix(),
+                        proj: cam.proj_matrix(aspect, *is_ortho),
+                    }
+                })
+                .collect();
+
             // Record gizmo draw commands — one call per viewport sub-rect so
             // each sub-rect gets its own view/projection matrix.
             // The grid pipeline's record already set viewport/scissor to the
             // last sub-rect; we re-set them here for correctness.
-            if let Ok(world_guard) = _world.read() {
+            if let Ok(world_guard) = world.read() {
                 unsafe {
                     for (bounds, camera, _grid_visible, is_ortho) in viewports {
                         let sx = bounds.x.max(0) as u32;
@@ -957,10 +1001,10 @@ void main() {
                         );
                     }
                 }
-            }
 
-            // TODO(Task 8): wire render_meshes once SceneWorldState is available
-            // self.renderer.render_meshes(&recorder, &world, None, &vp_descs);
+                // Render meshes from ECS world (Phase 1.8)
+                self.renderer.render_meshes(&recorder, &world_guard, Some(asset_manager), &vp_descs);
+            }
 
             self.renderer.end_frame(recorder);
             Ok(())
@@ -980,6 +1024,7 @@ void main() {
         screenshot_slot: Arc<Mutex<Option<std::sync::mpsc::SyncSender<Result<Vec<u8>, String>>>>>,
         selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
         gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+        asset_manager: Arc<engine_assets::AssetManager>,
     ) {
         let (init_w, init_h) = client_size(hwnd);
         let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h) {
@@ -1022,7 +1067,7 @@ void main() {
                 2 => crate::viewport::gizmo_pipeline::GizmoMode::Scale,
                 _ => crate::viewport::gizmo_pipeline::GizmoMode::Move,
             };
-            if let Err(e) = renderer.render_frame(&viewports, &world, selected_id, gizmo_mode_val) {
+            if let Err(e) = renderer.render_frame(&viewports, &world, selected_id, gizmo_mode_val, &asset_manager) {
                 tracing::error!(error = %e, "render_frame failed");
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }

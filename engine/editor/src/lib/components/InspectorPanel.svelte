@@ -1,6 +1,6 @@
 <!-- src/lib/components/InspectorPanel.svelte -->
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { t } from '$lib/i18n';
   import type { SceneEntity } from '$lib/scene/state';
   import { subscribeSchemas, getSchemas } from '$lib/inspector/schema-store';
@@ -11,6 +11,9 @@
   import Vec3Field   from '$lib/inspector/widgets/Vec3Field.svelte';
   import EnumField   from '$lib/inspector/widgets/EnumField.svelte';
   import StringField from '$lib/inspector/widgets/StringField.svelte';
+  import { assignMesh } from '$lib/api';
+  import { getActiveTemplatePath } from '$lib/stores/undo-history';
+  import { getAssets, subscribeAssets, type AssetEntry } from '$lib/stores/assets';
 
   let { entity = null }: { entity: SceneEntity | null } = $props();
 
@@ -22,6 +25,24 @@
   // Refresh schemas when store loads (schemas arrive async after startup)
   const unsub = subscribeSchemas(() => { schemas = getSchemas(); });
   onDestroy(unsub);
+
+  // Mesh asset list for the MeshRenderer picker
+  let meshAssets = $state<AssetEntry[]>(getAssets().filter((a) => a.assetType === 'mesh'));
+  let unsubAssets: (() => void) | null = null;
+  onMount(() => {
+    unsubAssets = subscribeAssets((list) => {
+      meshAssets = list.filter((a) => a.assetType === 'mesh');
+    });
+  });
+  onDestroy(() => unsubAssets?.());
+
+  async function onMeshChange(event: Event): Promise<void> {
+    if (!entity) return;
+    const meshPath = (event.target as HTMLSelectElement).value;
+    const templatePath = getActiveTemplatePath();
+    if (!templatePath) return;
+    await assignMesh(entity.id, templatePath, meshPath);
+  }
 
   function toggleSection(name: string) {
     collapsedSections[name] = !collapsedSections[name];
@@ -85,7 +106,32 @@
 
         {#if !collapsedSections[componentName]}
           <div class="component-body">
-            {#if schema}
+            {#if componentName === 'MeshRenderer'}
+              <!-- Mesh picker row -->
+              <div class="field-row">
+                <span class="field-label">Mesh</span>
+                <select
+                  class="mesh-select"
+                  value={String(entity.componentValues?.['MeshRenderer']?.['mesh_path'] ?? 'builtin://cube')}
+                  onchange={onMeshChange}
+                >
+                  <optgroup label="Primitives">
+                    <option value="builtin://cube">Cube</option>
+                    <option value="builtin://sphere">Sphere</option>
+                    <option value="builtin://plane">Plane</option>
+                    <option value="builtin://cylinder">Cylinder</option>
+                    <option value="builtin://capsule">Capsule</option>
+                  </optgroup>
+                  {#if meshAssets.length > 0}
+                    <optgroup label="Models">
+                      {#each meshAssets as asset (asset.path)}
+                        <option value={asset.path}>{asset.filename}</option>
+                      {/each}
+                    </optgroup>
+                  {/if}
+                </select>
+              </div>
+            {:else if schema}
               {#each schema.fields as field (field.name)}
                 {@const ft = field.field_type}
                 {@const val = fieldValue(componentName, field.name)}
@@ -413,4 +459,18 @@
   }
 
   .picker-backdrop { position: fixed; inset: 0; z-index: 99; }
+
+  .mesh-select {
+    flex: 1;
+    background: var(--color-bg, #1e1e1e);
+    border: 1px solid var(--color-border, #404040);
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 11px;
+    color: var(--color-text, #ccc);
+    outline: none;
+    font-family: inherit;
+    min-width: 0;
+  }
+  .mesh-select:focus { border-color: var(--color-accent, #007acc); }
 </style>
