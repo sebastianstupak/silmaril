@@ -289,6 +289,9 @@ pub fn run() {
     let ai_bridge_state = AiBridgeState::new(registry_rx.clone());
     let registry = Arc::new(Mutex::new(registry));
 
+    let asset_manager = Arc::new(engine_assets::AssetManager::new());
+    crate::state::primitives::register_primitives(&asset_manager);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
@@ -302,6 +305,7 @@ pub fn run() {
         .manage(TerminalState::new())
         .manage(OutputState::new())
         .manage(crate::state::SceneWorldState::new())
+        .manage(crate::state::AssetManagerState(asset_manager))
         .invoke_handler(tauri::generate_handler![
             commands::get_editor_state,
             commands::get_component_schemas,

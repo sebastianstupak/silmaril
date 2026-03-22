@@ -28,6 +28,7 @@ codegen = []
 engine-ops = { path = "../ops" }
 engine-core = { path = "../core" }
 engine-ai = { path = "../ai" }
+engine-assets = { path = "../assets" }
 tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
