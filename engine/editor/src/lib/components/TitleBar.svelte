@@ -10,16 +10,7 @@
   import { t } from '$lib/i18n';
   import Omnibar from '$lib/omnibar/Omnibar.svelte';
   import type { RecentItem } from '$lib/stores/recent-items';
-
-  // ── Panel catalogue ────────────────────────────────────────────────────────
-  const ALL_PANELS: { id: string; label: string }[] = [
-    { id: 'hierarchy', label: 'Hierarchy' },
-    { id: 'viewport',  label: 'Viewport'  },
-    { id: 'inspector', label: 'Inspector' },
-    { id: 'console',   label: 'Console'   },
-    { id: 'profiler',  label: 'Profiler'  },
-    { id: 'assets',    label: 'Assets'    },
-  ];
+  import type { PanelContribution } from '$lib/contributions/registry';
 
   // ── Props ──────────────────────────────────────────────────────────────────
   interface Props {
@@ -48,6 +39,7 @@
     onOmnibarClose?: () => void;
     projectPath?: string | null;
     recentItems?: RecentItem[];
+    panelContributions?: PanelContribution[];
   }
 
   let {
@@ -76,6 +68,7 @@
     onOmnibarClose,
     projectPath = null,
     recentItems = [],
+    panelContributions = [],
   }: Props = $props();
 
   const MAX_VISIBLE_SLOTS = 4;
@@ -305,32 +298,6 @@
         </DropdownMenu.Content>
       </DropdownMenu.Root>
 
-      <!-- View -->
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger class="menu-trigger" title={t('menu.view')}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-            <path d="M7 2C4 2 1.5 4.5 1 7c.5 2.5 3 5 6 5s5.5-2.5 6-5c-.5-2.5-3-5-6-5zm0 8a3 3 0 110-6 3 3 0 010 6zm0-4.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"/>
-          </svg>
-          <span class="menu-label">{t('menu.view')}</span>
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Content align="start" sideOffset={4} class="min-w-[200px]">
-          <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger>{t('menu.view.layout')}</DropdownMenu.SubTrigger>
-            <DropdownMenu.SubContent>
-              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-scene')}>{t('layout.scene')}</DropdownMenu.Item>
-              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-code')}>{t('layout.code')}</DropdownMenu.Item>
-              <DropdownMenu.Item onclick={() => onApplyLayout?.('builtin-perf')}>{t('layout.perf')}</DropdownMenu.Item>
-            </DropdownMenu.SubContent>
-          </DropdownMenu.Sub>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item onclick={() => onLayoutReset?.()}>{t('layout.reset')}</DropdownMenu.Item>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item onclick={() => $aiServerRunning ? stopAiServer() : startAiServer('')}>
-            {$aiServerRunning ? 'Stop AI Server' : 'Start AI Server'}
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Root>
-
       <!-- Entity -->
       <DropdownMenu.Root>
         <DropdownMenu.Trigger class="menu-trigger" title={t('menu.entity')}>
@@ -546,6 +513,20 @@
       </div>
     {/if}
 
+    <!-- ── AI Server indicator ── -->
+    <button
+      class="icon-btn ai-server-btn"
+      class:ai-running={$aiServerRunning}
+      onclick={() => $aiServerRunning ? stopAiServer() : startAiServer('')}
+      title={$aiServerRunning ? 'AI Server running — click to stop' : 'Start AI Server'}
+      aria-label={$aiServerRunning ? 'Stop AI Server' : 'Start AI Server'}
+    >
+      <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
+        <path d="M7 1L1 8h5l-1 5 6-7H6l1-5z"/>
+      </svg>
+      <span class="ai-server-dot" aria-hidden="true"></span>
+    </button>
+
     <!-- ── Panel management ── -->
     <div class="panels-btn-wrapper">
       <button
@@ -566,14 +547,14 @@
       {#if showPanelsMenu}
         <div class="panels-menu" role="menu" aria-label="Panels">
           <div class="panels-menu-header">Panels</div>
-          {#each ALL_PANELS as panel}
+          {#each panelContributions as panel}
             {@const isOpen = activePanels.has(panel.id)}
             <button
               class="panel-item"
               class:is-open={isOpen}
               onclick={(e) => { e.stopPropagation(); if (!isOpen) { onAddPanel?.(panel.id); } showPanelsMenu = false; }}
               role="menuitem"
-              title={isOpen ? `${panel.label} is already open` : `Add ${panel.label}`}
+              title={isOpen ? `${panel.title} is already open` : `Add ${panel.title}`}
             >
               <span class="panel-indicator" aria-hidden="true">
                 {#if isOpen}
@@ -587,7 +568,7 @@
                   </svg>
                 {/if}
               </span>
-              <span>{panel.label}</span>
+              <span>{panel.title}</span>
             </button>
           {/each}
         </div>
@@ -1104,5 +1085,28 @@
     height: 1px;
     background: color-mix(in srgb, var(--color-border, #404040) 50%, transparent);
     margin: 3px 0;
+  }
+
+  /* ── AI Server indicator ─────────────────────────────────────────────────── */
+  .ai-server-btn {
+    position: relative;
+  }
+  .ai-server-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-textDim, #666);
+    transition: background 0.2s;
+  }
+  .ai-server-btn.ai-running .ai-server-dot {
+    background: #4caf50;
+    animation: ai-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes ai-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 </style>

@@ -636,6 +636,7 @@
         {recentItems}
         onOmnibarOpen={() => { omnibarOpen = true; }}
         onOmnibarClose={() => { omnibarOpen = false; }}
+        {panelContributions}
       />
   {/if}
 
