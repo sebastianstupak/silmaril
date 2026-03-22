@@ -738,6 +738,354 @@ mod imp {
         Ok((pipeline, layout))
     }
 
+    fn create_gizmo_solid_pipeline(
+        device: &ash::Device,
+        render_pass: vk::RenderPass,
+        vert: &ShaderModule,
+        frag: &ShaderModule,
+    ) -> Result<(vk::Pipeline, vk::PipelineLayout), String> {
+        let stages = [vert.stage_create_info(), frag.stage_create_info()];
+        let binding = vk::VertexInputBindingDescription::default()
+            .binding(0)
+            .stride(std::mem::size_of::<GizmoVertex>() as u32) // 12 bytes
+            .input_rate(vk::VertexInputRate::VERTEX);
+        let attrs = [vk::VertexInputAttributeDescription::default()
+            .location(0)
+            .binding(0)
+            .format(vk::Format::R32G32B32_SFLOAT)
+            .offset(0)];
+
+        // Dummy viewport/scissor — overridden by dynamic state at draw time.
+        let vp =
+            vk::Viewport::default().width(1.0).height(1.0).max_depth(1.0);
+        let sc =
+            vk::Rect2D::default().extent(vk::Extent2D { width: 1, height: 1 });
+
+        // 112-byte push constant block shared by both stages.
+        let push_range = vk::PushConstantRange::default()
+            .stage_flags(
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            )
+            .offset(0)
+            .size(std::mem::size_of::<GizmoPushConstants>() as u32);
+
+        let layout = unsafe {
+            device
+                .create_pipeline_layout(
+                    &vk::PipelineLayoutCreateInfo::default()
+                        .push_constant_ranges(std::slice::from_ref(&push_range)),
+                    None,
+                )
+                .map_err(|e| format!("gizmo solid pipeline layout: {e}"))?
+        };
+
+        let blend_attachment = vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(vk::ColorComponentFlags::RGBA);
+
+        let pipeline = unsafe {
+            device
+                .create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    &[vk::GraphicsPipelineCreateInfo::default()
+                        .stages(&stages)
+                        .vertex_input_state(
+                            &vk::PipelineVertexInputStateCreateInfo::default()
+                                .vertex_binding_descriptions(std::slice::from_ref(
+                                    &binding,
+                                ))
+                                .vertex_attribute_descriptions(&attrs),
+                        )
+                        .input_assembly_state(
+                            &vk::PipelineInputAssemblyStateCreateInfo::default()
+                                .topology(vk::PrimitiveTopology::TRIANGLE_LIST),
+                        )
+                        .viewport_state(
+                            &vk::PipelineViewportStateCreateInfo::default()
+                                .viewports(std::slice::from_ref(&vp))
+                                .scissors(std::slice::from_ref(&sc)),
+                        )
+                        .rasterization_state(
+                            &vk::PipelineRasterizationStateCreateInfo::default()
+                                .polygon_mode(vk::PolygonMode::FILL)
+                                .cull_mode(vk::CullModeFlags::NONE)
+                                .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+                                .line_width(1.0),
+                        )
+                        .multisample_state(
+                            &vk::PipelineMultisampleStateCreateInfo::default()
+                                .rasterization_samples(vk::SampleCountFlags::TYPE_1),
+                        )
+                        .depth_stencil_state(
+                            // No depth test so gizmos are always visible.
+                            &vk::PipelineDepthStencilStateCreateInfo::default()
+                                .depth_test_enable(false)
+                                .depth_write_enable(false),
+                        )
+                        .color_blend_state(
+                            &vk::PipelineColorBlendStateCreateInfo::default()
+                                .attachments(std::slice::from_ref(&blend_attachment)),
+                        )
+                        .dynamic_state(
+                            &vk::PipelineDynamicStateCreateInfo::default()
+                                .dynamic_states(&[
+                                    vk::DynamicState::VIEWPORT,
+                                    vk::DynamicState::SCISSOR,
+                                ]),
+                        )
+                        .layout(layout)
+                        .render_pass(render_pass)
+                        .subpass(0)],
+                    None,
+                )
+                .map_err(|(_, e)| {
+                    device.destroy_pipeline_layout(layout, None);
+                    format!("gizmo solid pipeline: {e}")
+                })?[0]
+        };
+
+        info!("GizmoSolidPipeline Vulkan pipeline created (TRIANGLE_LIST, no depth test)");
+        Ok((pipeline, layout))
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // GizmoSolidPipeline
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// Gizmo overlay pipeline using TRIANGLE_LIST topology.
+    ///
+    /// Renders solid cone tips (Move mode) and solid cube tips (Scale mode)
+    /// on the selected entity.  Uses the same vertex/fragment shaders as
+    /// `GizmoPipeline` — only the topology differs.
+    #[allow(dead_code)]
+    pub struct GizmoSolidPipeline {
+        device: ash::Device,
+        pipeline: vk::Pipeline,
+        pipeline_layout: vk::PipelineLayout,
+        _vert_shader: ShaderModule,
+        _frag_shader: ShaderModule,
+
+        // Move cone solid buffers
+        move_x_cone_solid_buf: GpuBuffer,
+        move_x_cone_solid_count: u32,
+        move_y_cone_solid_buf: GpuBuffer,
+        move_y_cone_solid_count: u32,
+        move_z_cone_solid_buf: GpuBuffer,
+        move_z_cone_solid_count: u32,
+
+        // Scale cube solid buffers
+        scale_x_cube_solid_buf: GpuBuffer,
+        scale_x_cube_solid_count: u32,
+        scale_y_cube_solid_buf: GpuBuffer,
+        scale_y_cube_solid_count: u32,
+        scale_z_cube_solid_buf: GpuBuffer,
+        scale_z_cube_solid_count: u32,
+
+        /// Which gizmo axis is currently hovered (0 = none, 1..=6 = axes).
+        /// Shared with the main thread via atomic for hover highlighting.
+        hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
+    }
+
+    impl GizmoSolidPipeline {
+        pub fn new(
+            context: &VulkanContext,
+            render_pass: vk::RenderPass,
+            hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
+        ) -> Result<Self, String> {
+            let device = &context.device;
+            let (vert_spirv, frag_spirv) = get_or_compile_shaders()?;
+            let vert_shader =
+                ShaderModule::from_spirv(device, vert_spirv, vk::ShaderStageFlags::VERTEX, "main")
+                    .map_err(|e| format!("SolidGizmoVertShader: {e}"))?;
+            let frag_shader = ShaderModule::from_spirv(
+                device,
+                frag_spirv,
+                vk::ShaderStageFlags::FRAGMENT,
+                "main",
+            )
+            .map_err(|e| format!("SolidGizmoFragShader: {e}"))?;
+
+            let (pipeline, pipeline_layout) =
+                create_gizmo_solid_pipeline(device, render_pass, &vert_shader, &frag_shader)?;
+
+            // ── Generate and upload geometry ──────────────────────────────
+            macro_rules! upload {
+                ($verts:expr) => {{
+                    let v = $verts;
+                    let count = v.len() as u32;
+                    let buf = upload_verts(context, &v)?;
+                    (buf, count)
+                }};
+            }
+
+            let (move_x_cone_solid_buf, move_x_cone_solid_count) =
+                upload!(generate_move_cone_solid_vertices(GizmoAxis::X));
+            let (move_y_cone_solid_buf, move_y_cone_solid_count) =
+                upload!(generate_move_cone_solid_vertices(GizmoAxis::Y));
+            let (move_z_cone_solid_buf, move_z_cone_solid_count) =
+                upload!(generate_move_cone_solid_vertices(GizmoAxis::Z));
+            let (scale_x_cube_solid_buf, scale_x_cube_solid_count) =
+                upload!(generate_scale_cube_solid_vertices(GizmoAxis::X));
+            let (scale_y_cube_solid_buf, scale_y_cube_solid_count) =
+                upload!(generate_scale_cube_solid_vertices(GizmoAxis::Y));
+            let (scale_z_cube_solid_buf, scale_z_cube_solid_count) =
+                upload!(generate_scale_cube_solid_vertices(GizmoAxis::Z));
+
+            tracing::info!("GizmoSolidPipeline created");
+            Ok(Self {
+                device: device.clone(),
+                pipeline,
+                pipeline_layout,
+                _vert_shader: vert_shader,
+                _frag_shader: frag_shader,
+                move_x_cone_solid_buf,
+                move_x_cone_solid_count,
+                move_y_cone_solid_buf,
+                move_y_cone_solid_count,
+                move_z_cone_solid_buf,
+                move_z_cone_solid_count,
+                scale_x_cube_solid_buf,
+                scale_x_cube_solid_count,
+                scale_y_cube_solid_buf,
+                scale_y_cube_solid_count,
+                scale_z_cube_solid_buf,
+                scale_z_cube_solid_count,
+                hovered_gizmo_axis,
+            })
+        }
+
+        /// Record solid-tip draw commands for the selected entity.
+        ///
+        /// Caller must have already opened a render pass and set
+        /// viewport/scissor dynamic state.
+        pub unsafe fn record(
+            &self,
+            cmd: vk::CommandBuffer,
+            world: &engine_core::World,
+            selected_entity_id: Option<u64>,
+            mode: GizmoMode,
+            view_proj: glam::Mat4,
+            camera_pos: glam::Vec3,
+        ) {
+            let device = &self.device;
+            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+
+            let hover_raw =
+                self.hovered_gizmo_axis.load(std::sync::atomic::Ordering::Relaxed);
+
+            for entity in world.entities() {
+                let Some(transform) = world.get::<engine_core::Transform>(entity) else {
+                    continue;
+                };
+
+                let is_selected = selected_entity_id.map_or(false, |id| {
+                    if id > u32::MAX as u64 {
+                        return false;
+                    }
+                    entity.id() == id as u32
+                });
+                if !is_selected {
+                    continue;
+                }
+
+                let origin = transform.position;
+                let dist = (camera_pos - origin).length().max(0.1);
+                let scale = dist * 0.15;
+
+                match mode {
+                    GizmoMode::Move => {
+                        self.draw_solid(
+                            cmd, device, &self.move_x_cone_solid_buf, view_proj,
+                            origin.into(), axis_color(GizmoAxis::X, hover_raw == 1),
+                            scale, self.move_x_cone_solid_count,
+                        );
+                        self.draw_solid(
+                            cmd, device, &self.move_y_cone_solid_buf, view_proj,
+                            origin.into(), axis_color(GizmoAxis::Y, hover_raw == 2),
+                            scale, self.move_y_cone_solid_count,
+                        );
+                        self.draw_solid(
+                            cmd, device, &self.move_z_cone_solid_buf, view_proj,
+                            origin.into(), axis_color(GizmoAxis::Z, hover_raw == 3),
+                            scale, self.move_z_cone_solid_count,
+                        );
+                    }
+                    GizmoMode::Scale => {
+                        self.draw_solid(
+                            cmd, device, &self.scale_x_cube_solid_buf, view_proj,
+                            origin.into(), axis_color(GizmoAxis::X, hover_raw == 1),
+                            scale, self.scale_x_cube_solid_count,
+                        );
+                        self.draw_solid(
+                            cmd, device, &self.scale_y_cube_solid_buf, view_proj,
+                            origin.into(), axis_color(GizmoAxis::Y, hover_raw == 2),
+                            scale, self.scale_y_cube_solid_count,
+                        );
+                        self.draw_solid(
+                            cmd, device, &self.scale_z_cube_solid_buf, view_proj,
+                            origin.into(), axis_color(GizmoAxis::Z, hover_raw == 3),
+                            scale, self.scale_z_cube_solid_count,
+                        );
+                    }
+                    GizmoMode::Rotate => {
+                        // Rotate mode uses rings (lines) only — no solid tips.
+                    }
+                }
+            }
+        }
+
+        /// Push constants and issue a single triangle-list draw.
+        #[allow(clippy::too_many_arguments)]
+        unsafe fn draw_solid(
+            &self,
+            cmd: vk::CommandBuffer,
+            device: &ash::Device,
+            buf: &GpuBuffer,
+            view_proj: glam::Mat4,
+            origin: [f32; 3],
+            color: [f32; 4],
+            scale: f32,
+            vertex_count: u32,
+        ) {
+            device.cmd_bind_vertex_buffers(cmd, 0, &[buf.handle()], &[0]);
+            let pc = GizmoPushConstants {
+                view_proj: view_proj.to_cols_array_2d(),
+                origin,
+                _pad0: 0.0,
+                color,
+                scale,
+                _pad1: [0.0; 3],
+            };
+            let pc_bytes = std::slice::from_raw_parts(
+                &pc as *const GizmoPushConstants as *const u8,
+                std::mem::size_of::<GizmoPushConstants>(),
+            );
+            device.cmd_push_constants(
+                cmd,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                0,
+                pc_bytes,
+            );
+            device.cmd_draw(cmd, vertex_count, 1, 0, 0);
+        }
+    }
+
+    impl Drop for GizmoSolidPipeline {
+        fn drop(&mut self) {
+            unsafe {
+                self.device.destroy_pipeline(self.pipeline, None);
+                self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+            }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Tests
     // ─────────────────────────────────────────────────────────────────────
@@ -913,7 +1261,7 @@ pub use imp::{
     generate_crosshair_vertices, generate_move_arrow_vertices,
     generate_move_cone_solid_vertices, generate_rotate_ring_vertices,
     generate_scale_cube_solid_vertices, generate_scale_handle_vertices, GizmoAxis,
-    GizmoMode, GizmoPipeline, GizmoVertex,
+    GizmoMode, GizmoPipeline, GizmoSolidPipeline, GizmoVertex,
 };
 
 // On non-Windows platforms expose only the pure-Rust types (no Vulkan needed).
