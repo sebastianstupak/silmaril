@@ -653,7 +653,8 @@
 <style>
   /* ── Titlebar shell ─────────────────────────────────────────────────────── */
   .titlebar {
-    height: 32px;
+    --titlebar-height: 32px;
+    height: var(--titlebar-height);
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
