@@ -24,8 +24,8 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 | Phase | Duration | Key Deliverables | Status |
 |-------|----------|------------------|--------|
-| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | 🟡 ~99% (Profiling ✅, Docs ✅, **CLI ✅**, **Editor ✅ ~98%** — Tauri/Vulkan/panels/omnibar/undo-redo/CQRS/recent-items/hierarchy CRUD/inspector add-remove/assets panel all done; terminal+output panels next) |
-| **Phase 1** | 6-7 weeks | Core ECS + Basic Rendering + **Agentic Rendering Debug** | ✅ ~85-90% (ECS ✅, Serialization ✅, Templates ✅, Rendering ✅, Agentic Debug ✅, Assets ✅, Frame Capture ✅) |
+| **Phase 0** | 4-5 weeks | Documentation, CI, profiling, **CLI tool**, **Editor foundation** | ✅ **COMPLETE** (Profiling ✅, Docs ✅, **CLI ✅**, **Editor ✅** — Tauri/Vulkan/panels/omnibar/undo-redo/CQRS/recent-items/hierarchy CRUD/inspector add-remove/assets panel/terminal+output/gizmos/mesh rendering/E2E CI all done) |
+| **Phase 1** | 6-7 weeks | Core ECS + Basic Rendering + **Agentic Rendering Debug** | ✅ ~90-95% (ECS ✅, Serialization ✅, Templates ✅, Rendering ✅, Agentic Debug ✅, Assets ✅, Frame Capture ✅, **Mesh Rendering ✅**) |
 | **Phase 2** | 3-4 weeks | Networking + Client/Server | 🟡 ~75-80% (Foundation ✅, TCP/UDP ✅, Prediction ✅, Server Loop ✅, TLS ✅, Missing: Full E2E integration) |
 | **Phase 3** | 3-4 weeks | Physics + Audio + LOD | 🟡 ~35-40% (Audio ✅ 100%, Physics ~40-50%, Interest Mgmt ~30-40%, LOD ⚪ Not Started) |
 | **Phase 4** | 3-4 weeks | Polish + Production Features + **Editor Advanced** | ⚪ Not Started |
@@ -35,14 +35,15 @@ Build **Silmaril**: a fully automatable game engine optimized for AI agent workf
 
 **New Additions:**
 - **Phase 0.7: Silm CLI Tool** ✅ **COMPLETE** - Code-first game development
-- **Phase 0.8: Editor Foundation** ✅ **COMPLETE** - Tauri + Svelte + Vulkan viewport + docking + omnibar + undo/redo + CQRS + recent items + hierarchy CRUD + inspector add/remove + assets panel + terminal + output panels
+- **Phase 0.8: Editor Foundation** ✅ **COMPLETE** - Tauri + Svelte + Vulkan viewport + docking + omnibar + undo/redo + CQRS + recent items + hierarchy CRUD + inspector add/remove + assets panel + terminal + output panels + viewport gizmos + **mesh rendering** (storage buffer, 5 primitives, drag-drop assignment, inspector picker)
+- **Phase 0.9: Editor Test Infrastructure** ✅ **COMPLETE** - Vitest coverage + Playwright E2E (37 tests) + 4-job CI workflow (typecheck/unit/rust/e2e)
 - **Phase 4.9: Editor Advanced Features** 🟢 **LOW** - Drag-drop, full AI integration (3-4 weeks)
 
 ---
 
 ## 📋 **Phase 0: Documentation, Foundation & Developer Tools** (Weeks 1-5)
 
-**Status:** 🟡 **~99% Complete** (Profiling ✅, Repo Setup ✅, Docs ✅, Dev Tools ✅, CLI ✅, **Editor 🟡 ~98%**)
+**Status:** 🟡 **~99% Complete** (Profiling ✅, Repo Setup ✅, Docs ✅, Dev Tools ✅, CLI ✅, **Editor 🟡 ~99%**, **E2E CI ✅**)
 
 ### **Goals**
 - Complete technical documentation
@@ -336,13 +337,38 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 - [x] Inspector add/remove component (picker + Tauri IPC stubs) ✅
 - [x] Recent projects persist (store, omnibar wired, addRecentItem on open) ✅
 - [x] Terminal + Output panels ✅ (interactive PTY terminal + cargo build log with ANSI renderer)
+- [x] Viewport gizmos ✅ (crosshair axis gizmos for all entities, move/rotate/scale handles for selected entity, Vulkan pipeline with depth-test disabled, constant screen-space size)
+- [x] Gizmo commands ✅ (`gizmo_hit_test`, `gizmo_drag`, `gizmo_drag_end`, `set_gizmo_mode` — all registered in lib.rs)
+- [x] Editor E2E test suite ✅ (Playwright, 22 functional tests + 15 viewport/gizmo screenshot tests, CI workflow with 4 jobs: typecheck/unit/rust/e2e)
+- [x] Mesh rendering ✅ (storage buffer Bevy-pattern, 5 built-in primitives, .glb/.obj file assets, drag-drop from AssetsPanel, inspector picker, undo/redo sync)
 - [ ] Documentation (editor-guide.md) ⬜
 
-**Note:** Editor is **optional** - CLI (`silm`) is primary workflow. Editor provides visual tools for those who prefer it. Phase 0.8 is now 100% complete.
+**Note:** Editor is **optional** - CLI (`silm`) is primary workflow. Editor provides visual tools for those who prefer it. Phase 0.8 is now ✅ **COMPLETE**.
 
 ---
 
-**Phase 0 Time Estimate:** ✅ **COMPLETE** — CLI shipped, Editor 100% done.
+#### **0.9 Editor Test Infrastructure** ✅ **COMPLETE**
+
+**Priority:** 🟢 **QUALITY** - CI gates, coverage, and visual regression baseline
+
+- [x] Vitest unit test suite with `@vitest/coverage-v8` ✅
+  - Coverage thresholds: lines 50%, functions 35%, branches 45%, statements 50%
+  - `all: true` so unimported files appear in reports
+  - Artifacts uploaded to CI on every run
+- [x] Playwright E2E test suite (`@playwright/test`) ✅
+  - `e2e/editor.spec.ts` — 22 tests: hierarchy CRUD, inspector, components, tools, keyboard shortcuts
+  - `e2e/viewport.spec.ts` — 15 tests: gizmos, tool switching, transform editing, axis labels + screenshots
+  - `playwright.config.ts` — chromium, 1440×900, `vite preview` server, retries on CI
+  - Screenshots saved to `e2e/screenshots/` on every run (CI artefact)
+- [x] GitHub Actions workflow (`editor.yml`) ✅ — 4 jobs with concurrency cancellation:
+  - `typecheck` — TypeScript `tsc --noEmit` (ubuntu, `continue-on-error: true`)
+  - `unit` — Vitest coverage + upload `coverage/` artefact (ubuntu)
+  - `rust` — cargo test + xtask lint + xtask check-bindings (windows)
+  - `e2e` — `needs: [unit]`, build app, Playwright, upload `playwright-report/` + `test-results/` artefacts (ubuntu)
+
+---
+
+**Phase 0 Time Estimate:** ✅ **COMPLETE** — CLI shipped, Editor complete (mesh rendering done 2026-03-22).
 
 ---
 
@@ -536,16 +562,18 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 
 **Time Estimate:** 12-15 days
 
-#### **1.8 Mesh Rendering** ⚠️ **MUST READ:** [docs/tasks/phase1-8-mesh-rendering.md](docs/tasks/phase1-8-mesh-rendering.md)
-- [ ] Graphics pipeline (uses Asset system)
-- [ ] GPU mesh upload (uses AssetManager)
-- [ ] Transform component
-- [ ] MVP matrix calculation
-- [ ] Push constants for transforms
-- [ ] Depth buffer
-- [ ] Render system (World → Vulkan)
+#### **1.8 Mesh Rendering** ✅ **COMPLETE** - [docs/superpowers/specs/2026-03-22-mesh-rendering-design.md](docs/superpowers/specs/2026-03-22-mesh-rendering-design.md)
+- [x] Graphics pipeline (storage buffer, STORAGE_BUFFER descriptor at binding 0) ✅
+- [x] GPU mesh upload (AssetManager → MeshUniformBuffer via RefCell) ✅
+- [x] MeshUniform (Bevy pattern: world_from_local + local_from_world_transpose, 128 bytes) ✅
+- [x] VP push constant (64 bytes, per viewport) + SSBO indexed by gl_InstanceIndex ✅
+- [x] 5 built-in primitives (cube, sphere, plane, cylinder, capsule) with stable seed IDs ✅
+- [x] Render system (World → Vulkan: ECS MeshRenderer → draw list) ✅
+- [x] Editor assign_mesh command + sync_mesh_renderer_to_ecs (blake3 path-hash) ✅
+- [x] Undo/redo MeshRenderer sync (sync_all_mesh_renderers) ✅
+- [x] Frontend: drag-drop from AssetsPanel, drop target in HierarchyPanel, inspector picker ✅
 
-**Time Estimate:** 3-4 days
+**Time Actual:** ~1 day
 
 #### **1.9 Frame Capture for Agents** ✅ **COMPLETE** - [docs/tasks/phase1-frame-capture.md](docs/tasks/phase1-frame-capture.md) | [docs/frame-capture.md](docs/frame-capture.md)
 - [x] GPU→CPU image readback via staging buffers ✅
@@ -569,7 +597,7 @@ Extract CLI command logic into `engine/ops` so both CLI and editor use the same 
 - ✅ Custom ECS with full query support (COMPLETE)
 - ✅ Agentic rendering debug infrastructure (COMPLETE - Phase 1.6.R)
 - ✅ Frame capture for AI agents (COMPLETE - Phase 1.9)
-- 🟡 Vulkan renderer (triangle, cube, mesh) (IN PROGRESS - Phase 1.6-1.8)
+- ✅ Vulkan mesh renderer (storage buffer, primitives, editor integration) (COMPLETE - Phase 1.8)
 - 🟡 Cross-platform window + input (PARTIAL)
 - ⚪ All tests passing on all platforms
 
