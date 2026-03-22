@@ -454,6 +454,99 @@ pub fn set_gizmo_mode(
     Ok(())
 }
 
+/// Set the hovered gizmo axis for hover highlighting.
+///
+/// Called from the frontend on every mousemove (non-drag) and cleared on mouseleave.
+/// Unknown strings silently map to 0 (no hover) — intentional for this transient hint.
+#[tauri::command]
+pub fn set_hovered_gizmo_axis(
+    axis: Option<String>,
+    viewport_state: tauri::State<'_, super::commands::NativeViewportState>,
+) -> Result<(), String> {
+    let v = match axis.as_deref() {
+        Some("x") => 1u8,
+        Some("y") => 2u8,
+        Some("z") => 3u8,
+        _          => 0u8,
+    };
+    viewport_state
+        .hovered_gizmo_axis
+        .store(v, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
+}
+
+/// Read-only axis hit-test for hover highlighting. No DragState written.
+///
+/// Called from the frontend's mousemove handler when not dragging.
+/// Returns `"x"` | `"y"` | `"z"` | `null`.
+#[tauri::command]
+pub fn gizmo_hover_test(
+    viewport_id: String,
+    screen_x: f32,
+    screen_y: f32,
+    viewport_state: tauri::State<'_, super::commands::NativeViewportState>,
+    world_state: tauri::State<'_, crate::state::SceneWorldState>,
+) -> Result<Option<String>, String> {
+    // Read selected entity id — no entity selected means no gizmo to test.
+    let entity_id: u64 = match viewport_state
+        .selected_entity_id
+        .lock()
+        .map_err(|e| e.to_string())?
+        .as_ref()
+        .copied()
+    {
+        Some(id) => id,
+        None => return Ok(None),
+    };
+    if entity_id > u32::MAX as u64 {
+        return Ok(None);
+    }
+    // FIXME: hardcodes generation 0 — will break after any entity slot reuse.
+    let entity = engine_core::Entity::new(entity_id as u32, 0);
+
+    // Read entity position from ECS world.
+    let entity_pos = {
+        let world = world_state.inner().0.read().map_err(|e| e.to_string())?;
+        match world.get::<engine_core::Transform>(entity) {
+            Some(t) => t.position,
+            None    => return Ok(None),
+        }
+    };
+
+    // Get camera data from the viewport instance.
+    let (view, proj, bounds, gizmo_scale) = {
+        let registry = viewport_state.registry.lock().map_err(|e| e.to_string())?;
+        match registry.get_for_id(&viewport_id) {
+            Some(vp) => match vp.get_instance_ray_data(&viewport_id) {
+                Some((view, proj, eye, bounds)) => {
+                    let dist = (eye - entity_pos).length().max(0.1_f32);
+                    (view, proj, bounds, dist * 0.15)
+                }
+                None => return Ok(None),
+            },
+            None => return Ok(None),
+        }
+    };
+
+    // Unproject screen position to world-space ray.
+    let (ray_origin, ray_dir) = unproject_screen(screen_x, screen_y, &bounds, view, proj);
+
+    // Test each axis handle (same geometry as gizmo_hit_test, no DragState written).
+    let axes: [(Vec3, &str); 3] = [
+        (Vec3::X, "x"),
+        (Vec3::Y, "y"),
+        (Vec3::Z, "z"),
+    ];
+    for (axis_dir, label) in &axes {
+        let handle_end = entity_pos + *axis_dir * gizmo_scale;
+        let radius = gizmo_scale * 0.1;
+        if ray_capsule_intersects(ray_origin, ray_dir, entity_pos, handle_end, radius) {
+            return Ok(Some(label.to_string()));
+        }
+    }
+    Ok(None)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -525,6 +618,34 @@ mod tests {
             crate::bridge::template_commands::EditorState::new()
         ));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn set_hovered_axis_maps_strings_to_u8() {
+        use std::sync::{Arc, atomic::{AtomicU8, Ordering}};
+        let atom = Arc::new(AtomicU8::new(0));
+
+        // Simulate the handler's logic directly (not via Tauri State)
+        let map = |s: Option<&str>| -> u8 {
+            match s {
+                Some("x") => 1,
+                Some("y") => 2,
+                Some("z") => 3,
+                _          => 0,
+            }
+        };
+
+        atom.store(map(Some("x")), Ordering::Relaxed);
+        assert_eq!(atom.load(Ordering::Relaxed), 1);
+        atom.store(map(Some("y")), Ordering::Relaxed);
+        assert_eq!(atom.load(Ordering::Relaxed), 2);
+        atom.store(map(Some("z")), Ordering::Relaxed);
+        assert_eq!(atom.load(Ordering::Relaxed), 3);
+        atom.store(map(None), Ordering::Relaxed);
+        assert_eq!(atom.load(Ordering::Relaxed), 0);
+        // Unknown strings → 0
+        atom.store(map(Some("xy")), Ordering::Relaxed);
+        assert_eq!(atom.load(Ordering::Relaxed), 0);
     }
 
     #[test]

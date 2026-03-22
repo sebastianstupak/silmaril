@@ -368,6 +368,8 @@ pub fn run() {
             bridge::gizmo_commands::gizmo_drag,
             bridge::gizmo_commands::gizmo_drag_end,
             bridge::gizmo_commands::set_gizmo_mode,
+            bridge::gizmo_commands::gizmo_hover_test,
+            bridge::gizmo_commands::set_hovered_gizmo_axis,
             bridge::ai_bridge::ai_server_start,
             bridge::ai_bridge::ai_server_stop,
             bridge::ai_bridge::ai_server_status,
