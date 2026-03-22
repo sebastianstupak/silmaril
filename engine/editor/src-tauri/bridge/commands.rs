@@ -374,6 +374,9 @@ pub struct NativeViewportState {
     /// Current gizmo mode: 0 = Move, 1 = Rotate, 2 = Scale.
     /// Stored as `Arc<AtomicU8>` so it can be cloned into the render thread.
     pub gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+    /// Which gizmo axis is currently hovered (0 = none, 1..=6 = axes).
+    /// Stored as `Arc<AtomicU8>` so it can be cloned into the render thread.
+    pub hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
     /// The entity currently selected in the hierarchy, or `None`.
     /// Stored as `Arc<Mutex<Option<u64>>>` so the render thread can read it.
     pub selected_entity_id: std::sync::Arc<Mutex<Option<u64>>>,
@@ -385,6 +388,7 @@ impl Default for NativeViewportState {
             registry: Mutex::new(ViewportRegistry::new()),
             drag_state: Mutex::new(None),
             gizmo_mode: std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            hovered_gizmo_axis: std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0)),
             selected_entity_id: std::sync::Arc::new(Mutex::new(None)),
         }
     }
@@ -428,8 +432,9 @@ pub fn create_native_viewport(
             tracing::info!(hwnd = hwnd_isize, "Creating NativeViewport for window");
             let selected_entity_id = std::sync::Arc::clone(&viewport_state.selected_entity_id);
             let gizmo_mode = std::sync::Arc::clone(&viewport_state.gizmo_mode);
+            let hovered_gizmo_axis = std::sync::Arc::clone(&viewport_state.hovered_gizmo_axis);
             let asset_manager = asset_manager_state.0.clone();
-            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone(), selected_entity_id, gizmo_mode, asset_manager).map_err(|e| {
+            let mut vp = NativeViewport::new(parent_hwnd, world_state.inner().0.clone(), selected_entity_id, gizmo_mode, hovered_gizmo_axis, asset_manager).map_err(|e| {
                 tracing::error!(error = %e, "NativeViewport::new failed");
                 e
             })?;

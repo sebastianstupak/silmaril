@@ -321,12 +321,17 @@ mod imp {
         scale_y_count: u32,
         scale_z_buf: GpuBuffer,
         scale_z_count: u32,
+
+        /// Which gizmo axis is currently hovered (0 = none, 1..=6 = axes).
+        /// Shared with the main thread via atomic for hover highlighting.
+        hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
     }
 
     impl GizmoPipeline {
         pub fn new(
             context: &VulkanContext,
             render_pass: vk::RenderPass,
+            hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
         ) -> Result<Self, String> {
             let device = &context.device;
             let (vert_spirv, frag_spirv) = get_or_compile_shaders()?;
@@ -401,6 +406,7 @@ mod imp {
                 scale_y_count,
                 scale_z_buf,
                 scale_z_count,
+                hovered_gizmo_axis,
             })
         }
 

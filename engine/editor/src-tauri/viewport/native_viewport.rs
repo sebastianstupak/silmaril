@@ -100,6 +100,8 @@ mod platform {
         selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
         /// Current gizmo mode (0=Move, 1=Rotate, 2=Scale), shared with the render thread.
         gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+        /// Which gizmo axis is currently hovered (0 = none, 1..=6 = axes), shared with the render thread.
+        hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
         /// Asset manager shared with the render thread for mesh GPU upload.
         asset_manager: Arc<engine_assets::AssetManager>,
     }
@@ -110,6 +112,7 @@ mod platform {
             world: Arc<std::sync::RwLock<engine_core::World>>,
             selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
             gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+            hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
             asset_manager: Arc<engine_assets::AssetManager>,
         ) -> Result<Self, String> {
             tracing::info!(hwnd = ?parent_hwnd, "NativeViewport created for window");
@@ -123,6 +126,7 @@ mod platform {
                 screenshot_slot: Arc::new(Mutex::new(None)),
                 selected_entity_id,
                 gizmo_mode,
+                hovered_gizmo_axis,
                 asset_manager,
             })
         }
@@ -136,6 +140,7 @@ mod platform {
             let screenshot_slot = self.screenshot_slot.clone();
             let selected_entity_id = self.selected_entity_id.clone();
             let gizmo_mode = self.gizmo_mode.clone();
+            let hovered_gizmo_axis = self.hovered_gizmo_axis.clone();
             let asset_manager = self.asset_manager.clone();
 
             let handle = std::thread::Builder::new()
@@ -144,7 +149,7 @@ mod platform {
                     let hwnd = HWND(hwnd_raw as *mut _);
                     tracing::info!("Viewport render thread started");
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode, asset_manager);
+                        render_loop(hwnd, should_stop, render_active, instances, world, screenshot_slot, selected_entity_id, gizmo_mode, hovered_gizmo_axis, asset_manager);
                     })) {
                         Ok(()) => tracing::info!("Viewport render thread stopped"),
                         Err(e) => {
@@ -865,10 +870,13 @@ void main() {
         width: u32,
         height: u32,
         needs_recreate: bool,
+        /// Retained so GizmoSolidPipeline (Task 6) can share it without re-cloning.
+        #[allow(dead_code)]
+        hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
     }
 
     impl ViewportRenderer {
-        fn new(hwnd: HWND, width: u32, height: u32) -> Result<Self, String> {
+        fn new(hwnd: HWND, width: u32, height: u32, hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>) -> Result<Self, String> {
             let (width, height) = (width.max(1), height.max(1));
             let hwnd_raw = hwnd.0 as isize;
 
@@ -887,10 +895,11 @@ void main() {
             let gizmo_pipeline = crate::viewport::gizmo_pipeline::GizmoPipeline::new(
                 renderer.context(),
                 renderer.render_pass(),
+                std::sync::Arc::clone(&hovered_gizmo_axis),
             )?;
 
             tracing::info!(width, height, "ViewportRenderer initialised");
-            Ok(Self { renderer, grid_pipeline, gizmo_pipeline, width, height, needs_recreate: false })
+            Ok(Self { renderer, grid_pipeline, gizmo_pipeline, width, height, needs_recreate: false, hovered_gizmo_axis })
         }
 
         fn notify_resize(&mut self, w: u32, h: u32) {
@@ -1024,10 +1033,11 @@ void main() {
         screenshot_slot: Arc<Mutex<Option<std::sync::mpsc::SyncSender<Result<Vec<u8>, String>>>>>,
         selected_entity_id: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
         gizmo_mode: std::sync::Arc<std::sync::atomic::AtomicU8>,
+        hovered_gizmo_axis: std::sync::Arc<std::sync::atomic::AtomicU8>,
         asset_manager: Arc<engine_assets::AssetManager>,
     ) {
         let (init_w, init_h) = client_size(hwnd);
-        let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h) {
+        let mut renderer = match ViewportRenderer::new(hwnd, init_w, init_h, hovered_gizmo_axis) {
             Ok(r) => r,
             Err(e) => {
                 tracing::error!(error = %e, "ViewportRenderer init failed");

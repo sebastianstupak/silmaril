@@ -86,8 +86,9 @@ fn create_test_viewport(hwnd: HWND) -> Result<NativeViewport, String> {
     let world = Arc::new(std::sync::RwLock::new(World::new()));
     let selected_entity_id = Arc::new(Mutex::new(None::<u64>));
     let gizmo_mode = Arc::new(AtomicU8::new(0));
+    let hovered_gizmo_axis = Arc::new(AtomicU8::new(0));
     let asset_manager = Arc::new(engine_assets::AssetManager::new());
-    NativeViewport::new(hwnd, world, selected_entity_id, gizmo_mode, asset_manager)
+    NativeViewport::new(hwnd, world, selected_entity_id, gizmo_mode, hovered_gizmo_axis, asset_manager)
 }
 
 // ---------------------------------------------------------------------------
