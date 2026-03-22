@@ -258,6 +258,26 @@ mod imp {
         v.cross(candidate).normalize()
     }
 
+    /// Returns the RGBA colour for a gizmo axis, brightened when hovered.
+    fn axis_color(axis: GizmoAxis, hovered: bool) -> [f32; 4] {
+        let base: [f32; 4] = match axis {
+            GizmoAxis::X => [1.0, 0.2, 0.2, 1.0],
+            GizmoAxis::Y => [0.2, 1.0, 0.2, 1.0],
+            GizmoAxis::Z => [0.2, 0.4, 1.0, 1.0],
+            _ => [0.8, 0.8, 0.8, 1.0],
+        };
+        if hovered {
+            [
+                (base[0] + 0.35).min(1.0),
+                (base[1] + 0.35).min(1.0),
+                (base[2] + 0.35).min(1.0),
+                1.0,
+            ]
+        } else {
+            base
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // GpuBuffer helpers
     // ─────────────────────────────────────────────────────────────────────
@@ -425,6 +445,8 @@ mod imp {
             view_proj: glam::Mat4,
             camera_pos: glam::Vec3,
         ) {
+            let hover_raw = self.hovered_gizmo_axis.load(std::sync::atomic::Ordering::Relaxed);
+
             let device = &self.device;
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
 
@@ -458,7 +480,7 @@ mod imp {
                         &self.crosshair_buf,
                         view_proj,
                         origin.into(),
-                        [1.0, 0.2, 0.2, 0.9],
+                        { let mut c = axis_color(GizmoAxis::X, hover_raw == 1); c[3] = 0.9; c },
                         scale,
                         0,
                         2,
@@ -470,7 +492,7 @@ mod imp {
                         &self.crosshair_buf,
                         view_proj,
                         origin.into(),
-                        [0.2, 1.0, 0.2, 0.9],
+                        { let mut c = axis_color(GizmoAxis::Y, hover_raw == 2); c[3] = 0.9; c },
                         scale,
                         2,
                         2,
@@ -482,7 +504,7 @@ mod imp {
                         &self.crosshair_buf,
                         view_proj,
                         origin.into(),
-                        [0.2, 0.4, 1.0, 0.9],
+                        { let mut c = axis_color(GizmoAxis::Z, hover_raw == 3); c[3] = 0.9; c },
                         scale,
                         4,
                         2,
@@ -490,19 +512,19 @@ mod imp {
 
                     match mode {
                         GizmoMode::Move => {
-                            self.draw_buf(cmd, device, &self.move_x_buf, view_proj, origin.into(), [1.0, 0.2, 0.2, 1.0], scale, 0, self.move_x_count);
-                            self.draw_buf(cmd, device, &self.move_y_buf, view_proj, origin.into(), [0.2, 1.0, 0.2, 1.0], scale, 0, self.move_y_count);
-                            self.draw_buf(cmd, device, &self.move_z_buf, view_proj, origin.into(), [0.2, 0.4, 1.0, 1.0], scale, 0, self.move_z_count);
+                            self.draw_buf(cmd, device, &self.move_x_buf, view_proj, origin.into(), axis_color(GizmoAxis::X, hover_raw == 1), scale, 0, self.move_x_count);
+                            self.draw_buf(cmd, device, &self.move_y_buf, view_proj, origin.into(), axis_color(GizmoAxis::Y, hover_raw == 2), scale, 0, self.move_y_count);
+                            self.draw_buf(cmd, device, &self.move_z_buf, view_proj, origin.into(), axis_color(GizmoAxis::Z, hover_raw == 3), scale, 0, self.move_z_count);
                         }
                         GizmoMode::Rotate => {
-                            self.draw_buf(cmd, device, &self.rotate_x_buf, view_proj, origin.into(), [1.0, 0.2, 0.2, 1.0], scale, 0, self.rotate_x_count);
-                            self.draw_buf(cmd, device, &self.rotate_y_buf, view_proj, origin.into(), [0.2, 1.0, 0.2, 1.0], scale, 0, self.rotate_y_count);
-                            self.draw_buf(cmd, device, &self.rotate_z_buf, view_proj, origin.into(), [0.2, 0.4, 1.0, 1.0], scale, 0, self.rotate_z_count);
+                            self.draw_buf(cmd, device, &self.rotate_x_buf, view_proj, origin.into(), axis_color(GizmoAxis::X, hover_raw == 1), scale, 0, self.rotate_x_count);
+                            self.draw_buf(cmd, device, &self.rotate_y_buf, view_proj, origin.into(), axis_color(GizmoAxis::Y, hover_raw == 2), scale, 0, self.rotate_y_count);
+                            self.draw_buf(cmd, device, &self.rotate_z_buf, view_proj, origin.into(), axis_color(GizmoAxis::Z, hover_raw == 3), scale, 0, self.rotate_z_count);
                         }
                         GizmoMode::Scale => {
-                            self.draw_buf(cmd, device, &self.scale_x_buf, view_proj, origin.into(), [1.0, 0.2, 0.2, 1.0], scale, 0, self.scale_x_count);
-                            self.draw_buf(cmd, device, &self.scale_y_buf, view_proj, origin.into(), [0.2, 1.0, 0.2, 1.0], scale, 0, self.scale_y_count);
-                            self.draw_buf(cmd, device, &self.scale_z_buf, view_proj, origin.into(), [0.2, 0.4, 1.0, 1.0], scale, 0, self.scale_z_count);
+                            self.draw_buf(cmd, device, &self.scale_x_buf, view_proj, origin.into(), axis_color(GizmoAxis::X, hover_raw == 1), scale, 0, self.scale_x_count);
+                            self.draw_buf(cmd, device, &self.scale_y_buf, view_proj, origin.into(), axis_color(GizmoAxis::Y, hover_raw == 2), scale, 0, self.scale_y_count);
+                            self.draw_buf(cmd, device, &self.scale_z_buf, view_proj, origin.into(), axis_color(GizmoAxis::Z, hover_raw == 3), scale, 0, self.scale_z_count);
                         }
                     }
                 }
@@ -752,6 +774,34 @@ mod imp {
                 compile_glsl_to_spirv(GIZMO_FRAG_GLSL, naga::ShaderStage::Fragment);
             assert!(result.is_ok(), "gizmo.frag failed to compile: {:?}", result);
         }
+
+        #[test]
+        fn test_axis_color_hover() {
+            let normal_x = axis_color(GizmoAxis::X, false);
+            let hovered_x = axis_color(GizmoAxis::X, true);
+            // All RGB channels should be brighter when hovered
+            assert!(hovered_x[0] >= normal_x[0]);
+            assert!(hovered_x[1] >= normal_x[1]);
+            assert!(hovered_x[2] >= normal_x[2]);
+            // Alpha unchanged
+            assert_eq!(hovered_x[3], 1.0);
+            // At least one channel must actually be brighter
+            let any_brighter = hovered_x[0] > normal_x[0]
+                || hovered_x[1] > normal_x[1]
+                || hovered_x[2] > normal_x[2];
+            assert!(any_brighter);
+            // No channel exceeds 1.0
+            assert!(hovered_x[0] <= 1.0);
+            assert!(hovered_x[1] <= 1.0);
+            assert!(hovered_x[2] <= 1.0);
+        }
+
+        #[test]
+        fn test_axis_color_z_channel() {
+            // Z axis green channel is 0.4, NOT 0.2 — guard against future incorrect "normalisation"
+            let z = axis_color(GizmoAxis::Z, false);
+            assert_eq!(z[1], 0.4, "Z axis G channel must be 0.4");
+        }
     }
 } // mod imp
 
@@ -812,6 +862,26 @@ mod portable {
     fn perpendicular(v: Vec3) -> Vec3 {
         let candidate = if v.x.abs() < 0.9 { Vec3::X } else { Vec3::Y };
         v.cross(candidate).normalize()
+    }
+
+    /// Returns the RGBA colour for a gizmo axis, brightened when hovered.
+    fn axis_color(axis: GizmoAxis, hovered: bool) -> [f32; 4] {
+        let base: [f32; 4] = match axis {
+            GizmoAxis::X => [1.0, 0.2, 0.2, 1.0],
+            GizmoAxis::Y => [0.2, 1.0, 0.2, 1.0],
+            GizmoAxis::Z => [0.2, 0.4, 1.0, 1.0],
+            _ => [0.8, 0.8, 0.8, 1.0],
+        };
+        if hovered {
+            [
+                (base[0] + 0.35).min(1.0),
+                (base[1] + 0.35).min(1.0),
+                (base[2] + 0.35).min(1.0),
+                1.0,
+            ]
+        } else {
+            base
+        }
     }
 
     pub fn generate_crosshair_vertices() -> Vec<GizmoVertex> {
@@ -947,6 +1017,34 @@ mod portable {
                 assert_eq!(generate_scale_handle_vertices(axis).len() % 2, 0,
                     "scale handle vertices must be even for LINE_LIST on axis {:?}", axis);
             }
+        }
+
+        #[test]
+        fn test_axis_color_hover() {
+            let normal_x = axis_color(GizmoAxis::X, false);
+            let hovered_x = axis_color(GizmoAxis::X, true);
+            // All RGB channels should be brighter when hovered
+            assert!(hovered_x[0] >= normal_x[0]);
+            assert!(hovered_x[1] >= normal_x[1]);
+            assert!(hovered_x[2] >= normal_x[2]);
+            // Alpha unchanged
+            assert_eq!(hovered_x[3], 1.0);
+            // At least one channel must actually be brighter
+            let any_brighter = hovered_x[0] > normal_x[0]
+                || hovered_x[1] > normal_x[1]
+                || hovered_x[2] > normal_x[2];
+            assert!(any_brighter);
+            // No channel exceeds 1.0
+            assert!(hovered_x[0] <= 1.0);
+            assert!(hovered_x[1] <= 1.0);
+            assert!(hovered_x[2] <= 1.0);
+        }
+
+        #[test]
+        fn test_axis_color_z_channel() {
+            // Z axis green channel is 0.4, NOT 0.2 — guard against future incorrect "normalisation"
+            let z = axis_color(GizmoAxis::Z, false);
+            assert_eq!(z[1], 0.4, "Z axis G channel must be 0.4");
         }
     }
 }
