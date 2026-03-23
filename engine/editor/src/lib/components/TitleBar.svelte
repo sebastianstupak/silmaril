@@ -243,11 +243,11 @@
         <DropdownMenu.Content align="start" sideOffset={4} class="min-w-[200px]">
           <DropdownMenu.Item onclick={() => onOpenProject?.()}>{t('menu.file.open_project')}</DropdownMenu.Item>
           <DropdownMenu.Item>
-            {t('menu.file.save_scene')}
+            {t('menu.file.save_template')}
             <DropdownMenu.Shortcut>Ctrl+S</DropdownMenu.Shortcut>
           </DropdownMenu.Item>
-          <DropdownMenu.Item>{t('menu.file.save_scene_as')}</DropdownMenu.Item>
-          <DropdownMenu.Item>{t('menu.file.new_scene')}</DropdownMenu.Item>
+          <DropdownMenu.Item>{t('menu.file.save_template_as')}</DropdownMenu.Item>
+          <DropdownMenu.Item>{t('menu.file.new_template')}</DropdownMenu.Item>
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger>{t('menu.file.recent_projects')}</DropdownMenu.SubTrigger>
             <DropdownMenu.SubContent>
