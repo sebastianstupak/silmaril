@@ -6,9 +6,9 @@
     getSelectedEntity,
     subscribeContext,
   } from '$lib/stores/editor-context';
-  import type { SceneEntity } from '$lib/scene/state';
+  import type { TemplateEntity } from '$lib/template/state';
 
-  let entity: SceneEntity | null = $state(getSelectedEntity());
+  let entity: TemplateEntity | null = $state(getSelectedEntity());
 
   onMount(() => {
     return subscribeContext(() => {

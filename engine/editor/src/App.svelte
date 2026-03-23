@@ -13,7 +13,7 @@
   import { setAssets, clearAssets, type AssetEntry } from './lib/stores/assets';
   import { scanAssets } from './lib/api';
   import { logInfo, logWarn } from './lib/stores/console';
-  import { undo, redo, sceneUndo, sceneRedo, getCanUndo, getCanRedo, getViewportFocused, subscribeUndoHistory } from './lib/stores/undo-history';
+  import { undo, redo, templateUndo, templateRedo, getCanUndo, getCanRedo, getViewportFocused, subscribeUndoHistory } from './lib/stores/undo-history';
   import { loadSchemas } from './lib/inspector/schema-store';
   import DockContainer from './lib/docking/DockContainer.svelte';
   import DockSplitter from './lib/docking/DockSplitter.svelte';
@@ -24,10 +24,10 @@
   import type { EditorLayout, LayoutNode } from './lib/docking/types';
   import { setLayout as setLayoutStore, subscribeLayout, getLayout as getLayoutStore } from './lib/stores/layout';
   import { registerCommand } from './lib/omnibar/registry';
-  import { dispatchSceneCommand } from './lib/scene/commands';
+  import { dispatchTemplateCommand } from './lib/template/commands';
   import { populateRegistry, listSpecs, dispatchCommand, setUndoVerifier } from './lib/dispatch';
   import { registerAllHandlers } from './lib/commands/index';
-  import { initTauriListeners } from './lib/scene/state';
+  import { initTauriListeners } from './lib/template/state';
   import AiPermissionDialog from './lib/components/AiPermissionDialog.svelte';
   import { aiServerRunning, aiServerPort, refreshAiServerStatus } from './lib/stores/ai-server';
 
@@ -328,7 +328,7 @@
       if (e.key === 'z' && e.ctrlKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         if (getViewportFocused()) {
-          sceneUndo();
+          templateUndo();
         } else {
           undo();
         }
@@ -339,7 +339,7 @@
           (e.key === 'z' && e.ctrlKey && e.shiftKey && !e.altKey)) {
         e.preventDefault();
         if (getViewportFocused()) {
-          sceneRedo();
+          templateRedo();
         } else {
           redo();
         }
@@ -583,15 +583,15 @@
           await listen<{ id: string }>('editor-run-command', (event) => {
             const { id } = event.payload;
             const mapping: Record<string, () => void> = {
-              'editor.toggle_grid':       () => dispatchSceneCommand('toggle_grid', {}),
-              'editor.toggle_snap':       () => dispatchSceneCommand('toggle_snap', {}),
-              'editor.toggle_projection': () => dispatchSceneCommand('toggle_projection', {}),
-              'editor.new_scene':         () => dispatchSceneCommand('new_scene', {}),
-              'editor.reset_camera':      () => dispatchSceneCommand('reset_camera', {}),
-              'editor.set_tool.select':   () => dispatchSceneCommand('set_tool', { tool: 'select' }),
-              'editor.set_tool.move':     () => dispatchSceneCommand('set_tool', { tool: 'move' }),
-              'editor.set_tool.rotate':   () => dispatchSceneCommand('set_tool', { tool: 'rotate' }),
-              'editor.set_tool.scale':    () => dispatchSceneCommand('set_tool', { tool: 'scale' }),
+              'editor.toggle_grid':       () => dispatchTemplateCommand('toggle_grid', {}),
+              'editor.toggle_snap':       () => dispatchTemplateCommand('toggle_snap', {}),
+              'editor.toggle_projection': () => dispatchTemplateCommand('toggle_projection', {}),
+              'editor.new_template':      () => dispatchTemplateCommand('new_template', {}),
+              'editor.reset_camera':      () => dispatchTemplateCommand('reset_camera', {}),
+              'editor.set_tool.select':   () => dispatchTemplateCommand('set_tool', { tool: 'select' }),
+              'editor.set_tool.move':     () => dispatchTemplateCommand('set_tool', { tool: 'move' }),
+              'editor.set_tool.rotate':   () => dispatchTemplateCommand('set_tool', { tool: 'rotate' }),
+              'editor.set_tool.scale':    () => dispatchTemplateCommand('set_tool', { tool: 'scale' }),
             };
             mapping[id]?.();
           });
@@ -675,7 +675,7 @@
             <path d="M5.7 13.7l5-5a1 1 0 000-1.4l-5-5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
           </svg>
         </span>
-        <span class="breadcrumb-segment">{t('breadcrumb.no_scene')}</span>
+        <span class="breadcrumb-segment">{t('breadcrumb.no_template')}</span>
       </span>
     </div>
 

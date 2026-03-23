@@ -1,7 +1,7 @@
 import { registerFileHandlers } from './file';
 import { registerEditHandlers } from './edit';
 import { registerViewHandlers } from './view';
-import { registerSceneHandlers } from './scene';
+import { registerTemplateEntityHandlers } from './template-entities';
 import { registerAssetHandlers } from './asset';
 import { registerBuildHandlers } from './build';
 import { registerViewportHandlers } from './viewport';
@@ -11,7 +11,7 @@ export function registerAllHandlers(): void {
   registerFileHandlers();
   registerEditHandlers();
   registerViewHandlers();
-  registerSceneHandlers();
+  registerTemplateEntityHandlers();
   registerAssetHandlers();
   registerBuildHandlers();
   registerViewportHandlers();

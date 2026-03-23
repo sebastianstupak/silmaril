@@ -8,7 +8,7 @@
   import { listSpecs, dispatchCommand } from '$lib/dispatch';
   import type { CommandSpec } from '$lib/bindings';
   import { getEditorContext, setEntities, setSelectedEntityId } from '$lib/stores/editor-context';
-  import { selectEntity } from '$lib/scene/commands';
+  import { selectEntity } from '$lib/template/commands';
   import { openProject, scanProjectEntities, scanAssets } from '$lib/api';
   import type { RecentItem } from '$lib/stores/recent-items';
   import { addRecentItem } from '$lib/stores/recent-items';

@@ -7,9 +7,9 @@ const en = {
   // Menu bar
   'menu.file': 'File',
   'menu.file.open_project': 'Open Project...',
-  'menu.file.save_scene': 'Save Scene',
-  'menu.file.save_scene_as': 'Save Scene As...',
-  'menu.file.new_scene': 'New Scene',
+  'menu.file.save_template': 'Save Template',
+  'menu.file.save_template_as': 'Save Template As...',
+  'menu.file.new_template': 'New Template',
   'menu.file.recent_projects': 'Recent Projects',
   'menu.file.no_recent_projects': 'No recent projects',
   'menu.file.exit': 'Exit',
@@ -74,7 +74,7 @@ const en = {
   'placeholder.no_logs': 'No logs yet',
   'placeholder.viewport': 'Vulkan viewport will render here',
   'viewport.loading': 'Initializing viewport...',
-  'viewport.no_entities': 'No entities in scene',
+  'viewport.no_entities': 'No entities in template',
   'viewport.zoom': 'Zoom',
   'viewport.reset_camera': 'Reset Camera',
 
@@ -117,7 +117,7 @@ const en = {
   // Status bar
   'status.ready': 'Ready',
   'status.building': 'Building...',
-  'status.saved': 'Scene saved',
+  'status.saved': 'Template saved',
   'status.fps': 'FPS',
   'status.memory': 'Memory',
 
@@ -126,7 +126,7 @@ const en = {
 
   // Breadcrumb
   'breadcrumb.no_project': 'No project',
-  'breadcrumb.no_scene': 'Untitled Scene',
+  'breadcrumb.no_template': 'Untitled Template',
 
   // Console
   'console.clear': 'Clear',
@@ -182,8 +182,8 @@ const en = {
   'dialog.open_project_title': 'Open Silmaril Project',
 
   // Layout
-  'layout.default': 'Scene',
-  'layout.scene': 'Scene',
+  'layout.default': 'Template',
+  'layout.template': 'Template',
   'layout.code': 'Code',
   'layout.perf': 'Perf',
   'layout.tall': 'Tall',
@@ -199,23 +199,23 @@ const en = {
   'dock.close_others': 'Close Others',
   'dock.close_all': 'Close All',
 
-  // Scene tools
+  // Template tools
   'tool.select': 'Select (Q)',
   'tool.move': 'Move (W)',
   'tool.rotate': 'Rotate (E)',
   'tool.scale': 'Scale (R)',
   'tool.focus': 'Focus (F)',
 
-  // Viewport scene controls
+  // Viewport template controls
   'viewport.grid': 'Toggle Grid',
   'viewport.snap': 'Snap to Grid',
   'viewport.orbit': 'Orbit',
   'viewport.pan': 'Pan',
 
-  // Scene entity operations
-  'scene.create_entity': 'Create Entity',
-  'scene.delete_entity': 'Delete Entity',
-  'scene.duplicate_entity': 'Duplicate Entity',
+  // Template entity operations
+  'template.create_entity': 'Create Entity',
+  'template.delete_entity': 'Delete Entity',
+  'template.duplicate_entity': 'Duplicate Entity',
 
   // Pop-out
   'popout.unknown': 'Unknown panel',

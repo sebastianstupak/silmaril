@@ -2,13 +2,13 @@ import { registerCommandHandler } from '../dispatch';
 import { commands } from '../bindings';
 
 export function registerFileHandlers(): void {
-  registerCommandHandler('file.save_scene', async () => {
+  registerCommandHandler('file.save_template', async () => {
     await commands.runCommand('file.save_scene', null);
   });
-  registerCommandHandler('file.save_scene_as', async () => {
+  registerCommandHandler('file.save_template_as', async () => {
     await commands.runCommand('file.save_scene_as', null);
   });
-  registerCommandHandler('file.open_scene', async () => {
+  registerCommandHandler('file.open_template', async () => {
     await commands.runCommand('file.open_scene', null);
   });
   // file.new_project and file.open_project are UI-driven (open dialogs) —

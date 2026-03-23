@@ -1,4 +1,4 @@
-// Central scene state — single source of truth for the editor scene
+// Central template state — single source of truth for the editor template
 // Uses a simple pub/sub pattern (not Svelte stores) so it works from any
 // context: UI components, keyboard shortcuts, menu items, and AI agent
 // commands via Tauri.
@@ -16,7 +16,7 @@ export interface Vec3 {
   z: number;
 }
 
-export interface SceneEntity extends EntityInfo {
+export interface TemplateEntity extends EntityInfo {
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
@@ -28,7 +28,7 @@ export interface SceneEntity extends EntityInfo {
 
 export type ProjectionMode = 'ortho' | 'perspective';
 
-export interface SceneCamera {
+export interface TemplateCamera {
   position: Vec3;
   target: Vec3;
   zoom: number;
@@ -37,13 +37,13 @@ export interface SceneCamera {
   projection: ProjectionMode;
 }
 
-export type SceneTool = 'select' | 'move' | 'rotate' | 'scale';
+export type TemplateTool = 'select' | 'move' | 'rotate' | 'scale';
 
-export interface SceneState {
-  entities: SceneEntity[];
+export interface TemplateState {
+  entities: TemplateEntity[];
   selectedEntityId: number | null;
-  camera: SceneCamera;
-  activeTool: SceneTool;
+  camera: TemplateCamera;
+  activeTool: TemplateTool;
   gridVisible: boolean;
   snapToGrid: boolean;
   gridSize: number;
@@ -54,7 +54,7 @@ export interface SceneState {
 // Default state
 // ---------------------------------------------------------------------------
 
-function defaultCamera(): SceneCamera {
+function defaultCamera(): TemplateCamera {
   return {
     position: { x: 0, y: 5, z: 10 },
     target: { x: 0, y: 0, z: 0 },
@@ -65,7 +65,7 @@ function defaultCamera(): SceneCamera {
   };
 }
 
-function createDefaultState(): SceneState {
+function createDefaultState(): TemplateState {
   return {
     entities: [],
     selectedEntityId: null,
@@ -82,7 +82,7 @@ function createDefaultState(): SceneState {
 // Module-level state
 // ---------------------------------------------------------------------------
 
-let state: SceneState = createDefaultState();
+let state: TemplateState = createDefaultState();
 
 type Listener = () => void;
 let listeners: Listener[] = [];
@@ -95,16 +95,16 @@ function notify() {
 // Getters
 // ---------------------------------------------------------------------------
 
-export function getSceneState(): SceneState {
+export function getTemplateState(): TemplateState {
   return state;
 }
 
-export function getSelectedEntity(): SceneEntity | null {
+export function getSelectedEntity(): TemplateEntity | null {
   if (state.selectedEntityId == null) return null;
   return state.entities.find((e) => e.id === state.selectedEntityId) ?? null;
 }
 
-export function getEntityById(id: number): SceneEntity | null {
+export function getEntityById(id: number): TemplateEntity | null {
   return state.entities.find((e) => e.id === id) ?? null;
 }
 
@@ -112,7 +112,7 @@ export function getEntityById(id: number): SceneEntity | null {
 // Subscriptions
 // ---------------------------------------------------------------------------
 
-export function subscribeScene(fn: Listener): () => void {
+export function subscribeTemplate(fn: Listener): () => void {
   listeners.push(fn);
   return () => {
     listeners = listeners.filter((l) => l !== fn);
@@ -123,12 +123,12 @@ export function subscribeScene(fn: Listener): () => void {
 // Mutations (used by commands.ts — not exported directly to panels)
 // ---------------------------------------------------------------------------
 
-export function _mutate(updater: (s: SceneState) => SceneState): void {
+export function _mutate(updater: (s: TemplateState) => TemplateState): void {
   state = updater(state);
   notify();
 }
 
-export function _replaceState(next: SceneState): void {
+export function _replaceState(next: TemplateState): void {
   state = next;
   notify();
 }
@@ -145,7 +145,7 @@ export function _resetState(): void {
 let tauriListenersInitialised = false;
 
 /**
- * Initialise Tauri event listeners that keep the frontend scene state in sync
+ * Initialise Tauri event listeners that keep the frontend template state in sync
  * with the backend ECS world.  Safe to call multiple times — only the first
  * call registers the listeners.
  */
@@ -153,13 +153,16 @@ export async function initTauriListeners(): Promise<void> {
   if (tauriListenersInitialised) return;
   tauriListenersInitialised = true;
 
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+  if (!isTauri) return;
+
   const { listen } = await import('@tauri-apps/api/event');
 
   await listen<{ id: number; name: string; parentId?: number }>('entity-created', (event) => {
     const { id, name, parentId } = event.payload;
     // Avoid duplicates
     if (state.entities.some((e) => e.id === id)) return;
-    const newEntity: SceneEntity = {
+    const newEntity: TemplateEntity = {
       id,
       name,
       components: ['Transform'],

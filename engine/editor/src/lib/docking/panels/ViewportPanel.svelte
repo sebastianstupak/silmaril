@@ -23,7 +23,7 @@
     setHoveredGizmoAxis,
     setGizmoMode,
   } from '$lib/api';
-  import type { SceneTool, ProjectionMode } from '$lib/scene/state';
+  import type { TemplateTool, ProjectionMode } from '$lib/template/state';
   import {
     createEntity,
     deleteEntity,
@@ -32,7 +32,7 @@
     rotateEntityBy,
     scaleEntityBy,
     focusEntity,
-  } from '$lib/scene/commands';
+  } from '$lib/template/commands';
   import { saveViewportSettings, loadViewportSettings } from '$lib/viewport-settings';
   import { setViewportFocused, getActiveTemplatePath } from '$lib/stores/undo-history';
   import type { Component } from 'svelte';
@@ -43,7 +43,7 @@
   } from '@lucide/svelte';
   import { Tooltip } from 'bits-ui';
 
-  const TOOL_KEYS: Record<string, SceneTool> = {
+  const TOOL_KEYS: Record<string, TemplateTool> = {
     q: 'select',
     w: 'move',
     e: 'rotate',
@@ -78,7 +78,7 @@
   let nativeViewportCreated = $state(false);
 
   // Per-viewport UI state — fully local, NOT shared with other viewports.
-  let activeTool: SceneTool = $state('select');
+  let activeTool: TemplateTool = $state('select');
   let gridVisible = $state(true);
   let snapToGrid = $state(false);
   let projection: ProjectionMode = $state('perspective');
@@ -203,7 +203,7 @@
       // Restore persisted per-viewport settings from a previous session.
       const saved = loadViewportSettings(viewportId);
       if (saved) {
-        if (saved.activeTool) activeTool = saved.activeTool as SceneTool;
+        if (saved.activeTool) activeTool = saved.activeTool as TemplateTool;
         gridVisible = saved.gridVisible;
         snapToGrid = saved.snapToGrid;
         if (saved.projection === 'perspective' || saved.projection === 'ortho') {
@@ -250,7 +250,7 @@
   // ---------------------------------------------------------------------------
 
   /** Map a tool name to its resting (non-drag) cursor. */
-  function cursorForTool(tool: SceneTool): string {
+  function cursorForTool(tool: TemplateTool): string {
     switch (tool) {
       case 'select': return 'default';
       case 'move':   return 'move';
@@ -575,7 +575,7 @@
   }
 
   /** Tool button data. */
-  const tools: { key: SceneTool; label: string; shortcut: string; Icon: Component }[] = [
+  const tools: { key: TemplateTool; label: string; shortcut: string; Icon: Component }[] = [
     { key: 'select', label: 'Select',  shortcut: 'Q', Icon: MousePointer2 },
     { key: 'move',   label: 'Move',    shortcut: 'W', Icon: Move },
     { key: 'rotate', label: 'Rotate',  shortcut: 'E', Icon: RotateCw },

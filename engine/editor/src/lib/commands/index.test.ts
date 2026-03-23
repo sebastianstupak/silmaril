@@ -29,12 +29,12 @@ describe('registerAllHandlers', () => {
   it('registers handlers for all known command ids', () => {
     registerAllHandlers();
     const registered = (registerCommandHandler as ReturnType<typeof vi.fn>)
-      .mock.calls.map(([id]: [string]) => id);
+      .mock.calls.map((args: unknown[]) => args[0] as string);
 
     const expected = [
-      'file.save_scene',
-      'file.save_scene_as',
-      'file.open_scene',
+      'file.save_template',
+      'file.save_template_as',
+      'file.open_template',
       'file.new_project',
       'file.open_project',
       'edit.undo',
@@ -46,10 +46,10 @@ describe('registerAllHandlers', () => {
       'view.zoom_in',
       'view.zoom_out',
       'view.zoom_reset',
-      'scene.new_entity',
-      'scene.delete_entity',
-      'scene.duplicate_entity',
-      'scene.focus_entity',
+      'template.new_entity',
+      'template.delete_entity',
+      'template.duplicate_entity',
+      'template.focus_entity',
       'asset.scan',
       'asset.import',
       'asset.refresh',

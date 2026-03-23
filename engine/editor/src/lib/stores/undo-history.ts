@@ -29,14 +29,14 @@ export function getActiveTemplatePath(): string | null { return _path; }
 
 // Track whether the viewport panel is currently under the mouse cursor.
 // ViewportPanel sets this via setViewportFocused(); App.svelte reads it to
-// route Ctrl+Z / Ctrl+Y to scene_undo / scene_redo instead of template undo.
+// route Ctrl+Z / Ctrl+Y to template_undo / template_redo instead of template undo.
 let _viewportFocused = false;
 export function setViewportFocused(focused: boolean): void { _viewportFocused = focused; }
 export function getViewportFocused(): boolean { return _viewportFocused; }
 
 // When the OS takes focus away from the window (Alt+Tab etc.) while the mouse
 // is inside the viewport, no mouseleave fires. Reset _viewportFocused so that
-// subsequent Ctrl+Z is not incorrectly routed to sceneUndo.
+// subsequent Ctrl+Z is not incorrectly routed to templateUndo.
 if (typeof window !== 'undefined') {
   window.addEventListener('blur', () => {
     _viewportFocused = false;
@@ -44,37 +44,37 @@ if (typeof window !== 'undefined') {
 }
 
 // Guard against concurrent in-flight IPC calls from rapid Ctrl+Z/Ctrl+Y holds.
-let _sceneUndoRedoInFlight = false;
+let _templateUndoRedoInFlight = false;
 
 /** Undo the last transform change, routed through the active template. */
-export async function sceneUndo(): Promise<void> {
-  if (_sceneUndoRedoInFlight) return;
+export async function templateUndo(): Promise<void> {
+  if (_templateUndoRedoInFlight) return;
   const path = getActiveTemplatePath();
   if (!path) return;
-  _sceneUndoRedoInFlight = true;
+  _templateUndoRedoInFlight = true;
   try {
     await commands.runCommand('template.undo', { template_path: path });
     await _refreshState();
   } catch (e) {
-    logError(`Scene undo failed: ${e}`);
+    logError(`Template undo failed: ${e}`);
   } finally {
-    _sceneUndoRedoInFlight = false;
+    _templateUndoRedoInFlight = false;
   }
 }
 
 /** Redo the last undone transform change, routed through the active template. */
-export async function sceneRedo(): Promise<void> {
-  if (_sceneUndoRedoInFlight) return;
+export async function templateRedo(): Promise<void> {
+  if (_templateUndoRedoInFlight) return;
   const path = getActiveTemplatePath();
   if (!path) return;
-  _sceneUndoRedoInFlight = true;
+  _templateUndoRedoInFlight = true;
   try {
     await commands.runCommand('template.redo', { template_path: path });
     await _refreshState();
   } catch (e) {
-    logError(`Scene redo failed: ${e}`);
+    logError(`Template redo failed: ${e}`);
   } finally {
-    _sceneUndoRedoInFlight = false;
+    _templateUndoRedoInFlight = false;
   }
 }
 

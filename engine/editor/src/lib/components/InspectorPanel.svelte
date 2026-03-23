@@ -2,9 +2,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { t } from '$lib/i18n';
-  import type { SceneEntity } from '$lib/scene/state';
+  import type { TemplateEntity } from '$lib/template/state';
   import { subscribeSchemas, getSchemas } from '$lib/inspector/schema-store';
-  import { setComponentField, addComponent, removeComponent } from '$lib/scene/commands';
+  import { setComponentField, addComponent, removeComponent } from '$lib/template/commands';
   import type { ComponentSchemas } from '$lib/inspector/schema';
   import F32Field    from '$lib/inspector/widgets/F32Field.svelte';
   import BoolField   from '$lib/inspector/widgets/BoolField.svelte';
@@ -15,7 +15,7 @@
   import { getActiveTemplatePath } from '$lib/stores/undo-history';
   import { getAssets, subscribeAssets, type AssetEntry } from '$lib/stores/assets';
 
-  let { entity = null }: { entity: SceneEntity | null } = $props();
+  let { entity = null }: { entity: TemplateEntity | null } = $props();
 
   let schemas: ComponentSchemas = $state(getSchemas());
   let collapsedSections: Record<string, boolean> = $state({});

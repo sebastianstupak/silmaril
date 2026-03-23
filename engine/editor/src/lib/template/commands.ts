@@ -1,17 +1,17 @@
-// Scene commands — unified API called by UI, menus, keyboard shortcuts, and
-// AI agents. Every scene manipulation goes through one of these functions so
+// Template commands — unified API called by UI, menus, keyboard shortcuts, and
+// AI agents. Every template manipulation goes through one of these functions so
 // that the undo system (when wired) has a single choke-point.
 
 import type { EntityInfo } from '$lib/api';
 import { createEntityChild as apiCreateEntityChild } from '$lib/api';
 import {
-  getSceneState,
+  getTemplateState,
   getEntityById,
   _mutate,
   _resetState,
   defaultCamera,
-  type SceneEntity,
-  type SceneTool,
+  type TemplateEntity,
+  type TemplateTool,
   type ProjectionMode,
   type Vec3,
 } from './state';
@@ -44,8 +44,8 @@ export function selectEntity(id: number | null): void {
 }
 
 /** Create a new entity with an optional name. Returns the new entity info. */
-export function createEntity(name?: string): SceneEntity {
-  let created!: SceneEntity;
+export function createEntity(name?: string): TemplateEntity {
+  let created!: TemplateEntity;
   _mutate((s) => {
     const id = s.nextEntityId;
     const position = {
@@ -53,7 +53,7 @@ export function createEntity(name?: string): SceneEntity {
       y: 0,
       z: (Math.random() - 0.5) * 10,
     };
-    const entity: SceneEntity = {
+    const entity: TemplateEntity = {
       id,
       name: name ?? `Entity ${id}`,
       components: ['Transform'],
@@ -92,12 +92,35 @@ export function createEntity(name?: string): SceneEntity {
  * Returns a promise that resolves with the new entity id.
  */
 export async function createEntityChild(parentId: number, name?: string): Promise<number> {
-  const childId = await apiCreateEntityChild(parentId, name);
-  // The `entity-created` Tauri event (with parentId set) will update the scene state,
-  // but we also need to select the new child.
-  _mutate((s) => ({ ...s, selectedEntityId: childId }));
-  logInfo(`Child entity created under #${parentId}: #${childId}`);
-  return childId;
+  const rawId = await apiCreateEntityChild(parentId, name);
+  // In browser/test mode, apiCreateEntityChild returns null (no IPC).
+  // Fall back to creating the child locally with parentId set.
+  if (rawId == null) {
+    let childId!: number;
+    _mutate((s) => {
+      childId = s.nextEntityId;
+      const childName = name ?? `Entity ${childId}`;
+      const child: TemplateEntity = {
+        id: childId,
+        name: childName,
+        components: ['Transform'],
+        parentId,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        visible: true,
+        locked: false,
+        componentValues: buildInitialComponentValues(['Transform'], getSchemas()),
+      };
+      return { ...s, entities: [...s.entities, child], nextEntityId: childId + 1, selectedEntityId: childId };
+    });
+    logInfo(`Child entity created (local) under #${parentId}: #${childId}`);
+    return childId;
+  }
+  // Tauri mode: entity-created event will update state; just select the child.
+  _mutate((s) => ({ ...s, selectedEntityId: rawId }));
+  logInfo(`Child entity created under #${parentId}: #${rawId}`);
+  return rawId;
 }
 
 /** Delete an entity by id. Deselects if currently selected. */
@@ -112,14 +135,14 @@ export function deleteEntity(id: number): void {
 }
 
 /** Duplicate an entity by id. Returns the new copy. */
-export function duplicateEntity(id: number): SceneEntity | null {
+export function duplicateEntity(id: number): TemplateEntity | null {
   const source = getEntityById(id);
   if (!source) return null;
 
-  let created!: SceneEntity;
+  let created!: TemplateEntity;
   _mutate((s) => {
     const newId = s.nextEntityId;
-    const copy: SceneEntity = {
+    const copy: TemplateEntity = {
       ...structuredClone(source),
       id: newId,
       name: `${source.name} (copy)`,
@@ -325,7 +348,7 @@ export function toggleProjection(): void {
 // ---------------------------------------------------------------------------
 
 /** Switch the active tool (select, move, rotate, scale). */
-export function setActiveTool(tool: SceneTool): void {
+export function setActiveTool(tool: TemplateTool): void {
   _mutate((s) => ({ ...s, activeTool: tool }));
 }
 
@@ -349,19 +372,19 @@ export function setGridSize(size: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Scene management
+// Template management
 // ---------------------------------------------------------------------------
 
-/** Reset to an empty scene. */
+/** Reset to an empty template. */
 export function newScene(): void {
   _resetState();
 }
 
-/** Populate scene entities from project scan results.
+/** Populate template entities from project scan results.
  *  Assigns random positions so they appear spread out in the viewport. */
 export function populateFromScan(infos: EntityInfo[]): void {
   _mutate((s) => {
-    const entities: SceneEntity[] = infos.map((info) => ({
+    const entities: TemplateEntity[] = infos.map((info) => ({
       ...info,
       position: {
         x: (Math.random() - 0.5) * 10,
@@ -490,7 +513,7 @@ export function removeComponent(entityId: number, componentName: string): void {
 // Used by the Tauri bridge for AI agent access.
 // ---------------------------------------------------------------------------
 
-export function dispatchSceneCommand(
+export function dispatchTemplateCommand(
   command: string,
   args: Record<string, unknown>,
 ): unknown {
@@ -565,7 +588,7 @@ export function dispatchSceneCommand(
       return { ok: true };
 
     case 'set_tool':
-      setActiveTool(args.tool as SceneTool);
+      setActiveTool(args.tool as TemplateTool);
       return { ok: true };
 
     case 'toggle_grid':
@@ -580,12 +603,12 @@ export function dispatchSceneCommand(
       toggleProjection();
       return { ok: true };
 
-    case 'new_scene':
+    case 'new_template':
       newScene();
       return { ok: true };
 
     case 'get_state':
-      return getSceneState();
+      return getTemplateState();
 
     case 'add_component':
       addComponent(args.id as number, args.component as string);
@@ -605,6 +628,6 @@ export function dispatchSceneCommand(
       return { ok: true };
 
     default:
-      return { error: `Unknown scene command: ${command}` };
+      return { error: `Unknown template command: ${command}` };
   }
 }

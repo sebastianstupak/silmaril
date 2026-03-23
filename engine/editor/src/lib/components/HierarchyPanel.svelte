@@ -10,7 +10,7 @@
     deleteEntity,
     duplicateEntity,
     renameEntity,
-  } from '$lib/scene/commands';
+  } from '$lib/template/commands';
   import { getActiveTemplatePath } from '$lib/stores/undo-history';
 
   let { entities = [], selectedId = null, onSelect }: {

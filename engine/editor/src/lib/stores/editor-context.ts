@@ -6,21 +6,21 @@
 
 import type { EntityInfo } from '$lib/api';
 import {
-  getSceneState,
+  getTemplateState,
   getSelectedEntity as _getSelectedEntity,
-  subscribeScene,
-  type SceneEntity,
-} from '$lib/scene/state';
-import { selectEntity, populateFromScan } from '$lib/scene/commands';
+  subscribeTemplate,
+  type TemplateEntity,
+} from '$lib/template/state';
+import { selectEntity, populateFromScan } from '$lib/template/commands';
 
 interface EditorContext {
   entities: EntityInfo[];
   selectedEntityId: number | null;
 }
 
-/** Read the editor context (derived from scene state). */
+/** Read the editor context (derived from template state). */
 export function getEditorContext(): EditorContext {
-  const s = getSceneState();
+  const s = getTemplateState();
   return {
     entities: s.entities,
     selectedEntityId: s.selectedEntityId,
@@ -39,15 +39,15 @@ export function setSelectedEntityId(id: number | null) {
 
 /** Get the id of the currently selected entity (or null). */
 export function getSelectedEntityId(): number | null {
-  return getSceneState().selectedEntityId;
+  return getTemplateState().selectedEntityId;
 }
 
-/** Get the currently selected entity from scene state. */
-export function getSelectedEntity(): SceneEntity | null {
+/** Get the currently selected entity from template state. */
+export function getSelectedEntity(): TemplateEntity | null {
   return _getSelectedEntity();
 }
 
-/** Subscribe to changes — delegates to scene state pub/sub. */
+/** Subscribe to changes — delegates to template state pub/sub. */
 export function subscribeContext(fn: () => void): () => void {
-  return subscribeScene(fn);
+  return subscribeTemplate(fn);
 }

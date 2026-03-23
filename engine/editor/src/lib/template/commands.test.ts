@@ -1,9 +1,9 @@
-// engine/editor/src/lib/scene/commands.test.ts
+// engine/editor/src/lib/template/commands.test.ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createEntity, addComponent, removeComponent, newScene } from './commands';
 import { getEntityById } from './state';
 
-// Reset scene state before each test
+// Reset template state before each test
 beforeEach(() => { newScene(); });
 
 describe('addComponent', () => {
