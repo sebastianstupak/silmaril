@@ -168,7 +168,7 @@ pub fn gizmo_hit_test(
         _ => crate::viewport::GizmoMode::Move,
     };
 
-    // --- 5. Test ray against X, Y, Z axis handles ---
+    // --- 5. Test ray against X, Y, Z axis handles using mode-appropriate geometry ---
     let axes = [
         (crate::viewport::GizmoAxis::X, Vec3::X),
         (crate::viewport::GizmoAxis::Y, Vec3::Y),
@@ -176,9 +176,35 @@ pub fn gizmo_hit_test(
     ];
 
     for (axis, axis_dir) in &axes {
-        let handle_end = entity_pos + *axis_dir * gizmo_scale;
-        let radius = gizmo_scale * 0.1;
-        if ray_capsule_intersects(ray_origin, ray_dir, entity_pos, handle_end, radius) {
+        let hit = match mode {
+            crate::viewport::GizmoMode::Move | crate::viewport::GizmoMode::Scale => {
+                // Shaft capsule from origin to 0.9 * gizmo_scale (covers tip cube/cone).
+                let handle_end = entity_pos + *axis_dir * gizmo_scale * 0.9;
+                let radius = gizmo_scale * 0.12;
+                ray_capsule_intersects(ray_origin, ray_dir, entity_pos, handle_end, radius)
+            }
+            crate::viewport::GizmoMode::Rotate => {
+                // Ring lies in the plane perpendicular to axis_dir at entity_pos.
+                // Find ray-plane intersection, then check distance from ring radius.
+                let ring_radius = gizmo_scale;       // matches RADIUS=1.0 in geometry
+                let hit_tolerance = gizmo_scale * 0.15;
+                let denom = ray_dir.dot(*axis_dir);
+                if denom.abs() < 1e-6 {
+                    false // ray parallel to ring plane
+                } else {
+                    let t = (entity_pos - ray_origin).dot(*axis_dir) / denom;
+                    if t < 0.0 {
+                        false // intersection behind camera
+                    } else {
+                        let hit_pt = ray_origin + ray_dir * t;
+                        let dist = (hit_pt - entity_pos).length();
+                        (dist - ring_radius).abs() <= hit_tolerance
+                    }
+                }
+            }
+        };
+
+        if hit {
             *viewport_state.drag_state.lock().ok()? = Some(DragState {
                 entity_id,
                 viewport_id,
@@ -192,12 +218,7 @@ pub fn gizmo_hit_test(
                 viewport_width: bounds.width.max(1) as f32,
             });
 
-            tracing::debug!(
-                entity_id,
-                axis = ?axis,
-                mode = ?mode,
-                "Gizmo hit"
-            );
+            tracing::debug!(entity_id, axis = ?axis, mode = ?mode, "Gizmo hit");
 
             let axis_str = match axis {
                 crate::viewport::GizmoAxis::X  => "x",
@@ -212,10 +233,7 @@ pub fn gizmo_hit_test(
                 crate::viewport::GizmoMode::Rotate => "rotate",
                 crate::viewport::GizmoMode::Scale  => "scale",
             };
-            return Some(serde_json::json!({
-                "axis": axis_str,
-                "mode": mode_str,
-            }));
+            return Some(serde_json::json!({ "axis": axis_str, "mode": mode_str }));
         }
     }
 
@@ -289,10 +307,13 @@ pub fn gizmo_drag(
         }
 
         crate::viewport::GizmoMode::Rotate => {
-            let angle = (dx / 300.0) * std::f32::consts::TAU;
+            // dx - dy gives consistent rotation feel across all ring orientations:
+            // horizontal drag rotates Y rings, vertical drag rotates X rings, both combine for Z.
+            let angle = ((dx - dy) / 300.0) * std::f32::consts::TAU;
             let rotation_delta = Quat::from_axis_angle(axis_vec, angle);
             let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
             if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
+                // World-space rotation (rings are world-aligned, not local).
                 t.rotation = (rotation_delta * t.rotation).normalize();
                 let pos = [t.position.x, t.position.y, t.position.z];
                 let rot = [t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w];
@@ -312,17 +333,23 @@ pub fn gizmo_drag(
         }
 
         crate::viewport::GizmoMode::Scale => {
-            let factor = 1.0 + dx / 200.0;
+            // Y handle responds to vertical drag (-dy), X/Z to horizontal (dx).
+            let screen_delta = match axis {
+                crate::viewport::GizmoAxis::Y => -dy,
+                _ => dx,
+            };
+            // Clamp factor to prevent negative or zero scale.
+            let factor = (1.0_f32 + screen_delta / 200.0).clamp(0.01, 100.0);
             let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
             if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
                 match axis {
-                    crate::viewport::GizmoAxis::X => t.scale.x *= factor,
-                    crate::viewport::GizmoAxis::Y => t.scale.y *= factor,
-                    crate::viewport::GizmoAxis::Z => t.scale.z *= factor,
+                    crate::viewport::GizmoAxis::X => t.scale.x = (t.scale.x * factor).max(0.001),
+                    crate::viewport::GizmoAxis::Y => t.scale.y = (t.scale.y * factor).max(0.001),
+                    crate::viewport::GizmoAxis::Z => t.scale.z = (t.scale.z * factor).max(0.001),
                     _ => {
-                        t.scale.x *= factor;
-                        t.scale.y *= factor;
-                        t.scale.z *= factor;
+                        t.scale.x = (t.scale.x * factor).max(0.001);
+                        t.scale.y = (t.scale.y * factor).max(0.001);
+                        t.scale.z = (t.scale.z * factor).max(0.001);
                     }
                 }
                 let pos = [t.position.x, t.position.y, t.position.z];
@@ -531,16 +558,42 @@ pub fn gizmo_hover_test(
     // Unproject screen position to world-space ray.
     let (ray_origin, ray_dir) = unproject_screen(screen_x, screen_y, &bounds, view, proj);
 
-    // Test each axis handle (same geometry as gizmo_hit_test, no DragState written).
-    let axes: [(Vec3, &str); 3] = [
-        (Vec3::X, "x"),
-        (Vec3::Y, "y"),
-        (Vec3::Z, "z"),
-    ];
+    // Read current gizmo mode so hover geometry matches rendered geometry.
+    let gizmo_mode_u8 = viewport_state.gizmo_mode.load(std::sync::atomic::Ordering::Relaxed);
+    let mode = match gizmo_mode_u8 {
+        1 => crate::viewport::GizmoMode::Rotate,
+        2 => crate::viewport::GizmoMode::Scale,
+        _ => crate::viewport::GizmoMode::Move,
+    };
+
+    // Test each axis handle using mode-appropriate geometry (no DragState written).
+    let axes: [(Vec3, &str); 3] = [(Vec3::X, "x"), (Vec3::Y, "y"), (Vec3::Z, "z")];
     for (axis_dir, label) in &axes {
-        let handle_end = entity_pos + *axis_dir * gizmo_scale;
-        let radius = gizmo_scale * 0.1;
-        if ray_capsule_intersects(ray_origin, ray_dir, entity_pos, handle_end, radius) {
+        let hit = match mode {
+            crate::viewport::GizmoMode::Move | crate::viewport::GizmoMode::Scale => {
+                let handle_end = entity_pos + *axis_dir * gizmo_scale * 0.9;
+                let radius = gizmo_scale * 0.12;
+                ray_capsule_intersects(ray_origin, ray_dir, entity_pos, handle_end, radius)
+            }
+            crate::viewport::GizmoMode::Rotate => {
+                let ring_radius = gizmo_scale;
+                let hit_tolerance = gizmo_scale * 0.15;
+                let denom = ray_dir.dot(*axis_dir);
+                if denom.abs() < 1e-6 {
+                    false
+                } else {
+                    let t = (entity_pos - ray_origin).dot(*axis_dir) / denom;
+                    if t < 0.0 {
+                        false
+                    } else {
+                        let hit_pt = ray_origin + ray_dir * t;
+                        let dist = (hit_pt - entity_pos).length();
+                        (dist - ring_radius).abs() <= hit_tolerance
+                    }
+                }
+            }
+        };
+        if hit {
             return Ok(Some(label.to_string()));
         }
     }

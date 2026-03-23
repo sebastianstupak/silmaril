@@ -700,7 +700,7 @@ mod imp {
                                 .polygon_mode(vk::PolygonMode::FILL)
                                 .cull_mode(vk::CullModeFlags::NONE)
                                 .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-                                .line_width(1.0),
+                                .line_width(2.0),
                         )
                         .multisample_state(
                             &vk::PipelineMultisampleStateCreateInfo::default()

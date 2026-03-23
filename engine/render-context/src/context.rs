@@ -840,7 +840,7 @@ fn create_logical_device(
     #[cfg(target_os = "macos")]
     extension_names.push(vk::KHR_PORTABILITY_SUBSET_NAME.as_ptr());
 
-    let device_features = vk::PhysicalDeviceFeatures::default();
+    let device_features = vk::PhysicalDeviceFeatures::default().wide_lines(true);
 
     let create_info = vk::DeviceCreateInfo::default()
         .queue_create_infos(&queue_create_infos)
