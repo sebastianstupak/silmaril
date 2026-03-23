@@ -94,6 +94,24 @@
     for (const [id, inst] of xtermInstances) {
       inst.el.style.display = id === termState.activeTabId ? 'block' : 'none';
     }
+    // Re-fit the newly-visible terminal. fit.fit() reads offsetWidth/offsetHeight,
+    // which returns 0 while display:none — so the initial fit() in createTerminal()
+    // always produces 0×0 cols/rows. Calling it again once the element is visible
+    // gives xterm the correct dimensions.
+    const activeId = termState.activeTabId;
+    if (activeId) {
+      const inst = xtermInstances.get(activeId);
+      if (inst) {
+        try {
+          inst.fit.fit();
+          invoke('terminal_resize', {
+            tabId: activeId,
+            cols: inst.term.cols,
+            rows: inst.term.rows,
+          }).catch(() => {});
+        } catch { /* ignore fit errors on hidden/unmeasurable elements */ }
+      }
+    }
   }
 
   function fitAll(): void {

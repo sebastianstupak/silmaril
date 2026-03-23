@@ -23,6 +23,7 @@
   let unsubscribe: (() => void) | null = null;
   let unlistenData: (() => void) | null = null;
   let unlistenExit: (() => void) | null = null;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
 
   async function handleRun(command: string, args: string[]): Promise<void> {
     const label = `${command} ${args.join(' ')}`;
@@ -50,14 +51,19 @@
 
     if (!isTauri) return;
 
-    // Check project is loaded
-    try {
-      const editorState = await invoke<{ project_path?: string }>('get_editor_state');
-      // hasProject is set once on mount. If a project is opened after mount,
-      // the panel must be remounted to pick up the change. This is acceptable
-      // because the docking system remounts panels when layout changes.
-      hasProject = !!editorState.project_path;
-    } catch { /* leave hasProject false */ }
+    // Check project on mount and keep polling so the panel reacts
+    // when a project is opened after the panel was already mounted.
+    async function refreshHasProject(): Promise<void> {
+      try {
+        const editorState = await invoke<{ project_path?: string }>('get_editor_state');
+        hasProject = !!editorState.project_path;
+      } catch { /* leave hasProject unchanged */ }
+    }
+
+    await refreshHasProject();
+
+    // Re-check every 2 seconds so opening a project shows the panel without remounting.
+    pollInterval = setInterval(refreshHasProject, 2000);
 
     unlistenData = await listen<{ line: string; stream: 'stdout' | 'stderr' }>(
       'output-data',
@@ -74,6 +80,7 @@
     unsubscribe?.();
     unlistenData?.();
     unlistenExit?.();
+    if (pollInterval !== null) clearInterval(pollInterval);
     // Note: does NOT cancel running process — build continues in background.
   });
 </script>
