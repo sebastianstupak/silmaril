@@ -1450,7 +1450,7 @@ pub fn assign_mesh(
 ///
 /// Walks the parent chain of `new_parent_id` upward; if it reaches
 /// `entity_id`, a cycle would result.
-pub fn would_create_cycle(
+pub(crate) fn would_create_cycle(
     world: &engine_core::World,
     entity_id: u32,
     new_parent_id: u32,

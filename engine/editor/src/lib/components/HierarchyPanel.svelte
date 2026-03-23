@@ -269,7 +269,10 @@
           ondragstart={(e) => startEntityDrag(e, entity.id)}
           ondragover={(e) => { onDragOver(e, entity.id); onEntityDragOver(e, entity); }}
           ondragleave={() => { onDragLeave(entity.id); reparentTargetId = null; }}
-          ondrop={(e) => { onDropMesh(e, entity.id); onEntityDrop(e, entity.id); }}
+          ondrop={(e) => {
+            onDropMesh(e, entity.id);      // handles mesh drags; no-op if MIME is not mesh
+            onEntityDrop(e, entity.id);    // handles entity drags; no-op if MIME is not entity
+          }}
           ondragend={() => { draggedEntityId = null; reparentTargetId = null; }}
         >
           <!-- Expand/collapse chevron -->

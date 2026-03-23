@@ -25,7 +25,7 @@ impl Component for Health {}
 /// let child  = world.spawn();
 /// world.add(child, Parent(parent.id()));
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Parent(pub u32);
 
 impl Component for Parent {}
