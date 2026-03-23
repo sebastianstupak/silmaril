@@ -620,7 +620,15 @@
                 class="tool-btn"
                 class:active={activeTool === tool.key}
                 aria-label={tool.label}
-                onclick={(e: MouseEvent) => { e.stopPropagation(); activeTool = tool.key; cursor = cursorForTool(tool.key); }}
+                onclick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  activeTool = tool.key;
+                  cursor = cursorForTool(tool.key);
+                  if (tool.key === 'move' || tool.key === 'rotate' || tool.key === 'scale') {
+                    gizmoMode = tool.key;
+                    setGizmoMode(tool.key);
+                  }
+                }}
               >
                 <tool.Icon width={14} height={14} />
               </button>
