@@ -11,6 +11,7 @@
   import { hydrateRecentItems, addRecentItem, subscribeRecent, getRecentItems, type RecentItem } from './lib/stores/recent-items';
   import { setEntities, setSelectedEntityId } from './lib/stores/editor-context';
   import { setAssets, clearAssets, type AssetEntry } from './lib/stores/assets';
+  import { loadTree } from './lib/stores/file-explorer';
   import { scanAssets } from './lib/api';
   import { logInfo, logWarn } from './lib/stores/console';
   import { undo, redo, templateUndo, templateRedo, getCanUndo, getCanRedo, getViewportFocused, subscribeUndoHistory } from './lib/stores/undo-history';
@@ -103,6 +104,7 @@
     try {
       editorState = await openProject(path);
       addRecentItem({ label: editorState.project_name ?? path, path, itemType: 'project' });
+      await loadTree(path);
       const entities = await scanProjectEntities(path);
       setEntities(entities);
       setSelectedEntityId(null);
