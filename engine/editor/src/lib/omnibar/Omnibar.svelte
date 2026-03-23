@@ -334,7 +334,7 @@
     top: calc(var(--titlebar-height, 32px) + 2px);
     left: 50%;
     transform: translateX(-50%);
-    width: clamp(360px, 40vw, 580px);
+    width: clamp(400px, 55vw, 780px);
     z-index: 10000;
     background: var(--color-bgPanel, #1e1e2e);
     border: 1px solid var(--color-accent, #89b4fa);

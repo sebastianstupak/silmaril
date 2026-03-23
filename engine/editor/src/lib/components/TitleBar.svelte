@@ -742,6 +742,7 @@
   .titlebar-right {
     display: flex;
     align-items: center;
+    align-self: stretch;
     justify-self: end;
     gap: 1px;
     padding-right: 0;
@@ -1063,7 +1064,6 @@
   }
   .wc-btn:hover { background: rgba(255,255,255,0.08); color: var(--color-textMuted, #999); }
   .wc-close:hover { background: #c42b1c; color: #fff; }
-  .wc-minimize { align-items: flex-end; padding-bottom: 10px; }
 
   /* ── Context menu ────────────────────────────────────────────────────────── */
   .context-menu {

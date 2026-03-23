@@ -941,8 +941,8 @@ pub fn viewport_set_projection(
 /// Pass `None` to deselect.
 ///
 /// Also ensures the entity exists in the ECS world (the frontend creates
-/// entities optimistically without always going through Tauri IPC) and focuses
-/// every active viewport camera on the entity's Transform position.
+/// entities optimistically without always going through Tauri IPC). Does NOT
+/// move the camera — use `focus_entity_animated` for explicit camera fly-to.
 #[tauri::command]
 pub fn set_selected_entity(
     entity_id: Option<u64>,
@@ -960,25 +960,10 @@ pub fn set_selected_entity(
         let entity = engine_core::Entity::new(id as u32, 0);
 
         // Ensure entity exists in the ECS world.
-        let pos = {
-            let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
-            if !world.is_alive(entity) {
-                world.spawn_with_id(entity);
-                world.add(entity, engine_core::Transform::default());
-            }
-            world
-                .get::<engine_core::Transform>(entity)
-                .map(|t| [t.position.x, t.position.y, t.position.z])
-                .unwrap_or([0.0, 0.0, 0.0])
-        };
-
-        // Focus every active viewport camera to the entity's position.
-        let registry = viewport_state.registry.lock().map_err(|e| e.to_string())?;
-        let ids: Vec<String> = registry.hwnd_by_id.keys().cloned().collect();
-        for vid in ids {
-            if let Some(vp) = registry.get_for_id(&vid) {
-                vp.camera_focus(&vid, pos);
-            }
+        let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
+        if !world.is_alive(entity) {
+            world.spawn_with_id(entity);
+            world.add(entity, engine_core::Transform::default());
         }
     }
 
