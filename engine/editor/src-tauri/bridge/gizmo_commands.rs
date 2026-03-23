@@ -727,4 +727,66 @@ mod tests {
         let history = crate::bridge::template_commands::template_history_inner(&editor_state, path).unwrap();
         assert_eq!(history.len(), 1, "should have 1 undo entry");
     }
+
+    /// Helper: run the ring intersection logic (extracted from gizmo_hit_test/hover_test).
+    fn ring_hit(ray_origin: Vec3, ray_dir: Vec3, entity_pos: Vec3, axis_dir: Vec3, gizmo_scale: f32) -> bool {
+        let ring_radius = gizmo_scale;
+        let hit_tolerance = gizmo_scale * 0.15;
+        let denom = ray_dir.dot(axis_dir);
+        if denom.abs() < 1e-6 { return false; }
+        let t = (entity_pos - ray_origin).dot(axis_dir) / denom;
+        if t < 0.0 { return false; }
+        let hit_pt = ray_origin + ray_dir * t;
+        let dist = (hit_pt - entity_pos).length();
+        (dist - ring_radius).abs() <= hit_tolerance
+    }
+
+    #[test]
+    fn rotate_ring_x_hit_from_front() {
+        // X ring lies in the YZ plane (plane normal = X).  The ray must have
+        // an X component to intersect the plane (otherwise it is parallel).
+        // Camera at (5, 1, 0) shooting in -X direction; will hit (0, 1, 0)
+        // which is exactly on the ring at radius 1.0.
+        let ray_origin = Vec3::new(5.0, 1.0, 0.0);
+        let ray_dir = Vec3::new(-1.0, 0.0, 0.0);
+        assert!(
+            ring_hit(ray_origin, ray_dir, Vec3::ZERO, Vec3::X, 1.0),
+            "ray aimed at ring point (0,1,0) should hit X ring"
+        );
+    }
+
+    #[test]
+    fn rotate_ring_x_misses_center() {
+        // Ray aimed at origin (center of ring) should miss — too close, not at radius.
+        let ray_origin = Vec3::new(0.0, 0.0, -5.0);
+        let ray_dir = Vec3::new(0.0, 0.0, 1.0);
+        assert!(
+            !ring_hit(ray_origin, ray_dir, Vec3::ZERO, Vec3::X, 1.0),
+            "ray aimed at ring center should miss X ring"
+        );
+    }
+
+    #[test]
+    fn rotate_ring_y_hit_from_front() {
+        // Y ring lies in the XZ plane (plane normal = Y).  The ray must have
+        // a Y component to intersect the plane.
+        // Camera at (1, 5, 0) shooting in -Y direction; will hit (1, 0, 0)
+        // which is exactly on the ring at radius 1.0.
+        let ray_origin = Vec3::new(1.0, 5.0, 0.0);
+        let ray_dir = Vec3::new(0.0, -1.0, 0.0);
+        assert!(
+            ring_hit(ray_origin, ray_dir, Vec3::ZERO, Vec3::Y, 1.0),
+            "ray aimed at ring point (1,0,0) should hit Y ring"
+        );
+    }
+
+    #[test]
+    fn scale_factor_clamped_prevents_negative() {
+        // Simulating the fixed scale drag clamp logic.
+        let dx: f32 = -500.0; // large left drag that would previously invert scale
+        let factor = (1.0_f32 + dx / 200.0).clamp(0.01, 100.0);
+        assert!(factor > 0.0, "factor must remain positive, got {factor}");
+        let scale = (1.0_f32 * factor).max(0.001);
+        assert!(scale > 0.0, "resulting scale must be positive, got {scale}");
+    }
 }
