@@ -190,6 +190,8 @@
             // Sync grid visibility and projection to Rust on mount — restores persisted state
             viewportSetGridVisible(viewportId, gridVisible);
             viewportSetProjection(viewportId, projection === 'ortho');
+            // Sync gizmo mode — default activeTool is 'select' so hide handles.
+            setGizmoMode(activeTool === 'select' ? 'select' : (activeTool as 'move' | 'rotate' | 'scale'));
           }).catch((_e) => {
             loading = false;
           });
@@ -341,9 +343,11 @@
     // First try gizmo hit test — if a handle is hit, gizmo drag takes priority.
     if (event.button === 0 && tool !== 'select' && selectedEntityId != null) {
       event.preventDefault();
+      // Convert CSS pixels → physical pixels (required by Rust's bounds-based unproject).
+      const sf = window.devicePixelRatio || 1;
       let hit = null;
       try {
-        hit = await gizmoHitTest(viewportId, event.clientX, event.clientY, selectedEntityId);
+        hit = await gizmoHitTest(viewportId, event.clientX * sf, event.clientY * sf, selectedEntityId);
       } catch (err) {
         console.error('gizmo_hit_test failed:', err);
       }
@@ -376,7 +380,9 @@
     // Gizmo drag takes priority over camera/entity drag.
     if (isDraggingGizmo) {
       try {
-        await gizmoDrag(viewportId, event.clientX, event.clientY);
+        const sf = window.devicePixelRatio || 1;
+        const snapGridSize = snapToGrid ? 0.5 : 0;
+        await gizmoDrag(viewportId, event.clientX * sf, event.clientY * sf, snapGridSize);
       } catch (err) {
         console.error('gizmo_drag failed:', err);
         isDraggingGizmo = false;  // clear on error to prevent stuck state
@@ -454,7 +460,8 @@
     // Hover test — update hovered axis for visual highlight (non-drag only)
     if (!isDraggingGizmo && !isDragging && isTauri) {
       try {
-        const hit = await gizmoHoverTest(viewportId, event.clientX, event.clientY);
+        const sf = window.devicePixelRatio || 1;
+        const hit = await gizmoHoverTest(viewportId, event.clientX * sf, event.clientY * sf);
         await setHoveredGizmoAxis(hit ?? null);
       } catch {
         // Non-critical — hover state may be stale for one frame; silently ignore errors.
@@ -508,8 +515,10 @@
       event.preventDefault();
       activeTool = toolKey;
       cursor = cursorForTool(toolKey);
-      // Sync gizmo mode for manipulation tools
-      if (toolKey === 'move') {
+      // Sync gizmo mode for manipulation tools (select=none hides handles).
+      if (toolKey === 'select') {
+        setGizmoMode('select');
+      } else if (toolKey === 'move') {
         gizmoMode = 'move';
         setGizmoMode('move');
       } else if (toolKey === 'rotate') {
@@ -624,7 +633,9 @@
                   e.stopPropagation();
                   activeTool = tool.key;
                   cursor = cursorForTool(tool.key);
-                  if (tool.key === 'move' || tool.key === 'rotate' || tool.key === 'scale') {
+                  if (tool.key === 'select') {
+                    setGizmoMode('select');
+                  } else if (tool.key === 'move' || tool.key === 'rotate' || tool.key === 'scale') {
                     gizmoMode = tool.key;
                     setGizmoMode(tool.key);
                   }

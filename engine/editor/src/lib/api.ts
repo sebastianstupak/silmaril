@@ -328,14 +328,16 @@ export async function gizmoHitTest(
   });
 }
 
-/** Apply one mouse-move step to the active gizmo drag. */
+/** Apply one mouse-move step to the active gizmo drag.
+ *  snapSize > 0 snaps the position to the nearest multiple of snapSize (world units). */
 export async function gizmoDrag(
   viewportId: string,
   screenX: number,
   screenY: number,
+  snapSize?: number,
 ): Promise<void> {
   if (!isTauri) return;
-  return tauriInvoke<void>('gizmo_drag', { viewportId, screenX, screenY });
+  return tauriInvoke<void>('gizmo_drag', { viewportId, screenX, screenY, snapSize: snapSize ?? 0 });
 }
 
 /** Finalise an active gizmo drag: clears drag state and pushes undo entry. */
@@ -355,8 +357,9 @@ export async function createEntityChild(parentId: number, name?: string): Promis
   return tauriInvoke<number>('create_entity_child', { parentId, name });
 }
 
-/** Set the active gizmo mode. Accepted values: "move", "rotate", "scale". */
-export async function setGizmoMode(mode: 'move' | 'rotate' | 'scale'): Promise<void> {
+/** Set the active gizmo mode.
+ *  'select'/'none' hides all gizmo handles (select tool). */
+export async function setGizmoMode(mode: 'move' | 'rotate' | 'scale' | 'select' | 'none'): Promise<void> {
   if (!isTauri) return;
   return tauriInvoke<void>('set_gizmo_mode', { mode });
 }

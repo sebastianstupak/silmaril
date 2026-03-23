@@ -165,6 +165,7 @@ pub fn gizmo_hit_test(
     let mode = match gizmo_mode_u8 {
         1 => crate::viewport::GizmoMode::Rotate,
         2 => crate::viewport::GizmoMode::Scale,
+        3 => return None, // select/none — no gizmo handles active
         _ => crate::viewport::GizmoMode::Move,
     };
 
@@ -202,6 +203,7 @@ pub fn gizmo_hit_test(
                     }
                 }
             }
+            crate::viewport::GizmoMode::None => false,
         };
 
         if hit {
@@ -232,6 +234,7 @@ pub fn gizmo_hit_test(
                 crate::viewport::GizmoMode::Move   => "move",
                 crate::viewport::GizmoMode::Rotate => "rotate",
                 crate::viewport::GizmoMode::Scale  => "scale",
+                crate::viewport::GizmoMode::None   => "none",
             };
             return Some(serde_json::json!({ "axis": axis_str, "mode": mode_str }));
         }
@@ -249,10 +252,12 @@ pub fn gizmo_drag(
     viewport_id: String,
     screen_x: f32,
     screen_y: f32,
+    snap_size: Option<f32>,
     viewport_state: tauri::State<'_, super::commands::NativeViewportState>,
     world_state: tauri::State<'_, crate::state::SceneWorldState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
+    let snap_size = snap_size.unwrap_or(0.0);
     use tauri::Emitter;
 
     let mut drag_lock = viewport_state.drag_state.lock().map_err(|e| e.to_string())?;
@@ -289,6 +294,12 @@ pub fn gizmo_drag(
             let mut world = world_state.inner().0.write().map_err(|e| e.to_string())?;
             if let Some(t) = world.get_mut::<engine_core::Transform>(entity) {
                 t.position += delta;
+                // Snap to grid when enabled.
+                if snap_size > 0.0 {
+                    t.position.x = (t.position.x / snap_size).round() * snap_size;
+                    t.position.y = (t.position.y / snap_size).round() * snap_size;
+                    t.position.z = (t.position.z / snap_size).round() * snap_size;
+                }
                 let pos = [t.position.x, t.position.y, t.position.z];
                 let rot = [t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w];
                 let scl = [t.scale.x, t.scale.y, t.scale.z];
@@ -331,6 +342,8 @@ pub fn gizmo_drag(
                 .map_err(|e| e.to_string())?;
             }
         }
+
+        crate::viewport::GizmoMode::None => {}
 
         crate::viewport::GizmoMode::Scale => {
             // Y handle responds to vertical drag (-dy), X/Z to horizontal (dx).
@@ -474,6 +487,7 @@ pub fn set_gizmo_mode(
         "move" => 0u8,
         "rotate" => 1u8,
         "scale" => 2u8,
+        "select" | "none" => 3u8,
         other => return Err(format!("unknown gizmo mode: {other}")),
     };
     viewport_state.gizmo_mode.store(m, std::sync::atomic::Ordering::Relaxed);
@@ -563,6 +577,7 @@ pub fn gizmo_hover_test(
     let mode = match gizmo_mode_u8 {
         1 => crate::viewport::GizmoMode::Rotate,
         2 => crate::viewport::GizmoMode::Scale,
+        3 => return Ok(None), // select/none — no gizmo handles to hover
         _ => crate::viewport::GizmoMode::Move,
     };
 
@@ -592,6 +607,7 @@ pub fn gizmo_hover_test(
                     }
                 }
             }
+            crate::viewport::GizmoMode::None => false,
         };
         if hit {
             return Ok(Some(label.to_string()));

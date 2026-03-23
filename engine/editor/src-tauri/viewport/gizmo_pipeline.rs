@@ -43,6 +43,8 @@ mod imp {
         Move,
         Rotate,
         Scale,
+        /// Select tool — gizmo handles are hidden entirely.
+        None,
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -509,6 +511,11 @@ mod imp {
                     entity.id() == id as u32
                 });
                 if is_selected {
+                    // Select mode (None) hides gizmo entirely.
+                    if mode == GizmoMode::None {
+                        continue;
+                    }
+
                     // ── Crosshair (selected entity only) ─────────────────
                     // X axis — red
                     // Vertex buffer layout: X0,X1,Y0,Y1,Z0,Z1 (2 verts each).
@@ -566,6 +573,7 @@ mod imp {
                             self.draw_buf(cmd, device, &self.scale_y_buf, view_proj, origin.into(), axis_color(GizmoAxis::Y, hover_raw == 2), scale, 0, self.scale_y_count);
                             self.draw_buf(cmd, device, &self.scale_z_buf, view_proj, origin.into(), axis_color(GizmoAxis::Z, hover_raw == 3), scale, 0, self.scale_z_count);
                         }
+                        GizmoMode::None => { /* already handled by continue above */ }
                     }
                 }
             }
@@ -700,7 +708,7 @@ mod imp {
                                 .polygon_mode(vk::PolygonMode::FILL)
                                 .cull_mode(vk::CullModeFlags::NONE)
                                 .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-                                .line_width(2.0),
+                                .line_width(3.0),
                         )
                         .multisample_state(
                             &vk::PipelineMultisampleStateCreateInfo::default()
@@ -994,6 +1002,11 @@ mod imp {
                     continue;
                 }
 
+                // Select mode hides gizmo entirely.
+                if mode == GizmoMode::None {
+                    continue;
+                }
+
                 let origin = transform.position;
                 let dist = (camera_pos - origin).length().max(0.1);
                 let scale = dist * 0.15;
@@ -1036,6 +1049,7 @@ mod imp {
                     GizmoMode::Rotate => {
                         // Rotate mode uses rings (lines) only — no solid tips.
                     }
+                    GizmoMode::None => { /* already handled by continue above */ }
                 }
             }
         }
@@ -1286,6 +1300,8 @@ mod portable {
         Move,
         Rotate,
         Scale,
+        /// Select tool — gizmo handles are hidden entirely.
+        None,
     }
 
     /// One vertex in gizmo-local space.

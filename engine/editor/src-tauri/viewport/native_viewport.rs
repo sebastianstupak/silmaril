@@ -1145,6 +1145,7 @@ void main() {
             let gizmo_mode_val = match gizmo_mode.load(std::sync::atomic::Ordering::Relaxed) {
                 1 => crate::viewport::gizmo_pipeline::GizmoMode::Rotate,
                 2 => crate::viewport::gizmo_pipeline::GizmoMode::Scale,
+                3 => crate::viewport::gizmo_pipeline::GizmoMode::None,
                 _ => crate::viewport::gizmo_pipeline::GizmoMode::Move,
             };
             if let Err(e) = renderer.render_frame(&viewports, &world, selected_id, gizmo_mode_val, &asset_manager) {
