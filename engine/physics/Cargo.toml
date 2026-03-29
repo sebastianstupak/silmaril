@@ -34,7 +34,7 @@ debug-render = ["dep:engine-renderer"]
 engine-build-utils = { path = "../build-utils" }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 serde_yaml = "0.9"
 bincode = "1.3"
 engine-macros = { path = "../macros" }

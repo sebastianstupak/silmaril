@@ -33,7 +33,7 @@ default = []
 backtrace = ["engine-core/backtrace"]
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 mockito = "1.2"
 tokio-test = "0.4"
 

@@ -44,7 +44,7 @@ png = "0.17"
 image = "0.25"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 proptest = "1.0"
 tracing-subscriber = "0.3"
 tempfile = "3.8"
