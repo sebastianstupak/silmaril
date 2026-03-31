@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-rapier3d = { version = "0.18", features = ["parallel", "simd-stable"] }
+rapier3d = { version = "0.32", features = ["parallel", "simd-stable"] }
 engine-core = { path = "../core" }
 engine-math = { path = "../math", features = ["serde", "simd"] }
 engine-macros = { path = "../macros" }
