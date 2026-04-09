@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-meshopt = "0.2"
+meshopt = "0.6"
 engine-core = { path = "../core" }
 glam = { workspace = true }
 
