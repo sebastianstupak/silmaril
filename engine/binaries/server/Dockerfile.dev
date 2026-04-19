@@ -1,6 +1,6 @@
 # Development Dockerfile for Server
 # Hot-reload enabled with cargo-watch
-FROM rust:1.75-bookworm
+FROM rust:1.95-bookworm
 
 # Install development tools
 RUN cargo install cargo-watch

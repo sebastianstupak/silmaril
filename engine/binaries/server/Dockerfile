@@ -1,6 +1,6 @@
 # Multi-stage build for server binary
 # Target: <50MB image size
-FROM rust:1.75-slim as builder
+FROM rust:1.95-slim as builder
 
 # Install only essential build dependencies
 RUN apt-get update && apt-get install -y \
